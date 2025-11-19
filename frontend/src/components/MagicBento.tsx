@@ -63,7 +63,7 @@ export const ParticleCard: React.FC<{
 }) => {
 	const cardRef = useRef<HTMLDivElement | null>(null);
 	const particlesRef = useRef<HTMLElement[]>([]);
-	const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
+	const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
 	const isHoveredRef = useRef(false);
 	const memoizedParticles = useRef<HTMLElement[]>([]);
 	const particlesInitialized = useRef(false);
