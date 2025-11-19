@@ -6,6 +6,10 @@ export default defineConfig({
 	server: {
 		port: 5173,
 	},
-	base: process.env.VITE_BASE || "/",
+	// Auto‑detect base path on GitHub Actions → Pages
+	base:
+		(process.env.GITHUB_REPOSITORY && `/${process.env.GITHUB_REPOSITORY.split("/").pop()}/`) ||
+		process.env.VITE_BASE ||
+		"/",
 })
 
