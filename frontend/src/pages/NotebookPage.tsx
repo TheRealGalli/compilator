@@ -5,7 +5,6 @@ import TemplateSelector from "../components/TemplateSelector";
 import { uploadAndExtract, compileDocument } from "../lib/api";
 import Folder from "../components/Folder";
 import Modal from "../components/Modal";
-import GooeyNav from "../components/GooeyNav";
 
 export default function NotebookPage() {
 	const [template, setTemplate] = React.useState<ExtractedDoc | null>(null);
@@ -281,13 +280,37 @@ export default function NotebookPage() {
 								const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "guardrails.json"; a.click(); URL.revokeObjectURL(a.href);
 							}}>Esporta</button>
 						</div>
-						<div className="gooey-wrapper">
-							<GooeyNav
-								items={guardrailBlocks.map((g) => ({ label: g }))}
-								onSelect={(_i: number, item: any) => {
-									setSelectedGuardrails((prev) => (prev.includes(item.label) ? prev : [...prev, item.label]));
-								}}
-							/>
+						{/* Blocchi standard senza animazione */}
+						<div
+							style={{
+								display: "flex",
+								flexWrap: "wrap",
+								gap: 8,
+								marginTop: 6,
+							}}
+						>
+							{guardrailBlocks.map((g) => {
+								const selected = selectedGuardrails.includes(g);
+								return (
+									<button
+										key={g}
+										className="btn"
+										onClick={() => {
+											setSelectedGuardrails((prev) =>
+												prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
+											);
+										}}
+										style={{
+											background: selected ? "rgba(34,197,94,0.18)" : undefined,
+											color: selected ? "#000" : undefined,
+											borderColor: selected ? "rgba(34,197,94,0.5)" : undefined,
+										}}
+										aria-pressed={selected}
+									>
+										{g}
+									</button>
+								);
+							})}
 						</div>
 						{selectedGuardrails.length ? (
 							<div style={{ marginTop: 10 }} className="doc-list">
