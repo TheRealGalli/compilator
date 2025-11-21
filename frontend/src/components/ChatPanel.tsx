@@ -7,13 +7,24 @@ type Message = { role: "user" | "assistant"; text: string };
 export default function ChatPanel({
 	mode,
 	docsForChat,
+	previewTokens,
 }: {
 	mode: "analyze" | "compile";
 	docsForChat: ExtractedDoc[];
+	previewTokens?: number; // es. 2000 per anteprima tipo NotebookLM
 }) {
 	const [messages, setMessages] = React.useState<Message[]>([]);
 	const [input, setInput] = React.useState("");
 	const [loading, setLoading] = React.useState(false);
+
+	function truncateToTokens(text: string, maxTokens: number): string {
+		if (!maxTokens || maxTokens <= 0) return text;
+		// stima semplice: token = parole separate da spazi/punteggiatura
+		const tokens = text.split(/\s+/g);
+		if (tokens.length <= maxTokens) return text;
+		const trimmed = tokens.slice(0, maxTokens).join(" ");
+		return trimmed + "\n\n[Anteprima 2K token – contenuto troncato]";
+	}
 
 	async function send() {
 		if (!input.trim() || !docsForChat.length || mode !== "analyze") return;
@@ -26,8 +37,14 @@ export default function ChatPanel({
 				task: userMsg.text,
 				documents: docsForChat.map((d) => ({ name: d.name, text: d.text })),
 			});
-			const assistant: Message = { role: "assistant", text: res.resultText };
+			const preview = previewTokens ? truncateToTokens(res.resultText, previewTokens) : res.resultText;
+			const assistant: Message = { role: "assistant", text: preview };
 			setMessages((m) => [...m, assistant]);
+		} catch (err: any) {
+			const msg =
+				"Errore durante l'analisi. Controlla la connessione o le variabili VITE_SERVER_URL/CORS.\n" +
+				(err?.message || String(err));
+			setMessages((m) => [...m, { role: "assistant", text: msg }]);
 		} finally {
 			setLoading(false);
 		}
