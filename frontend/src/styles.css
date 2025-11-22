@@ -462,6 +462,12 @@ p {
 	border-radius: 4px;
 }
 
+/* Nascondi ogni eventuale anteprima testo nelle card documenti */
+.doc-list .doc-card pre,
+.doc-list .doc-text {
+	display: none !important;
+}
+
 /* Animations */
 @keyframes slideIn {
 	from {
