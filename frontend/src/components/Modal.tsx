@@ -11,7 +11,7 @@ type ModalProps = {
 export default function Modal({ title, open, onClose, children, width = 720 }: ModalProps) {
 	if (!open) return null;
 	return (
-		<div className="modal-overlay" onClick={onClose}>
+		<div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
 			<div
 				className="modal-content"
 				style={{ width }}
@@ -21,7 +21,7 @@ export default function Modal({ title, open, onClose, children, width = 720 }: M
 			>
 				<div className="modal-header">
 					<div className="modal-title">{title}</div>
-					<button className="btn" onClick={onClose}>
+					<button className="btn" onClick={onClose} aria-label="Chiudi modale">
 						Chiudi
 					</button>
 				</div>

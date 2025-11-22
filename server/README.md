@@ -44,6 +44,18 @@ Di default usa OpenAI. Per usare Gemini (Vertex AI) su GCP:
    In Cloud Run usa il service account del servizio con permesso Vertex AI User.
    In locale, `gcloud auth application-default login` oppure set di credenziali con GOOGLE_APPLICATION_CREDENTIALS.
 
+Provider esterno esistente (adattatore)
+---------------------------------------
+Se hai già un'API che espone /api/analyze e /api/compile (qualsiasi provider, es. Gemini 3),
+puoi far sì che questo server faccia da "proxy" verso quell'API senza cambiare il frontend:
+
+Imposta:
+  EXTERNAL_API_BASE=https://csd-station-api-XXXXXXXX.run.app
+
+Quando EXTERNAL_API_BASE è presente:
+- POST /api/analyze  -> inoltra a ${EXTERNAL_API_BASE}/api/analyze e normalizza la risposta in { resultText }
+- POST /api/compile  -> inoltra a ${EXTERNAL_API_BASE}/api/compile; se l'upstream restituisce DOCX binario, lo inoltra, altrimenti genera DOCX dal testo
+
 Build & Run con Docker (per Cloud Run)
 --------------------------------------
 docker build -t gcr.io/PROJECT_ID/compilator-server:latest .

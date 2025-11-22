@@ -1,4 +1,6 @@
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:8787";
+// Set to true to use local server, false for Cloud Run
+const USE_LOCAL = false;
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || (USE_LOCAL ? "http://localhost:8787" : "https://compilator-346681848489.europe-west1.run.app");
 
 export async function uploadAndExtract(files: File[]) {
 	const form = new FormData();

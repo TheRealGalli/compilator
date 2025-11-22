@@ -22,14 +22,12 @@ export async function runAnalysisPrompt(input: {
 		),
 	].join("\n");
 
-	const res = await client.responses.create({
+	const res = await client.chat.completions.create({
 		model,
-		input: prompt,
+		messages: [{ role: "user", content: prompt }],
 	});
 	// Extract text
-	const text =
-		res.output_text ||
-		(res.content?.[0] && "text" in res.content[0] ? (res.content[0] as any).text : "");
+	const text = res.choices[0]?.message?.content || "";
 	return { text };
 }
 
@@ -61,13 +59,11 @@ export async function runCompilePrompt(input: {
 		"Output richiesto: solo contenuto del documento compilato, senza spiegazioni.",
 	].join("\n");
 
-	const res = await client.responses.create({
+	const res = await client.chat.completions.create({
 		model,
-		input: prompt,
+		messages: [{ role: "user", content: prompt }],
 	});
-	const text =
-		res.output_text ||
-		(res.content?.[0] && "text" in res.content[0] ? (res.content[0] as any).text : "");
+	const text = res.choices[0]?.message?.content || "";
 	return { text };
 }
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { CompileRequest } from "../types";
 import { runCompilePrompt } from "../services/llm";
 import { createDocxFromText } from "../services/compileDoc";
+import fetch from "node-fetch";
 
 export const compileRouter = Router();
 
@@ -22,6 +23,43 @@ compileRouter.post("/", async (req, res) => {
 		return res.status(400).json({ error: parsed.error.flatten() });
 	}
 	try {
+		// Forward a provider esterno se definito
+		const external = process.env.EXTERNAL_API_BASE;
+		if (external) {
+			const url = `${external.replace(/\/+$/, "")}/api/compile`;
+			const r = await fetch(url, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(parsed.data),
+			});
+			if (!r.ok) {
+				const t = await r.text();
+				return res.status(502).json({ error: "Upstream compile error", details: t.slice(0, 2000) });
+			}
+			// Se upstream restituisce binario DOCX, inoltra
+			const contentType = r.headers.get("content-type") || "";
+			if (contentType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
+				const buf = Buffer.from(await r.arrayBuffer());
+				res.setHeader("Content-Type", contentType);
+				const filename =
+					(parsed.data.template?.name?.replace(/\.[^/.]+$/, "") || "documento_compilato") + ".docx";
+				res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+				return res.send(buf);
+			}
+			const j = (await r.json()) as any;
+			const compiledText = j.compiledText || j.text || j.output || JSON.stringify(j);
+			const outputFormat = parsed.data.outputFormat || j.format || "docx";
+			if (outputFormat === "docx") {
+				const buf = await createDocxFromText(compiledText);
+				const filename =
+					(parsed.data.template?.name?.replace(/\.[^/.]+$/, "") || "documento_compilato") + ".docx";
+				res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+				res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+				return res.send(buf);
+			}
+			return res.json({ compiledText, format: outputFormat });
+		}
+		// Fallback: provider interno (OpenAI/Vertex)
 		const result = await runCompilePrompt({
 			instructions: parsed.data.instructions || "Compila il documento",
 			template: parsed.data.template || null,

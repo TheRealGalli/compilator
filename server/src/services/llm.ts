@@ -23,11 +23,12 @@ function getProvider(): "vertex" | "openai" {
 async function generateWithOpenAI(prompt: string, model?: string): Promise<string> {
 	const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 	const m = model || process.env.OPENAI_MODEL || "gpt-4o-mini";
-	const res = await client.responses.create({ model: m, input: prompt });
-	const text =
-		res.output_text ||
-		(res.content?.[0] && "text" in res.content[0] ? (res.content[0] as any).text : "");
-	return text || "";
+	const res = await client.chat.completions.create({
+		model: m,
+		messages: [{ role: "user", content: prompt }],
+	});
+	const text = res.choices[0]?.message?.content || "";
+	return text;
 }
 
 async function generateWithVertex(prompt: string, model?: string): Promise<string> {
