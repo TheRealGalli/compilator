@@ -27,9 +27,7 @@ export async function uploadAndExtract(files: File[]) {
 
 	async function extractPdf(file: File): Promise<string> {
 		// pdf.js in browser; worker da CDN per semplicità
-		// @ts-expect-error dynamic import no types
-		const pdfjs = await import("pdfjs-dist/build/pdf");
-		// @ts-expect-error missing types
+		const pdfjs = (await import("pdfjs-dist/build/pdf")) as any;
 		pdfjs.GlobalWorkerOptions.workerSrc =
 			"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 		const data = await file.arrayBuffer();
@@ -37,7 +35,6 @@ export async function uploadAndExtract(files: File[]) {
 		let text = "";
 		for (let p = 1; p <= pdf.numPages; p++) {
 			const page = await pdf.getPage(p);
-			// @ts-expect-error textContent type
 			const content = await page.getTextContent();
 			const strings = content.items.map((it: any) => it.str).join(" ");
 			text += (p > 1 ? "\n\n" : "") + strings;
@@ -46,16 +43,14 @@ export async function uploadAndExtract(files: File[]) {
 	}
 
 	async function extractDocx(file: File): Promise<string> {
-		// @ts-expect-error dynamic import
-		const mammoth = await import("mammoth");
+		const mammoth = (await import("mammoth")) as any;
 		const arrayBuffer = await file.arrayBuffer();
 		const res = await mammoth.extractRawText({ arrayBuffer });
 		return res.value || "";
 	}
 
 	async function extractXlsx(file: File): Promise<string> {
-		// @ts-expect-error dynamic import
-		const XLSX = await import("xlsx");
+		const XLSX = (await import("xlsx")) as any;
 		const data = new Uint8Array(await file.arrayBuffer());
 		const wb = XLSX.read(data, { type: "array" });
 		let text = "";
@@ -72,8 +67,7 @@ export async function uploadAndExtract(files: File[]) {
 	}
 
 	async function extractImageOcr(file: File): Promise<string> {
-		// @ts-expect-error dynamic import default
-		const Tesseract = (await import("tesseract.js")).default;
+		const Tesseract = ((await import("tesseract.js")) as any).default;
 		const result = await Tesseract.recognize(file, "eng+ita");
 		return result.data?.text || "";
 	}
