@@ -106,13 +106,25 @@ export async function analyzeDocuments(body: {
 	task?: string;
 	documents: Array<{ name: string; text: string }>;
 }) {
-	const resp = await fetch(`${SERVER_URL}/api/analyze`, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(body),
-	});
-	if (!resp.ok) throw new Error("Errore analisi");
-	return (await resp.json()) as { resultText: string };
+	// Tenta più percorsi noti: /api/analyze, /analyze
+	const paths = [`${SERVER_URL}/api/analyze`, `${SERVER_URL}/analyze`];
+	let lastErr: any = null;
+	for (const url of paths) {
+		try {
+			const resp = await fetch(url, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+			});
+			if (resp.ok) {
+				return (await resp.json()) as { resultText: string };
+			}
+			lastErr = new Error(`HTTP ${resp.status}`);
+		} catch (e) {
+			lastErr = e;
+		}
+	}
+	throw new Error(`Errore analisi: ${lastErr?.message || "fetch failed"}`);
 }
 
 export async function compileDocument(body: {
@@ -123,22 +135,47 @@ export async function compileDocument(body: {
 }) {
 	// Se output docx, server risponde binario
 	if (!body.outputFormat || body.outputFormat === "docx") {
-		const resp = await fetch(`${SERVER_URL}/api/compile`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(body),
-		});
-		if (!resp.ok) throw new Error("Errore compilazione");
-		const blob = await resp.blob();
-		return { blob, contentType: resp.headers.get("content-type") || "application/octet-stream" };
+		const paths = [`${SERVER_URL}/api/compile`, `${SERVER_URL}/compile`];
+		let lastErr: any = null;
+		for (const url of paths) {
+			try {
+				const resp = await fetch(url, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(body),
+				});
+				if (resp.ok) {
+					const blob = await resp.blob();
+					return {
+						blob,
+						contentType: resp.headers.get("content-type") || "application/octet-stream",
+					};
+				}
+				lastErr = new Error(`HTTP ${resp.status}`);
+			} catch (e) {
+				lastErr = e;
+			}
+		}
+		throw new Error(`Errore compilazione: ${lastErr?.message || "fetch failed"}`);
 	}
-	const resp = await fetch(`${SERVER_URL}/api/compile`, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(body),
-	});
-	if (!resp.ok) throw new Error("Errore compilazione");
-	return (await resp.json()) as { compiledText: string; format: string };
+	const paths = [`${SERVER_URL}/api/compile`, `${SERVER_URL}/compile`];
+	let lastErr: any = null;
+	for (const url of paths) {
+		try {
+			const resp = await fetch(url, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+			});
+			if (resp.ok) {
+				return (await resp.json()) as { compiledText: string; format: string };
+			}
+			lastErr = new Error(`HTTP ${resp.status}`);
+		} catch (e) {
+			lastErr = e;
+		}
+	}
+	throw new Error(`Errore compilazione: ${lastErr?.message || "fetch failed"}`);
 }
 
 export async function setExcelCredentials(body: { headerName?: string; apiKey?: string }) {

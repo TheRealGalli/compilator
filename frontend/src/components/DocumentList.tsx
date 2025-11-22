@@ -17,10 +17,6 @@ export default function DocumentList({ docs }: { docs: ExtractedDoc[] }) {
 						<div className="doc-name">{d.name}</div>
 						<div className="doc-kind">{d.sourceKind}</div>
 					</div>
-					<pre className="doc-text">
-{(d.text || "").slice(0, 800)}
-{d.text.length > 800 ? "\n...[troncato]..." : ""}
-					</pre>
 				</div>
 			))}
 		</div>
