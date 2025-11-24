@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { google } from '@ai-sdk/google';
+import { generateText } from 'ai';
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
@@ -124,12 +125,21 @@ Istruzioni:
 
       let compiledContent = '';
       if (modelProvider === 'gemini') {
-        // Use Gemini SDK
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-        const prompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite.\n\nTemplate:\n${template}\n\n${notes ? `Note e contesto:\n${notes}` : ''}\n\nIstruzioni:\n- Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate\n- Mantieni la struttura e il formato del template\n- Usa un tono ${formalTone ? 'formale' : 'informale'}\n- Fornisci contenuti dettagliati e professionali`;
-        const result = await model.generateContent(prompt);
-        compiledContent = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        // Use Vercel AI SDK with Google provider
+        // Set the API key in env (Vercel AI SDK reads from GOOGLE_GENERATIVE_AI_API_KEY)
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+
+        const systemPrompt = 'Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.';
+        const userPrompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite.\n\nTemplate:\n${template}\n\n${notes ? `Note e contesto:\n${notes}` : ''}\n\nIstruzioni:\n- Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate\n- Mantieni la struttura e il formato del template\n- Usa un tono ${formalTone ? 'formale' : 'informale'}\n- Fornisci contenuti dettagliati e professionali`;
+
+        const result = await generateText({
+          model: google('gemini-2.0-flash-exp'),
+          system: systemPrompt,
+          prompt: userPrompt,
+          temperature: temperature || 0.7,
+        });
+
+        compiledContent = result.text;
       } else {
         // Fallback to OpenAI
         const openai = new OpenAI({ apiKey });
@@ -171,22 +181,21 @@ Istruzioni:
 
       let responseContent = '';
       if (modelProvider === 'gemini') {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        // Use Vercel AI SDK with Google provider
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
-        const chat = model.startChat({
-          history: messages.slice(0, -1).map((msg: any) => ({
-            role: msg.role === 'user' ? 'user' : 'model', // Gemini uses 'user' and 'model' roles
-            parts: [{ text: msg.content }],
-          })),
-          generationConfig: {
-            temperature: req.body.temperature || 0.7,
-          },
+        // Convert messages to the format expected by generateText
+        const systemMessage = 'Sei un assistente AI di ricerca. Aiuti gli utenti ad analizzare documenti e rispondere a domande.';
+        const conversationHistory = messages.map((msg: any) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n\n');
+
+        const result = await generateText({
+          model: google('gemini-2.0-flash-exp'),
+          system: systemMessage,
+          prompt: conversationHistory,
+          temperature: req.body.temperature || 0.7,
         });
 
-        const lastUserMessage = messages[messages.length - 1].content;
-        const result = await chat.sendMessage(lastUserMessage);
-        responseContent = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        responseContent = result.text;
       } else {
         // Fallback to OpenAI
         const openai = new OpenAI({ apiKey });
