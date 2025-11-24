@@ -34,12 +34,12 @@ export function ModelSettings({
 }: ModelSettingsProps) {
   return (
     <div className="h-full flex flex-col border rounded-lg bg-background overflow-hidden">
-      <div className="border-b px-4 py-3 bg-muted/30 flex-shrink-0">
+      <div className="border-b px-3 py-2 bg-muted/30 flex-shrink-0">
         <h3 className="text-sm font-medium">Impostazioni Modello</h3>
       </div>
       
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-6">
+        <div className="p-3 space-y-4">
           {/* Note */}
           <div className="space-y-2">
             <Label htmlFor="notes" className="text-sm font-medium">Note Aggiuntive</Label>
@@ -99,7 +99,7 @@ export function ModelSettings({
             <Label className="text-sm font-medium">Strumenti AI</Label>
             
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+              <div className="flex items-center justify-between p-2 rounded-lg border bg-card">
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="web-research" className="text-sm font-medium cursor-pointer">
@@ -128,7 +128,7 @@ export function ModelSettings({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+              <div className="flex items-center justify-between p-2 rounded-lg border bg-card">
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="detailed-analysis" className="text-sm font-medium cursor-pointer">
@@ -157,7 +157,7 @@ export function ModelSettings({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+              <div className="flex items-center justify-between p-2 rounded-lg border bg-card">
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="formal-tone" className="text-sm font-medium cursor-pointer">
