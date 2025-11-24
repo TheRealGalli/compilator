@@ -15,24 +15,24 @@ export function CompiledOutput({
 }: CompiledOutputProps) {
   return (
     <div className="h-full flex flex-col border rounded-lg overflow-hidden bg-background">
-      <div className="border-b px-3 py-2 bg-muted/30 flex items-center justify-between flex-shrink-0">
+      <div className="border-b px-2 py-1.5 bg-muted/30 flex items-center justify-between flex-shrink-0">
         <h3 className="text-sm font-medium">Documento Compilato</h3>
         {content && (
-          <div className="flex gap-1">
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onCopy} data-testid="button-copy-output">
+          <div className="flex gap-0.5">
+            <Button size="icon" variant="ghost" className="h-5 w-5" onClick={onCopy} data-testid="button-copy-output">
               <Copy className="w-3 h-3" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onDownload} data-testid="button-download-output">
+            <Button size="icon" variant="ghost" className="h-5 w-5" onClick={onDownload} data-testid="button-download-output">
               <Download className="w-3 h-3" />
             </Button>
           </div>
         )}
       </div>
       <ScrollArea className="flex-1">
-        <div className="p-3">
+        <div className="p-2">
           {content ? (
             <div className="prose prose-sm max-w-none" data-testid="text-compiled-output">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{content}</pre>
+              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">{content}</pre>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center px-4">

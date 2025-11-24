@@ -34,47 +34,43 @@ export function ModelSettings({
 }: ModelSettingsProps) {
   return (
     <div className="h-full flex flex-col border rounded-lg bg-background overflow-hidden">
-      <div className="border-b px-3 py-2 bg-muted/30 flex-shrink-0">
+      <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0">
         <h3 className="text-sm font-medium">Impostazioni Modello</h3>
       </div>
       
       <ScrollArea className="flex-1">
-        <div className="p-3 space-y-4">
+        <div className="p-2 space-y-3">
           {/* Note */}
-          <div className="space-y-2">
-            <Label htmlFor="notes" className="text-sm font-medium">Note Aggiuntive</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="notes" className="text-xs font-medium">Note Aggiuntive</Label>
             <Textarea
               id="notes"
               value={notes}
               onChange={(e) => onNotesChange?.(e.target.value)}
-              placeholder="Inserisci note o istruzioni specifiche per la compilazione del documento..."
-              className="min-h-[100px] text-sm"
+              placeholder="Inserisci note o istruzioni specifiche..."
+              className="min-h-[70px] text-xs"
               data-testid="textarea-notes"
             />
-            <p className="text-xs text-muted-foreground">
-              Aggiungi contesto o requisiti specifici per migliorare la qualità del documento
-            </p>
           </div>
 
           <Separator />
 
           {/* Temperature */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Creatività (Temperature)</Label>
+              <Label className="text-xs font-medium">Creatività</Label>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                  <Info className="w-3 h-3 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs text-xs">
-                    Controlla la creatività del modello. Valori bassi (0.1-0.3) per testi formali,
-                    valori alti (0.7-1.0) per contenuti creativi.
+                    Valori bassi (0.1-0.3) per testi formali, alti (0.7-1.0) per creatività.
                   </p>
                 </TooltipContent>
               </Tooltip>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Slider
                 value={[temperature]}
                 onValueChange={(value) => onTemperatureChange?.(value[0])}
@@ -95,14 +91,14 @@ export function ModelSettings({
           <Separator />
 
           {/* Tools */}
-          <div className="space-y-4">
-            <Label className="text-sm font-medium">Strumenti AI</Label>
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">Strumenti AI</Label>
             
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-2 rounded-lg border bg-card">
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="web-research" className="text-sm font-medium cursor-pointer">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="web-research" className="text-xs font-medium cursor-pointer">
                       Web Research
                     </Label>
                     <Tooltip>
@@ -111,14 +107,11 @@ export function ModelSettings({
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="max-w-xs text-xs">
-                          Consente al modello di cercare informazioni online per arricchire il documento
+                          Ricerca informazioni online
                         </p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Ricerca informazioni aggiornate online
-                  </p>
                 </div>
                 <Switch
                   id="web-research"
@@ -128,10 +121,10 @@ export function ModelSettings({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-2 rounded-lg border bg-card">
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="detailed-analysis" className="text-sm font-medium cursor-pointer">
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="detailed-analysis" className="text-xs font-medium cursor-pointer">
                       Analisi Dettagliata
                     </Label>
                     <Tooltip>
@@ -140,14 +133,11 @@ export function ModelSettings({
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="max-w-xs text-xs">
-                          Analizza approfonditamente i documenti fonte per estrarre dettagli rilevanti
+                          Analisi approfondita documenti
                         </p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Estrae informazioni dettagliate dai documenti
-                  </p>
                 </div>
                 <Switch
                   id="detailed-analysis"
@@ -157,10 +147,10 @@ export function ModelSettings({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-2 rounded-lg border bg-card">
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="formal-tone" className="text-sm font-medium cursor-pointer">
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="formal-tone" className="text-xs font-medium cursor-pointer">
                       Tono Formale
                     </Label>
                     <Tooltip>
@@ -169,14 +159,11 @@ export function ModelSettings({
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="max-w-xs text-xs">
-                          Utilizza un linguaggio formale e professionale nel documento generato
+                          Linguaggio formale e professionale
                         </p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Linguaggio professionale e formale
-                  </p>
                 </div>
                 <Switch
                   id="formal-tone"
