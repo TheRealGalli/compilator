@@ -3,9 +3,10 @@ import { useRef } from "react";
 
 interface FileUploadZoneProps {
   onFilesSelected?: (files: FileList) => void;
+  disabled?: boolean;
 }
 
-export function FileUploadZone({ onFilesSelected }: FileUploadZoneProps) {
+export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleClick = () => {
@@ -31,10 +32,14 @@ export function FileUploadZone({ onFilesSelected }: FileUploadZoneProps) {
 
   return (
     <div
-      onClick={handleClick}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      className="border-2 border-dashed rounded-lg p-12 text-center cursor-pointer hover-elevate active-elevate-2 transition-colors"
+      onClick={disabled ? undefined : handleClick}
+      onDrop={disabled ? undefined : handleDrop}
+      onDragOver={disabled ? undefined : handleDragOver}
+      className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
+        disabled 
+          ? 'opacity-50 cursor-not-allowed' 
+          : 'cursor-pointer hover-elevate active-elevate-2'
+      }`}
       data-testid="zone-file-upload"
     >
       <input

@@ -192,7 +192,7 @@ export function DocumentCompilerSection() {
     }
   };
 
-  const handleCompile = () => {
+  const handleCompile = async () => {
     if (!templateContent.trim()) {
       toast({
         title: "Errore",
@@ -204,104 +204,46 @@ export function DocumentCompilerSection() {
 
     setIsCompiling(true);
     
-    setTimeout(() => {
-      let compiled = templateContent;
-      
-      // Base replacements
-      const replacements: Record<string, string> = {
-        '[DATA]': new Date().toLocaleDateString('it-IT'),
-        '[AZIENDA]': 'Acme Corporation S.r.l.',
-        '[EMAIL_AZIENDA]': 'privacy@acmecorp.it',
-        '[PROGETTO]': 'Modernizzazione Infrastruttura IT',
-        '[CLIENTE]': 'Beta Industries S.p.A.',
-        '[RESPONSABILE]': 'Ing. Mario Rossi',
-        '[OBIETTIVO_1]': 'Migliorare le performance del sistema',
-        '[OBIETTIVO_2]': 'Ridurre i costi operativi del 30%',
-        '[OBIETTIVO_3]': 'Aumentare la sicurezza dei dati',
-        '[DESCRIZIONE_SITUAZIONE]': 'L\'infrastruttura attuale presenta criticità nelle performance',
-        '[PROBLEMA_1]': 'Server obsoleti con capacità insufficiente',
-        '[PROBLEMA_2]': 'Mancanza di ridondanza e backup adeguati',
-        '[DESCRIZIONE_SOLUZIONE]': 'Migrazione verso cloud infrastructure con architettura scalabile',
-        '[PERSONALE]': '5 sviluppatori senior, 2 project manager, 1 security specialist',
-        '[BUDGET]': '€ 150.000',
-        '[TEMPISTICHE]': '6 mesi (gennaio-giugno 2025)',
-        '[FASE_1]': 'Analisi e pianificazione (mese 1-2)',
-        '[FASE_2]': 'Implementazione e migrazione (mese 3-5)',
-        '[FASE_3]': 'Testing e deployment (mese 6)',
-        '[CONCLUSIONI]': 'La soluzione proposta è tecnicamente fattibile e economicamente sostenibile',
-        '[FORNITORE]': 'Tech Solutions S.r.l.',
-        '[SEDE_FORNITORE]': 'Via Roma 123, 20100 Milano (MI)',
-        '[PIVA_FORNITORE]': 'IT12345678901',
-        '[RAPPRESENTANTE_FORNITORE]': 'Dott. Giovanni Bianchi',
-        '[SEDE_CLIENTE]': 'Via Garibaldi 45, 00100 Roma (RM)',
-        '[PIVA_CLIENTE]': 'IT98765432109',
-        '[RAPPRESENTANTE_CLIENTE]': 'Dott.ssa Laura Verdi',
-        '[ATTIVITA_FORNITORE]': 'consulenza informatica e sviluppo software',
-        '[SERVIZIO]': 'consulenza informatica',
-        '[SERVIZIO_DETTAGLIO]': 'consulenza e sviluppo software personalizzato per la modernizzazione infrastrutturale',
-        '[DURATA]': '12 mesi',
-        '[DATA_INIZIO]': '01/01/2025',
-        '[DATA_FINE]': '31/12/2025',
-        '[IMPORTO]': '50.000',
-        '[IMPORTO_LETTERE]': 'cinquantamila/00',
-        '[MODALITA_PAGAMENTO]': 'bonifico bancario entro 30 giorni dalla data fattura',
-        '[OBBLIGO_FORNITORE_1]': 'Fornire i servizi con professionalità e competenza',
-        '[OBBLIGO_FORNITORE_2]': 'Rispettare le tempistiche concordate',
-        '[OBBLIGO_CLIENTE_1]': 'Effettuare i pagamenti nei termini stabiliti',
-        '[OBBLIGO_CLIENTE_2]': 'Fornire le informazioni necessarie per l\'esecuzione dei servizi',
-        '[PREAVVISO_RECESSO]': '30',
-        '[FORO_COMPETENTE]': 'Milano',
-        '[LUOGO]': 'Milano',
-      };
-
-      // Apply model settings influence
-      if (detailedAnalysis) {
-        // Add more detailed information
-        replacements['[DESCRIZIONE_SOLUZIONE]'] = 'Migrazione verso cloud infrastructure con architettura scalabile basata su microservizi. La soluzione prevede l\'utilizzo di container Docker orchestrati con Kubernetes per garantire alta disponibilità e scalabilità automatica. Implementazione di CI/CD pipeline per deployment automatizzato e monitoraggio avanzato tramite stack ELK.';
-      }
-
-      if (formalTone) {
-        // Ensure formal language (already in templates, but could be enhanced)
-        replacements['[CONCLUSIONI]'] = 'Si raccomanda vivamente di procedere con l\'implementazione della soluzione proposta nei tempi concordati, al fine di garantire il raggiungimento degli obiettivi prefissati e la piena soddisfazione delle esigenze del Cliente.';
-      }
-
-      // Apply temperature influence (simulated)
-      if (temperature > 0.8) {
-        // More creative/varied content
-        replacements['[DESCRIZIONE_SOLUZIONE]'] = 'Proponiamo un approccio innovativo di migrazione cloud che combina le migliori pratiche DevOps con tecnologie all\'avanguardia, creando un ecosistema IT resiliente e altamente performante che supporterà la crescita aziendale per i prossimi anni.';
-      } else if (temperature < 0.3) {
-        // More precise/concise content
-        replacements['[DESCRIZIONE_SOLUZIONE]'] = 'Migrazione cloud con tecnologie standard del settore.';
-      }
-
-      // Apply replacements
-      for (const [placeholder, value] of Object.entries(replacements)) {
-        compiled = compiled.replaceAll(placeholder, value);
-      }
-
-      // Add notes if provided
-      if (notes.trim()) {
-        compiled += `\n\n───────────────────────────────────────\nNOTE AGGIUNTIVE:\n${notes.trim()}`;
-      }
-
-      // Simulate web research influence
-      if (webResearch) {
-        compiled += `\n\n───────────────────────────────────────\nFONTI DI RICERCA ONLINE:\n- Normativa GDPR aggiornata al ${new Date().toLocaleDateString('it-IT')}\n- Best practices di settore da fonti autorevoli\n- Dati di mercato e benchmark industriali`;
-      }
-      
-      setCompiledContent(compiled);
-      setIsCompiling(false);
-      
-      const settingsInfo = [];
-      if (webResearch) settingsInfo.push('Web Research');
-      if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
-      if (formalTone) settingsInfo.push('Tono Formale');
-      
-      toast({
-        title: "Documento compilato con successo",
-        description: `Temperatura: ${temperature.toFixed(1)} | Strumenti attivi: ${settingsInfo.join(', ')}`,
+    try {
+      const { apiRequest } = await import("@/lib/queryClient");
+      const response = await apiRequest('POST', '/api/compile', {
+        template: templateContent,
+        notes,
+        temperature,
+        webResearch,
+        detailedAnalysis,
+        formalTone,
+        modelProvider: 'openai',
+        model: 'gpt-4',
       });
-    }, 2000);
+
+      const data = await response.json();
+      
+      if (data.success && data.compiledContent) {
+        setCompiledContent(data.compiledContent);
+        
+        const settingsInfo = [];
+        if (webResearch) settingsInfo.push('Web Research');
+        if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
+        if (formalTone) settingsInfo.push('Tono Formale');
+        
+        toast({
+          title: "Documento compilato con successo",
+          description: `Temperatura: ${temperature.toFixed(1)} | Strumenti attivi: ${settingsInfo.join(', ')}`,
+        });
+      } else {
+        throw new Error(data.error || 'Errore durante la compilazione');
+      }
+    } catch (error: any) {
+      console.error('Errore durante compilazione:', error);
+      toast({
+        title: "Errore",
+        description: error.message || "Si è verificato un errore durante la compilazione del documento.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCompiling(false);
+    }
   };
 
   const handleCopy = () => {

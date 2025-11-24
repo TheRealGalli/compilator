@@ -5,6 +5,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "./ChatMessage";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface Message {
   id: string;
@@ -24,6 +26,8 @@ export function ChatInterface() {
     },
   ]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const suggestedPrompts = [
     "Riassumi i punti chiave",
@@ -32,29 +36,68 @@ export function ChatInterface() {
     "Crea una FAQ",
   ];
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
     
-    const newMessage: Message = {
+    const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: input,
       timestamp: "Ora",
     };
     
-    setMessages([...messages, newMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setIsLoading(true);
     
-    setTimeout(() => {
-      const response: Message = {
+    try {
+      // Prepara i messaggi per l'API (solo user e assistant, senza metadata)
+      const apiMessages = [...messages, userMessage]
+        .filter(msg => msg.role !== 'system')
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        }));
+      
+      const response = await apiRequest('POST', '/api/chat', {
+        messages: apiMessages,
+        modelProvider: 'openai',
+        model: 'gpt-4',
+        temperature: 0.7,
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.message) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.message.content,
+          timestamp: "Ora",
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        throw new Error(data.error || 'Errore durante la chat');
+      }
+    } catch (error: any) {
+      console.error('Errore durante chat:', error);
+      toast({
+        title: "Errore",
+        description: error.message || "Si è verificato un errore durante l'invio del messaggio.",
+        variant: "destructive",
+      });
+      
+      // Aggiungi un messaggio di errore
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Ho capito la tua domanda. In base ai documenti caricati, ecco cosa ho trovato...",
+        content: "Mi dispiace, si è verificato un errore. Riprova più tardi.",
         timestamp: "Ora",
-        sources: ["documento-ricerca.pdf"],
       };
-      setMessages((prev) => [...prev, response]);
-    }, 1000);
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -104,7 +147,7 @@ export function ChatInterface() {
             <Button 
               size="icon" 
               onClick={handleSend}
-              disabled={!input.trim()}
+              disabled={!input.trim() || isLoading}
               data-testid="button-send-message"
             >
               <Send className="w-4 h-4" />
