@@ -1,17 +1,11 @@
-import { Sparkles, FileText } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TemplateEditor } from "./TemplateEditor";
 import { CompiledOutput } from "./CompiledOutput";
-import { SourceSelector } from "./SourceSelector";
+import { ModelSettings } from "./ModelSettings";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-
-interface Source {
-  id: string;
-  name: string;
-  selected: boolean;
-}
 
 const templates = {
   privacy: {
@@ -183,17 +177,12 @@ export function DocumentCompilerSection() {
   const [isCompiling, setIsCompiling] = useState(false);
   const { toast } = useToast();
 
-  const [sources, setSources] = useState<Source[]>([
-    { id: "1", name: "documento-base.pdf", selected: true },
-    { id: "2", name: "dati-azienda.txt", selected: true },
-    { id: "3", name: "informazioni-legali.docx", selected: false },
-    { id: "4", name: "termini-servizio.pdf", selected: true },
-    { id: "5", name: "clausole-standard.txt", selected: false },
-    { id: "6", name: "dati-contatto.pdf", selected: true },
-    { id: "7", name: "riferimenti-normativi.docx", selected: false },
-    { id: "8", name: "template-base.txt", selected: false },
-    { id: "9", name: "glossario-termini.pdf", selected: false },
-  ]);
+  // Model settings
+  const [notes, setNotes] = useState("");
+  const [temperature, setTemperature] = useState(0.7);
+  const [webResearch, setWebResearch] = useState(false);
+  const [detailedAnalysis, setDetailedAnalysis] = useState(true);
+  const [formalTone, setFormalTone] = useState(true);
 
   const handleTemplateChange = (value: string) => {
     setSelectedTemplate(value as keyof typeof templates);
@@ -203,24 +192,7 @@ export function DocumentCompilerSection() {
     }
   };
 
-  const handleToggleSource = (id: string) => {
-    setSources(sources.map(s => 
-      s.id === id ? { ...s, selected: !s.selected } : s
-    ));
-  };
-
   const handleCompile = () => {
-    const selectedSources = sources.filter(s => s.selected);
-    
-    if (selectedSources.length === 0) {
-      toast({
-        title: "Errore",
-        description: "Seleziona almeno una fonte prima di compilare.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!templateContent.trim()) {
       toast({
         title: "Errore",
@@ -235,6 +207,7 @@ export function DocumentCompilerSection() {
     setTimeout(() => {
       let compiled = templateContent;
       
+      // Base replacements
       const replacements: Record<string, string> = {
         '[DATA]': new Date().toLocaleDateString('it-IT'),
         '[AZIENDA]': 'Acme Corporation S.r.l.',
@@ -281,18 +254,54 @@ export function DocumentCompilerSection() {
         '[LUOGO]': 'Milano',
       };
 
+      // Apply model settings influence
+      if (detailedAnalysis) {
+        // Add more detailed information
+        replacements['[DESCRIZIONE_SOLUZIONE]'] = 'Migrazione verso cloud infrastructure con architettura scalabile basata su microservizi. La soluzione prevede l\'utilizzo di container Docker orchestrati con Kubernetes per garantire alta disponibilità e scalabilità automatica. Implementazione di CI/CD pipeline per deployment automatizzato e monitoraggio avanzato tramite stack ELK.';
+      }
+
+      if (formalTone) {
+        // Ensure formal language (already in templates, but could be enhanced)
+        replacements['[CONCLUSIONI]'] = 'Si raccomanda vivamente di procedere con l\'implementazione della soluzione proposta nei tempi concordati, al fine di garantire il raggiungimento degli obiettivi prefissati e la piena soddisfazione delle esigenze del Cliente.';
+      }
+
+      // Apply temperature influence (simulated)
+      if (temperature > 0.8) {
+        // More creative/varied content
+        replacements['[DESCRIZIONE_SOLUZIONE]'] = 'Proponiamo un approccio innovativo di migrazione cloud che combina le migliori pratiche DevOps con tecnologie all\'avanguardia, creando un ecosistema IT resiliente e altamente performante che supporterà la crescita aziendale per i prossimi anni.';
+      } else if (temperature < 0.3) {
+        // More precise/concise content
+        replacements['[DESCRIZIONE_SOLUZIONE]'] = 'Migrazione cloud con tecnologie standard del settore.';
+      }
+
+      // Apply replacements
       for (const [placeholder, value] of Object.entries(replacements)) {
         compiled = compiled.replaceAll(placeholder, value);
+      }
+
+      // Add notes if provided
+      if (notes.trim()) {
+        compiled += `\n\n───────────────────────────────────────\nNOTE AGGIUNTIVE:\n${notes.trim()}`;
+      }
+
+      // Simulate web research influence
+      if (webResearch) {
+        compiled += `\n\n───────────────────────────────────────\nFONTI DI RICERCA ONLINE:\n- Normativa GDPR aggiornata al ${new Date().toLocaleDateString('it-IT')}\n- Best practices di settore da fonti autorevoli\n- Dati di mercato e benchmark industriali`;
       }
       
       setCompiledContent(compiled);
       setIsCompiling(false);
       
+      const settingsInfo = [];
+      if (webResearch) settingsInfo.push('Web Research');
+      if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
+      if (formalTone) settingsInfo.push('Tono Formale');
+      
       toast({
         title: "Documento compilato con successo",
-        description: `Utilizzate ${selectedSources.length} fonti per generare il documento.`,
+        description: `Temperatura: ${temperature.toFixed(1)} | Strumenti attivi: ${settingsInfo.join(', ')}`,
       });
-    }, 1500);
+    }, 2000);
   };
 
   const handleCopy = () => {
@@ -328,7 +337,7 @@ export function DocumentCompilerSection() {
   return (
     <div className="h-full flex flex-col p-6 gap-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-xl font-semibold">Compilatore Documenti</h2>
+        <h2 className="text-xl font-semibold">Compilatore Documenti AI</h2>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
             <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
@@ -347,14 +356,25 @@ export function DocumentCompilerSection() {
             className="w-full sm:w-auto"
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            {isCompiling ? "Compilazione..." : "Compila"}
+            {isCompiling ? "Compilazione..." : "Compila con AI"}
           </Button>
         </div>
       </div>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
-        <div className="lg:col-span-3 h-[400px] lg:h-full">
-          <SourceSelector sources={sources} onToggle={handleToggleSource} />
+        <div className="lg:col-span-3 h-[500px] lg:h-full">
+          <ModelSettings
+            notes={notes}
+            temperature={temperature}
+            webResearch={webResearch}
+            detailedAnalysis={detailedAnalysis}
+            formalTone={formalTone}
+            onNotesChange={setNotes}
+            onTemperatureChange={setTemperature}
+            onWebResearchChange={setWebResearch}
+            onDetailedAnalysisChange={setDetailedAnalysis}
+            onFormalToneChange={setFormalTone}
+          />
         </div>
         <div className="lg:col-span-4 h-[400px] lg:h-full">
           <TemplateEditor 
