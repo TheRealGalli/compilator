@@ -1,4 +1,4 @@
-import { FileText, MessageSquare, Code, Sparkles, Plus, File, FileCode, FileType } from "lucide-react";
+import { FileText, MessageSquare, Code, Sparkles, Plus, File, FileCode, FileType, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -8,12 +8,14 @@ interface AppSidebarProps {
   activeSection?: "documents" | "chat" | "compiler" | "generated";
   onSectionChange?: (section: "documents" | "chat" | "compiler" | "generated") => void;
   documents?: Array<{ id: string; name: string; type: string }>;
+  onRemoveDocument?: (id: string) => void;
 }
 
 export function AppSidebar({
   activeSection = "documents",
   onSectionChange = () => {},
-  documents = []
+  documents = [],
+  onRemoveDocument
 }: AppSidebarProps) {
   const sections = [
     { id: "documents" as const, label: "Documenti", icon: FileText },
@@ -77,11 +79,25 @@ export function AppSidebar({
                 return (
                   <div
                     key={doc.id}
-                    className="flex items-center gap-2 p-2 rounded-md hover-elevate active-elevate-2 cursor-pointer"
+                    className="flex items-center gap-2 p-2 rounded-md hover-elevate active-elevate-2 group"
                     data-testid={`file-item-${doc.id}`}
                   >
                     <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    <span className="text-sm truncate">{doc.name}</span>
+                    <span className="text-sm truncate flex-1 cursor-pointer">{doc.name}</span>
+                    {onRemoveDocument && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveDocument(doc.id);
+                        }}
+                        data-testid={`button-remove-${doc.id}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    )}
                   </div>
                 );
               })}

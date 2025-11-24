@@ -341,9 +341,44 @@ export function DocumentCompilerSection() {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
             <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
-              <SelectValue placeholder="Seleziona modello" />
+              <SelectValue placeholder="Seleziona template" />
             </SelectTrigger>
             <SelectContent>
+              <div className="p-2 border-b">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('template-upload')?.click();
+                  }}
+                  data-testid="button-upload-template"
+                >
+                  <span className="mr-2">📄</span>
+                  Upload Template
+                </Button>
+                <input
+                  id="template-upload"
+                  type="file"
+                  accept=".txt,.md"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        setTemplateContent(event.target?.result as string);
+                        setSelectedTemplate("");
+                        toast({
+                          title: "Template caricato",
+                          description: `${file.name} è stato caricato con successo.`,
+                        });
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                />
+              </div>
               <SelectItem value="privacy">Privacy Policy</SelectItem>
               <SelectItem value="relazione">Relazione Tecnica</SelectItem>
               <SelectItem value="contratto">Contratto di Servizio</SelectItem>
