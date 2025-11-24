@@ -168,9 +168,17 @@ ___________________                    ___________________
 [RAPPRESENTANTE_FORNITORE]            [RAPPRESENTANTE_CLIENTE]
 [FORNITORE]                           [CLIENTE]`
   }
-};
+} as const;
 
-export function DocumentCompilerSection() {
+interface DocumentCompilerSectionProps {
+  modelProvider?: 'openai' | 'gemini';
+  onModelProviderChange?: (value: 'openai' | 'gemini') => void;
+}
+
+export function DocumentCompilerSection({
+  modelProvider: initialModelProvider = 'gemini',
+  onModelProviderChange
+}: DocumentCompilerSectionProps = {}) {
   const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof templates | "">("");
   const [templateContent, setTemplateContent] = useState("");
   const [compiledContent, setCompiledContent] = useState("");
@@ -183,7 +191,7 @@ export function DocumentCompilerSection() {
   const [webResearch, setWebResearch] = useState(false);
   const [detailedAnalysis, setDetailedAnalysis] = useState(true);
   const [formalTone, setFormalTone] = useState(true);
-  const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>('gemini');
+  const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
 
   const handleTemplateChange = (value: string) => {
     setSelectedTemplate(value as keyof typeof templates);

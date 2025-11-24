@@ -10,6 +10,7 @@ type Section = "documents" | "chat" | "compiler" | "generated";
 
 export default function Home() {
   const [activeSection, setActiveSection] = useState<Section>("documents");
+  const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>('gemini');
   const [documents, setDocuments] = useState([
     { id: "1", name: "documento-base.pdf", type: "application/pdf" },
     { id: "2", name: "dati-azienda.txt", type: "text/plain" },
@@ -31,9 +32,9 @@ export default function Home() {
       case "documents":
         return <DocumentsSection />;
       case "chat":
-        return <ChatInterface />;
+        return <ChatInterface modelProvider={modelProvider} />;
       case "compiler":
-        return <DocumentCompilerSection />;
+        return <DocumentCompilerSection modelProvider={modelProvider} onModelProviderChange={setModelProvider} />;
       case "generated":
         return <GeneratedContentSection />;
       default:

@@ -16,7 +16,11 @@ interface Message {
   sources?: string[];
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  modelProvider?: 'openai' | 'gemini';
+}
+
+export function ChatInterface({ modelProvider = 'openai' }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -38,18 +42,18 @@ export function ChatInterface() {
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
-    
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: input,
       timestamp: "Ora",
     };
-    
+
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
-    
+
     try {
       // Prepara i messaggi per l'API (solo user e assistant, senza metadata)
       const apiMessages = [...messages, userMessage]
@@ -58,16 +62,16 @@ export function ChatInterface() {
           role: msg.role,
           content: msg.content,
         }));
-      
+
       const response = await apiRequest('POST', '/api/chat', {
         messages: apiMessages,
-        modelProvider: 'openai',
-        model: 'gpt-4',
+        modelProvider: modelProvider,
+        model: modelProvider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4',
         temperature: 0.7,
       });
 
       const data = await response.json();
-      
+
       if (data.success && data.message) {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -86,7 +90,7 @@ export function ChatInterface() {
         description: error.message || "Si è verificato un errore durante l'invio del messaggio.",
         variant: "destructive",
       });
-      
+
       // Aggiungi un messaggio di errore
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -134,7 +138,7 @@ export function ChatInterface() {
               ))}
             </div>
           )}
-          
+
           <div className="flex gap-2">
             <Textarea
               value={input}
@@ -144,8 +148,8 @@ export function ChatInterface() {
               className="resize-none min-h-[60px]"
               data-testid="input-chat"
             />
-            <Button 
-              size="icon" 
+            <Button
+              size="icon"
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
               data-testid="button-send-message"
