@@ -126,7 +126,7 @@ Istruzioni:
       if (modelProvider === 'gemini') {
         // Use Gemini SDK
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
         const prompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite.\n\nTemplate:\n${template}\n\n${notes ? `Note e contesto:\n${notes}` : ''}\n\nIstruzioni:\n- Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate\n- Mantieni la struttura e il formato del template\n- Usa un tono ${formalTone ? 'formale' : 'informale'}\n- Fornisci contenuti dettagliati e professionali`;
         const result = await model.generateContent(prompt);
         compiledContent = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -172,7 +172,7 @@ Istruzioni:
       let responseContent = '';
       if (modelProvider === 'gemini') {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
         const chat = model.startChat({
           history: messages.slice(0, -1).map((msg: any) => ({
