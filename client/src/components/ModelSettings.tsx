@@ -13,11 +13,13 @@ interface ModelSettingsProps {
   webResearch?: boolean;
   detailedAnalysis?: boolean;
   formalTone?: boolean;
+  modelProvider?: 'openai' | 'gemini';
   onNotesChange?: (value: string) => void;
   onTemperatureChange?: (value: number) => void;
   onWebResearchChange?: (value: boolean) => void;
   onDetailedAnalysisChange?: (value: boolean) => void;
   onFormalToneChange?: (value: boolean) => void;
+  onModelProviderChange?: (value: 'openai' | 'gemini') => void;
 }
 
 export function ModelSettings({
@@ -26,18 +28,20 @@ export function ModelSettings({
   webResearch = false,
   detailedAnalysis = true,
   formalTone = true,
+  modelProvider = 'gemini',
   onNotesChange,
   onTemperatureChange,
   onWebResearchChange,
   onDetailedAnalysisChange,
   onFormalToneChange,
+  onModelProviderChange,
 }: ModelSettingsProps) {
   return (
     <div className="h-full flex flex-col border rounded-lg bg-background overflow-hidden">
       <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0">
         <h3 className="text-sm font-medium">Impostazioni Modello</h3>
       </div>
-      
+
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-3">
           {/* Note */}
@@ -93,7 +97,7 @@ export function ModelSettings({
           {/* Tools */}
           <div className="space-y-2">
             <Label className="text-xs font-medium">Strumenti AI</Label>
-            
+
             <div className="space-y-2">
               <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
                 <div className="flex-1">
@@ -171,6 +175,25 @@ export function ModelSettings({
                   onCheckedChange={onFormalToneChange}
                   data-testid="switch-formal-tone"
                 />
+              </div>
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
+                      Modello
+                    </Label>
+                    <select
+                      id="model-provider"
+                      value={modelProvider}
+                      onChange={(e) => onModelProviderChange?.(e.target.value as 'openai' | 'gemini')}
+                      className="ml-2 text-xs border rounded"
+                      data-testid="select-model-provider"
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="gemini">Gemini 2.5 Flash</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
@@ -27,7 +28,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    
+
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);
     }
@@ -66,7 +67,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/files/:gcsPath(*)', async (req: Request, res: Response) => {
     try {
       const { gcsPath } = req.params;
-      
+
       if (!await fileExists(gcsPath)) {
         return res.status(404).json({ error: 'File non trovato' });
       }
@@ -95,7 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per compilare documenti con AI
   app.post('/api/compile', async (req: Request, res: Response) => {
     try {
-      const { template, notes, temperature, modelProvider = 'openai' } = req.body;
+      const { template, notes, temperature, formalTone, modelProvider = 'openai' } = req.body;
 
       if (!template) {
         return res.status(400).json({ error: 'Template richiesto' });
@@ -121,23 +122,28 @@ Istruzioni:
 - Usa un tono ${req.body.formalTone ? 'formale' : 'informale'}
 - Fornisci contenuti dettagliati e professionali`;
 
-      // Chiama l'API di OpenAI
-      const completion = await openai.chat.completions.create({
-        model: req.body.model || 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: 'Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: temperature || 0.7,
-      });
-
-      const compiledContent = completion.choices[0]?.message?.content || '';
+      let compiledContent = '';
+      if (modelProvider === 'gemini') {
+        // Use Gemini SDK
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const prompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite.\n\nTemplate:\n${template}\n\n${notes ? `Note e contesto:\n${notes}` : ''}\n\nIstruzioni:\n- Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate\n- Mantieni la struttura e il formato del template\n- Usa un tono ${formalTone ? 'formale' : 'informale'}\n- Fornisci contenuti dettagliati e professionali`;
+        const result = await model.generateContent(prompt);
+        compiledContent = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } else {
+        // Fallback to OpenAI
+        const openai = new OpenAI({ apiKey });
+        const prompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite.\n\nTemplate:\n${template}\n\n${notes ? `Note e contesto:\n${notes}` : ''}\n\nIstruzioni:\n- Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate\n- Mantieni la struttura e il formato del template\n- Usa un tono ${formalTone ? 'formale' : 'informale'}\n- Fornisci contenuti dettagliati e professionali`;
+        const completion = await openai.chat.completions.create({
+          model: req.body.model || 'gpt-4',
+          messages: [
+            { role: 'system', content: 'Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: temperature || 0.7,
+        });
+        compiledContent = completion.choices[0]?.message?.content || '';
+      }
 
       res.json({
         success: true,
@@ -145,7 +151,7 @@ Istruzioni:
       });
     } catch (error: any) {
       console.error('Errore durante compilazione:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: error.message || 'Errore durante compilazione documento',
       });
     }
@@ -163,31 +169,50 @@ Istruzioni:
       // Recupera la chiave API dal Secret Manager
       const apiKey = await getModelApiKey(modelProvider);
 
-      // Inizializza il client OpenAI
-      const openai = new OpenAI({ apiKey });
+      let responseContent = '';
+      if (modelProvider === 'gemini') {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-      // Chiama l'API di OpenAI
-      const completion = await openai.chat.completions.create({
-        model: req.body.model || 'gpt-4',
-        messages: messages.map((msg: any) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        temperature: req.body.temperature || 0.7,
-      });
+        const chat = model.startChat({
+          history: messages.slice(0, -1).map((msg: any) => ({
+            role: msg.role === 'user' ? 'user' : 'model', // Gemini uses 'user' and 'model' roles
+            parts: [{ text: msg.content }],
+          })),
+          generationConfig: {
+            temperature: req.body.temperature || 0.7,
+          },
+        });
 
-      const response = completion.choices[0]?.message?.content || '';
+        const lastUserMessage = messages[messages.length - 1].content;
+        const result = await chat.sendMessage(lastUserMessage);
+        responseContent = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } else {
+        // Fallback to OpenAI
+        const openai = new OpenAI({ apiKey });
+
+        // Chiama l'API di OpenAI
+        const completion = await openai.chat.completions.create({
+          model: req.body.model || 'gpt-4',
+          messages: messages.map((msg: any) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+          temperature: req.body.temperature || 0.7,
+        });
+        responseContent = completion.choices[0]?.message?.content || '';
+      }
 
       res.json({
         success: true,
         message: {
           role: 'assistant',
-          content: response,
+          content: responseContent,
         },
       });
     } catch (error: any) {
       console.error('Errore durante chat:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: error.message || 'Errore durante chat',
       });
     }

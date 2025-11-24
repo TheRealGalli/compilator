@@ -183,6 +183,7 @@ export function DocumentCompilerSection() {
   const [webResearch, setWebResearch] = useState(false);
   const [detailedAnalysis, setDetailedAnalysis] = useState(true);
   const [formalTone, setFormalTone] = useState(true);
+  const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>('gemini');
 
   const handleTemplateChange = (value: string) => {
     setSelectedTemplate(value as keyof typeof templates);
@@ -203,7 +204,7 @@ export function DocumentCompilerSection() {
     }
 
     setIsCompiling(true);
-    
+
     try {
       const { apiRequest } = await import("@/lib/queryClient");
       const response = await apiRequest('POST', '/api/compile', {
@@ -213,20 +214,20 @@ export function DocumentCompilerSection() {
         webResearch,
         detailedAnalysis,
         formalTone,
-        modelProvider: 'openai',
-        model: 'gpt-4',
+        modelProvider,
+        model: modelProvider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4',
       });
 
       const data = await response.json();
-      
+
       if (data.success && data.compiledContent) {
         setCompiledContent(data.compiledContent);
-        
+
         const settingsInfo = [];
         if (webResearch) settingsInfo.push('Web Research');
         if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
         if (formalTone) settingsInfo.push('Tono Formale');
-        
+
         toast({
           title: "Documento compilato con successo",
           description: `Temperatura: ${temperature.toFixed(1)} | Strumenti attivi: ${settingsInfo.join(', ')}`,
@@ -248,7 +249,7 @@ export function DocumentCompilerSection() {
 
   const handleCopy = () => {
     if (!compiledContent) return;
-    
+
     navigator.clipboard.writeText(compiledContent);
     toast({
       title: "Copiato",
@@ -258,7 +259,7 @@ export function DocumentCompilerSection() {
 
   const handleDownload = () => {
     if (!compiledContent) return;
-    
+
     const blob = new Blob([compiledContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -269,7 +270,7 @@ export function DocumentCompilerSection() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     toast({
       title: "Download completato",
       description: "Il documento è stato scaricato con successo.",
@@ -287,8 +288,8 @@ export function DocumentCompilerSection() {
             </SelectTrigger>
             <SelectContent>
               <div className="p-2 border-b">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   onClick={(e) => {
                     e.preventDefault();
@@ -326,7 +327,7 @@ export function DocumentCompilerSection() {
               <SelectItem value="contratto">Contratto di Servizio</SelectItem>
             </SelectContent>
           </Select>
-          <Button 
+          <Button
             onClick={handleCompile}
             disabled={!templateContent || isCompiling}
             data-testid="button-compile"
@@ -346,21 +347,23 @@ export function DocumentCompilerSection() {
             webResearch={webResearch}
             detailedAnalysis={detailedAnalysis}
             formalTone={formalTone}
+            modelProvider={modelProvider}
             onNotesChange={setNotes}
             onTemperatureChange={setTemperature}
             onWebResearchChange={setWebResearch}
             onDetailedAnalysisChange={setDetailedAnalysis}
             onFormalToneChange={setFormalTone}
+            onModelProviderChange={setModelProvider}
           />
         </div>
         <div className="lg:col-span-4 h-[400px] lg:h-full">
-          <TemplateEditor 
+          <TemplateEditor
             value={templateContent}
             onChange={setTemplateContent}
           />
         </div>
         <div className="lg:col-span-5 h-[400px] lg:h-full">
-          <CompiledOutput 
+          <CompiledOutput
             content={compiledContent}
             onCopy={handleCopy}
             onDownload={handleDownload}
