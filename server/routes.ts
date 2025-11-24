@@ -133,7 +133,7 @@ Istruzioni:
         const userPrompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite.\n\nTemplate:\n${template}\n\n${notes ? `Note e contesto:\n${notes}` : ''}\n\nIstruzioni:\n- Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate\n- Mantieni la struttura e il formato del template\n- Usa un tono ${formalTone ? 'formale' : 'informale'}\n- Fornisci contenuti dettagliati e professionali`;
 
         const result = await generateText({
-          model: google('gemini-2.0-flash-exp'),
+          model: google('gemini-2.5-flash'),
           system: systemPrompt,
           prompt: userPrompt,
           temperature: temperature || 0.7,
@@ -189,7 +189,7 @@ Istruzioni:
         const conversationHistory = messages.map((msg: any) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n\n');
 
         const result = await generateText({
-          model: google('gemini-2.0-flash-exp'),
+          model: google('gemini-2.5-flash'),
           system: systemMessage,
           prompt: conversationHistory,
           temperature: req.body.temperature || 0.7,
