@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redirecting...</title>
+    <script>
+      // GitHub Pages 404.html workaround
+      // Reindirizza tutte le richieste a index.html per gestire il routing client-side
+      // Il base path è /compilator/ per questo repository
+      const basePath = '/compilator';
+      const currentPath = window.location.pathname;
+      
+      // Se siamo già nel base path, reindirizza a index.html mantenendo il path per il routing client-side
+      if (currentPath.startsWith(basePath)) {
+        // Mantieni il path completo per il routing client-side
+        window.location.replace(basePath + '/index.html' + window.location.search + window.location.hash);
+      } else {
+        // Altrimenti reindirizza al base path
+        window.location.replace(basePath + '/index.html' + window.location.search + window.location.hash);
+      }
+    </script>
+  </head>
+  <body>
+    <p>Redirecting...</p>
+    <script>
+      // Fallback: se lo script non funziona, mostra un link
+      setTimeout(() => {
+        document.body.innerHTML = '<p>Redirecting...</p><p><a href="/compilator/">Click here if you are not redirected</a></p>';
+      }, 1000);
+    </script>
+  </body>
+</html>
+
