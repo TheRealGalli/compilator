@@ -1,7 +1,7 @@
-import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Source {
   id: string;
@@ -18,30 +18,32 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
   const selectedCount = sources.filter(s => s.selected).length;
 
   return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className="h-full flex flex-col border rounded-lg bg-background overflow-hidden">
+      <div className="border-b px-4 py-3 bg-muted/30 flex items-center justify-between flex-shrink-0">
         <h3 className="text-sm font-medium">Fonti Disponibili</h3>
         <Badge variant="secondary" data-testid="badge-selected-count">
-          {selectedCount}/9 selezionate
+          {selectedCount}/9
         </Badge>
       </div>
-      <div className="space-y-2">
-        {sources.map((source) => (
-          <div
-            key={source.id}
-            className="flex items-center gap-3 p-2 rounded-md hover-elevate active-elevate-2"
-            data-testid={`source-item-${source.id}`}
-          >
-            <Checkbox
-              checked={source.selected}
-              onCheckedChange={() => onToggle?.(source.id)}
-              data-testid={`checkbox-source-${source.id}`}
-            />
-            <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <span className="text-sm flex-1 truncate">{source.name}</span>
-          </div>
-        ))}
-      </div>
-    </Card>
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-2">
+          {sources.map((source) => (
+            <div
+              key={source.id}
+              className="flex items-center gap-3 p-2 rounded-md hover-elevate active-elevate-2"
+              data-testid={`source-item-${source.id}`}
+            >
+              <Checkbox
+                checked={source.selected}
+                onCheckedChange={() => onToggle?.(source.id)}
+                data-testid={`checkbox-source-${source.id}`}
+              />
+              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm flex-1 truncate">{source.name}</span>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }

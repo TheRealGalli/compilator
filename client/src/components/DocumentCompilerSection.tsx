@@ -19,7 +19,7 @@ const templates = {
     content: `INFORMATIVA SULLA PRIVACY
 
 1. INTRODUZIONE
-La presente informativa sulla privacy descrive come raccogliamo, utilizziamo e proteggiamo i dati personali degli utenti.
+La presente informativa sulla privacy descrive come raccogliamo, utilizziamo e proteggiamo i dati personali degli utenti di [AZIENDA].
 
 2. DATI RACCOLTI
 Raccogliamo i seguenti tipi di dati:
@@ -34,74 +34,145 @@ I dati raccolti vengono utilizzati per:
 - Comunicazioni relative ai servizi
 
 4. PROTEZIONE DEI DATI
-Implementiamo misure di sicurezza appropriate per proteggere i dati personali.
+[AZIENDA] implementa misure di sicurezza appropriate per proteggere i dati personali.
 
 5. DIRITTI DELL'UTENTE
 Gli utenti hanno il diritto di accedere, correggere o cancellare i propri dati personali.
 
-Data: [DATA]
-Azienda: [AZIENDA]`
+6. CONTATTI
+Per qualsiasi richiesta relativa ai dati personali, contattare [AZIENDA] all'indirizzo email [EMAIL_AZIENDA].
+
+Data di entrata in vigore: [DATA]
+
+© [DATA] [AZIENDA]. Tutti i diritti riservati.`
   },
   relazione: {
     name: "Relazione Tecnica",
     content: `RELAZIONE TECNICA
 
 Progetto: [PROGETTO]
+Cliente: [CLIENTE]
 Data: [DATA]
 Responsabile: [RESPONSABILE]
 
+═══════════════════════════════════════
+
 1. INTRODUZIONE
-[Descrizione generale del progetto e obiettivi]
+
+Il presente documento illustra l'analisi tecnica svolta per il progetto [PROGETTO] commissionato da [CLIENTE].
+
+Obiettivi principali:
+- [OBIETTIVO_1]
+- [OBIETTIVO_2]
+- [OBIETTIVO_3]
 
 2. ANALISI DELLA SITUAZIONE
-[Analisi del contesto attuale e problematiche]
+
+Situazione attuale: [DESCRIZIONE_SITUAZIONE]
+
+Problematiche identificate:
+- [PROBLEMA_1]
+- [PROBLEMA_2]
 
 3. SOLUZIONE PROPOSTA
-[Descrizione dettagliata della soluzione]
+
+[DESCRIZIONE_SOLUZIONE]
 
 4. RISORSE NECESSARIE
-- Personale: [PERSONALE]
-- Budget: [BUDGET]
-- Tempistiche: [TEMPISTICHE]
 
-5. CONCLUSIONI
-[Riepilogo e raccomandazioni]
+Personale: [PERSONALE]
+Budget stimato: [BUDGET]
+Tempistiche: [TEMPISTICHE]
 
+5. PIANO DI IMPLEMENTAZIONE
+
+Fase 1: [FASE_1]
+Fase 2: [FASE_2]
+Fase 3: [FASE_3]
+
+6. CONCLUSIONI
+
+[CONCLUSIONI]
+
+Si raccomanda di procedere con l'implementazione della soluzione proposta nei tempi indicati.
+
+═══════════════════════════════════════
+
+Redatto da: [RESPONSABILE]
+Data: [DATA]
 Firma: ___________________`
   },
   contratto: {
     name: "Contratto di Servizio",
-    content: `CONTRATTO DI SERVIZIO
+    content: `CONTRATTO DI PRESTAZIONE DI SERVIZI
 
-Tra:
-FORNITORE: [FORNITORE]
-Sede: [SEDE_FORNITORE]
+Tra le parti:
 
-E:
-CLIENTE: [CLIENTE]
-Sede: [SEDE_CLIENTE]
+FORNITORE:
+Ragione sociale: [FORNITORE]
+Sede legale: [SEDE_FORNITORE]
+P.IVA: [PIVA_FORNITORE]
+Rappresentata da: [RAPPRESENTANTE_FORNITORE]
+
+E
+
+CLIENTE:
+Ragione sociale: [CLIENTE]
+Sede legale: [SEDE_CLIENTE]
+P.IVA: [PIVA_CLIENTE]
+Rappresentata da: [RAPPRESENTANTE_CLIENTE]
+
+═══════════════════════════════════════
 
 PREMESSO CHE:
-- Il Fornitore offre servizi di [SERVIZIO]
-- Il Cliente desidera usufruire di tali servizi
+
+- Il Fornitore svolge attività di [ATTIVITA_FORNITORE]
+- Il Cliente necessita di servizi di [SERVIZIO]
+- Le parti intendono regolare i termini della collaborazione
 
 SI CONVIENE E SI STIPULA QUANTO SEGUE:
 
 Art. 1 - OGGETTO DEL CONTRATTO
-Il presente contratto ha per oggetto la fornitura di [SERVIZIO_DETTAGLIO]
+Il presente contratto ha per oggetto la fornitura di [SERVIZIO_DETTAGLIO] da parte del Fornitore al Cliente.
 
 Art. 2 - DURATA
-Il contratto ha durata di [DURATA] a partire dal [DATA_INIZIO]
+Il contratto ha durata di [DURATA] con decorrenza dal [DATA_INIZIO] e termine il [DATA_FINE].
 
 Art. 3 - CORRISPETTIVO
-Il Cliente si impegna a corrispondere l'importo di [IMPORTO] Euro
+Il Cliente si impegna a corrispondere al Fornitore l'importo complessivo di € [IMPORTO] (Euro [IMPORTO_LETTERE]), oltre IVA di legge.
 
 Art. 4 - MODALITÀ DI PAGAMENTO
 Il pagamento avverrà secondo le seguenti modalità: [MODALITA_PAGAMENTO]
 
-Luogo e Data: ___________________
-Firma Fornitore: ___________________
-Firma Cliente: ___________________`
+Art. 5 - OBBLIGHI DEL FORNITORE
+Il Fornitore si impegna a:
+- [OBBLIGO_FORNITORE_1]
+- [OBBLIGO_FORNITORE_2]
+
+Art. 6 - OBBLIGHI DEL CLIENTE
+Il Cliente si impegna a:
+- [OBBLIGO_CLIENTE_1]
+- [OBBLIGO_CLIENTE_2]
+
+Art. 7 - RECESSO
+Ciascuna parte potrà recedere dal contratto con preavviso scritto di [PREAVVISO_RECESSO] giorni.
+
+Art. 8 - RISERVATEZZA
+Le parti si impegnano a mantenere riservate tutte le informazioni scambiate nell'ambito del presente contratto.
+
+Art. 9 - FORO COMPETENTE
+Per qualsiasi controversia è competente il Foro di [FORO_COMPETENTE].
+
+═══════════════════════════════════════
+
+Luogo e Data: [LUOGO], [DATA]
+
+Firma del Fornitore                    Firma del Cliente
+
+___________________                    ___________________
+
+[RAPPRESENTANTE_FORNITORE]            [RAPPRESENTANTE_CLIENTE]
+[FORNITORE]                           [CLIENTE]`
   }
 };
 
@@ -128,6 +199,7 @@ export function DocumentCompilerSection() {
     setSelectedTemplate(value as keyof typeof templates);
     if (value && templates[value as keyof typeof templates]) {
       setTemplateContent(templates[value as keyof typeof templates].content);
+      setCompiledContent("");
     }
   };
 
@@ -138,41 +210,94 @@ export function DocumentCompilerSection() {
   };
 
   const handleCompile = () => {
+    const selectedSources = sources.filter(s => s.selected);
+    
+    if (selectedSources.length === 0) {
+      toast({
+        title: "Errore",
+        description: "Seleziona almeno una fonte prima di compilare.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!templateContent.trim()) {
+      toast({
+        title: "Errore",
+        description: "Il template non può essere vuoto.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsCompiling(true);
     
     setTimeout(() => {
-      const selectedSources = sources.filter(s => s.selected);
-      
       let compiled = templateContent;
-      compiled = compiled.replace('[DATA]', new Date().toLocaleDateString('it-IT'));
-      compiled = compiled.replace('[AZIENDA]', 'Acme Corporation S.r.l.');
-      compiled = compiled.replace('[PROGETTO]', 'Modernizzazione Infrastruttura IT');
-      compiled = compiled.replace('[RESPONSABILE]', 'Ing. Mario Rossi');
-      compiled = compiled.replace('[PERSONALE]', '5 sviluppatori, 2 project manager');
-      compiled = compiled.replace('[BUDGET]', '€150,000');
-      compiled = compiled.replace('[TEMPISTICHE]', '6 mesi');
-      compiled = compiled.replace('[FORNITORE]', 'Tech Solutions S.r.l.');
-      compiled = compiled.replace('[SEDE_FORNITORE]', 'Via Roma 123, Milano');
-      compiled = compiled.replace('[CLIENTE]', 'Acme Corporation S.r.l.');
-      compiled = compiled.replace('[SEDE_CLIENTE]', 'Via Garibaldi 45, Roma');
-      compiled = compiled.replace('[SERVIZIO]', 'consulenza informatica');
-      compiled = compiled.replace('[SERVIZIO_DETTAGLIO]', 'consulenza e sviluppo software personalizzato');
-      compiled = compiled.replace('[DURATA]', '12 mesi');
-      compiled = compiled.replace('[DATA_INIZIO]', '01/01/2025');
-      compiled = compiled.replace('[IMPORTO]', '50.000');
-      compiled = compiled.replace('[MODALITA_PAGAMENTO]', 'bonifico bancario entro 30 giorni');
+      
+      const replacements: Record<string, string> = {
+        '[DATA]': new Date().toLocaleDateString('it-IT'),
+        '[AZIENDA]': 'Acme Corporation S.r.l.',
+        '[EMAIL_AZIENDA]': 'privacy@acmecorp.it',
+        '[PROGETTO]': 'Modernizzazione Infrastruttura IT',
+        '[CLIENTE]': 'Beta Industries S.p.A.',
+        '[RESPONSABILE]': 'Ing. Mario Rossi',
+        '[OBIETTIVO_1]': 'Migliorare le performance del sistema',
+        '[OBIETTIVO_2]': 'Ridurre i costi operativi del 30%',
+        '[OBIETTIVO_3]': 'Aumentare la sicurezza dei dati',
+        '[DESCRIZIONE_SITUAZIONE]': 'L\'infrastruttura attuale presenta criticità nelle performance',
+        '[PROBLEMA_1]': 'Server obsoleti con capacità insufficiente',
+        '[PROBLEMA_2]': 'Mancanza di ridondanza e backup adeguati',
+        '[DESCRIZIONE_SOLUZIONE]': 'Migrazione verso cloud infrastructure con architettura scalabile',
+        '[PERSONALE]': '5 sviluppatori senior, 2 project manager, 1 security specialist',
+        '[BUDGET]': '€ 150.000',
+        '[TEMPISTICHE]': '6 mesi (gennaio-giugno 2025)',
+        '[FASE_1]': 'Analisi e pianificazione (mese 1-2)',
+        '[FASE_2]': 'Implementazione e migrazione (mese 3-5)',
+        '[FASE_3]': 'Testing e deployment (mese 6)',
+        '[CONCLUSIONI]': 'La soluzione proposta è tecnicamente fattibile e economicamente sostenibile',
+        '[FORNITORE]': 'Tech Solutions S.r.l.',
+        '[SEDE_FORNITORE]': 'Via Roma 123, 20100 Milano (MI)',
+        '[PIVA_FORNITORE]': 'IT12345678901',
+        '[RAPPRESENTANTE_FORNITORE]': 'Dott. Giovanni Bianchi',
+        '[SEDE_CLIENTE]': 'Via Garibaldi 45, 00100 Roma (RM)',
+        '[PIVA_CLIENTE]': 'IT98765432109',
+        '[RAPPRESENTANTE_CLIENTE]': 'Dott.ssa Laura Verdi',
+        '[ATTIVITA_FORNITORE]': 'consulenza informatica e sviluppo software',
+        '[SERVIZIO]': 'consulenza informatica',
+        '[SERVIZIO_DETTAGLIO]': 'consulenza e sviluppo software personalizzato per la modernizzazione infrastrutturale',
+        '[DURATA]': '12 mesi',
+        '[DATA_INIZIO]': '01/01/2025',
+        '[DATA_FINE]': '31/12/2025',
+        '[IMPORTO]': '50.000',
+        '[IMPORTO_LETTERE]': 'cinquantamila/00',
+        '[MODALITA_PAGAMENTO]': 'bonifico bancario entro 30 giorni dalla data fattura',
+        '[OBBLIGO_FORNITORE_1]': 'Fornire i servizi con professionalità e competenza',
+        '[OBBLIGO_FORNITORE_2]': 'Rispettare le tempistiche concordate',
+        '[OBBLIGO_CLIENTE_1]': 'Effettuare i pagamenti nei termini stabiliti',
+        '[OBBLIGO_CLIENTE_2]': 'Fornire le informazioni necessarie per l\'esecuzione dei servizi',
+        '[PREAVVISO_RECESSO]': '30',
+        '[FORO_COMPETENTE]': 'Milano',
+        '[LUOGO]': 'Milano',
+      };
+
+      for (const [placeholder, value] of Object.entries(replacements)) {
+        compiled = compiled.replaceAll(placeholder, value);
+      }
       
       setCompiledContent(compiled);
       setIsCompiling(false);
       
       toast({
-        title: "Documento compilato",
+        title: "Documento compilato con successo",
         description: `Utilizzate ${selectedSources.length} fonti per generare il documento.`,
       });
     }, 1500);
   };
 
   const handleCopy = () => {
+    if (!compiledContent) return;
+    
     navigator.clipboard.writeText(compiledContent);
     toast({
       title: "Copiato",
@@ -181,27 +306,32 @@ export function DocumentCompilerSection() {
   };
 
   const handleDownload = () => {
-    const blob = new Blob([compiledContent], { type: 'text/plain' });
+    if (!compiledContent) return;
+    
+    const blob = new Blob([compiledContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `documento-compilato-${Date.now()}.txt`;
+    const templateName = selectedTemplate ? templates[selectedTemplate].name : 'documento';
+    a.download = `${templateName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.txt`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
     toast({
-      title: "Download avviato",
-      description: "Il documento è stato scaricato.",
+      title: "Download completato",
+      description: "Il documento è stato scaricato con successo.",
     });
   };
 
   return (
-    <div className="h-full flex flex-col p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="h-full flex flex-col p-6 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 className="text-xl font-semibold">Compilatore Documenti</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-            <SelectTrigger className="w-[200px]" data-testid="select-template">
+            <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
               <SelectValue placeholder="Seleziona modello" />
             </SelectTrigger>
             <SelectContent>
@@ -214,24 +344,25 @@ export function DocumentCompilerSection() {
             onClick={handleCompile}
             disabled={!templateContent || isCompiling}
             data-testid="button-compile"
+            className="w-full sm:w-auto"
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            {isCompiling ? "Compilazione..." : "Compila Documento"}
+            {isCompiling ? "Compilazione..." : "Compila"}
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
-        <div className="lg:col-span-3 min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
+        <div className="lg:col-span-3 h-[400px] lg:h-full">
           <SourceSelector sources={sources} onToggle={handleToggleSource} />
         </div>
-        <div className="lg:col-span-4 min-h-0">
+        <div className="lg:col-span-4 h-[400px] lg:h-full">
           <TemplateEditor 
             value={templateContent}
             onChange={setTemplateContent}
           />
         </div>
-        <div className="lg:col-span-5 min-h-0">
+        <div className="lg:col-span-5 h-[400px] lg:h-full">
           <CompiledOutput 
             content={compiledContent}
             onCopy={handleCopy}
