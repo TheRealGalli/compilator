@@ -16,10 +16,10 @@ export function AppSidebar({
   documents = []
 }: AppSidebarProps) {
   const sections = [
-    { id: "documents" as const, label: "Documents", icon: FileText },
+    { id: "documents" as const, label: "Documenti", icon: FileText },
     { id: "chat" as const, label: "Chat", icon: MessageSquare },
-    { id: "compiler" as const, label: "Compiler", icon: Code },
-    { id: "generated" as const, label: "Generated", icon: Sparkles },
+    { id: "compiler" as const, label: "Compilatore", icon: Code },
+    { id: "generated" as const, label: "Generati", icon: Sparkles },
   ];
 
   const getFileIcon = (type: string) => {
@@ -33,14 +33,14 @@ export function AppSidebar({
       <div className="p-4">
         <Button className="w-full" data-testid="button-new-notebook">
           <Plus className="w-4 h-4 mr-2" />
-          New Notebook
+          Nuovo Notebook
         </Button>
       </div>
 
       <Separator />
 
       <div className="p-4">
-        <h3 className="text-sm font-medium mb-3 text-muted-foreground">Sections</h3>
+        <h3 className="text-sm font-medium mb-3 text-muted-foreground">Sezioni</h3>
         <div className="flex flex-col gap-1">
           {sections.map((section) => {
             const Icon = section.icon;
@@ -65,11 +65,11 @@ export function AppSidebar({
 
       <div className="flex-1 overflow-hidden flex flex-col">
         <div className="p-4 pb-2">
-          <h3 className="text-sm font-medium text-muted-foreground">Sources</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">Fonti</h3>
         </div>
         <ScrollArea className="flex-1 px-4">
           {documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">No documents uploaded</p>
+            <p className="text-sm text-muted-foreground py-4">Nessun documento caricato</p>
           ) : (
             <div className="flex flex-col gap-2 pb-4">
               {documents.map((doc) => {
@@ -94,7 +94,7 @@ export function AppSidebar({
 
       <div className="p-4">
         <div className="bg-accent/50 rounded-lg p-3">
-          <p className="text-xs text-muted-foreground mb-2">Storage Used</p>
+          <p className="text-xs text-muted-foreground mb-2">Spazio Utilizzato</p>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">2.4 GB / 10 GB</span>
             <Badge variant="secondary" className="text-xs">24%</Badge>
