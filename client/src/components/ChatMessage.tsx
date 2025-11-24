@@ -12,7 +12,7 @@ interface ChatMessageProps {
 export function ChatMessage({ 
   role, 
   content, 
-  timestamp = "Just now",
+  timestamp = "Ora",
   sources = []
 }: ChatMessageProps) {
   const isUser = role === "user";

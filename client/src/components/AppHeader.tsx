@@ -7,7 +7,7 @@ interface AppHeaderProps {
   notebookTitle?: string;
 }
 
-export function AppHeader({ notebookTitle = "Untitled Notebook" }: AppHeaderProps) {
+export function AppHeader({ notebookTitle = "Notebook Senza Titolo" }: AppHeaderProps) {
   const { theme, toggleTheme } = useTheme();
 
   return (

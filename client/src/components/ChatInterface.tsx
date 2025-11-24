@@ -19,17 +19,17 @@ export function ChatInterface() {
     {
       id: "1",
       role: "assistant",
-      content: "Hello! I'm your AI research assistant. I can help you analyze your documents, answer questions, and generate insights. What would you like to know?",
-      timestamp: "Just now",
+      content: "Ciao! Sono il tuo assistente di ricerca AI. Posso aiutarti ad analizzare i tuoi documenti, rispondere a domande e generare approfondimenti. Come posso aiutarti?",
+      timestamp: "Ora",
     },
   ]);
   const [input, setInput] = useState("");
 
   const suggestedPrompts = [
-    "Summarize the key points",
-    "What are the main findings?",
-    "Generate study notes",
-    "Create a FAQ",
+    "Riassumi i punti chiave",
+    "Quali sono i risultati principali?",
+    "Genera note di studio",
+    "Crea una FAQ",
   ];
 
   const handleSend = () => {
@@ -39,7 +39,7 @@ export function ChatInterface() {
       id: Date.now().toString(),
       role: "user",
       content: input,
-      timestamp: "Just now",
+      timestamp: "Ora",
     };
     
     setMessages([...messages, newMessage]);
@@ -49,9 +49,9 @@ export function ChatInterface() {
       const response: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I understand your question. Based on the uploaded documents, here's what I found...",
-        timestamp: "Just now",
-        sources: ["research-paper.pdf"],
+        content: "Ho capito la tua domanda. In base ai documenti caricati, ecco cosa ho trovato...",
+        timestamp: "Ora",
+        sources: ["documento-ricerca.pdf"],
       };
       setMessages((prev) => [...prev, response]);
     }, 1000);
@@ -97,7 +97,7 @@ export function ChatInterface() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask a question about your documents..."
+              placeholder="Fai una domanda sui tuoi documenti..."
               className="resize-none min-h-[60px]"
               data-testid="input-chat"
             />

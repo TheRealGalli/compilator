@@ -29,11 +29,11 @@ export function DocumentsSection() {
   return (
     <div className="h-full flex flex-col p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold">Documents</h2>
+        <h2 className="text-xl font-semibold">Documenti</h2>
         {documents.length > 0 && (
           <Button data-testid="button-analyze-documents">
             <Sparkles className="w-4 h-4 mr-2" />
-            Analyze Documents
+            Analizza Documenti
           </Button>
         )}
       </div>
@@ -45,7 +45,7 @@ export function DocumentsSection() {
       {documents.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-muted-foreground">
-            Uploaded Files ({documents.length})
+            File Caricati ({documents.length})
           </h3>
           <div className="space-y-2">
             {documents.map((doc) => (

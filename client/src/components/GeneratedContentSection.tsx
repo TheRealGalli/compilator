@@ -7,31 +7,31 @@ export function GeneratedContentSection() {
   const generatedContent = [
     {
       id: "1",
-      title: "Summary",
+      title: "Riassunto",
       icon: <Sparkles className="w-4 h-4 text-primary" />,
-      content: "This research explores the intersection of machine learning and climate science. The study demonstrates how neural networks can predict weather patterns with 23% higher accuracy than traditional models. Key innovations include a novel attention mechanism and multi-scale temporal analysis.",
+      content: "Questa ricerca esplora l'intersezione tra machine learning e scienze climatiche. Lo studio dimostra come le reti neurali possano prevedere i modelli meteorologici con un'accuratezza superiore del 23% rispetto ai modelli tradizionali. Le innovazioni chiave includono un nuovo meccanismo di attenzione e un'analisi temporale multi-scala.",
     },
     {
       id: "2",
-      title: "Study Notes",
+      title: "Note di Studio",
       icon: <FileText className="w-4 h-4 text-primary" />,
-      content: "• Machine learning improves weather prediction accuracy by 23%\n• Novel attention mechanism enables better feature extraction\n• Multi-scale temporal analysis captures both short and long-term patterns\n• Dataset comprises 10 years of global weather data\n• Model achieves state-of-the-art results on benchmark tests",
+      content: "• Il machine learning migliora l'accuratezza delle previsioni meteo del 23%\n• Nuovo meccanismo di attenzione che consente una migliore estrazione delle caratteristiche\n• L'analisi temporale multi-scala cattura sia pattern a breve che a lungo termine\n• Il dataset comprende 10 anni di dati meteorologici globali\n• Il modello raggiunge risultati all'avanguardia nei test di benchmark",
     },
     {
       id: "3",
       title: "FAQ",
       icon: <HelpCircle className="w-4 h-4 text-primary" />,
-      content: "Q: What is the main contribution of this research?\nA: A novel neural network architecture for weather prediction with 23% improved accuracy.\n\nQ: What dataset was used?\nA: 10 years of global weather data from multiple sources.\n\nQ: How does it compare to existing methods?\nA: It outperforms traditional models and achieves state-of-the-art results.",
+      content: "D: Qual è il contributo principale di questa ricerca?\nR: Una nuova architettura di rete neurale per le previsioni meteorologiche con un'accuratezza migliorata del 23%.\n\nD: Quale dataset è stato utilizzato?\nR: 10 anni di dati meteorologici globali provenienti da più fonti.\n\nD: Come si confronta con i metodi esistenti?\nR: Supera i modelli tradizionali e raggiunge risultati all'avanguardia.",
     },
   ];
 
   return (
     <div className="h-full flex flex-col p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold">Generated Content</h2>
+        <h2 className="text-xl font-semibold">Contenuti Generati</h2>
         <Button variant="outline" data-testid="button-generate-all">
           <Sparkles className="w-4 h-4 mr-2" />
-          Generate All
+          Genera Tutto
         </Button>
       </div>
 

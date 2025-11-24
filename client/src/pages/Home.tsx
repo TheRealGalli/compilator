@@ -43,7 +43,7 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      <AppHeader notebookTitle="My Research Notebook" />
+      <AppHeader notebookTitle="Il Mio Notebook di Ricerca" />
       <div className="flex-1 flex overflow-hidden">
         <AppSidebar
           activeSection={activeSection}

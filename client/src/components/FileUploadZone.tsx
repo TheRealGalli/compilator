@@ -47,9 +47,9 @@ export function FileUploadZone({ onFilesSelected }: FileUploadZoneProps) {
         data-testid="input-file-hidden"
       />
       <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-      <h3 className="text-lg font-medium mb-2">Drop files here or click to browse</h3>
+      <h3 className="text-lg font-medium mb-2">Trascina i file qui o clicca per sfogliare</h3>
       <p className="text-sm text-muted-foreground">
-        Supported formats: PDF, TXT, DOCX (Max 10MB per file)
+        Formati supportati: PDF, TXT, DOCX (Max 10MB per file)
       </p>
     </div>
   );
