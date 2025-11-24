@@ -13,14 +13,14 @@ const PROJECT_ID = process.env.GCP_PROJECT_ID || '';
  */
 export async function getSecret(secretName: string): Promise<string> {
   const name = `projects/${PROJECT_ID}/secrets/${secretName}/versions/latest`;
-  
+
   try {
     const [version] = await client.accessSecretVersion({ name });
-    
+
     if (!version.payload?.data) {
       throw new Error(`Secret ${secretName} not found or empty`);
     }
-    
+
     // I dati possono essere Buffer o stringa
     const secretValue = version.payload.data.toString();
     return secretValue;
@@ -38,12 +38,12 @@ export async function createOrUpdateSecret(
   secretValue: string,
 ): Promise<void> {
   const parent = `projects/${PROJECT_ID}`;
-  
+
   try {
     // Verifica se il segreto esiste già
     try {
       await client.getSecret({ name: `${parent}/secrets/${secretName}` });
-      
+
       // Il segreto esiste, aggiungi una nuova versione
       await client.addSecretVersion({
         parent: `${parent}/secrets/${secretName}`,
@@ -63,7 +63,7 @@ export async function createOrUpdateSecret(
             },
           },
         });
-        
+
         // Aggiungi la prima versione
         await client.addSecretVersion({
           parent: `${parent}/secrets/${secretName}`,
@@ -83,9 +83,21 @@ export async function createOrUpdateSecret(
 
 /**
  * Recupera la chiave API del modello (es. OpenAI, Google AI, ecc.)
+ * Prima controlla le variabili d'ambiente, poi fallback su Secret Manager
  */
 export async function getModelApiKey(modelProvider: string = 'openai'): Promise<string> {
+  // Prova prima con variabili d'ambiente (per Cloud Run)
+  const envVarName = `${modelProvider.toUpperCase()}_API_KEY`;
+  const envValue = process.env[envVarName];
+
+  if (envValue) {
+    console.log(`Using ${envVarName} from environment variable`);
+    return envValue;
+  }
+
+  // Fallback su Secret Manager (per compatibilità)
   const secretName = `MODEL_API_KEY_${modelProvider.toUpperCase()}`;
+  console.log(`Trying to fetch ${secretName} from Secret Manager`);
   return getSecret(secretName);
 }
 
