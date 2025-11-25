@@ -250,7 +250,7 @@ Istruzioni:
   // Endpoint per chat con AI (con streaming)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
-      const { messages, selectedDocuments } = req.body;
+      const { messages, selectedDocuments, sources } = req.body;
 
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'Messaggi richiesti' });
@@ -260,27 +260,17 @@ Istruzioni:
       const apiKey = await getModelApiKey('gemini');
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
-      // Load chunks from selected documents
+      // Build system message (without context for now - sources are in-memory)
       let contextMessage = '';
-      if (selectedDocuments && selectedDocuments.length > 0) {
-        const chunkedDocs = await loadMultipleDocumentChunks(selectedDocuments);
-        const allChunks: DocumentChunk[] = chunkedDocs.flatMap(doc => doc.chunks);
 
-        // Get the last user message for relevance scoring
-        const lastUserMessage = messages.filter((m: any) => m.role === 'user').slice(-1)[0];
-        const query = lastUserMessage ? lastUserMessage.content : '';
+      // TODO: Handle in-memory sources when implementation is complete
+      // For now, just provide a basic system message
 
-        // Select most relevant chunks
-        const relevantChunks = selectRelevantChunks(allChunks, query, 8000, 3);
-        contextMessage = formatContextWithCitations(relevantChunks);
-      }
-
-      // Build system message
       const systemMessage = `Sei un assistente AI di ricerca. Aiuti gli utenti ad analizzare documenti e rispondere a domande.
 
 ${contextMessage}
 
-Usa le informazioni dai documenti sopra per rispondere alle domande dell'utente. Cita i nomi dei documenti quando usi informazioni da essi.`;
+Rispondi in modo chiaro e conciso alle domande dell'utente.`;
 
       // Use streamText for real-time responses
       const result = streamText({

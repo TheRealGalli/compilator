@@ -14,6 +14,11 @@ interface SourceSelectorProps {
   onToggle?: (id: string) => void;
 }
 
+const truncateFilename = (name: string, maxLength: number = 17): string => {
+  if (name.length <= maxLength) return name;
+  return name.substring(0, maxLength) + "...";
+};
+
 export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
   const selectedCount = sources.filter(s => s.selected).length;
 
@@ -22,7 +27,7 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
       <div className="border-b px-4 py-3 bg-muted/30 flex items-center justify-between flex-shrink-0">
         <h3 className="text-sm font-medium">Fonti Disponibili</h3>
         <Badge variant="secondary" data-testid="badge-selected-count">
-          {selectedCount}/9
+          {selectedCount}/10
         </Badge>
       </div>
       <ScrollArea className="flex-1">
@@ -39,7 +44,9 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
                 data-testid={`checkbox-source-${source.id}`}
               />
               <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm flex-1 truncate">{source.name}</span>
+              <span className="text-sm flex-1 truncate" title={source.name}>
+                {truncateFilename(source.name)}
+              </span>
             </div>
           ))}
         </div>
