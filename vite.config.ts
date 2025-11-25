@@ -3,6 +3,12 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 export default defineConfig(async () => {
   const plugins = [
     react(),
@@ -27,20 +33,20 @@ export default defineConfig(async () => {
     plugins,
     resolve: {
       alias: {
-        "@": path.resolve(import.meta.dirname, "client", "src"),
-        "@shared": path.resolve(import.meta.dirname, "shared"),
-        "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+        "@": path.resolve(__dirname, "client", "src"),
+        "@shared": path.resolve(__dirname, "shared"),
+        "@assets": path.resolve(__dirname, "attached_assets"),
       },
     },
-    root: path.resolve(import.meta.dirname, "client"),
-    base: process.env.GITHUB_PAGES 
-      ? `/${process.env.GITHUB_REPOSITORY?.split('/')[1] || 'compilator'}/` 
+    root: path.resolve(__dirname, "client"),
+    base: process.env.GITHUB_PAGES
+      ? `/${process.env.GITHUB_REPOSITORY?.split('/')[1] || 'compilator'}/`
       : '/',
     build: {
-      outDir: path.resolve(import.meta.dirname, "dist/public"),
+      outDir: path.resolve(__dirname, "dist/public"),
       emptyOutDir: true,
     },
-    publicDir: path.resolve(import.meta.dirname, "client", "public"),
+    publicDir: path.resolve(__dirname, "client", "public"),
     server: {
       fs: {
         strict: true,

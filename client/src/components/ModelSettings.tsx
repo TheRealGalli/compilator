@@ -182,16 +182,11 @@ export function ModelSettings({
                     <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
                       Modello
                     </Label>
-                    <select
-                      id="model-provider"
-                      value={modelProvider}
-                      onChange={(e) => onModelProviderChange?.(e.target.value as 'openai' | 'gemini')}
-                      className="ml-2 text-xs border rounded"
-                      data-testid="select-model-provider"
-                    >
-                      <option value="openai">OpenAI</option>
-                      <option value="gemini">Gemini 2.5 Flash</option>
-                    </select>
+                    <div className="space-y-2">
+                      <div className="p-2 border rounded-md bg-muted/50 text-sm text-muted-foreground">
+                        Gemini 2.5 Flash (Google)
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

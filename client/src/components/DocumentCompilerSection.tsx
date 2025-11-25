@@ -1,11 +1,15 @@
-import { Sparkles } from "lucide-react";
+import { Sparkles, FileText, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TemplateEditor } from "./TemplateEditor";
 import { CompiledOutput } from "./CompiledOutput";
 import { ModelSettings } from "./ModelSettings";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const templates = {
   privacy: {
@@ -175,6 +179,11 @@ interface DocumentCompilerSectionProps {
   onModelProviderChange?: (value: 'openai' | 'gemini') => void;
 }
 
+interface Document {
+  name: string;
+  gcsPath: string;
+}
+
 export function DocumentCompilerSection({
   modelProvider: initialModelProvider = 'gemini',
   onModelProviderChange
@@ -183,6 +192,8 @@ export function DocumentCompilerSection({
   const [templateContent, setTemplateContent] = useState("");
   const [compiledContent, setCompiledContent] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const { toast } = useToast();
 
   // Model settings
@@ -192,6 +203,23 @@ export function DocumentCompilerSection({
   const [detailedAnalysis, setDetailedAnalysis] = useState(true);
   const [formalTone, setFormalTone] = useState(true);
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  const fetchDocuments = async () => {
+    try {
+      const { getApiUrl } = await import("@/lib/api-config");
+      const response = await fetch(getApiUrl('/api/documents'));
+      if (response.ok) {
+        const data = await response.json();
+        setDocuments(data);
+      }
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    }
+  };
 
   const handleTemplateChange = (value: string) => {
     setSelectedTemplate(value as keyof typeof templates);
@@ -222,8 +250,9 @@ export function DocumentCompilerSection({
         webResearch,
         detailedAnalysis,
         formalTone,
-        modelProvider,
-        model: modelProvider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4',
+        modelProvider: 'gemini', // Enforce Gemini
+        selectedDocuments, // Pass selected documents context
+        model: 'gemini-2.5-flash',
       });
 
       const data = await response.json();
@@ -235,6 +264,7 @@ export function DocumentCompilerSection({
         if (webResearch) settingsInfo.push('Web Research');
         if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
         if (formalTone) settingsInfo.push('Tono Formale');
+        if (selectedDocuments.length > 0) settingsInfo.push(`${selectedDocuments.length} docs`);
 
         toast({
           title: "Documento compilato con successo",
@@ -283,6 +313,14 @@ export function DocumentCompilerSection({
       title: "Download completato",
       description: "Il documento è stato scaricato con successo.",
     });
+  };
+
+  const toggleDocument = (gcsPath: string) => {
+    setSelectedDocuments(prev =>
+      prev.includes(gcsPath)
+        ? prev.filter(p => p !== gcsPath)
+        : [...prev, gcsPath]
+    );
   };
 
   return (
@@ -335,6 +373,48 @@ export function DocumentCompilerSection({
               <SelectItem value="contratto">Contratto di Servizio</SelectItem>
             </SelectContent>
           </Select>
+
+          {documents.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto gap-2">
+                  <FileText className="w-4 h-4" />
+                  {selectedDocuments.length > 0
+                    ? `${selectedDocuments.length} docs`
+                    : "Contesto"}
+                  <ChevronUp className="w-4 h-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <div className="p-4 border-b">
+                  <h4 className="font-medium leading-none">Documenti di contesto</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Seleziona i documenti per la compilazione
+                  </p>
+                </div>
+                <ScrollArea className="h-[200px] p-4">
+                  <div className="space-y-4">
+                    {documents.map((doc) => (
+                      <div key={doc.gcsPath} className="flex items-start space-x-2">
+                        <Checkbox
+                          id={`compiler-${doc.gcsPath}`}
+                          checked={selectedDocuments.includes(doc.gcsPath)}
+                          onCheckedChange={() => toggleDocument(doc.gcsPath)}
+                        />
+                        <Label
+                          htmlFor={`compiler-${doc.gcsPath}`}
+                          className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          {doc.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+          )}
+
           <Button
             onClick={handleCompile}
             disabled={!templateContent || isCompiling}

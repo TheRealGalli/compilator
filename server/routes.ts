@@ -1,12 +1,16 @@
 import type { Express, Request, Response } from "express";
 import { google } from '@ai-sdk/google';
-import { generateText } from 'ai';
+import { generateText, streamText } from 'ai';
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
-import { uploadFile, downloadFile, deleteFile, fileExists } from "./gcp-storage";
+import { uploadFile, downloadFile, deleteFile, fileExists, uploadFileToPath, listFiles, saveDocumentChunks, loadMultipleDocumentChunks } from "./gcp-storage";
 import { getModelApiKey } from "./gcp-secrets";
-import OpenAI from "openai";
+import mammoth from 'mammoth';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdf = require('pdf-parse');
+import { chunkText, type ChunkedDocument, selectRelevantChunks, formatContextWithCitations, type DocumentChunk } from './rag-utils';
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
@@ -18,6 +22,47 @@ const upload = multer({
     fileSize: 50 * 1024 * 1024, // 50MB max
   },
 });
+
+async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
+  try {
+    if (mimeType === 'application/pdf') {
+      const data = await pdf(buffer);
+      return data.text;
+    } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      const result = await mammoth.extractRawText({ buffer });
+      return result.value;
+    } else if (mimeType === 'text/plain') {
+      return buffer.toString('utf-8');
+    }
+    return '';
+  } catch (error) {
+    console.error('Error extracting text:', error);
+    return '';
+  }
+}
+
+async function getDocumentsContext(selectedDocuments: string[]): Promise<string> {
+  if (!selectedDocuments || selectedDocuments.length === 0) {
+    return '';
+  }
+
+  let context = '\n\nDOCUMENTI DI CONTESTO:\n';
+
+  for (const docPath of selectedDocuments) {
+    try {
+      const sidecarPath = `${docPath}.txt`;
+      if (await fileExists(sidecarPath)) {
+        const buffer = await downloadFile(sidecarPath);
+        const text = buffer.toString('utf-8');
+        context += `\n--- INIZIO DOCUMENTO: ${docPath} ---\n${text}\n--- FINE DOCUMENTO ---\n`;
+      }
+    } catch (error) {
+      console.error(`Errore recupero contesto per ${docPath}:`, error);
+    }
+  }
+
+  return context;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configurazione CORS
@@ -41,6 +86,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // List documents endpoint
+  app.get('/api/documents', async (_req: Request, res: Response) => {
+    try {
+      const files = await listFiles();
+      // Filter out sidecar .txt files
+      const documents = files.filter(f => !f.name.endsWith('.txt'));
+      res.json(documents);
+    } catch (error: any) {
+      console.error('Errore durante recupero documenti:', error);
+      res.status(500).json({ error: error.message || 'Errore durante recupero documenti' });
+    }
+  });
+
   // Upload file endpoint
   app.post('/api/files/upload', upload.single('file'), async (req: Request, res: Response) => {
     try {
@@ -48,11 +106,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Nessun file fornito' });
       }
 
+      // 1. Upload original file
       const result = await uploadFile(
         req.file.buffer,
         req.file.originalname,
         req.file.mimetype,
       );
+
+      // 2. Extract text
+      const textContent = await extractText(req.file.buffer, req.file.mimetype);
+
+      // 3. Upload extracted text as sidecar if text was extracted
+      if (textContent) {
+        const sidecarPath = `${result.gcsPath}.txt`;
+        const textBuffer = Buffer.from(textContent, 'utf-8');
+
+        await uploadFileToPath(
+          textBuffer,
+          sidecarPath,
+          'text/plain'
+        );
+
+        console.log(`Text extracted and saved to ${sidecarPath}`);
+
+        // 4. Create and save document chunks
+        try {
+          const chunks = chunkText(
+            textContent,
+            req.file.originalname,
+            result.gcsPath,
+            1000 // max tokens per chunk
+          );
+
+          const chunkedDocument: ChunkedDocument = {
+            documentName: req.file.originalname,
+            documentPath: result.gcsPath,
+            chunks,
+            createdAt: new Date().toISOString(),
+          };
+
+          await saveDocumentChunks(result.gcsPath, chunkedDocument);
+          console.log(`Created ${chunks.length} chunks for ${req.file.originalname}`);
+        } catch (chunkError) {
+          console.error('Error creating chunks:', chunkError);
+          // Don't fail the upload if chunking fails
+        }
+      }
 
       res.json({
         success: true,
@@ -97,67 +196,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per compilare documenti con AI
   app.post('/api/compile', async (req: Request, res: Response) => {
     try {
-      const { template, notes, temperature, formalTone, modelProvider = 'openai' } = req.body;
+      const { template, notes, temperature, formalTone, selectedDocuments } = req.body;
 
       if (!template) {
         return res.status(400).json({ error: 'Template richiesto' });
       }
 
-      // Recupera la chiave API dal Secret Manager
-      const apiKey = await getModelApiKey(modelProvider);
+      // Recupera contesto dai documenti selezionati
+      const documentsContext = await getDocumentsContext(selectedDocuments);
 
-      // Inizializza il client OpenAI
-      const openai = new OpenAI({ apiKey });
+      // Recupera la chiave API dal Secret Manager (default gemini)
+      const apiKey = await getModelApiKey('gemini');
 
-      // Prepara il prompt
-      const prompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite.
+      // Use Vercel AI SDK with Google provider
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+
+      const systemPrompt = 'Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.';
+      const userPrompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite e sui documenti di contesto.
 
 Template:
 ${template}
 
-${notes ? `Note e contesto:\n${notes}` : ''}
+${notes ? `Note:\n${notes}` : ''}
+
+${documentsContext}
 
 Istruzioni:
 - Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate
+- Usa le informazioni dai documenti di contesto se disponibili
 - Mantieni la struttura e il formato del template
-- Usa un tono ${req.body.formalTone ? 'formale' : 'informale'}
+- Usa un tono ${formalTone ? 'formale' : 'informale'}
 - Fornisci contenuti dettagliati e professionali`;
 
-      let compiledContent = '';
-      if (modelProvider === 'gemini') {
-        // Use Vercel AI SDK with Google provider
-        // Set the API key in env (Vercel AI SDK reads from GOOGLE_GENERATIVE_AI_API_KEY)
-        process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
-
-        const systemPrompt = 'Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.';
-        const userPrompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite.\n\nTemplate:\n${template}\n\n${notes ? `Note e contesto:\n${notes}` : ''}\n\nIstruzioni:\n- Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate\n- Mantieni la struttura e il formato del template\n- Usa un tono ${formalTone ? 'formale' : 'informale'}\n- Fornisci contenuti dettagliati e professionali`;
-
-        const result = await generateText({
-          model: google('gemini-2.5-flash'),
-          system: systemPrompt,
-          prompt: userPrompt,
-          temperature: temperature || 0.7,
-        });
-
-        compiledContent = result.text;
-      } else {
-        // Fallback to OpenAI
-        const openai = new OpenAI({ apiKey });
-        const prompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite.\n\nTemplate:\n${template}\n\n${notes ? `Note e contesto:\n${notes}` : ''}\n\nIstruzioni:\n- Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate\n- Mantieni la struttura e il formato del template\n- Usa un tono ${formalTone ? 'formale' : 'informale'}\n- Fornisci contenuti dettagliati e professionali`;
-        const completion = await openai.chat.completions.create({
-          model: req.body.model || 'gpt-4',
-          messages: [
-            { role: 'system', content: 'Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.' },
-            { role: 'user', content: prompt },
-          ],
-          temperature: temperature || 0.7,
-        });
-        compiledContent = completion.choices[0]?.message?.content || '';
-      }
+      const result = await generateText({
+        model: google('gemini-2.5-flash'),
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature: temperature || 0.7,
+      });
 
       res.json({
         success: true,
-        compiledContent,
+        compiledContent: result.text,
       });
     } catch (error: any) {
       console.error('Errore durante compilazione:', error);
@@ -167,58 +247,54 @@ Istruzioni:
     }
   });
 
-  // Endpoint per chat con AI
+  // Endpoint per chat con AI (con streaming)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
-      const { messages, modelProvider = 'openai' } = req.body;
+      const { messages, selectedDocuments } = req.body;
 
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'Messaggi richiesti' });
       }
 
       // Recupera la chiave API dal Secret Manager
-      const apiKey = await getModelApiKey(modelProvider);
+      const apiKey = await getModelApiKey('gemini');
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
-      let responseContent = '';
-      if (modelProvider === 'gemini') {
-        // Use Vercel AI SDK with Google provider
-        process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+      // Load chunks from selected documents
+      let contextMessage = '';
+      if (selectedDocuments && selectedDocuments.length > 0) {
+        const chunkedDocs = await loadMultipleDocumentChunks(selectedDocuments);
+        const allChunks: DocumentChunk[] = chunkedDocs.flatMap(doc => doc.chunks);
 
-        // Convert messages to the format expected by generateText
-        const systemMessage = 'Sei un assistente AI di ricerca. Aiuti gli utenti ad analizzare documenti e rispondere a domande.';
-        const conversationHistory = messages.map((msg: any) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n\n');
+        // Get the last user message for relevance scoring
+        const lastUserMessage = messages.filter((m: any) => m.role === 'user').slice(-1)[0];
+        const query = lastUserMessage ? lastUserMessage.content : '';
 
-        const result = await generateText({
-          model: google('gemini-2.5-flash'),
-          system: systemMessage,
-          prompt: conversationHistory,
-          temperature: req.body.temperature || 0.7,
-        });
-
-        responseContent = result.text;
-      } else {
-        // Fallback to OpenAI
-        const openai = new OpenAI({ apiKey });
-
-        // Chiama l'API di OpenAI
-        const completion = await openai.chat.completions.create({
-          model: req.body.model || 'gpt-4',
-          messages: messages.map((msg: any) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
-          temperature: req.body.temperature || 0.7,
-        });
-        responseContent = completion.choices[0]?.message?.content || '';
+        // Select most relevant chunks
+        const relevantChunks = selectRelevantChunks(allChunks, query, 8000, 3);
+        contextMessage = formatContextWithCitations(relevantChunks);
       }
 
-      res.json({
-        success: true,
-        message: {
-          role: 'assistant',
-          content: responseContent,
-        },
+      // Build system message
+      const systemMessage = `Sei un assistente AI di ricerca. Aiuti gli utenti ad analizzare documenti e rispondere a domande.
+
+${contextMessage}
+
+Usa le informazioni dai documenti sopra per rispondere alle domande dell'utente. Cita i nomi dei documenti quando usi informazioni da essi.`;
+
+      // Use streamText for real-time responses
+      const result = streamText({
+        model: google('gemini-2.5-flash'),
+        system: systemMessage,
+        messages: messages.map((m: any) => ({
+          role: m.role,
+          content: m.content,
+        })),
+        temperature: req.body.temperature || 0.7,
       });
+
+      // Stream the response back
+      return result.toTextStreamResponse();
     } catch (error: any) {
       console.error('Errore durante chat:', error);
       res.status(500).json({
