@@ -1,15 +1,13 @@
-import { Send, FileText, ChevronUp } from "lucide-react";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "./ChatMessage";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { useSources } from "@/contexts/SourcesContext";
 
 interface Message {
   id: string;
@@ -23,11 +21,6 @@ interface ChatInterfaceProps {
   modelProvider?: 'openai' | 'gemini';
 }
 
-interface Document {
-  name: string;
-  gcsPath: string;
-}
-
 export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -39,26 +32,8 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const { toast } = useToast();
-
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
-
-  const fetchDocuments = async () => {
-    try {
-      const { getApiUrl } = await import("@/lib/api-config");
-      const response = await fetch(getApiUrl('/api/documents'));
-      if (response.ok) {
-        const data = await response.json();
-        setDocuments(data);
-      }
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-    }
-  };
+  const { selectedSources } = useSources();
 
   const suggestedPrompts = [
     "Riassumi i punti chiave",
@@ -93,7 +68,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       const response = await apiRequest('POST', '/api/chat', {
         messages: apiMessages,
         modelProvider: 'gemini', // Enforce Gemini
-        selectedDocuments, // Pass selected documents context
+        sources: selectedSources, // Pass selected sources
         temperature: 0.7,
       });
 
@@ -138,14 +113,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     }
   };
 
-  const toggleDocument = (gcsPath: string) => {
-    setSelectedDocuments(prev =>
-      prev.includes(gcsPath)
-        ? prev.filter(p => p !== gcsPath)
-        : [...prev, gcsPath]
-    );
-  };
-
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1 p-6">
@@ -175,48 +142,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           )}
 
           <div className="flex flex-col gap-2">
-            {documents.length > 0 && (
-              <div className="flex justify-end">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 gap-2">
-                      <FileText className="w-4 h-4" />
-                      {selectedDocuments.length > 0
-                        ? `${selectedDocuments.length} documenti selezionati`
-                        : "Seleziona contesto"}
-                      <ChevronUp className="w-4 h-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80 p-0" align="end">
-                    <div className="p-4 border-b">
-                      <h4 className="font-medium leading-none">Documenti di contesto</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Seleziona i documenti da usare per la risposta
-                      </p>
-                    </div>
-                    <ScrollArea className="h-[200px] p-4">
-                      <div className="space-y-4">
-                        {documents.map((doc) => (
-                          <div key={doc.gcsPath} className="flex items-start space-x-2">
-                            <Checkbox
-                              id={doc.gcsPath}
-                              checked={selectedDocuments.includes(doc.gcsPath)}
-                              onCheckedChange={() => toggleDocument(doc.gcsPath)}
-                            />
-                            <Label
-                              htmlFor={doc.gcsPath}
-                              className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                            >
-                              {doc.name}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
 
             <div className="flex gap-2">
               <Textarea

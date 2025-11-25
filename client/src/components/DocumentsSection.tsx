@@ -2,86 +2,50 @@ import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-
-interface Document {
-  id: string;
-  name: string;
-  size: string;
-  gcsPath: string;
-  contentType?: string;
-}
+import { useSources } from "@/contexts/SourcesContext";
 
 export function DocumentsSection() {
-  const [documents, setDocuments] = useState<Document[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
-
-  // Fetch documents on mount
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
-
-  const fetchDocuments = async () => {
-    try {
-      const { getApiUrl } = await import("@/lib/api-config");
-      const response = await fetch(getApiUrl('/api/documents'));
-      if (response.ok) {
-        const data = await response.json();
-        const formattedDocs = data.map((doc: any) => ({
-          id: doc.gcsPath, // Use gcsPath as ID
-          name: doc.name,
-          size: `${(parseInt(doc.size) / 1024 / 1024).toFixed(2)} MB`,
-          gcsPath: doc.gcsPath,
-          contentType: doc.contentType
-        }));
-        setDocuments(formattedDocs);
-      }
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-    }
-  };
+  const { sources, addSource, removeSource, maxSources } = useSources();
 
   const handleFilesSelected = async (files: FileList) => {
     setIsUploading(true);
 
     try {
-      const { getApiUrl } = await import("@/lib/api-config");
+      let successCount = 0;
+      let failedCount = 0;
 
-      const uploadPromises = Array.from(files).map(async (file) => {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await fetch(getApiUrl('/api/files/upload'), {
-          method: 'POST',
-          body: formData,
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || 'Upload fallito');
+      for (const file of Array.from(files)) {
+        const added = addSource(file);
+        if (added) {
+          successCount++;
+        } else {
+          failedCount++;
         }
+      }
 
-        return await response.json();
-      });
+      if (successCount > 0) {
+        toast({
+          title: "File aggiunti alle fonti",
+          description: `${successCount} file${successCount > 1 ? ' aggiunti' : ' aggiunto'} alle fonti (max ${maxSources})`,
+        });
+      }
 
-      await Promise.all(uploadPromises);
-
-      // Refresh list after upload
-      await fetchDocuments();
-
-      toast({
-        title: "File caricati con successo",
-        description: `${files.length} file caricato/i su Google Cloud Storage`,
-      });
+      if (failedCount > 0) {
+        toast({
+          title: "Limite raggiunto",
+          description: `${failedCount} file non ${failedCount > 1 ? 'aggiunti' : 'aggiunto'} - limite massimo ${maxSources} fonti`,
+          variant: "destructive",
+        });
+      }
     } catch (error: any) {
-      console.error('Errore durante upload:', error);
+      console.error('Error adding files:', error);
       toast({
-        title: "Errore durante upload",
-        description: error.message || "Si è verificato un errore durante il caricamento dei file.",
+        title: "Errore",
+        description: "Errore durante l'aggiunta dei file",
         variant: "destructive",
       });
     } finally {
@@ -90,57 +54,73 @@ export function DocumentsSection() {
   };
 
   const handleRemove = async (id: string) => {
-    // id is gcsPath
     try {
-      await apiRequest('DELETE', `/api/files/${id}`);
-      setDocuments(documents.filter((doc) => doc.id !== id));
+      removeSource(id);
       toast({
-        title: "File eliminato",
-        description: "Il file è stato eliminato con successo.",
+        title: "Fonte rimossa",
+        description: "La fonte è stata rimossa dalla sessione",
       });
     } catch (error: any) {
-      console.error('Errore durante eliminazione:', error);
+      console.error('Error removing file:', error);
       toast({
         title: "Errore",
-        description: "Si è verificato un errore durante l'eliminazione del file.",
+        description: "Errore durante la rimozione",
         variant: "destructive",
       });
     }
   };
 
+  const formatSize = (bytes: number): string => {
+    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  };
+
   return (
-    <div className="h-full flex flex-col p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold">Documenti</h2>
-        {documents.length > 0 && (
-          <Button data-testid="button-analyze-documents">
-            <Sparkles className="w-4 h-4 mr-2" />
-            Analizza Documenti
-          </Button>
-        )}
+    <div className="h-full p-6 flex flex-col gap-6 overflow-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Gestione Documenti</h2>
+          <p className="text-muted-foreground mt-1">
+            Carica fino a {maxSources} fonti per l'analisi (solo sessione corrente)
+          </p>
+        </div>
+        <Button>
+          <Sparkles className="w-4 h-4 mr-2" />
+          Genera Sommario
+        </Button>
       </div>
 
-      <div className="mb-6">
-        <FileUploadZone
-          onFilesSelected={handleFilesSelected}
-          disabled={isUploading}
-        />
-      </div>
+      <FileUploadZone
+        onFilesSelected={handleFilesSelected}
+        disabled={isUploading}
+      />
 
-      {documents.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            File Caricati ({documents.length})
+      {sources.length > 0 && (
+        <div className="flex-1 overflow-auto">
+          <h3 className="text-lg font-semibold mb-4">
+            Fonti Caricate ({sources.length}/{maxSources})
           </h3>
-          <div className="space-y-2">
-            {documents.map((doc) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sources.map((source) => (
               <FileCard
-                key={doc.id}
-                name={doc.name}
-                size={doc.size}
-                onRemove={() => handleRemove(doc.id)}
+                key={source.id}
+                name={source.name}
+                size={formatSize(source.size)}
+                onRemove={() => handleRemove(source.id)}
               />
             ))}
+          </div>
+        </div>
+      )}
+
+      {sources.length === 0 && (
+        <div className="flex-1 flex items-center justify-center text-center">
+          <div className="max-w-md">
+            <p className="text-muted-foreground">
+              Nessuna fonte caricata. Trascina file qui sopra o clicca per selezionarli.
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Le fonti sono temporanee e verranno rimosse al refresh della pagina.
+            </p>
           </div>
         </div>
       )}

@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useSources } from "@/contexts/SourcesContext";
 
 const templates = {
   privacy: {
@@ -193,8 +194,8 @@ export function DocumentCompilerSection({
   const [compiledContent, setCompiledContent] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const { toast } = useToast();
+  const { selectedSources, toggleSource } = useSources();
 
   // Model settings
   const [notes, setNotes] = useState("");
@@ -251,7 +252,7 @@ export function DocumentCompilerSection({
         detailedAnalysis,
         formalTone,
         modelProvider: 'gemini', // Enforce Gemini
-        selectedDocuments, // Pass selected documents context
+        sources: selectedSources, // Pass selected sources
         model: 'gemini-2.5-flash',
       });
 
@@ -264,7 +265,7 @@ export function DocumentCompilerSection({
         if (webResearch) settingsInfo.push('Web Research');
         if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
         if (formalTone) settingsInfo.push('Tono Formale');
-        if (selectedDocuments.length > 0) settingsInfo.push(`${selectedDocuments.length} docs`);
+        if (selectedSources.length > 0) settingsInfo.push(`${selectedSources.length} docs`);
 
         toast({
           title: "Documento compilato con successo",
@@ -313,14 +314,6 @@ export function DocumentCompilerSection({
       title: "Download completato",
       description: "Il documento è stato scaricato con successo.",
     });
-  };
-
-  const toggleDocument = (gcsPath: string) => {
-    setSelectedDocuments(prev =>
-      prev.includes(gcsPath)
-        ? prev.filter(p => p !== gcsPath)
-        : [...prev, gcsPath]
-    );
   };
 
   return (
@@ -373,47 +366,6 @@ export function DocumentCompilerSection({
               <SelectItem value="contratto">Contratto di Servizio</SelectItem>
             </SelectContent>
           </Select>
-
-          {documents.length > 0 && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto gap-2">
-                  <FileText className="w-4 h-4" />
-                  {selectedDocuments.length > 0
-                    ? `${selectedDocuments.length} docs`
-                    : "Contesto"}
-                  <ChevronUp className="w-4 h-4 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 p-0" align="end">
-                <div className="p-4 border-b">
-                  <h4 className="font-medium leading-none">Documenti di contesto</h4>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Seleziona i documenti per la compilazione
-                  </p>
-                </div>
-                <ScrollArea className="h-[200px] p-4">
-                  <div className="space-y-4">
-                    {documents.map((doc) => (
-                      <div key={doc.gcsPath} className="flex items-start space-x-2">
-                        <Checkbox
-                          id={`compiler-${doc.gcsPath}`}
-                          checked={selectedDocuments.includes(doc.gcsPath)}
-                          onCheckedChange={() => toggleDocument(doc.gcsPath)}
-                        />
-                        <Label
-                          htmlFor={`compiler-${doc.gcsPath}`}
-                          className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                        >
-                          {doc.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </PopoverContent>
-            </Popover>
-          )}
 
           <Button
             onClick={handleCompile}

@@ -1,34 +1,30 @@
-import { FileText, MessageSquare, Code, Sparkles, Plus, File, FileCode, FileType, X } from "lucide-react";
+import { FileText, MessageSquare, Code, Sparkles, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { SourceSelector } from "@/components/SourceSelector";
+import type { Source } from "@/contexts/SourcesContext";
 
 interface AppSidebarProps {
   activeSection?: "documents" | "chat" | "compiler" | "generated";
   onSectionChange?: (section: "documents" | "chat" | "compiler" | "generated") => void;
-  documents?: Array<{ id: string; name: string; type: string }>;
-  onRemoveDocument?: (id: string) => void;
+  sources?: Source[];
+  onRemoveSource?: (id: string) => void;
+  onToggleSource?: (id: string) => void;
 }
 
 export function AppSidebar({
   activeSection = "documents",
-  onSectionChange = () => {},
-  documents = [],
-  onRemoveDocument
+  onSectionChange = () => { },
+  sources = [],
+  onToggleSource
 }: AppSidebarProps) {
   const sections = [
     { id: "documents" as const, label: "Documenti", icon: FileText },
-    { id: "chat" as const, label: "Chat", icon: MessageSquare },
+    { id: "chat" as const, label: "Analizzatore", icon: MessageSquare },
     { id: "compiler" as const, label: "Compilatore", icon: Code },
     { id: "generated" as const, label: "Generati", icon: Sparkles },
   ];
-
-  const getFileIcon = (type: string) => {
-    if (type.includes("pdf")) return File;
-    if (type.includes("code")) return FileCode;
-    return FileType;
-  };
 
   return (
     <aside className="w-[280px] border-r bg-sidebar flex flex-col h-full">
@@ -65,55 +61,20 @@ export function AppSidebar({
 
       <Separator />
 
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="p-4 pb-2">
-          <h3 className="text-sm font-medium text-muted-foreground">Fonti</h3>
-        </div>
-        <ScrollArea className="flex-1 px-4">
-          {documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">Nessun documento caricato</p>
-          ) : (
-            <div className="flex flex-col gap-2 pb-4">
-              {documents.map((doc) => {
-                const Icon = getFileIcon(doc.type);
-                return (
-                  <div
-                    key={doc.id}
-                    className="flex items-center gap-2 p-2 rounded-md hover-elevate active-elevate-2 group"
-                    data-testid={`file-item-${doc.id}`}
-                  >
-                    <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    <span className="text-sm truncate flex-1 cursor-pointer">{doc.name}</span>
-                    {onRemoveDocument && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveDocument(doc.id);
-                        }}
-                        data-testid={`button-remove-${doc.id}`}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </ScrollArea>
+      <div className="flex-1 overflow-hidden flex flex-col p-4">
+        <SourceSelector sources={sources} onToggle={onToggleSource} />
       </div>
 
       <Separator />
 
       <div className="p-4">
         <div className="bg-accent/50 rounded-lg p-3">
-          <p className="text-xs text-muted-foreground mb-2">Spazio Utilizzato</p>
+          <p className="text-xs text-muted-foreground mb-2">Fonti Caricate</p>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">2.4 GB / 10 GB</span>
-            <Badge variant="secondary" className="text-xs">24%</Badge>
+            <span className="text-sm font-medium">{sources.length} / 10</span>
+            <Badge variant="secondary" className="text-xs">
+              {sources.filter(s => s.selected).length} selezionate
+            </Badge>
           </div>
         </div>
       </div>

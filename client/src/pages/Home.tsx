@@ -5,27 +5,14 @@ import { DocumentsSection } from "@/components/DocumentsSection";
 import { ChatInterface } from "@/components/ChatInterface";
 import { DocumentCompilerSection } from "@/components/DocumentCompilerSection";
 import { GeneratedContentSection } from "@/components/GeneratedContentSection";
+import { useSources } from "@/contexts/SourcesContext";
 
 type Section = "documents" | "chat" | "compiler" | "generated";
 
 export default function Home() {
   const [activeSection, setActiveSection] = useState<Section>("documents");
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>('gemini');
-  const [documents, setDocuments] = useState([
-    { id: "1", name: "documento-base.pdf", type: "application/pdf" },
-    { id: "2", name: "dati-azienda.txt", type: "text/plain" },
-    { id: "3", name: "informazioni-legali.docx", type: "application/docx" },
-    { id: "4", name: "termini-servizio.pdf", type: "application/pdf" },
-    { id: "5", name: "clausole-standard.txt", type: "text/plain" },
-    { id: "6", name: "dati-contatto.pdf", type: "application/pdf" },
-    { id: "7", name: "riferimenti-normativi.docx", type: "application/docx" },
-    { id: "8", name: "template-base.txt", type: "text/plain" },
-    { id: "9", name: "glossario-termini.pdf", type: "application/pdf" },
-  ]);
-
-  const handleRemoveDocument = (id: string) => {
-    setDocuments(documents.filter(doc => doc.id !== id));
-  };
+  const { sources, removeSource, toggleSource } = useSources();
 
   const renderSection = () => {
     switch (activeSection) {
@@ -49,8 +36,9 @@ export default function Home() {
         <AppSidebar
           activeSection={activeSection}
           onSectionChange={setActiveSection}
-          documents={documents}
-          onRemoveDocument={handleRemoveDocument}
+          sources={sources}
+          onRemoveSource={removeSource}
+          onToggleSource={toggleSource}
         />
         <main className="flex-1 overflow-auto">
           {renderSection()}
