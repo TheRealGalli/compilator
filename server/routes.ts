@@ -242,15 +242,22 @@ Istruzioni:
       // Build system instruction
       const systemInstruction = `Sei un assistente AI di ricerca. Usa i documenti forniti per rispondere alle domande dell'utente. Cita i nomi dei documenti quando usi informazioni da essi.`;
 
+      console.log(`[DEBUG] Received ${sources?.length || 0} sources`);
+      if (sources && sources.length > 0) {
+        console.log('[DEBUG] Sources:', sources.map((s: any) => ({ name: s.name, url: s.url })));
+      }
+
       // Download files from GCS and convert to base64
       const fileContents = await Promise.all(
         (sources || []).map(async (source: any) => {
           try {
             // Extract GCS path from URL
             const gcsPath = source.url.split('.com/')[1];
+            console.log(`[DEBUG] Downloading file: ${source.name} from ${gcsPath}`);
 
             // Download file from GCS
             const buffer = await downloadFile(gcsPath);
+            console.log(`[DEBUG] Downloaded ${buffer.length} bytes for ${source.name}`);
             const base64 = buffer.toString('base64');
 
             return {
@@ -267,6 +274,7 @@ Istruzioni:
 
       // Filter out failed downloads
       const validFiles = fileContents.filter(f => f !== null);
+      console.log(`[DEBUG] Successfully downloaded ${validFiles.length} files`);
 
       // Build messages array with files attached to last user message
       const formattedMessages = [...messages];
@@ -282,6 +290,7 @@ Istruzioni:
               ...validFiles,
             ],
           };
+          console.log(`[DEBUG] Attached ${validFiles.length} files to user message`);
         }
       }
 
