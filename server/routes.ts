@@ -9,7 +9,8 @@ import { getModelApiKey } from "./gcp-secrets";
 import mammoth from 'mammoth';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
+const pdfParse = require('pdf-parse');
+const pdf = pdfParse.default || pdfParse; // Handle both CommonJS and ESM
 import { chunkText, type ChunkedDocument, selectRelevantChunks, formatContextWithCitations, type DocumentChunk } from './rag-utils';
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
