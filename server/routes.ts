@@ -26,7 +26,8 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
     console.log(`[DEBUG extractText] Processing ${mimeType}, buffer size: ${buffer.length}`);
     if (mimeType === 'application/pdf') {
       // Use dynamic import for pdf-parse (ESM module)
-      const pdfParse = await import('pdf-parse');
+      const pdfParseModule = await import('pdf-parse');
+      const pdfParse = (pdfParseModule as any).default || pdfParseModule;
       const data = await pdfParse(buffer);
       console.log(`[DEBUG extractText] PDF parsed, text length: ${data.text.length}, pages: ${data.numpages}`);
       return data.text;
