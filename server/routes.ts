@@ -304,11 +304,16 @@ Istruzioni:
         const lastMessageIndex = formattedMessages.length - 1;
         const lastMessage = formattedMessages[lastMessageIndex];
         if (lastMessage.role === 'user') {
+          // Check if content is already an array or a string
+          const textContent = typeof lastMessage.content === 'string'
+            ? lastMessage.content
+            : lastMessage.content;
+
           // Attach multimodal files to last user message
           formattedMessages[lastMessageIndex] = {
-            ...lastMessage,
+            role: 'user',
             content: [
-              { type: 'text', text: lastMessage.content },
+              { type: 'text', text: textContent },
               ...multimodalFiles,
             ],
           };
