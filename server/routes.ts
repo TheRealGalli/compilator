@@ -7,10 +7,7 @@ import { storage } from "./storage";
 import { uploadFile, downloadFile, deleteFile, fileExists, uploadFileToPath, listFiles, saveDocumentChunks, loadMultipleDocumentChunks } from "./gcp-storage";
 import { getModelApiKey } from "./gcp-secrets";
 import mammoth from 'mammoth';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
-const pdf = pdfParse.default || pdfParse; // Handle both CommonJS and ESM
+// pdf-parse is imported dynamically in extractText function
 import { chunkText, type ChunkedDocument, selectRelevantChunks, formatContextWithCitations, type DocumentChunk } from './rag-utils';
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
@@ -28,7 +25,9 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
   try {
     console.log(`[DEBUG extractText] Processing ${mimeType}, buffer size: ${buffer.length}`);
     if (mimeType === 'application/pdf') {
-      const data = await pdf(buffer);
+      // Use dynamic import for pdf-parse (ESM module)
+      const pdfParse = (await import('pdf-parse')).default;
+      const data = await pdfParse(buffer);
       console.log(`[DEBUG extractText] PDF parsed, text length: ${data.text.length}, pages: ${data.numpages}`);
       return data.text;
     } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
