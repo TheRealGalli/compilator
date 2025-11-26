@@ -258,9 +258,11 @@ Istruzioni:
       if (sources && sources.length > 0) {
         for (const source of sources) {
           try {
-            // Extract GCS path from URL
-            const gcsPath = source.url.split('.com/')[1];
+            // Extract GCS path from URL (remove query params from signed URL)
+            const urlWithoutParams = source.url.split('?')[0]; // Remove ?GoogleAccessId=...
+            const gcsPath = urlWithoutParams.split('.com/')[1];
             console.log(`[DEBUG] Processing file: ${source.name} (${source.type})`);
+            console.log(`[DEBUG] GCS path: ${gcsPath}`);
 
             // Download file from GCS
             const buffer = await downloadFile(gcsPath);
