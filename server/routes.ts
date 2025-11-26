@@ -273,8 +273,12 @@ Istruzioni:
           try {
             // Extract GCS path from URL (remove query params from signed URL)
             const urlWithoutParams = source.url.split('?')[0]; // Remove ?GoogleAccessId=...
-            const gcsPath = urlWithoutParams.split('.com/')[1];
+            // URL format: https://storage.googleapis.com/BUCKET_NAME/PATH
+            // We need only PATH (without bucket name)
+            const pathParts = urlWithoutParams.split('/');
+            const gcsPath = pathParts.slice(4).join('/'); // Skip https:, '', storage.googleapis.com, BUCKET_NAME
             console.log(`[DEBUG] Processing file: ${source.name} (${source.type})`);
+            console.log(`[DEBUG] Full URL: ${source.url.substring(0, 150)}`);
             console.log(`[DEBUG] GCS path: ${gcsPath}`);
 
             // Download file from GCS
