@@ -304,10 +304,15 @@ Istruzioni:
         const lastMessageIndex = formattedMessages.length - 1;
         const lastMessage = formattedMessages[lastMessageIndex];
         if (lastMessage.role === 'user') {
-          // Check if content is already an array or a string
-          const textContent = typeof lastMessage.content === 'string'
-            ? lastMessage.content
-            : lastMessage.content;
+          // Extract text content (handle both string and array formats)
+          let textContent = '';
+          if (typeof lastMessage.content === 'string') {
+            textContent = lastMessage.content;
+          } else if (Array.isArray(lastMessage.content)) {
+            // Find the text part in the array
+            const textPart = lastMessage.content.find((part: any) => part.type === 'text');
+            textContent = textPart?.text || '';
+          }
 
           // Attach multimodal files to last user message
           formattedMessages[lastMessageIndex] = {
