@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { google } from '@ai-sdk/google';
-import { generateText, streamText } from 'ai';
+import { generateText, streamText, convertToCoreMessages } from 'ai';
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
@@ -299,23 +299,26 @@ Istruzioni:
       console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters`);
 
       // Build messages with multimodal files if present
-      // Clean messages to ModelMessage format (only role and content)
-      const cleanMessages = messages.map((msg: any) => ({
-        role: msg.role,
-        content: typeof msg.content === 'string' ? msg.content :
-          Array.isArray(msg.content) ?
-            (msg.content.find((p: any) => p.type === 'text')?.text || '') :
-            ''
-      }));
+      // Use convertToCoreMessages to ensure correct format (strips UI metadata)
+      const coreMessages = convertToCoreMessages(messages);
 
       // If we have multimodal files, attach them to the last user message
-      if (multimodalFiles.length > 0 && cleanMessages.length > 0) {
-        const lastMessageIndex = cleanMessages.length - 1;
-        if (cleanMessages[lastMessageIndex].role === 'user') {
-          cleanMessages[lastMessageIndex] = {
-            role: 'user',
+      if (multimodalFiles.length > 0 && coreMessages.length > 0) {
+        const lastMessageIndex = coreMessages.length - 1;
+        const lastMessage = coreMessages[lastMessageIndex];
+
+        if (lastMessage.role === 'user') {
+          // Ensure content is an array of parts
+          const currentContent = typeof lastMessage.content === 'string'
+            ? [{ type: 'text' as const, text: lastMessage.content }]
+            : Array.isArray(lastMessage.content)
+              ? lastMessage.content
+              : []; // Should not happen for UserMessage
+
+          coreMessages[lastMessageIndex] = {
+            ...lastMessage,
             content: [
-              { type: 'text', text: cleanMessages[lastMessageIndex].content },
+              ...currentContent as any[], // Cast to avoid strict type issues during construction
               ...multimodalFiles,
             ],
           };
@@ -323,13 +326,13 @@ Istruzioni:
         }
       }
 
-      console.log(`[DEBUG] Clean messages count: ${cleanMessages.length}`);
+      console.log(`[DEBUG] Core messages count: ${coreMessages.length}`);
 
       // Use generateText with multimodal content
       const result = await generateText({
         model: google('gemini-2.5-flash'),
         system: systemInstruction,
-        messages: cleanMessages,
+        messages: coreMessages,
         temperature: req.body.temperature || 0.7,
       });
 
