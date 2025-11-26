@@ -36,8 +36,8 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
       onDrop={disabled ? undefined : handleDrop}
       onDragOver={disabled ? undefined : handleDragOver}
       className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${disabled
-          ? 'opacity-50 cursor-not-allowed'
-          : 'cursor-pointer hover-elevate active-elevate-2'
+        ? 'opacity-50 cursor-not-allowed'
+        : 'cursor-pointer hover-elevate active-elevate-2'
         }`}
       data-testid="zone-file-upload"
     >
@@ -45,7 +45,7 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
         ref={inputRef}
         type="file"
         multiple
-        accept=".pdf,.txt,.docx,.doc"
+        accept=".pdf,.txt,.docx,.doc,image/*,audio/*,video/*"
         className="hidden"
         onChange={handleFileChange}
         data-testid="input-file-hidden"
@@ -53,7 +53,7 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
       <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
       <h3 className="text-lg font-medium mb-2">Trascina i file qui o clicca per sfogliare</h3>
       <p className="text-sm text-muted-foreground">
-        Formati supportati: PDF, TXT, DOCX (Max 10MB per file)
+        Supportati: PDF, DOCX, TXT, Immagini, Audio, Video (Max 50MB)
       </p>
     </div>
   );
