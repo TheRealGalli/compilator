@@ -239,9 +239,6 @@ Istruzioni:
       const apiKey = await getModelApiKey('gemini');
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
-      // Build system instruction
-      const systemInstruction = `Sei un assistente AI di ricerca. Usa i documenti forniti per rispondere alle domande dell'utente. Cita i nomi dei documenti quando usi informazioni da essi.`;
-
       console.log(`[DEBUG] Received ${sources?.length || 0} sources`);
       if (sources && sources.length > 0) {
         console.log('[DEBUG] Sources:', sources.map((s: any) => ({ name: s.name, url: s.url })));
