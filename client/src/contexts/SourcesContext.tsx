@@ -6,7 +6,7 @@ export interface Source {
     selected: boolean;
     type: string;
     size: number;
-    data: string; // base64 encoded file data
+    url: string; // GCS URL instead of base64
 }
 
 interface SourcesContextType {
@@ -35,26 +35,38 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
             return false; // Duplicate name
         }
 
-        // Convert file to base64
-        const arrayBuffer = await file.arrayBuffer();
-        const base64 = btoa(
-            new Uint8Array(arrayBuffer).reduce(
-                (data, byte) => data + String.fromCharCode(byte),
-                ''
-            )
-        );
+        try {
+            // Upload to backend GCS
+            const formData = new FormData();
+            formData.append('file', file);
 
-        const newSource: Source = {
-            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            name: file.name,
-            selected: true, // Auto-select new sources
-            type: file.type,
-            size: file.size,
-            data: base64,
-        };
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/files/upload`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include',
+            });
 
-        setSources(prev => [...prev, newSource]);
-        return true;
+            if (!response.ok) {
+                throw new Error('Upload failed');
+            }
+
+            const data = await response.json();
+
+            const newSource: Source = {
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                name: file.name,
+                selected: true,
+                type: file.type,
+                size: file.size,
+                url: data.file.publicUrl, // GCS URL
+            };
+
+            setSources(prev => [...prev, newSource]);
+            return true;
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            return false;
+        }
     }, [sources]);
 
     const removeSource = useCallback((id: string) => {

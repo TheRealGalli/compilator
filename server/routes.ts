@@ -108,21 +108,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Upload file endpoint - now uses Gemini File API for session-based RAG
+  // Upload file endpoint - uploads to GCS with 1-hour TTL
   app.post('/api/files/upload', upload.single('file'), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'Nessun file fornito' });
       }
 
-      // Upload to Gemini File API instead of GCS
+      // Upload to GCS with TTL for temp storage
+      const result = await uploadFile(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+      );
 
-      const geminiFile = {
-        uri: `session://${req.file.originalname}`,
-        name: req.file.originalname,
-      };
-
-      console.log(`File uploaded to Gemini: ${geminiFile.name}`);
+      console.log(`File uploaded to GCS: ${result.gcsPath}`);
 
       res.json({
         success: true,
@@ -130,8 +130,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: req.file.originalname,
           size: req.file.size,
           mimeType: req.file.mimetype,
-          geminiUri: geminiFile.uri,
-          geminiName: geminiFile.name,
+          publicUrl: result.publicUrl,
+          gcsPath: result.gcsPath,
         },
       });
     } catch (error: any) {
@@ -229,7 +229,7 @@ Istruzioni:
   // Endpoint per chat con AI (con streaming e file support)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
-      const { messages, sources } = req.body; // sources: array of {name, type, size, data: base64}
+      const { messages, sources } = req.body; // sources: array of {name, type, size, url: GCS URL}
 
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'Messaggi richiesti' });
@@ -242,16 +242,35 @@ Istruzioni:
       // Build system instruction
       const systemInstruction = `Sei un assistente AI di ricerca. Usa i documenti forniti per rispondere alle domande dell'utente. Cita i nomi dei documenti quando usi informazioni da essi.`;
 
-      // Convert sources to Vercel AI SDK file format
-      const fileContents = (sources || []).map((source: any) => ({
-        type: 'file' as const,
-        data: source.data, // base64
-        mimeType: source.type,
-      }));
+      // Download files from GCS and convert to base64
+      const fileContents = await Promise.all(
+        (sources || []).map(async (source: any) => {
+          try {
+            // Extract GCS path from URL
+            const gcsPath = source.url.split('.com/')[1];
+
+            // Download file from GCS
+            const buffer = await downloadFile(gcsPath);
+            const base64 = buffer.toString('base64');
+
+            return {
+              type: 'file' as const,
+              data: base64,
+              mimeType: source.type,
+            };
+          } catch (error) {
+            console.error(`Error downloading file ${source.name}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Filter out failed downloads
+      const validFiles = fileContents.filter(f => f !== null);
 
       // Build messages array with files attached to last user message
       const formattedMessages = [...messages];
-      if (fileContents.length > 0 && formattedMessages.length > 0) {
+      if (validFiles.length > 0 && formattedMessages.length > 0) {
         const lastMessageIndex = formattedMessages.length - 1;
         const lastMessage = formattedMessages[lastMessageIndex];
         if (lastMessage.role === 'user') {
@@ -260,7 +279,7 @@ Istruzioni:
             ...lastMessage,
             content: [
               { type: 'text', text: lastMessage.content },
-              ...fileContents,
+              ...validFiles,
             ],
           };
         }
