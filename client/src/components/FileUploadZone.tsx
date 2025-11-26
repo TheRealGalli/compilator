@@ -2,7 +2,7 @@ import { Upload } from "lucide-react";
 import { useRef } from "react";
 
 interface FileUploadZoneProps {
-  onFilesSelected?: (files: FileList) => void;
+  onFilesSelected?: (files: File[]) => void;
   disabled?: boolean;
 }
 
@@ -15,14 +15,14 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onFilesSelected?.(e.target.files);
+      onFilesSelected?.(Array.from(e.target.files));
     }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onFilesSelected?.(e.dataTransfer.files);
+      onFilesSelected?.(Array.from(e.dataTransfer.files));
     }
   };
 
@@ -35,11 +35,10 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
       onClick={disabled ? undefined : handleClick}
       onDrop={disabled ? undefined : handleDrop}
       onDragOver={disabled ? undefined : handleDragOver}
-      className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
-        disabled 
-          ? 'opacity-50 cursor-not-allowed' 
+      className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${disabled
+          ? 'opacity-50 cursor-not-allowed'
           : 'cursor-pointer hover-elevate active-elevate-2'
-      }`}
+        }`}
       data-testid="zone-file-upload"
     >
       <input

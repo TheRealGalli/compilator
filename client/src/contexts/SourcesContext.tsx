@@ -3,15 +3,15 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 export interface Source {
     id: string;
     name: string;
-    file: File;
     selected: boolean;
     type: string;
     size: number;
+    data: string; // base64 encoded file data
 }
 
 interface SourcesContextType {
     sources: Source[];
-    addSource: (file: File) => boolean;
+    addSource: (file: File) => Promise<boolean>;
     removeSource: (id: string) => void;
     toggleSource: (id: string) => void;
     selectedSources: Source[];
@@ -25,7 +25,7 @@ const MAX_SOURCES = 10;
 export function SourcesProvider({ children }: { children: ReactNode }) {
     const [sources, setSources] = useState<Source[]>([]);
 
-    const addSource = useCallback((file: File): boolean => {
+    const addSource = useCallback(async (file: File): Promise<boolean> => {
         if (sources.length >= MAX_SOURCES) {
             return false; // Max limit reached
         }
@@ -35,13 +35,22 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
             return false; // Duplicate name
         }
 
+        // Convert file to base64
+        const arrayBuffer = await file.arrayBuffer();
+        const base64 = btoa(
+            new Uint8Array(arrayBuffer).reduce(
+                (data, byte) => data + String.fromCharCode(byte),
+                ''
+            )
+        );
+
         const newSource: Source = {
             id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             name: file.name,
-            file,
             selected: true, // Auto-select new sources
             type: file.type,
             size: file.size,
+            data: base64,
         };
 
         setSources(prev => [...prev, newSource]);

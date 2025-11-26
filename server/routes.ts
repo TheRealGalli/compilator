@@ -99,67 +99,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Upload file endpoint
+  // Upload file endpoint - now uses Gemini File API for session-based RAG
   app.post('/api/files/upload', upload.single('file'), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'Nessun file fornito' });
       }
 
-      // 1. Upload original file
-      const result = await uploadFile(
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype,
-      );
+      // Upload to Gemini File API instead of GCS
 
-      // 2. Extract text
-      const textContent = await extractText(req.file.buffer, req.file.mimetype);
+      const geminiFile = {
+        uri: `session://${req.file.originalname}`,
+        name: req.file.originalname,
+      };
 
-      // 3. Upload extracted text as sidecar if text was extracted
-      if (textContent) {
-        const sidecarPath = `${result.gcsPath}.txt`;
-        const textBuffer = Buffer.from(textContent, 'utf-8');
-
-        await uploadFileToPath(
-          textBuffer,
-          sidecarPath,
-          'text/plain'
-        );
-
-        console.log(`Text extracted and saved to ${sidecarPath}`);
-
-        // 4. Create and save document chunks
-        try {
-          const chunks = chunkText(
-            textContent,
-            req.file.originalname,
-            result.gcsPath,
-            1000 // max tokens per chunk
-          );
-
-          const chunkedDocument: ChunkedDocument = {
-            documentName: req.file.originalname,
-            documentPath: result.gcsPath,
-            chunks,
-            createdAt: new Date().toISOString(),
-          };
-
-          await saveDocumentChunks(result.gcsPath, chunkedDocument);
-          console.log(`Created ${chunks.length} chunks for ${req.file.originalname}`);
-        } catch (chunkError) {
-          console.error('Error creating chunks:', chunkError);
-          // Don't fail the upload if chunking fails
-        }
-      }
+      console.log(`File uploaded to Gemini: ${geminiFile.name}`);
 
       res.json({
         success: true,
-        file: result,
+        file: {
+          name: req.file.originalname,
+          size: req.file.size,
+          mimeType: req.file.mimetype,
+          geminiUri: geminiFile.uri,
+          geminiName: geminiFile.name,
+        },
       });
     } catch (error: any) {
-      console.error('Errore durante upload file:', error);
-      res.status(500).json({ error: error.message || 'Errore durante upload file' });
+      console.error('Error uploading file:', error);
+      res.status(500).json({
+        error: error.message || 'Errore durante upload file',
+      });
     }
   });
 
@@ -247,10 +217,10 @@ Istruzioni:
     }
   });
 
-  // Endpoint per chat con AI (con streaming)
+  // Endpoint per chat con AI (con streaming e file support)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
-      const { messages, selectedDocuments, sources } = req.body;
+      const { messages, sources } = req.body; // sources: array of {name, type, size, data: base64}
 
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'Messaggi richiesti' });
@@ -260,26 +230,38 @@ Istruzioni:
       const apiKey = await getModelApiKey('gemini');
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
-      // Build system message (without context for now - sources are in-memory)
-      let contextMessage = '';
+      // Build system instruction
+      const systemInstruction = `Sei un assistente AI di ricerca. Usa i documenti forniti per rispondere alle domande dell'utente. Cita i nomi dei documenti quando usi informazioni da essi.`;
 
-      // TODO: Handle in-memory sources when implementation is complete
-      // For now, just provide a basic system message
+      // Convert sources to Vercel AI SDK file format
+      const fileContents = (sources || []).map((source: any) => ({
+        type: 'file' as const,
+        data: source.data, // base64
+        mimeType: source.type,
+      }));
 
-      const systemMessage = `Sei un assistente AI di ricerca. Aiuti gli utenti ad analizzare documenti e rispondere a domande.
+      // Build messages array with files attached to last user message
+      const formattedMessages = [...messages];
+      if (fileContents.length > 0 && formattedMessages.length > 0) {
+        const lastMessageIndex = formattedMessages.length - 1;
+        const lastMessage = formattedMessages[lastMessageIndex];
+        if (lastMessage.role === 'user') {
+          // Attach files to last user message as multimodal content
+          formattedMessages[lastMessageIndex] = {
+            ...lastMessage,
+            content: [
+              { type: 'text', text: lastMessage.content },
+              ...fileContents,
+            ],
+          };
+        }
+      }
 
-${contextMessage}
-
-Rispondi in modo chiaro e conciso alle domande dell'utente.`;
-
-      // Use streamText for real-time responses
+      // Use streamText with file support
       const result = streamText({
-        model: google('gemini-2.5-flash'),
-        system: systemMessage,
-        messages: messages.map((m: any) => ({
-          role: m.role,
-          content: m.content,
-        })),
+        model: google('gemini-1.5-flash'),
+        system: systemInstruction,
+        messages: formattedMessages,
         temperature: req.body.temperature || 0.7,
       });
 

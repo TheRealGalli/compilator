@@ -11,16 +11,15 @@ export function DocumentsSection() {
   const { toast } = useToast();
   const { sources, addSource, removeSource, maxSources } = useSources();
 
-  const handleFilesSelected = async (files: FileList) => {
+  const handleFilesSelected = async (selectedFiles: File[]) => {
     setIsUploading(true);
-
     try {
       let successCount = 0;
       let failedCount = 0;
 
-      for (const file of Array.from(files)) {
-        const added = addSource(file);
-        if (added) {
+      for (const file of selectedFiles) {
+        const success = await addSource(file);
+        if (success) {
           successCount++;
         } else {
           failedCount++;
