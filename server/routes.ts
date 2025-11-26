@@ -287,7 +287,7 @@ Istruzioni:
 
       // Use generateText instead of streamText (frontend expects JSON)
       const result = await generateText({
-        model: google('gemini-1.5-flash'),
+        model: google('gemini-2.0-flash-exp'),
         system: systemInstruction,
         messages: formattedMessages,
         temperature: req.body.temperature || 0.7,
