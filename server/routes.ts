@@ -247,58 +247,59 @@ Istruzioni:
         console.log('[DEBUG] Sources:', sources.map((s: any) => ({ name: s.name, url: s.url })));
       }
 
-      // Download files from GCS and convert to base64
-      const fileContents = await Promise.all(
-        (sources || []).map(async (source: any) => {
-          try {
-            // Extract GCS path from URL
-            const gcsPath = source.url.split('.com/')[1];
-            console.log(`[DEBUG] Downloading file: ${source.name} from ${gcsPath}`);
+      // Download files from GCS and extract text
+      let documentsContext = '';
+      if (sources && sources.length > 0) {
+        const fileTexts = await Promise.all(
+          sources.map(async (source: any) => {
+            try {
+              // Extract GCS path from URL
+              const gcsPath = source.url.split('.com/')[1];
+              console.log(`[DEBUG] Downloading file: ${source.name} from ${gcsPath}`);
 
-            // Download file from GCS
-            const buffer = await downloadFile(gcsPath);
-            console.log(`[DEBUG] Downloaded ${buffer.length} bytes for ${source.name}`);
-            const base64 = buffer.toString('base64');
+              // Download file from GCS
+              const buffer = await downloadFile(gcsPath);
+              console.log(`[DEBUG] Downloaded ${buffer.length} bytes for ${source.name}`);
 
-            return {
-              type: 'file' as const,
-              data: base64,
-              mimeType: source.type,
-            };
-          } catch (error) {
-            console.error(`Error downloading file ${source.name}:`, error);
-            return null;
-          }
-        })
-      );
+              // Extract text from file
+              const text = await extractText(buffer, source.type);
+              console.log(`[DEBUG] Extracted ${text.length} characters from ${source.name}`);
 
-      // Filter out failed downloads
-      const validFiles = fileContents.filter(f => f !== null);
-      console.log(`[DEBUG] Successfully downloaded ${validFiles.length} files`);
+              return {
+                name: source.name,
+                text: text,
+              };
+            } catch (error) {
+              console.error(`Error processing file ${source.name}:`, error);
+              return null;
+            }
+          })
+        );
 
-      // Build messages array with files attached to last user message
-      const formattedMessages = [...messages];
-      if (validFiles.length > 0 && formattedMessages.length > 0) {
-        const lastMessageIndex = formattedMessages.length - 1;
-        const lastMessage = formattedMessages[lastMessageIndex];
-        if (lastMessage.role === 'user') {
-          // Attach files to last user message as multimodal content
-          formattedMessages[lastMessageIndex] = {
-            ...lastMessage,
-            content: [
-              { type: 'text', text: lastMessage.content },
-              ...validFiles,
-            ],
-          };
-          console.log(`[DEBUG] Attached ${validFiles.length} files to user message`);
+        // Filter out failed downloads and build context
+        const validFiles = fileTexts.filter(f => f !== null);
+        console.log(`[DEBUG] Successfully processed ${validFiles.length} files`);
+
+        if (validFiles.length > 0) {
+          documentsContext = '\n\nDOCUMENTI FORNITI:\n\n' +
+            validFiles.map(f => `## ${f!.name}\n\n${f!.text}`).join('\n\n---\n\n');
         }
       }
 
-      // Use generateText instead of streamText (frontend expects JSON)
+      // Build system instruction with documents context
+      const systemInstruction = `Sei un assistente AI di ricerca. ${documentsContext ? 'Usa SOLO le informazioni contenute nei documenti forniti per rispondere.' : 'Aiuti gli utenti ad analizzare documenti.'}
+      
+${documentsContext}
+
+Quando rispondi, cita sempre il nome del documento da cui prendi le informazioni.`;
+
+      console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters`);
+
+      // Use generateText with text-only messages (no file attachments)
       const result = await generateText({
         model: google('gemini-2.5-flash'),
         system: systemInstruction,
-        messages: formattedMessages,
+        messages: messages,
         temperature: req.body.temperature || 0.7,
       });
 
