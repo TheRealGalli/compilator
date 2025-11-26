@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { getApiUrl } from '@/lib/api-config';
 
 export interface Source {
     id: string;
@@ -40,14 +41,15 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
             const formData = new FormData();
             formData.append('file', file);
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/files/upload`, {
+            const response = await fetch(getApiUrl('/api/files/upload'), {
                 method: 'POST',
                 body: formData,
                 credentials: 'include',
             });
 
             if (!response.ok) {
-                throw new Error('Upload failed');
+                const errorText = await response.text();
+                throw new Error(`Upload failed: ${errorText}`);
             }
 
             const data = await response.json();
