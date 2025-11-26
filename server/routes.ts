@@ -285,16 +285,21 @@ Istruzioni:
         }
       }
 
-      // Use streamText with file support
-      const result = streamText({
+      // Use generateText instead of streamText (frontend expects JSON)
+      const result = await generateText({
         model: google('gemini-1.5-flash'),
         system: systemInstruction,
         messages: formattedMessages,
         temperature: req.body.temperature || 0.7,
       });
 
-      // Stream the response back
-      return result.toTextStreamResponse();
+      // Return JSON response
+      res.json({
+        success: true,
+        message: {
+          content: result.text,
+        },
+      });
     } catch (error: any) {
       console.error('Errore durante chat:', error);
       res.status(500).json({
