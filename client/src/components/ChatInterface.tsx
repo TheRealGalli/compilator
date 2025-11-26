@@ -65,6 +65,12 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           content: msg.content,
         }));
 
+      console.log('[DEBUG Frontend] Sending request with:', {
+        messagesCount: apiMessages.length,
+        sourcesCount: selectedSources.length,
+        sources: selectedSources.map(s => ({ name: s.name, type: s.type }))
+      });
+
       const response = await apiRequest('POST', '/api/chat', {
         messages: apiMessages,
         modelProvider: 'gemini', // Enforce Gemini
