@@ -25,18 +25,24 @@ const upload = multer({
 
 async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
   try {
+    console.log(`[DEBUG extractText] Processing ${mimeType}, buffer size: ${buffer.length}`);
     if (mimeType === 'application/pdf') {
       const data = await pdf(buffer);
+      console.log(`[DEBUG extractText] PDF parsed, text length: ${data.text.length}, pages: ${data.numpages}`);
       return data.text;
     } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       const result = await mammoth.extractRawText({ buffer });
+      console.log(`[DEBUG extractText] DOCX parsed, text length: ${result.value.length}`);
       return result.value;
     } else if (mimeType === 'text/plain') {
-      return buffer.toString('utf-8');
+      const text = buffer.toString('utf-8');
+      console.log(`[DEBUG extractText] Text file, length: ${text.length}`);
+      return text;
     }
+    console.log(`[DEBUG extractText] Unsupported mime type: ${mimeType}`);
     return '';
   } catch (error) {
-    console.error('Error extracting text:', error);
+    console.error('[ERROR extractText] Failed:', error);
     return '';
   }
 }
