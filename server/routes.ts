@@ -246,8 +246,14 @@ Istruzioni:
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
       console.log(`[DEBUG] Received ${sources?.length || 0} sources`);
+      console.log(`[DEBUG] Sources type:`, typeof sources);
+      console.log(`[DEBUG] Sources is array:`, Array.isArray(sources));
+      console.log(`[DEBUG] Sources value:`, JSON.stringify(sources));
+
       if (sources && sources.length > 0) {
-        console.log('[DEBUG] Sources:', sources.map((s: any) => ({ name: s.name, type: s.type, url: s.url })));
+        console.log('[DEBUG] Sources:', sources.map((s: any) => ({ name: s.name, type: s.type, url: s.url?.substring(0, 100) })));
+      } else {
+        console.log('[DEBUG] No sources to process - sources is empty, undefined, or not an array');
       }
 
       // Helper to check if file should use multimodal attachment
@@ -262,6 +268,7 @@ Istruzioni:
       const multimodalFiles: any[] = [];
 
       if (sources && sources.length > 0) {
+        console.log(`[DEBUG] Starting to process ${sources.length} files`);
         for (const source of sources) {
           try {
             // Extract GCS path from URL (remove query params from signed URL)
