@@ -299,38 +299,37 @@ Istruzioni:
       console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters`);
 
       // Build messages with multimodal files if present
-      const formattedMessages = [...messages];
-      if (multimodalFiles.length > 0 && formattedMessages.length > 0) {
-        const lastMessageIndex = formattedMessages.length - 1;
-        const lastMessage = formattedMessages[lastMessageIndex];
-        if (lastMessage.role === 'user') {
-          // Extract text content (handle both string and array formats)
-          let textContent = '';
-          if (typeof lastMessage.content === 'string') {
-            textContent = lastMessage.content;
-          } else if (Array.isArray(lastMessage.content)) {
-            // Find the text part in the array
-            const textPart = lastMessage.content.find((part: any) => part.type === 'text');
-            textContent = textPart?.text || '';
-          }
+      // Clean messages to ModelMessage format (only role and content)
+      const cleanMessages = messages.map((msg: any) => ({
+        role: msg.role,
+        content: typeof msg.content === 'string' ? msg.content :
+          Array.isArray(msg.content) ?
+            (msg.content.find((p: any) => p.type === 'text')?.text || '') :
+            ''
+      }));
 
-          // Attach multimodal files to last user message
-          formattedMessages[lastMessageIndex] = {
+      // If we have multimodal files, attach them to the last user message
+      if (multimodalFiles.length > 0 && cleanMessages.length > 0) {
+        const lastMessageIndex = cleanMessages.length - 1;
+        if (cleanMessages[lastMessageIndex].role === 'user') {
+          cleanMessages[lastMessageIndex] = {
             role: 'user',
             content: [
-              { type: 'text', text: textContent },
+              { type: 'text', text: cleanMessages[lastMessageIndex].content },
               ...multimodalFiles,
             ],
           };
-          console.log(`[DEBUG] Attached ${multimodalFiles.length} multimodal files to user message`);
+          console.log(`[DEBUG] Attached ${multimodalFiles.length} multimodal files to last user message`);
         }
       }
+
+      console.log(`[DEBUG] Clean messages count: ${cleanMessages.length}`);
 
       // Use generateText with multimodal content
       const result = await generateText({
         model: google('gemini-2.5-flash'),
         system: systemInstruction,
-        messages: formattedMessages,
+        messages: cleanMessages,
         temperature: req.body.temperature || 0.7,
       });
 
