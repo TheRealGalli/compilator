@@ -249,86 +249,52 @@ Istruzioni:
       console.log(`[DEBUG] Received ${sources?.length || 0} sources`);
       console.log(`[DEBUG] Sources type:`, typeof sources);
       console.log(`[DEBUG] Sources is array:`, Array.isArray(sources));
-      console.log(`[DEBUG] Sources value:`, JSON.stringify(sources));
 
       if (sources && sources.length > 0) {
         console.log('[DEBUG] Sources:', sources.map((s: any) => ({ name: s.name, type: s.type, url: s.url?.substring(0, 100) })));
-      } else {
-        console.log('[DEBUG] No sources to process - sources is empty, undefined, or not an array');
       }
 
-      // Helper to check if file should use multimodal attachment
-      const isMediaFileType = (mimeType: string): boolean => {
-        return mimeType.startsWith('image/') ||
-          mimeType.startsWith('audio/') ||
-          mimeType.startsWith('video/');
-      };
-
-      // Download files from GCS - hybrid approach
-      let documentsContext = '';
+      // Download files from GCS and attach as multimodal content
       const multimodalFiles: any[] = [];
+      let filesContext = '';
 
       if (sources && sources.length > 0) {
         console.log(`[DEBUG] Starting to process ${sources.length} files`);
+
         for (const source of sources) {
           try {
             // Extract GCS path from URL (remove query params from signed URL)
-            const urlWithoutParams = source.url.split('?')[0]; // Remove ?GoogleAccessId=...
-            // URL format: https://storage.googleapis.com/BUCKET_NAME/PATH
-            // We need only PATH (without bucket name)
+            const urlWithoutParams = source.url.split('?')[0];
             const pathParts = urlWithoutParams.split('/');
-            const gcsPath = pathParts.slice(4).join('/'); // Skip https:, '', storage.googleapis.com, BUCKET_NAME
+            const gcsPath = pathParts.slice(4).join('/');
+
             console.log(`[DEBUG] Processing file: ${source.name} (${source.type})`);
-            console.log(`[DEBUG] Full URL: ${source.url.substring(0, 150)}`);
             console.log(`[DEBUG] GCS path: ${gcsPath}`);
 
             // Download file from GCS
             const buffer = await downloadFile(gcsPath);
             console.log(`[DEBUG] Downloaded ${buffer.length} bytes for ${source.name}`);
 
-            // Hybrid processing based on file type
-            if (isMediaFileType(source.type)) {
-              // Images, audio, video → multimodal attachment
-              const base64 = buffer.toString('base64');
-              multimodalFiles.push({
-                type: 'file' as const,
-                data: base64,
-                mimeType: source.type,
-              });
-              console.log(`[DEBUG] Added ${source.name} as multimodal attachment`);
+            // Convert to base64 and add as multimodal file
+            const base64 = buffer.toString('base64');
+            multimodalFiles.push({
+              type: 'file' as const,
+              data: base64,
+              mimeType: source.type,
+            });
 
-              // Add reference to context
-              if (documentsContext === '') {
-                documentsContext = '\n\nFILE MULTIMEDIALI FORNITI:\n\n';
-              }
-              documentsContext += `- ${source.name} (${source.type})\n`;
-            } else {
-              // PDF, DOCX, TXT → text extraction
-              const text = await extractText(buffer, source.type);
-              console.log(`[DEBUG] Extracted ${text.length} characters from ${source.name}`);
-
-              if (text) {
-                if (documentsContext === '') {
-                  documentsContext = '\n\nDOCUMENTI FORNITI:\n\n';
-                }
-                documentsContext += `## ${source.name}\n\n${text}\n\n---\n\n`;
-              }
-            }
+            console.log(`[DEBUG] Added ${source.name} as multimodal attachment`);
+            filesContext += `- ${source.name} (${source.type})\n`;
           } catch (error) {
             console.error(`Error processing file ${source.name}:`, error);
           }
         }
       }
 
-      console.log(`[DEBUG] Text documents in context: ${documentsContext.length} chars`);
-      console.log(`[DEBUG] Multimodal files: ${multimodalFiles.length}`);
+      console.log(`[DEBUG] Multimodal files attached: ${multimodalFiles.length}`);
 
-      // Build system instruction with documents context
-      const systemInstruction = `Sei un assistente AI di ricerca. ${documentsContext || multimodalFiles.length > 0 ? 'Analizza attentamente i documenti e file multimediali forniti per rispondere alle domande.' : 'Aiuti gli utenti ad analizzare documenti.'}
-      
-${documentsContext}
-
-Quando rispondi, cita sempre la fonte delle informazioni (nome del file).`;
+      // Build system instruction
+      const systemInstruction = `Sei un assistente AI di ricerca. ${multimodalFiles.length > 0 ? `Hai accesso ai seguenti file:\n\n${filesContext}\nAnalizza attentamente i file forniti per rispondere alle domande. Cita sempre la fonte delle informazioni (nome del file).` : 'Aiuti gli utenti ad analizzare documenti.'}`;
 
       console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters`);
 
@@ -350,7 +316,7 @@ Quando rispondi, cita sempre la fonte delle informazioni (nome del file).`;
         }
       }
 
-      // Use generateText with hybrid content
+      // Use generateText with multimodal content
       const result = await generateText({
         model: google('gemini-2.5-flash'),
         system: systemInstruction,
