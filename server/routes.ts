@@ -321,8 +321,18 @@ Istruzioni:
           // If content is array, ensure it has valid parts
           if (Array.isArray(content)) {
             content = content.map((part: any) => {
-              if (part.type === 'text') return { type: 'text', text: part.text };
-              // We can add other part types if needed, but for now text is main priority from UI
+              if (part.type === 'text') {
+                return {
+                  type: 'text',
+                  text: typeof part.text === 'string' ? part.text : (part.text ? String(part.text) : '')
+                };
+              }
+              // Handle other known types if necessary, or fallback to text representation
+              if (part.type === 'image' || part.type === 'file') {
+                return part; // Pass through valid media parts if they exist in history
+              }
+
+              // Fallback for unknown parts
               return { type: 'text', text: JSON.stringify(part) };
             });
           }
@@ -338,11 +348,15 @@ Istruzioni:
 
         if (lastMessage.role === 'user') {
           // Ensure content is an array of parts
-          const currentContent = typeof lastMessage.content === 'string'
-            ? [{ type: 'text', text: lastMessage.content }]
-            : Array.isArray(lastMessage.content)
-              ? lastMessage.content
-              : [{ type: 'text', text: '' }];
+          let currentContent: any[] = [];
+
+          if (typeof lastMessage.content === 'string') {
+            currentContent = [{ type: 'text', text: lastMessage.content }];
+          } else if (Array.isArray(lastMessage.content)) {
+            currentContent = lastMessage.content;
+          } else {
+            currentContent = [{ type: 'text', text: '' }];
+          }
 
           coreMessages[lastMessageIndex] = {
             ...lastMessage,
