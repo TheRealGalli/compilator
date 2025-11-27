@@ -301,36 +301,34 @@ Istruzioni:
       // Build messages with multimodal files if present
       let coreMessages: any[] = [];
 
-      // Log incoming messages for debugging
-      try {
-        console.log('[DEBUG] Incoming messages payload:', JSON.stringify(messages, null, 2).substring(0, 1000));
-      } catch (e) {
-        console.log('[DEBUG] Could not stringify messages');
-      }
-
-      try {
-        if (!messages || !Array.isArray(messages)) {
-          console.warn('[WARN] Messages is not an array, defaulting to empty array');
-          coreMessages = [];
-        } else {
-          // Try using SDK conversion first
-          try {
-            coreMessages = convertToCoreMessages(messages);
-          } catch (conversionError) {
-            console.warn('[WARN] convertToCoreMessages failed, falling back to manual conversion:', conversionError);
-            // Manual fallback for CoreMessage format
-            coreMessages = messages.map((msg: any) => ({
-              role: (msg.role === 'data' ? 'user' : msg.role) as 'system' | 'user' | 'assistant' | 'tool',
-              content: typeof msg.content === 'string' ? msg.content :
-                Array.isArray(msg.content) ?
-                  (msg.content.find((p: any) => p.type === 'text')?.text || '') :
-                  String(msg.content || '')
-            }));
+      // Manual strict conversion to CoreMessage format
+      // We avoid convertToCoreMessages as it was crashing
+      if (messages && Array.isArray(messages)) {
+        coreMessages = messages.map((msg: any) => {
+          // Normalize role
+          let role = msg.role;
+          if (role === 'data') role = 'user';
+          if (!['system', 'user', 'assistant', 'tool'].includes(role)) {
+            role = 'user'; // Default to user for unknown roles
           }
-        }
-      } catch (err) {
-        console.error('[ERROR] Message processing failed:', err);
-        coreMessages = [];
+
+          // Normalize content
+          let content = msg.content;
+          if (typeof content !== 'string' && !Array.isArray(content)) {
+            content = String(content || '');
+          }
+
+          // If content is array, ensure it has valid parts
+          if (Array.isArray(content)) {
+            content = content.map((part: any) => {
+              if (part.type === 'text') return { type: 'text', text: part.text };
+              // We can add other part types if needed, but for now text is main priority from UI
+              return { type: 'text', text: JSON.stringify(part) };
+            });
+          }
+
+          return { role, content };
+        });
       }
 
       // If we have multimodal files, attach them to the last user message
@@ -341,15 +339,15 @@ Istruzioni:
         if (lastMessage.role === 'user') {
           // Ensure content is an array of parts
           const currentContent = typeof lastMessage.content === 'string'
-            ? [{ type: 'text' as const, text: lastMessage.content }]
+            ? [{ type: 'text', text: lastMessage.content }]
             : Array.isArray(lastMessage.content)
               ? lastMessage.content
-              : []; // Should not happen for UserMessage
+              : [{ type: 'text', text: '' }];
 
           coreMessages[lastMessageIndex] = {
             ...lastMessage,
             content: [
-              ...currentContent as any[], // Cast to avoid strict type issues during construction
+              ...currentContent,
               ...multimodalFiles,
             ],
           };
@@ -364,7 +362,7 @@ Istruzioni:
 
       // Use generateText with multimodal content
       const result = await generateText({
-        model: google('gemini-2.5-flash'),
+        model: google('gemini-1.5-flash'), // Fixed model name from 2.5 to 1.5-flash
         system: systemInstruction,
         messages: coreMessages,
         temperature: req.body.temperature || 0.7,
