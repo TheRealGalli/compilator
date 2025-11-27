@@ -299,8 +299,32 @@ Istruzioni:
       console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters`);
 
       // Build messages with multimodal files if present
-      // Use convertToCoreMessages to ensure correct format (strips UI metadata)
-      const coreMessages = convertToCoreMessages(messages);
+      let coreMessages: any[] = [];
+
+      try {
+        if (!messages || !Array.isArray(messages)) {
+          console.warn('[WARN] Messages is not an array, defaulting to empty array');
+          coreMessages = [];
+        } else {
+          // Try using SDK conversion first
+          try {
+            coreMessages = convertToCoreMessages(messages);
+          } catch (conversionError) {
+            console.warn('[WARN] convertToCoreMessages failed, falling back to manual conversion:', conversionError);
+            // Manual fallback for CoreMessage format
+            coreMessages = messages.map((msg: any) => ({
+              role: (msg.role === 'data' ? 'user' : msg.role) as 'system' | 'user' | 'assistant' | 'tool',
+              content: typeof msg.content === 'string' ? msg.content :
+                Array.isArray(msg.content) ?
+                  (msg.content.find((p: any) => p.type === 'text')?.text || '') :
+                  String(msg.content || '')
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('[ERROR] Message processing failed:', err);
+        coreMessages = [];
+      }
 
       // If we have multimodal files, attach them to the last user message
       if (multimodalFiles.length > 0 && coreMessages.length > 0) {
