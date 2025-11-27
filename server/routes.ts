@@ -351,9 +351,18 @@ Istruzioni:
           let currentContent: any[] = [];
 
           if (typeof lastMessage.content === 'string') {
-            currentContent = [{ type: 'text', text: lastMessage.content }];
+            currentContent = [{ type: 'text', text: lastMessage.content || '' }];
           } else if (Array.isArray(lastMessage.content)) {
-            currentContent = lastMessage.content;
+            // Re-validate existing content parts to be absolutely sure
+            currentContent = lastMessage.content.map((part: any) => {
+              if (part.type === 'text') {
+                return {
+                  type: 'text',
+                  text: typeof part.text === 'string' ? part.text : (part.text ? String(part.text) : '')
+                };
+              }
+              return part;
+            });
           } else {
             currentContent = [{ type: 'text', text: '' }];
           }
