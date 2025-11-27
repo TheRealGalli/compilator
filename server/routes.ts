@@ -301,6 +301,13 @@ Istruzioni:
       // Build messages with multimodal files if present
       let coreMessages: any[] = [];
 
+      // Log incoming messages for debugging
+      try {
+        console.log('[DEBUG] Incoming messages payload:', JSON.stringify(messages, null, 2).substring(0, 1000));
+      } catch (e) {
+        console.log('[DEBUG] Could not stringify messages');
+      }
+
       try {
         if (!messages || !Array.isArray(messages)) {
           console.warn('[WARN] Messages is not an array, defaulting to empty array');
@@ -351,6 +358,9 @@ Istruzioni:
       }
 
       console.log(`[DEBUG] Core messages count: ${coreMessages.length}`);
+      try {
+        console.log('[DEBUG] Final coreMessages:', JSON.stringify(coreMessages, null, 2).substring(0, 1000));
+      } catch (e) { console.log('[DEBUG] Could not stringify coreMessages'); }
 
       // Use generateText with multimodal content
       const result = await generateText({
