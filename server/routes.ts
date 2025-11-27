@@ -277,13 +277,23 @@ Istruzioni:
 
             // Convert to base64 and add as multimodal file
             const base64 = buffer.toString('base64');
-            multimodalFiles.push({
-              type: 'file' as const,
-              data: base64,
-              mimeType: source.type,
-            });
+            const isImage = source.type.startsWith('image/');
 
-            console.log(`[DEBUG] Added ${source.name} as multimodal attachment`);
+            if (isImage) {
+              multimodalFiles.push({
+                type: 'image',
+                image: base64,
+                mimeType: source.type, // Optional for some providers but good to have
+              });
+            } else {
+              multimodalFiles.push({
+                type: 'file',
+                data: base64,
+                mimeType: source.type,
+              });
+            }
+
+            console.log(`[DEBUG] Added ${source.name} as ${isImage ? 'image' : 'file'} attachment`);
             filesContext += `- ${source.name} (${source.type})\n`;
           } catch (error) {
             console.error(`Error processing file ${source.name}:`, error);
