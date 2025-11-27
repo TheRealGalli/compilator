@@ -362,7 +362,7 @@ Istruzioni:
 
       // Use generateText with multimodal content
       const result = await generateText({
-        model: google('gemini-1.5-flash'), // Fixed model name from 2.5 to 1.5-flash
+        model: google('gemini-2.5-flash'),
         system: systemInstruction,
         messages: coreMessages,
         temperature: req.body.temperature || 0.7,
