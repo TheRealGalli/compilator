@@ -236,7 +236,18 @@ Istruzioni:
   // Endpoint per chat con AI (con streaming e file support)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
-      const { messages, sources } = req.body; // sources: array of {name, type, size, url: GCS URL}
+      const { temperature } = req.body;
+      let { messages, sources } = req.body; // sources: array of {name, type, size, url: GCS URL}
+
+      // Parse messages if string (multipart/form-data)
+      if (typeof messages === 'string') {
+        try {
+          messages = JSON.parse(messages);
+        } catch (e) {
+          console.error('[ERROR] Failed to parse messages JSON:', e);
+          messages = [];
+        }
+      }
 
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'Messaggi richiesti' });
@@ -247,6 +258,7 @@ Istruzioni:
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
       console.log(`[DEBUG] Received ${sources?.length || 0} sources`);
+      console.log(`[DEBUG] Messages type: ${typeof messages}, isArray: ${Array.isArray(messages)}`);
       console.log(`[DEBUG] Sources type:`, typeof sources);
       console.log(`[DEBUG] Sources is array:`, Array.isArray(sources));
 
