@@ -305,50 +305,50 @@ Istruzioni:
 
       // Build system instruction
       const systemInstruction = `Sei un assistente AI di ricerca. ${multimodalFiles.length > 0 ? `Hai accesso ai seguenti file:\n\n${filesContext}\nAnalizza attentamente i file forniti per rispondere alle domande. Cita sempre la fonte delle informazioni (nome del file).` : 'Aiuti gli utenti ad analizzare documenti.'}`;
-
       console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters`);
 
       // Build messages with multimodal files if present
       let coreMessages: any[] = [];
 
-      // Manual strict conversion to CoreMessage format
-      // We avoid convertToCoreMessages as it was crashing
-      if (messages && Array.isArray(messages)) {
-        coreMessages = messages.map((msg: any) => {
-          // Normalize role
-          let role = msg.role;
-          if (role === 'data') role = 'user';
-          if (!['system', 'user', 'assistant', 'tool'].includes(role)) {
-            role = 'user'; // Default to user for unknown roles
-          }
+      try {
+        if (!messages || !Array.isArray(messages)) {
+          console.warn('[WARN] Messages is not an array, defaulting to empty array');
+          coreMessages = [];
+        } else {
+          // Sanitize messages to prevent convertToCoreMessages from crashing
+          const sanitizedMessages = messages.map((msg: any) => {
+            const role = (msg.role === 'data' ? 'user' : msg.role) || 'user';
+            let content = msg.content;
 
-          // Normalize content
-          let content = msg.content;
-          if (typeof content !== 'string' && !Array.isArray(content)) {
-            content = String(content || '');
-          }
+            // Ensure content is never undefined/null
+            if (content === undefined || content === null) {
+              content = '';
+            }
 
-          // If content is array, ensure it has valid parts
-          if (Array.isArray(content)) {
-            content = content.map((part: any) => {
-              if (part.type === 'text') {
-                return {
-                  type: 'text',
-                  text: typeof part.text === 'string' ? part.text : (part.text ? String(part.text) : '')
-                };
-              }
-              // Handle other known types if necessary, or fallback to text representation
-              if (part.type === 'image' || part.type === 'file') {
-                return part; // Pass through valid media parts if they exist in history
-              }
+            // If content is an array, filter out invalid parts
+            if (Array.isArray(content)) {
+              content = content.map((part: any) => {
+                if (part.type === 'text') {
+                  return { type: 'text', text: part.text || '' };
+                }
+                return part;
+              });
+            }
 
-              // Fallback for unknown parts
-              return { type: 'text', text: JSON.stringify(part) };
-            });
-          }
+            return {
+              ...msg,
+              role,
+              content,
+            };
+          });
 
-          return { role, content };
-        });
+          // Now safe to use SDK conversion
+          coreMessages = convertToCoreMessages(sanitizedMessages);
+        }
+      } catch (err) {
+        console.error('[ERROR] Message processing failed:', err);
+        // Fallback to empty to prevent 500
+        coreMessages = [];
       }
 
       // If we have multimodal files, attach them to the last user message
