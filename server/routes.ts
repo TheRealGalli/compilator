@@ -324,39 +324,41 @@ Istruzioni:
 
       try {
         // 1. Sanitize inputs to ensure they are safe for the SDK
-        const sanitizedMessages = messages.map((msg: any) => {
-          // Ensure role is valid
-          const role = (msg.role === 'data' ? 'user' : msg.role) || 'user';
+        const sanitizedMessages = messages
+          .filter((msg: any) => msg.role !== 'system') // Remove system messages (passed separately)
+          .map((msg: any) => {
+            // Ensure role is valid
+            const role = (msg.role === 'data' ? 'user' : msg.role) || 'user';
 
-          // Ensure content is never undefined/null
-          let content = msg.content;
-          if (content === undefined || content === null) {
-            content = '';
-          }
+            // Ensure content is never undefined/null
+            let content = msg.content;
+            if (content === undefined || content === null) {
+              content = '';
+            }
 
-          // If content is array, sanitize parts
-          if (Array.isArray(content)) {
-            content = content.map((part: any) => {
-              if (part.type === 'text') {
-                return { type: 'text', text: String(part.text || '') };
-              }
-              // Keep other parts if they look valid, otherwise fallback to text
-              if (part.type === 'image' || part.type === 'file') {
-                return part;
-              }
-              return { type: 'text', text: '' };
-            });
-          } else {
-            // Ensure string content
-            content = String(content);
-          }
+            // If content is array, sanitize parts
+            if (Array.isArray(content)) {
+              content = content.map((part: any) => {
+                if (part.type === 'text') {
+                  return { type: 'text', text: String(part.text || '') };
+                }
+                // Keep other parts if they look valid, otherwise fallback to text
+                if (part.type === 'image' || part.type === 'file') {
+                  return part;
+                }
+                return { type: 'text', text: '' };
+              });
+            } else {
+              // Ensure string content
+              content = String(content);
+            }
 
-          return {
-            ...msg,
-            role,
-            content,
-          };
-        });
+            return {
+              ...msg,
+              role,
+              content,
+            };
+          });
 
         // 2. Use official SDK conversion
         // This ensures the output is strictly ModelMessage[] (CoreMessage[])
