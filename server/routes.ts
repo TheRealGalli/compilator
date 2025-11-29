@@ -338,17 +338,14 @@ Istruzioni:
           if (typeof msg.content === 'string') {
             content = msg.content;
           } else if (Array.isArray(msg.content)) {
-            content = msg.content.map((part: any) => {
-              if (part.type === 'text') {
-                // Strictly ensure text is a string
-                return { type: 'text', text: String(part.text || '') };
-              }
-              if (part.type === 'image' || part.type === 'file') {
-                return part; // Pass through valid media parts
-              }
-              // Fallback for unknown parts
-              return { type: 'text', text: '' };
-            });
+            // STRICT SANITIZATION: Only allow text parts from client history
+            // We do not pass through other types to avoid validation errors
+            content = msg.content
+              .filter((part: any) => part.type === 'text')
+              .map((part: any) => ({ type: 'text', text: String(part.text || '') }));
+
+            // If no text parts remain, default to empty string
+            if (content.length === 0) content = '';
           } else {
             content = String(msg.content || '');
           }
@@ -386,9 +383,16 @@ Istruzioni:
       }
 
       console.log(`[DEBUG] Core messages count: ${coreMessages.length}`);
+      // Log the EXACT payload we are sending to generateText
       try {
-        console.log('[DEBUG] Final coreMessages:', JSON.stringify(coreMessages, null, 2).substring(0, 1000));
-      } catch (e) { console.log('[DEBUG] Could not stringify coreMessages'); }
+        console.log('[DEBUG] Final coreMessages payload:', JSON.stringify(coreMessages, null, 2));
+      } catch (e) {
+        console.log('[DEBUG] Could not stringify coreMessages');
+      }
+
+      if (coreMessages.length === 0) {
+        return res.status(400).json({ error: 'No valid messages found after sanitization' });
+      }
 
       // Use generateText with multimodal content
       const result = await generateText({
