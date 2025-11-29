@@ -322,36 +322,50 @@ Istruzioni:
       // Build messages with multimodal files if present
       let coreMessages: any[] = [];
 
-      // Manual strict conversion to CoreMessage format
-      // We avoid convertToCoreMessages as it was crashing on some inputs
-      if (messages && Array.isArray(messages)) {
-        coreMessages = messages.map((msg: any) => {
-          // Normalize role
-          let role = msg.role;
-          if (role === 'data') role = 'user';
-          if (!['system', 'user', 'assistant', 'tool'].includes(role)) {
-            role = 'user'; // Default to user for unknown roles
+      try {
+        // 1. Sanitize inputs to ensure they are safe for the SDK
+        const sanitizedMessages = messages.map((msg: any) => {
+          // Ensure role is valid
+          const role = (msg.role === 'data' ? 'user' : msg.role) || 'user';
+
+          // Ensure content is never undefined/null
+          let content = msg.content;
+          if (content === undefined || content === null) {
+            content = '';
           }
 
-          // Normalize content
-          let content: any = '';
-          if (typeof msg.content === 'string') {
-            content = msg.content;
-          } else if (Array.isArray(msg.content)) {
-            // STRICT SANITIZATION: Only allow text parts from client history
-            // We do not pass through other types to avoid validation errors
-            content = msg.content
-              .filter((part: any) => part.type === 'text')
-              .map((part: any) => ({ type: 'text', text: String(part.text || '') }));
-
-            // If no text parts remain, default to empty string
-            if (content.length === 0) content = '';
+          // If content is array, sanitize parts
+          if (Array.isArray(content)) {
+            content = content.map((part: any) => {
+              if (part.type === 'text') {
+                return { type: 'text', text: String(part.text || '') };
+              }
+              // Keep other parts if they look valid, otherwise fallback to text
+              if (part.type === 'image' || part.type === 'file') {
+                return part;
+              }
+              return { type: 'text', text: '' };
+            });
           } else {
-            content = String(msg.content || '');
+            // Ensure string content
+            content = String(content);
           }
 
-          return { role, content };
+          return {
+            ...msg,
+            role,
+            content,
+          };
         });
+
+        // 2. Use official SDK conversion
+        // This ensures the output is strictly ModelMessage[] (CoreMessage[])
+        coreMessages = convertToCoreMessages(sanitizedMessages);
+
+      } catch (err) {
+        console.error('[ERROR] Message conversion failed:', err);
+        // Fallback: try to construct a minimal valid user message to avoid 500
+        coreMessages = [{ role: 'user', content: 'Error processing previous messages.' }];
       }
 
       // If we have multimodal files, attach them to the last user message
@@ -391,7 +405,7 @@ Istruzioni:
       }
 
       if (coreMessages.length === 0) {
-        return res.status(400).json({ error: 'No valid messages found after sanitization' });
+        return res.status(400).json({ error: 'No valid messages found' });
       }
 
       // Use generateText with multimodal content
