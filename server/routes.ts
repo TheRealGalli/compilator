@@ -21,6 +21,8 @@ const upload = multer({
   },
 });
 
+const BUCKET_NAME = process.env.GCP_STORAGE_BUCKET || 'notebooklm-compiler-files';
+
 async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
   try {
     console.log(`[DEBUG extractText] Processing ${mimeType}, buffer size: ${buffer.length}`);
