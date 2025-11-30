@@ -372,15 +372,14 @@ Istruzioni:
             }
 
             return {
-              ...msg,
               role,
               content,
             };
           });
 
-        // 2. Use official SDK conversion
-        // This ensures the output is strictly ModelMessage[] (CoreMessage[])
-        coreMessages = convertToCoreMessages(sanitizedMessages);
+        // 2. Use sanitized messages directly as CoreMessages
+        // We manually ensured they are strictly { role, content }
+        coreMessages = sanitizedMessages;
 
       } catch (err) {
         console.error('[ERROR] Message conversion failed:', err);
