@@ -266,36 +266,52 @@ Istruzioni:
         console.log('[DEBUG] Sources:', sources.map((s: any) => ({ name: s.name, type: s.type, url: s.url?.substring(0, 100) })));
       }
 
-      // Download files from GCS and attach as multimodal content
-      const multimodalFiles: any[] = [];
+      // Download and process files
       let filesContext = '';
+      const multimodalFiles: any[] = [];
 
-      if (sources && sources.length > 0) {
-        console.log(`[DEBUG] Starting to process ${sources.length} files`);
+      if (sources && Array.isArray(sources)) {
+        console.log(`[DEBUG] Processing ${sources.length} sources`);
 
         for (const source of sources) {
           try {
-            // Extract GCS path from URL (remove query params from signed URL)
-            const urlWithoutParams = source.url.split('?')[0];
-            const pathParts = urlWithoutParams.split('/');
-            const gcsPath = pathParts.slice(4).join('/');
+            let buffer: Buffer;
+            let base64: string;
 
-            console.log(`[DEBUG] Processing file: ${source.name} (${source.type})`);
-            console.log(`[DEBUG] GCS path: ${gcsPath}`);
+            // Check if we have direct base64 content (Client-side RAG)
+            if (source.base64) {
+              console.log(`[DEBUG] Using client-side base64 for ${source.name}`);
+              base64 = source.base64;
+            }
+            // Fallback to GCS download (Legacy/Compiler)
+            else if (source.url) {
+              console.log(`[DEBUG] Downloading from GCS: ${source.url}`);
+              // Extract path from URL
+              // URL format: https://storage.googleapis.com/BUCKET_NAME/path/to/file
+              const urlParts = source.url.split(`/${BUCKET_NAME}/`);
+              if (urlParts.length < 2) {
+                console.error(`Invalid GCS URL format: ${source.url}`);
+                continue;
+              }
 
-            // Download file from GCS
-            const buffer = await downloadFile(gcsPath);
-            console.log(`[DEBUG] Downloaded ${buffer.length} bytes for ${source.name}`);
+              // Remove any query parameters if present
+              const gcsPath = urlParts[1].split('?')[0];
+              console.log(`[DEBUG] Extracted GCS path: ${gcsPath}`);
 
-            // Convert to base64 and add as multimodal file
-            const base64 = buffer.toString('base64');
+              buffer = await downloadFile(gcsPath);
+              base64 = buffer.toString('base64');
+            } else {
+              console.warn(`[WARN] Source ${source.name} has no base64 or url`);
+              continue;
+            }
+
             const isImage = source.type.startsWith('image/');
 
             if (isImage) {
               multimodalFiles.push({
                 type: 'image',
                 image: base64,
-                mimeType: source.type, // Optional for some providers but good to have
+                mimeType: source.type,
               });
             } else {
               multimodalFiles.push({

@@ -7,7 +7,8 @@ export interface Source {
     selected: boolean;
     type: string;
     size: number;
-    url: string; // GCS URL instead of base64
+    url?: string; // Optional GCS URL (for backward compatibility or compiler)
+    base64?: string; // Client-side base64 content
 }
 
 interface SourcesContextType {
@@ -37,22 +38,18 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         }
 
         try {
-            // Upload to backend GCS
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const response = await fetch(getApiUrl('/api/files/upload'), {
-                method: 'POST',
-                body: formData,
-                credentials: 'include',
+            // Read file as Base64 client-side
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = reader.result as string;
+                    // Remove data URL prefix (e.g., "data:application/pdf;base64,")
+                    const base64Content = result.split(',')[1];
+                    resolve(base64Content);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
             });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Upload failed: ${errorText}`);
-            }
-
-            const data = await response.json();
 
             const newSource: Source = {
                 id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -60,13 +57,13 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 selected: true,
                 type: file.type,
                 size: file.size,
-                url: data.file.publicUrl, // GCS URL
+                base64: base64, // Store base64 directly
             };
 
             setSources(prev => [...prev, newSource]);
             return true;
         } catch (error) {
-            console.error('Error uploading file:', error);
+            console.error('Error reading file:', error);
             return false;
         }
     }, [sources]);
