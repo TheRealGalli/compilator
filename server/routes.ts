@@ -427,19 +427,56 @@ Istruzioni:
         return res.status(400).json({ error: 'No valid messages found' });
       }
 
-      // Use generateText with multimodal content
-      const result = await generateText({
-        model: google('gemini-1.5-flash'),
-        system: systemInstruction,
-        messages: coreMessages,
-        temperature: req.body.temperature || 0.7,
+      // 3. Use Google Generative AI SDK directly to bypass Vercel AI SDK validation issues
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(getModelApiKey());
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction: systemInstruction
       });
+
+      // Map CoreMessages to Google Generative AI format
+      const googleHistory = coreMessages.map(msg => {
+        const role = msg.role === 'assistant' ? 'model' : 'user';
+        let parts: any[] = [];
+
+        if (typeof msg.content === 'string') {
+          parts = [{ text: msg.content }];
+        } else if (Array.isArray(msg.content)) {
+          parts = msg.content.map((part: any) => {
+            if (part.type === 'text') {
+              return { text: part.text };
+            }
+            if (part.type === 'image') {
+              return { inlineData: { mimeType: part.mimeType || 'image/jpeg', data: part.image } };
+            }
+            if (part.type === 'file') {
+              return { inlineData: { mimeType: part.mimeType, data: part.data } };
+            }
+            return { text: '' };
+          });
+        }
+
+        return { role, parts };
+      });
+
+      console.log('[DEBUG] Sending request to Google Generative AI native SDK');
+
+      const result = await model.generateContent({
+        contents: googleHistory,
+        generationConfig: {
+          temperature: req.body.temperature || 0.7,
+        }
+      });
+
+      const response = await result.response;
+      const text = response.text();
 
       // Return JSON response
       res.json({
         success: true,
         message: {
-          content: result.text,
+          content: text,
         },
       });
     } catch (error: any) {
