@@ -429,7 +429,8 @@ Istruzioni:
 
       // 3. Use Google Generative AI SDK directly to bypass Vercel AI SDK validation issues
       const { GoogleGenerativeAI } = await import("@google/generative-ai");
-      const genAI = new GoogleGenerativeAI(getModelApiKey());
+      const apiKey = await getModelApiKey('gemini');
+      const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash",
         systemInstruction: systemInstruction
