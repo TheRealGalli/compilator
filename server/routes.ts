@@ -1,6 +1,4 @@
 import type { Express, Request, Response } from "express";
-import { google } from '@ai-sdk/google';
-import { generateText, streamText, convertToCoreMessages } from 'ai';
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
