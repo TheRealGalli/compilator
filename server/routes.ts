@@ -196,10 +196,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Recupera la chiave API dal Secret Manager (default gemini)
       const apiKey = await getModelApiKey('gemini');
 
-      // Use Vercel AI SDK with Google provider
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
-
+      // Use Google Generative AI SDK directly
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(apiKey);
       const systemPrompt = 'Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.';
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction: systemPrompt
+      });
+
       const userPrompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite e sui documenti di contesto.
 
 Template:
@@ -216,16 +221,19 @@ Istruzioni:
 - Usa un tono ${formalTone ? 'formale' : 'informale'}
 - Fornisci contenuti dettagliati e professionali`;
 
-      const result = await generateText({
-        model: google('gemini-2.5-flash'),
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: temperature || 0.7,
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        generationConfig: {
+          temperature: temperature || 0.7,
+        }
       });
+
+      const response = await result.response;
+      const text = response.text();
 
       res.json({
         success: true,
-        compiledContent: result.text,
+        compiledContent: text,
       });
     } catch (error: any) {
       console.error('Errore durante compilazione:', error);
