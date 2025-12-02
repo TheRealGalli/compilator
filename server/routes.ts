@@ -433,16 +433,24 @@ Istruzioni:
         return res.status(400).json({ error: 'No valid messages found' });
       }
 
-      // 3. Use Google Generative AI SDK directly to bypass Vercel AI SDK validation issues
-      const { GoogleGenerativeAI } = await import("@google/generative-ai");
-      const googleApiKey = await getModelApiKey('gemini');
-      const genAI = new GoogleGenerativeAI(googleApiKey);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        systemInstruction: systemInstruction
+      // 3. Use Google Cloud Vertex AI SDK (Native GCP)
+      // This uses ADC (Application Default Credentials) automatically on Cloud Run
+      const { VertexAI } = await import("@google-cloud/vertexai");
+
+      const project = process.env.GCP_PROJECT_ID;
+      const location = 'europe-west1'; // User is in europe-west1
+
+      const vertex_ai = new VertexAI({ project: project, location: location });
+      const model = vertex_ai.getGenerativeModel({
+        model: "gemini-1.5-flash-001", // Use specific version for stability
+        systemInstruction: {
+          parts: [{ text: systemInstruction }]
+        }
       });
 
-      // Map CoreMessages to Google Generative AI format
+      // Map CoreMessages to Vertex AI format
+      // Vertex AI expects 'role' to be 'user' or 'model'
+      // Content parts are similar but strict on types
       const googleHistory = coreMessages.map(msg => {
         const role = msg.role === 'assistant' ? 'model' : 'user';
         let parts: any[] = [];
@@ -467,7 +475,7 @@ Istruzioni:
         return { role, parts };
       });
 
-      console.log('[DEBUG] Sending request to Google Generative AI native SDK');
+      console.log('[DEBUG] Sending request to Vertex AI (europe-west1)');
 
       const result = await model.generateContent({
         contents: googleHistory,
