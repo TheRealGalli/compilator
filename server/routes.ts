@@ -440,7 +440,22 @@ Istruzioni:
       const project = process.env.GCP_PROJECT_ID;
       const location = 'europe-west1'; // User is in europe-west1
 
-      const vertex_ai = new VertexAI({ project: project, location: location });
+      let authOptions = undefined;
+      if (process.env.GCP_CREDENTIALS) {
+        try {
+          const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
+          authOptions = { credentials };
+          console.log('[DEBUG] Using explicit GCP_CREDENTIALS from env');
+        } catch (e) {
+          console.error('[ERROR] Failed to parse GCP_CREDENTIALS:', e);
+        }
+      }
+
+      const vertex_ai = new VertexAI({
+        project: project,
+        location: location,
+        googleAuthOptions: authOptions
+      });
       const model = vertex_ai.getGenerativeModel({
         model: "gemini-1.5-flash-001", // Use specific version for stability
         systemInstruction: {
