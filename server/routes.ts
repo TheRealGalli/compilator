@@ -191,16 +191,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Recupera contesto dai documenti selezionati
       const documentsContext = await getDocumentsContext(selectedDocuments);
 
-      // Recupera la chiave API dal Secret Manager (default gemini)
-      const apiKey = await getModelApiKey('gemini');
+      // Use Vertex AI SDK (same as /api/chat)
+      const { VertexAI } = await import("@google-cloud/vertexai");
 
-      // Use Google Generative AI SDK directly
-      const { GoogleGenerativeAI } = await import("@google/generative-ai");
-      const genAI = new GoogleGenerativeAI(apiKey);
+      const project = process.env.GCP_PROJECT_ID;
+      const location = 'europe-west1';
+
+      let authOptions = undefined;
+      if (process.env.GCP_CREDENTIALS) {
+        try {
+          const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
+          authOptions = { credentials };
+          console.log('[DEBUG Compile] Using explicit GCP_CREDENTIALS from env');
+        } catch (e) {
+          console.error('[ERROR Compile] Failed to parse GCP_CREDENTIALS:', e);
+        }
+      }
+
+      const vertex_ai = new VertexAI({
+        project: project,
+        location: location,
+        googleAuthOptions: authOptions
+      });
+
       const systemPrompt = 'Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.';
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        systemInstruction: systemPrompt
+      const model = vertex_ai.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        systemInstruction: {
+          role: 'system',
+          parts: [{ text: systemPrompt }]
+        }
       });
 
       const userPrompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite e sui documenti di contesto.
@@ -226,8 +246,8 @@ Istruzioni:
         }
       });
 
-      const response = await result.response;
-      const text = response.text();
+      const response = result.response;
+      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
       res.json({
         success: true,
