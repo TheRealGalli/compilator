@@ -214,6 +214,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } else if (docPath.endsWith('.webp')) {
                 mimeType = 'image/webp';
               }
+              // Audio formats
+              else if (docPath.endsWith('.mp3')) {
+                mimeType = 'audio/mpeg';
+              } else if (docPath.endsWith('.wav')) {
+                mimeType = 'audio/wav';
+              } else if (docPath.endsWith('.flac')) {
+                mimeType = 'audio/flac';
+              } else if (docPath.endsWith('.aac')) {
+                mimeType = 'audio/aac';
+              }
+              // Video formats
+              else if (docPath.endsWith('.mp4')) {
+                mimeType = 'video/mp4';
+              } else if (docPath.endsWith('.mov')) {
+                mimeType = 'video/quicktime';
+              } else if (docPath.endsWith('.avi')) {
+                mimeType = 'video/x-msvideo';
+              } else if (docPath.endsWith('.webm')) {
+                mimeType = 'video/webm';
+              }
 
               const isImage = mimeType.startsWith('image/');
 
