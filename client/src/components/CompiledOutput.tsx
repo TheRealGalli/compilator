@@ -51,6 +51,8 @@ export function CompiledOutput({ content, onCopy, onDownload }: CompiledOutputPr
               questi testi con quelli reali prima di qualsiasi utilizzo ufficiale in questione.
             </p>
           )}
-        </div>
-        );
+        </ScrollArea>
+      </CardContent>
+    </Card>
+  );
 }
