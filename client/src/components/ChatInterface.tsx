@@ -1,8 +1,9 @@
-import { Send } from "lucide-react";
+import { Send, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "./ChatMessage";
+import { TypingIndicator } from "./TypingIndicator";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -127,6 +128,16 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           {messages.map((message) => (
             <ChatMessage key={message.id} {...message} />
           ))}
+          {isLoading && (
+            <div className="flex gap-3 justify-start">
+              <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
+                <Bot className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <div className="bg-muted rounded-lg">
+                <TypingIndicator />
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
 
