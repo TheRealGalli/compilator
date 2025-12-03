@@ -438,7 +438,7 @@ Istruzioni:
       const { VertexAI } = await import("@google-cloud/vertexai");
 
       const project = process.env.GCP_PROJECT_ID;
-      const location = 'europe-west1'; // User is in europe-west1
+      const location = 'us-central1'; // Switch to us-central1 for better model availability
 
       let authOptions = undefined;
       if (process.env.GCP_CREDENTIALS) {
