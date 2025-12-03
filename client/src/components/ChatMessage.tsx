@@ -1,6 +1,7 @@
 import { Bot, User, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { FormattedMessage } from "./FormattedMessage";
 
 interface ChatMessageProps {
   role: "user" | "assistant" | "system";
@@ -27,7 +28,11 @@ export function ChatMessage({
 
       <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} max-w-[70%]`}>
         <div className={`rounded-lg p-4 ${isUser ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-          <p className="text-sm whitespace-pre-wrap" data-testid={`text-message-${role}`}>{content}</p>
+          {isUser ? (
+            <p className="text-sm whitespace-pre-wrap" data-testid={`text-message-${role}`}>{content}</p>
+          ) : (
+            <FormattedMessage content={content} className="text-sm" data-testid={`text-message-${role}`} />
+          )}
         </div>
 
         <div className="flex items-center gap-2 mt-2">

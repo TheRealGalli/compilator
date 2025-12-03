@@ -339,8 +339,29 @@ Istruzioni:
 
       console.log(`[DEBUG] Multimodal files attached: ${multimodalFiles.length}`);
 
-      // Build system instruction
-      const systemInstruction = `Sei un assistente AI di ricerca. ${multimodalFiles.length > 0 ? `Hai accesso ai seguenti file:\n\n${filesContext}\nAnalizza attentamente i file forniti per rispondere alle domande. Cita sempre la fonte delle informazioni (nome del file).` : 'Aiuti gli utenti ad analizzare documenti.'}`;
+      // Build enhanced system instruction for high-quality responses
+      const systemInstruction = multimodalFiles.length > 0
+        ? `Sei un assistente AI di ricerca esperto e professionale.
+
+**DOCUMENTI DISPONIBILI:**
+${filesContext}
+
+**ISTRUZIONI:**
+1. Analizza attentamente i documenti forniti prima di rispondere
+2. Fornisci risposte concise, precise e ben strutturate
+3. Usa liste puntate per organizzare le informazioni quando necessario
+4. Cita sempre la fonte tra parentesi, es: (da: nome_file.pdf)
+5. Se la risposta non è nei documenti, dichiaralo esplicitamente
+6. Evita ripetizioni e informazioni superflue
+7. Usa un tono professionale ma accessibile
+
+**FORMATO RISPOSTA:**
+- Inizia con un breve riepilogo (1-2 righe)
+- Sviluppa i punti chiave in modo chiaro
+- Concludi solo se necessario (evita conclusioni generiche)`
+        : `Sei un assistente AI di ricerca esperto. 
+Fornisci risposte concise, precise e ben strutturate.
+Usa liste puntate per organizzare le informazioni quando necessario.`;
       console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters`);
 
       // Build messages with multimodal files if present
