@@ -438,7 +438,7 @@ Istruzioni:
       const { VertexAI } = await import("@google-cloud/vertexai");
 
       const project = process.env.GCP_PROJECT_ID;
-      const location = 'us-central1'; // Switch to us-central1 for better model availability
+      const location = 'europe-west1'; // Reverted to europe-west1 as requested
 
       let authOptions = undefined;
       if (process.env.GCP_CREDENTIALS) {
@@ -457,8 +457,9 @@ Istruzioni:
         googleAuthOptions: authOptions
       });
       const model = vertex_ai.getGenerativeModel({
-        model: "gemini-1.5-flash-001", // Use specific version for stability
+        model: "gemini-2.5-flash", // Latest stable Flash model
         systemInstruction: {
+          role: 'system',
           parts: [{ text: systemInstruction }]
         }
       });
@@ -490,7 +491,7 @@ Istruzioni:
         return { role, parts };
       });
 
-      console.log('[DEBUG] Sending request to Vertex AI (europe-west1)');
+      console.log('[DEBUG] Sending request to Vertex AI (europe-west1) with gemini-2.5-flash');
 
       const result = await model.generateContent({
         contents: googleHistory,
@@ -499,8 +500,9 @@ Istruzioni:
         }
       });
 
-      const response = await result.response;
-      const text = response.text();
+      const response = result.response;
+      // Vertex AI response structure: response.candidates[0].content.parts[0].text
+      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
       // Return JSON response
       res.json({
