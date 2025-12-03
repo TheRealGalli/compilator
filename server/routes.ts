@@ -191,6 +191,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Recupera contesto dai documenti selezionati
       const documentsContext = await getDocumentsContext(selectedDocuments);
 
+      // Download multimodal files from GCS (images/PDFs)
+      const multimodalFiles: any[] = [];
+      if (selectedDocuments && Array.isArray(selectedDocuments)) {
+        console.log(`[DEBUG Compile] Processing ${selectedDocuments.length} documents`);
+
+        for (const docPath of selectedDocuments) {
+          try {
+            // Download original file from GCS
+            if (await fileExists(docPath)) {
+              const buffer = await downloadFile(docPath);
+              const base64 = buffer.toString('base64');
+
+              // Determine MIME type from file extension
+              let mimeType = 'application/octet-stream';
+              if (docPath.endsWith('.pdf')) {
+                mimeType = 'application/pdf';
+              } else if (docPath.endsWith('.jpg') || docPath.endsWith('.jpeg')) {
+                mimeType = 'image/jpeg';
+              } else if (docPath.endsWith('.png')) {
+                mimeType = 'image/png';
+              } else if (docPath.endsWith('.webp')) {
+                mimeType = 'image/webp';
+              }
+
+              const isImage = mimeType.startsWith('image/');
+
+              multimodalFiles.push({
+                type: isImage ? 'image' : 'file',
+                data: base64,
+                mimeType: mimeType,
+                name: docPath
+              });
+
+              console.log(`[DEBUG Compile] Added ${docPath} as ${isImage ? 'image' : 'file'} (${mimeType})`);
+            }
+          } catch (error) {
+            console.error(`[ERROR Compile] Failed to process ${docPath}:`, error);
+          }
+        }
+      }
+
+      console.log(`[DEBUG Compile] Total multimodal files: ${multimodalFiles.length}`);
+
       // Use Vertex AI SDK (same as /api/chat)
       const { VertexAI } = await import("@google-cloud/vertexai");
 
@@ -214,7 +257,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         googleAuthOptions: authOptions
       });
 
-      const systemPrompt = 'Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.';
+      const systemPrompt = `Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.
+${multimodalFiles.length > 0 ? `Hai accesso a ${multimodalFiles.length} file (immagini, PDF, documenti). Analizza attentamente questi file per estrarre informazioni utili alla compilazione del template.` : ''}`;
+
       const model = vertex_ai.getGenerativeModel({
         model: "gemini-2.5-flash",
         systemInstruction: {
@@ -234,13 +279,30 @@ ${documentsContext}
 
 Istruzioni:
 - Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate
-- Usa le informazioni dai documenti di contesto se disponibili
+- Usa le informazioni dai documenti forniti (foto, visure, PDF) per completare il template
 - Mantieni la struttura e il formato del template
 - Usa un tono ${formalTone ? 'formale' : 'informale'}
-- Fornisci contenuti dettagliati e professionali`;
+- Fornisci contenuti dettagliati e professionali
+- IMPORTANTE: Analizza attentamente tutti i file multimodali forniti`;
+
+      // Build contents with multimodal files
+      const userParts: any[] = [{ text: userPrompt }];
+
+      // Add multimodal files as inline data
+      for (const file of multimodalFiles) {
+        if (file.type === 'image') {
+          userParts.push({
+            inlineData: { mimeType: file.mimeType, data: file.data }
+          });
+        } else {
+          userParts.push({
+            inlineData: { mimeType: file.mimeType, data: file.data }
+          });
+        }
+      }
 
       const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        contents: [{ role: 'user', parts: userParts }],
         generationConfig: {
           temperature: temperature || 0.7,
         }
@@ -248,6 +310,8 @@ Istruzioni:
 
       const response = result.response;
       const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      console.log(`[DEBUG Compile] Generated ${text.length} characters`);
 
       res.json({
         success: true,

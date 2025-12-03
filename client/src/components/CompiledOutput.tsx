@@ -1,51 +1,56 @@
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
 import { Copy, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CompiledOutputProps {
-  content?: string;
-  onCopy?: () => void;
-  onDownload?: () => void;
+  content: string;
+  onCopy: () => void;
+  onDownload: () => void;
 }
 
-export function CompiledOutput({ 
-  content = "",
-  onCopy,
-  onDownload
-}: CompiledOutputProps) {
+export function CompiledOutput({ content, onCopy, onDownload }: CompiledOutputProps) {
   return (
-    <div className="h-full flex flex-col border rounded-lg overflow-hidden bg-background">
-      <div className="border-b px-2 py-1.5 bg-muted/30 flex items-center justify-between flex-shrink-0">
-        <h3 className="text-sm font-medium">Documento Compilato</h3>
-        {content && (
-          <div className="flex gap-0.5">
-            <Button size="icon" variant="ghost" className="h-5 w-5" onClick={onCopy} data-testid="button-copy-output">
-              <Copy className="w-3 h-3" />
+    <Card className="h-full flex flex-col">
+      <CardHeader className="flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">Documento Compilato</CardTitle>
+          <div className="flex gap-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={onCopy}
+              disabled={!content}
+              data-testid="button-copy-compiled"
+            >
+              <Copy className="w-4 h-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-5 w-5" onClick={onDownload} data-testid="button-download-output">
-              <Download className="w-3 h-3" />
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={onDownload}
+              disabled={!content}
+              data-testid="button-download-compiled"
+            >
+              <Download className="w-4 h-4" />
             </Button>
           </div>
-        )}
-      </div>
-      <ScrollArea className="flex-1">
-        <div className="p-2">
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 overflow-hidden p-0">
+        <ScrollArea className="h-full px-6 pb-6">
           {content ? (
-            <div className="prose prose-sm max-w-none" data-testid="text-compiled-output">
-              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">{content}</pre>
-            </div>
+            <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-compiled-output">
+              {content}
+            </pre>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center px-4">
-              <p className="text-sm text-muted-foreground">
-                Nessun documento compilato ancora.
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Seleziona un modello e clicca "Compila" per generare il documento.
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Certamente, di seguito trovi il template compilato con informazioni
+              esemplificative, dove nel mondo reale e dai tuoi documenti di contesto
+              specificherò note dettagliate per ogni placeholder. Ti prego di sostituire
+              questi testi con quelli reali prima di qualsiasi utilizzo ufficiale in questione.
+            </p>
           )}
         </div>
-      </ScrollArea>
-    </div>
-  );
+        );
 }
