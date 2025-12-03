@@ -12,7 +12,7 @@ interface CompiledOutputProps {
 export function CompiledOutput({ content, onCopy, onDownload }: CompiledOutputProps) {
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader className="flex-shrink-0">
+      <CardHeader className="flex-shrink-0 pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Documento Compilato</CardTitle>
           <div className="flex gap-2">
@@ -37,20 +37,21 @@ export function CompiledOutput({ content, onCopy, onDownload }: CompiledOutputPr
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 overflow-hidden p-0">
-        <ScrollArea className="h-full px-6 pb-6">
-          {content ? (
-            <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-compiled-output">
-              {content}
-            </pre>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Certamente, di seguito trovi il template compilato con informazioni
-              esemplificative, dove nel mondo reale e dai tuoi documenti di contesto
-              specificherò note dettagliate per ogni placeholder. Ti prego di sostituire
-              questi testi con quelli reali prima di qualsiasi utilizzo ufficiale in questione.
-            </p>
-          )}
+      <CardContent className="flex-1 p-0 overflow-hidden">
+        <ScrollArea className="h-full w-full">
+          <div className="px-6 pb-6">
+            {content ? (
+              <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-compiled-output">
+                {content}
+              </pre>
+            ) : (
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p className="font-medium">Il Compilatore AI trasforma template in documenti completi.</p>
+                <p>Seleziona un template preimpostato o carica il tuo, aggiungi documenti di contesto (visure, contratti, foto), e l'AI compilerà automaticamente tutti i placeholder con le informazioni estratte dai tuoi file.</p>
+                <p className="text-xs">Perfetto per: contratti, relazioni tecniche, privacy policy, documenti legali.</p>
+              </div>
+            )}
+          </div>
         </ScrollArea>
       </CardContent>
     </Card>
