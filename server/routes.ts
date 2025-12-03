@@ -339,12 +339,24 @@ Istruzioni:
 
       console.log(`[DEBUG] Multimodal files attached: ${multimodalFiles.length}`);
 
+      // Calculate max response length based on number of documents
+      const getMaxChars = (docCount: number): number => {
+        if (docCount === 0) return 3000;
+        if (docCount === 1) return 3000;
+        if (docCount <= 5) return 3500;
+        return 4000; // 6-10+ documents
+      };
+
+      const maxChars = getMaxChars(multimodalFiles.length);
+
       // Build enhanced system instruction for high-quality responses
       const systemInstruction = multimodalFiles.length > 0
         ? `Sei un assistente AI di ricerca esperto e professionale.
 
 **DOCUMENTI DISPONIBILI:**
 ${filesContext}
+
+**LIMITE LUNGHEZZA RISPOSTA:** Massimo ${maxChars} caratteri (include spazi e punteggiatura).
 
 **ISTRUZIONI:**
 1. Analizza attentamente i documenti forniti prima di rispondere
@@ -354,6 +366,7 @@ ${filesContext}
 5. Se la risposta non è nei documenti, dichiaralo esplicitamente
 6. Evita ripetizioni e informazioni superflue
 7. Usa un tono professionale ma accessibile
+8. IMPORTANTE: Rispetta sempre il limite di ${maxChars} caratteri
 
 **FORMATO RISPOSTA:**
 - Inizia con un breve riepilogo (1-2 righe)
@@ -361,8 +374,9 @@ ${filesContext}
 - Concludi solo se necessario (evita conclusioni generiche)`
         : `Sei un assistente AI di ricerca esperto. 
 Fornisci risposte concise, precise e ben strutturate.
-Usa liste puntate per organizzare le informazioni quando necessario.`;
-      console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters`);
+Usa liste puntate per organizzare le informazioni quando necessario.
+LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
+      console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters, max response: ${maxChars}`);
 
       // Build messages with multimodal files if present
       let coreMessages: any[] = [];
