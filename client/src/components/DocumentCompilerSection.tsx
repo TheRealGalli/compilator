@@ -246,17 +246,15 @@ export function DocumentCompilerSection({
       const { apiRequest } = await import("@/lib/queryClient");
 
       console.log('[DEBUG Frontend] selectedSources:', selectedSources);
-      console.log('[DEBUG Frontend] documents array:', documents);
 
-      // Map selectedSources to GCS paths
-      const selectedDocuments = selectedSources.map((source) => {
-        console.log('[DEBUG Frontend] Looking for source:', source.name);
-        const doc = documents.find(d => d.name === source.name);
-        console.log('[DEBUG Frontend] Found document:', doc);
-        return doc?.gcsPath;
-      }).filter(Boolean); // Remove undefined values
+      // Pass sources with base64 content directly
+      const sourcesForCompiler = selectedSources.map((source) => ({
+        name: source.name,
+        type: source.type,
+        base64: source.base64,
+      }));
 
-      console.log('[DEBUG Frontend] Final selectedDocuments to send:', selectedDocuments);
+      console.log('[DEBUG Frontend] Sources for compiler:', sourcesForCompiler.length);
 
       const response = await apiRequest('POST', '/api/compile', {
         template: templateContent,
@@ -265,8 +263,8 @@ export function DocumentCompilerSection({
         webResearch,
         detailedAnalysis,
         formalTone,
-        modelProvider: 'gemini', // Enforce Gemini
-        selectedDocuments, // Pass GCS paths
+        modelProvider: 'gemini',
+        sources: sourcesForCompiler, // Pass sources with base64 directly
         model: 'gemini-2.5-flash',
       });
 

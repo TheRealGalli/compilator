@@ -182,77 +182,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per compilare documenti con AI
   app.post('/api/compile', async (req: Request, res: Response) => {
     try {
-      const { template, notes, temperature, formalTone, selectedDocuments } = req.body;
+      const { template, notes, temperature, formalTone, sources } = req.body;
 
       if (!template) {
         return res.status(400).json({ error: 'Template richiesto' });
       }
 
-      // Recupera contesto dai documenti selezionati
-      const documentsContext = await getDocumentsContext(selectedDocuments);
+      console.log(`[DEBUG Compile] Received sources:`, sources?.length || 0);
 
-      console.log(`[DEBUG Compile] Received selectedDocuments:`, selectedDocuments);
-      console.log(`[DEBUG Compile] Documents context length:`, documentsContext.length);
-
-      // Download multimodal files from GCS (images/PDFs)
+      // Build multimodal files from sources with base64
       const multimodalFiles: any[] = [];
-      if (selectedDocuments && Array.isArray(selectedDocuments)) {
-        console.log(`[DEBUG Compile] Processing ${selectedDocuments.length} documents`);
+      if (sources && Array.isArray(sources)) {
+        for (const source of sources) {
+          if (source.base64) {
+            // Determine MIME type from file extension
+            const fileName = source.name || 'file';
+            let mimeType = source.type || 'application/octet-stream';
 
-        for (const docPath of selectedDocuments) {
-          console.log(`[DEBUG Compile] Attempting to download: ${docPath}`);
-          try {
-            // Download original file from GCS
-            if (await fileExists(docPath)) {
-              console.log(`[DEBUG Compile] File exists, downloading: ${docPath}`);
-              const buffer = await downloadFile(docPath);
-              const base64 = buffer.toString('base64');
-
-              // Determine MIME type from file extension
-              let mimeType = 'application/octet-stream';
-              if (docPath.endsWith('.pdf')) {
-                mimeType = 'application/pdf';
-              } else if (docPath.endsWith('.jpg') || docPath.endsWith('.jpeg')) {
-                mimeType = 'image/jpeg';
-              } else if (docPath.endsWith('.png')) {
-                mimeType = 'image/png';
-              } else if (docPath.endsWith('.webp')) {
-                mimeType = 'image/webp';
-              }
-              // Audio formats
-              else if (docPath.endsWith('.mp3')) {
-                mimeType = 'audio/mpeg';
-              } else if (docPath.endsWith('.wav')) {
-                mimeType = 'audio/wav';
-              } else if (docPath.endsWith('.flac')) {
-                mimeType = 'audio/flac';
-              } else if (docPath.endsWith('.aac')) {
-                mimeType = 'audio/aac';
-              }
-              // Video formats
-              else if (docPath.endsWith('.mp4')) {
-                mimeType = 'video/mp4';
-              } else if (docPath.endsWith('.mov')) {
-                mimeType = 'video/quicktime';
-              } else if (docPath.endsWith('.avi')) {
-                mimeType = 'video/x-msvideo';
-              } else if (docPath.endsWith('.webm')) {
-                mimeType = 'video/webm';
-              }
-
-              const isImage = mimeType.startsWith('image/');
-
-              multimodalFiles.push({
-                type: isImage ? 'image' : 'file',
-                data: base64,
-                mimeType: mimeType,
-                name: docPath
-              });
-
-              console.log(`[DEBUG Compile] Added ${docPath} as ${isImage ? 'image' : 'file'} (${mimeType})`);
+            // Normalize MIME type based on extension if needed
+            if (fileName.endsWith('.pdf')) {
+              mimeType = 'application/pdf';
+            } else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+              mimeType = 'image/jpeg';
+            } else if (fileName.endsWith('.png')) {
+              mimeType = 'image/png';
+            } else if (fileName.endsWith('.webp')) {
+              mimeType = 'image/webp';
+            } else if (fileName.endsWith('.mp3')) {
+              mimeType = 'audio/mpeg';
+            } else if (fileName.endsWith('.wav')) {
+              mimeType = 'audio/wav';
+            } else if (fileName.endsWith('.mp4')) {
+              mimeType = 'video/mp4';
             }
-          } catch (error) {
-            console.error(`[ERROR Compile] Failed to process ${docPath}:`, error);
+
+            multimodalFiles.push({
+              type: mimeType.startsWith('image/') ? 'image' : 'file',
+              data: source.base64,
+              mimeType: mimeType,
+              name: fileName
+            });
+
+            console.log(`[DEBUG Compile] Added source: ${fileName} (${mimeType})`);
           }
         }
       }
@@ -304,14 +275,14 @@ Analizza TUTTI i file forniti per estrapolare le informazioni necessarie a compi
         }
       });
 
-      const userPrompt = `Compila il seguente template sostituendo i placeholder con informazioni basate sulle note fornite e sui documenti di contesto.
+      const userPrompt = `Compila il seguente template con informazioni coerenti e professionali.
+${notes ? `\nNOTE AGGIUNTIVE: ${notes}` : ''}
+${formalTone ? '\nUsa un tono formale e professionale.' : ''}
 
-Template:
+TEMPLATE DA COMPILARE:
 ${template}
 
-${notes ? `Note:\n${notes}` : ''}
-
-${documentsContext}
+${multimodalFiles.length > 0 ? 'IMPORTANTE: Usa i dati che estrai dai file allegati per compilare i placeholder del template. NON inventare dati, usa SOLO quelli che trovi nei documenti.' : 'Compila i placeholder con dati di esempio realistici.'}
 
 Istruzioni:
 - Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate
