@@ -1,7 +1,6 @@
 import { Copy, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CompiledOutputProps {
   content: string;
@@ -37,22 +36,18 @@ export function CompiledOutput({ content, onCopy, onDownload }: CompiledOutputPr
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea className="h-full w-full">
-          <div className="px-6 pb-6">
-            {content ? (
-              <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-compiled-output">
-                {content}
-              </pre>
-            ) : (
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p className="font-medium">Il Compilatore AI trasforma template in documenti completi.</p>
-                <p>Seleziona un template preimpostato o carica il tuo, aggiungi documenti di contesto (visure, contratti, foto), e l'AI compilerà automaticamente tutti i placeholder con le informazioni estratte dai tuoi file.</p>
-                <p className="text-xs">Perfetto per: contratti, relazioni tecniche, privacy policy, documenti legali.</p>
-              </div>
-            )}
+      <CardContent className="flex-1 overflow-auto p-6">
+        {content ? (
+          <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-compiled-output">
+            {content}
+          </pre>
+        ) : (
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p className="font-medium">Il Compilatore AI trasforma template in documenti completi.</p>
+            <p>Seleziona un template preimpostato o carica il tuo, aggiungi documenti di contesto (visure, contratti, foto), e l'AI compilerà automaticamente tutti i placeholder con le informazioni estratte dai tuoi file.</p>
+            <p className="text-xs">Perfetto per: contratti, relazioni tecniche, privacy policy, documenti legali.</p>
           </div>
-        </ScrollArea>
+        )}
       </CardContent>
     </Card>
   );

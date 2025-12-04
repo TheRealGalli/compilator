@@ -191,15 +191,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Recupera contesto dai documenti selezionati
       const documentsContext = await getDocumentsContext(selectedDocuments);
 
+      console.log(`[DEBUG Compile] Received selectedDocuments:`, selectedDocuments);
+      console.log(`[DEBUG Compile] Documents context length:`, documentsContext.length);
+
       // Download multimodal files from GCS (images/PDFs)
       const multimodalFiles: any[] = [];
       if (selectedDocuments && Array.isArray(selectedDocuments)) {
         console.log(`[DEBUG Compile] Processing ${selectedDocuments.length} documents`);
 
         for (const docPath of selectedDocuments) {
+          console.log(`[DEBUG Compile] Attempting to download: ${docPath}`);
           try {
             // Download original file from GCS
             if (await fileExists(docPath)) {
+              console.log(`[DEBUG Compile] File exists, downloading: ${docPath}`);
               const buffer = await downloadFile(docPath);
               const base64 = buffer.toString('base64');
 
