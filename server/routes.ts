@@ -278,7 +278,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const systemPrompt = `Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.
-${multimodalFiles.length > 0 ? `Hai accesso a ${multimodalFiles.length} file (immagini, PDF, documenti). Analizza attentamente questi file per estrarre informazioni utili alla compilazione del template.` : ''}`;
+${multimodalFiles.length > 0 ? `
+Hai accesso a ${multimodalFiles.length} file multimodali (immagini, PDF, documenti).
+
+IMPORTANTE - ANALISI PDF E DOCUMENTI:
+- Per i PDF, analizza sia il testo estraibile che le immagini/scansioni
+- Usa le capacità OCR native per leggere documenti scansionati o PDF immagine
+- Estrai informazioni da visure, contratti, certificati anche se scansionati
+- Riconosci testo in foto di documenti, tabelle, moduli compilati
+- Cerca dati strutturati: nomi, indirizzi, P.IVA, codici fiscali, importi, date
+
+Analizza TUTTI i file forniti per estrapolare le informazioni necessarie a compilare il template.` : ''}`;
+
 
       const model = vertex_ai.getGenerativeModel({
         model: "gemini-2.5-flash",

@@ -244,6 +244,15 @@ export function DocumentCompilerSection({
 
     try {
       const { apiRequest } = await import("@/lib/queryClient");
+
+      // Map selectedSources to GCS paths
+      const selectedDocuments = selectedSources.map((sourceName: string) => {
+        const doc = documents.find(d => d.name === sourceName);
+        return doc?.gcsPath;
+      }).filter(Boolean); // Remove undefined values
+
+      console.log('[DEBUG Compile] Sending documents:', selectedDocuments);
+
       const response = await apiRequest('POST', '/api/compile', {
         template: templateContent,
         notes,
@@ -252,7 +261,7 @@ export function DocumentCompilerSection({
         detailedAnalysis,
         formalTone,
         modelProvider: 'gemini', // Enforce Gemini
-        sources: selectedSources, // Pass selected sources
+        selectedDocuments, // Pass GCS paths
         model: 'gemini-2.5-flash',
       });
 
