@@ -28,14 +28,6 @@ export function AppSidebar({
 
   return (
     <aside className="w-[280px] border-r bg-sidebar flex flex-col h-full">
-      <div className="p-4">
-        <Button className="w-full" data-testid="button-new-notebook">
-          <Plus className="w-4 h-4 mr-2" />
-          Nuovo Notebook
-        </Button>
-      </div>
-
-      <Separator />
 
       <div className="p-4">
         <h3 className="text-sm font-medium mb-3 text-muted-foreground">Sezioni</h3>
