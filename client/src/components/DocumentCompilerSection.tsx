@@ -245,13 +245,18 @@ export function DocumentCompilerSection({
     try {
       const { apiRequest } = await import("@/lib/queryClient");
 
+      console.log('[DEBUG Frontend] selectedSources:', selectedSources);
+      console.log('[DEBUG Frontend] documents array:', documents);
+
       // Map selectedSources to GCS paths
       const selectedDocuments = selectedSources.map((source) => {
+        console.log('[DEBUG Frontend] Looking for source:', source.name);
         const doc = documents.find(d => d.name === source.name);
+        console.log('[DEBUG Frontend] Found document:', doc);
         return doc?.gcsPath;
       }).filter(Boolean); // Remove undefined values
 
-      console.log('[DEBUG Compile] Sending documents:', selectedDocuments);
+      console.log('[DEBUG Frontend] Final selectedDocuments to send:', selectedDocuments);
 
       const response = await apiRequest('POST', '/api/compile', {
         template: templateContent,
