@@ -10,7 +10,7 @@ interface CompiledOutputProps {
 
 export function CompiledOutput({ content, onCopy, onDownload }: CompiledOutputProps) {
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="h-full flex flex-col min-h-0">
       <CardHeader className="flex-shrink-0 pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Documento Compilato</CardTitle>
@@ -36,7 +36,7 @@ export function CompiledOutput({ content, onCopy, onDownload }: CompiledOutputPr
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 overflow-auto p-6">
+      <CardContent className="flex-1 min-h-0 overflow-y-auto p-6">
         {content ? (
           <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-compiled-output">
             {content}

@@ -391,8 +391,8 @@ export function DocumentCompilerSection({
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
-        <div className="lg:col-span-3 h-[500px] lg:h-full">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 overflow-hidden">
+        <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full overflow-auto">
           <ModelSettings
             notes={notes}
             temperature={temperature}
@@ -408,13 +408,13 @@ export function DocumentCompilerSection({
             onModelProviderChange={setModelProvider}
           />
         </div>
-        <div className="lg:col-span-4 h-[400px] lg:h-full">
+        <div className="lg:col-span-4 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
           <TemplateEditor
             value={templateContent}
             onChange={setTemplateContent}
           />
         </div>
-        <div className="lg:col-span-5 h-[400px] lg:h-full">
+        <div className="lg:col-span-5 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
           <CompiledOutput
             content={compiledContent}
             onCopy={handleCopy}
