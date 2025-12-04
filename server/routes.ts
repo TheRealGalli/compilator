@@ -182,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per compilare documenti con AI
   app.post('/api/compile', async (req: Request, res: Response) => {
     try {
-      const { template, notes, temperature, formalTone, sources } = req.body;
+      const { template, notes, temperature, formalTone, detailedAnalysis, webResearch, sources } = req.body;
 
       if (!template) {
         return res.status(400).json({ error: 'Template richiesto' });
@@ -254,6 +254,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const systemPrompt = `Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.
+${detailedAnalysis ? `
+MODALITÀ ANALISI DETTAGLIATA ATTIVA:
+- Fornisci risposte approfondite e complete
+- Includi tutti i dettagli rilevanti trovati nei documenti
+- Espandi le sezioni con informazioni contestuali
+- Aggiungi clausole e specifiche tecniche dove appropriato` : ''}
+${webResearch ? `
+MODALITÀ WEB RESEARCH ATTIVA:
+- Integra le informazioni con conoscenze aggiornate
+- Aggiungi riferimenti normativi e legali pertinenti
+- Includi best practices del settore
+- Suggerisci miglioramenti basati su standard attuali` : ''}
 ${multimodalFiles.length > 0 ? `
 Hai accesso a ${multimodalFiles.length} file multimodali (immagini, PDF, documenti).
 
