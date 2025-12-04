@@ -246,8 +246,8 @@ export function DocumentCompilerSection({
       const { apiRequest } = await import("@/lib/queryClient");
 
       // Map selectedSources to GCS paths
-      const selectedDocuments = selectedSources.map((sourceName: string) => {
-        const doc = documents.find(d => d.name === sourceName);
+      const selectedDocuments = selectedSources.map((source) => {
+        const doc = documents.find(d => d.name === source.name);
         return doc?.gcsPath;
       }).filter(Boolean); // Remove undefined values
 
