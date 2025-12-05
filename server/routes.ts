@@ -253,7 +253,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         googleAuthOptions: authOptions
       });
 
-      const systemPrompt = `Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.
+      // Get current datetime in Italian format
+      const now = new Date();
+      const dateTimeIT = now.toLocaleString('it-IT', {
+        timeZone: 'Europe/Rome',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const systemPrompt = `Data e ora corrente: ${dateTimeIT}
+
+Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.
 ${detailedAnalysis ? `
 MODALITÀ ANALISI DETTAGLIATA ATTIVA:
 - Fornisci risposte approfondite e complete
@@ -278,14 +292,24 @@ IMPORTANTE - ANALISI PDF E DOCUMENTI:
 
 Analizza TUTTI i file forniti per estrapolare le informazioni necessarie a compilare il template.` : ''}`;
 
-
-      const model = vertex_ai.getGenerativeModel({
+      // Configure model with optional Google Search grounding
+      const modelConfig: any = {
         model: "gemini-2.5-flash",
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemPrompt }]
         }
-      });
+      };
+
+      // Enable Google Search grounding when webResearch is active
+      if (webResearch) {
+        modelConfig.tools = [{
+          googleSearch: {}
+        }];
+        console.log('[DEBUG Compile] Google Search grounding ENABLED');
+      }
+
+      const model = vertex_ai.getGenerativeModel(modelConfig);
 
       const userPrompt = `Compila il seguente template con informazioni coerenti e professionali.
 ${notes ? `\nNOTE AGGIUNTIVE: ${notes}` : ''}
@@ -481,6 +505,21 @@ Usa liste puntate per organizzare le informazioni quando necessario.
 LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
       console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters, max response: ${maxChars}`);
 
+      // Get current datetime in Italian format for analyzer
+      const nowAnalyzer = new Date();
+      const dateTimeITAnalyzer = nowAnalyzer.toLocaleString('it-IT', {
+        timeZone: 'Europe/Rome',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Prepend datetime to system instruction
+      const systemInstructionWithDate = `Data e ora corrente: ${dateTimeITAnalyzer}\n\n${systemInstruction}`;
+
       // Build messages with multimodal files if present
       let coreMessages: any[] = [];
 
@@ -598,7 +637,7 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
         model: "gemini-2.5-flash", // Latest stable Flash model
         systemInstruction: {
           role: 'system',
-          parts: [{ text: systemInstruction }]
+          parts: [{ text: systemInstructionWithDate }]
         }
       });
 
