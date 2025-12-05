@@ -307,14 +307,19 @@ MODALITÀ WEB RESEARCH ATTIVA:
 - Includi best practices del settore
 - Suggerisci miglioramenti basati su standard attuali` : ''}
 ${multimodalFiles.length > 0 ? `
-Hai accesso a ${multimodalFiles.length} file multimodali (immagini, PDF, documenti).
+Hai accesso a ${multimodalFiles.length} file multimodali (immagini, PDF, documenti, audio).
 
-IMPORTANTE - ANALISI PDF E DOCUMENTI:
+IMPORTANTE - ANALISI MULTIMODALE:
 - Per i PDF, analizza sia il testo estraibile che le immagini/scansioni
 - Usa le capacità OCR native per leggere documenti scansionati o PDF immagine
 - Estrai informazioni da visure, contratti, certificati anche se scansionati
 - Riconosci testo in foto di documenti, tabelle, moduli compilati
 - Cerca dati strutturati: nomi, indirizzi, P.IVA, codici fiscali, importi, date
+
+IMPORTANTE - AUDIO:
+- Per i file audio (MP3, WAV, FLAC), TRASCRIVI il contenuto parlato
+- Estrai tutte le informazioni rilevanti dalla trascrizione
+- Se l'audio contiene dettature, istruzioni o dati, usali per compilare il template
 
 Analizza TUTTI i file forniti per estrapolare le informazioni necessarie a compilare il template.` : ''}`;
 
@@ -349,16 +354,13 @@ Istruzioni:
 
       // Add multimodal files as inline data
       for (const file of multimodalFiles) {
-        if (file.type === 'image') {
-          userParts.push({
-            inlineData: { mimeType: file.mimeType, data: file.data }
-          });
-        } else {
-          userParts.push({
-            inlineData: { mimeType: file.mimeType, data: file.data }
-          });
-        }
+        userParts.push({
+          inlineData: { mimeType: file.mimeType, data: file.data }
+        });
+        console.log(`[DEBUG Compile] Added to userParts: ${file.name} (${file.mimeType}), data length: ${file.data?.length || 0}`);
       }
+
+      console.log(`[DEBUG Compile] Total userParts: ${userParts.length} (1 text + ${multimodalFiles.length} files)`);
 
       // Build generateContent options with optional Google Search grounding
       const generateOptions: any = {
