@@ -34,7 +34,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                 const bulletContent = trimmedLine.replace(/^[\*\-\•]\s/, '');
                 elements.push(
                     <div key={`bullet-${key++}`} className="flex gap-3 mb-2 pl-1">
-                        <span className="text-orange-500 font-bold text-lg leading-tight mt-0.5">•</span>
+                        <span className="text-blue-600 font-bold text-lg leading-tight mt-0.5">•</span>
                         <span className="flex-1 leading-relaxed">{formatInlineMarkdown(bulletContent)}</span>
                     </div>
                 );
@@ -47,7 +47,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                     const [, number, listContent] = match;
                     elements.push(
                         <div key={`numbered-${key++}`} className="flex gap-3 mb-2 pl-1">
-                            <span className="text-orange-500 font-semibold min-w-[24px]">{number}.</span>
+                            <span className="text-blue-600 font-semibold min-w-[24px]">{number}.</span>
                             <span className="flex-1 leading-relaxed">{formatInlineMarkdown(listContent)}</span>
                         </div>
                     );
