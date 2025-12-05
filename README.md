@@ -1,113 +1,171 @@
-# CSD Station - Compilatore Documenti AI
+# CSD Station
 
 <p align="center">
   <img src="client/public/csd-logo-blue.svg" alt="CSD Station Logo" width="120" height="120">
 </p>
 
 <p align="center">
-  <strong>Compilatore AI per documenti legali e commerciali</strong><br>
-  Carica visure, contratti e foto • L'AI compila automaticamente i tuoi template
+  <strong>Piattaforma AI per la Compilazione Intelligente di Documenti</strong>
 </p>
 
 ---
 
-## 🚀 Funzionalità
+## Panoramica
 
-- **📄 Compilatore Documenti**: Carica template (Privacy Policy, Contratti, Relazioni) e documenti di contesto, l'AI compila automaticamente i placeholder
-- **💬 Analizzatore Chat**: Fai domande sui tuoi documenti, ottieni risposte basate sui file caricati
-- **📷 Supporto Multimodale**: PDF, immagini, audio, video - il modello analizza visivamente i documenti
-- **🔍 OCR Nativo**: Estrae testo da documenti scansionati e foto
+CSD Station è una piattaforma web che sfrutta l'intelligenza artificiale per automatizzare la compilazione di documenti professionali. Il sistema analizza documenti di contesto (visure camerali, contratti, fotografie, certificati) e utilizza le informazioni estratte per compilare automaticamente template predefiniti o personalizzati.
 
-## 🏗️ Architettura
+---
 
-| Componente | Tecnologia |
-|------------|------------|
-| **Frontend** | React + Vite + TypeScript |
-| **Backend** | Express.js + Node.js |
-| **AI Model** | Gemini 2.5 Flash (Vertex AI) |
-| **Storage** | Google Cloud Storage |
-| **Hosting Frontend** | GitHub Pages |
-| **Hosting Backend** | Google Cloud Run |
+## Funzionalità Principali
 
-## 📦 Setup Locale
+### 📄 Compilatore Documenti
 
-### Prerequisiti
+Il cuore della piattaforma. Permette di:
 
+- **Selezionare un template** tra quelli preimpostati (Privacy Policy, Relazione Tecnica, Contratto di Servizio) oppure caricare un template personalizzato in formato `.txt` o `.md`
+- **Caricare documenti di contesto** come visure camerali, contratti esistenti, certificati, fotografie di documenti o qualsiasi file che contenga informazioni utili
+- **Compilazione automatica**: l'AI analizza i documenti caricati, estrae le informazioni rilevanti (nomi, indirizzi, codici fiscali, P.IVA, importi, date) e le inserisce nei placeholder del template
+- **Controlli avanzati**:
+  - *Creatività*: regola il livello di creatività del modello (da preciso a creativo)
+  - *Analisi Dettagliata*: attiva un'analisi più approfondita dei documenti
+  - *Tono Formale*: imposta il registro linguistico del documento generato
+  - *Web Research*: integra informazioni da fonti esterne quando appropriato
+
+### 💬 Analizzatore
+
+Un assistente conversazionale che permette di:
+
+- **Interrogare i documenti caricati** con domande in linguaggio naturale
+- **Ottenere sintesi e riassunti** dei contenuti
+- **Estrarre informazioni specifiche** dai file
+- **Verificare dati** presenti nei documenti
+
+### 📁 Gestione Documenti
+
+- **Upload drag-and-drop** per caricare velocemente i file
+- **Supporto multimodale completo**:
+  - Documenti: PDF, DOCX, TXT
+  - Immagini: JPG, PNG, WebP
+  - Audio: MP3, WAV, FLAC, AAC
+  - Video: MP4, MOV, AVI, WebM
+- **Selezione multipla** delle fonti da utilizzare per la compilazione
+- **Anteprima** dei file caricati
+
+### 📋 Output
+
+- **Visualizzazione formattata** del documento compilato
+- **Copia negli appunti** con un click
+- **Download** del documento generato
+
+---
+
+## Architettura Tecnica
+
+### Frontend
+
+L'interfaccia utente è costruita con:
+
+- **React 18** con TypeScript per la type-safety
+- **Vite** come build tool per sviluppo veloce e bundle ottimizzati
+- **Tailwind CSS** per lo styling utility-first
+- **Shadcn/UI** come libreria di componenti accessibili
+- **Lucide React** per l'iconografia
+
+L'applicazione è una Single Page Application (SPA) con routing client-side e stato gestito tramite React Context.
+
+### Backend
+
+Il server è implementato con:
+
+- **Node.js** runtime
+- **Express.js** come framework HTTP
+- **TypeScript** per type-safety end-to-end
+
+Il backend espone API RESTful per la gestione dei file e la comunicazione con i servizi AI.
+
+### Intelligenza Artificiale
+
+Il motore AI utilizza:
+
+- **Google Vertex AI** come piattaforma di ML
+- **Gemini 2.5 Flash** come modello generativo
+- Elaborazione **multimodale nativa**: il modello può analizzare direttamente immagini, PDF e altri formati senza necessità di preprocessing
+- **OCR integrato**: riconoscimento automatico del testo in documenti scansionati o fotografati
+
+### Cloud Infrastructure
+
+- **Google Cloud Storage** per l'archiviazione sicura dei file
+- **Google Cloud Run** per l'hosting serverless del backend (scalabilità automatica)
+- **GitHub Pages** per l'hosting statico del frontend
+
+---
+
+## Requisiti di Sistema
+
+### Per l'Utilizzo
+- Browser moderno (Chrome, Firefox, Safari, Edge)
+- Connessione internet
+
+### Per lo Sviluppo
 - Node.js 20+
-- Account GCP con progetto configurato
-- Credenziali GCP (ADC o service account)
+- Account Google Cloud Platform
+- Credenziali GCP configurate
 
-### Installazione
+---
+
+## Installazione
 
 ```bash
+# Clona il repository
 git clone https://github.com/TheRealGalli/compilator.git
+
+# Installa le dipendenze
 cd compilator
 npm install
-```
 
-### Variabili d'Ambiente
+# Configura le variabili d'ambiente
+cp .env.example .env
+# Modifica .env con le tue credenziali GCP
 
-Crea `.env` nella root:
-
-```env
-GCP_PROJECT_ID=your-project-id
-GCP_STORAGE_BUCKET=your-bucket-name
-GCP_CREDENTIALS={"type":"service_account",...}  # JSON inline opzionale
-```
-
-### Avvio
-
-```bash
+# Avvia in modalità sviluppo
 npm run dev
 ```
 
-## 🌐 Deploy
+---
 
-### Frontend (GitHub Pages)
-
-Push su `main` → deploy automatico via GitHub Actions
-
-### Backend (Cloud Run)
-
-```bash
-gcloud run deploy csd-station \
-  --source . \
-  --region europe-west1 \
-  --allow-unauthenticated
-```
-
-## 📁 Struttura
+## Struttura del Progetto
 
 ```
-├── client/                 # Frontend React
-│   ├── src/components/     # UI Components
-│   └── public/             # Assets statici
+├── client/                 # Applicazione React
+│   ├── src/
+│   │   ├── components/     # Componenti UI riutilizzabili
+│   │   ├── contexts/       # React Context per stato globale
+│   │   ├── hooks/          # Custom hooks
+│   │   ├── lib/            # Utilities e configurazioni
+│   │   └── pages/          # Componenti pagina
+│   └── public/             # Asset statici
 ├── server/                 # Backend Express
-│   └── routes.ts           # API endpoints
-├── .github/workflows/      # CI/CD
-└── Dockerfile              # Container Cloud Run
+│   ├── routes.ts           # Definizione API
+│   ├── gcp-storage.ts      # Integrazione Cloud Storage
+│   └── gcp-secrets.ts      # Gestione secrets
+├── shared/                 # Codice condiviso client/server
+└── .github/workflows/      # Pipeline CI/CD
 ```
 
-## 🔌 API Endpoints
+---
 
-| Metodo | Endpoint | Descrizione |
-|--------|----------|-------------|
-| `POST` | `/api/compile` | Compila template con AI |
-| `POST` | `/api/chat` | Chat con documenti |
-| `POST` | `/api/files/upload` | Upload file |
-| `GET` | `/api/health` | Health check |
+## Deploy
 
-## 💰 Costi Stimati
+### Frontend
+Il frontend viene automaticamente deployato su GitHub Pages ad ogni push sul branch `main`.
 
-Per uno studio con ~150 documenti/mese:
+### Backend
+Il backend viene deployato su Google Cloud Run tramite GitHub Actions. Il workflow gestisce build, containerizzazione e deploy automatico.
 
-| Voce | Costo Mensile |
-|------|---------------|
-| Vertex AI (Gemini Flash) | ~€1-5 |
-| Cloud Run | ~€5-10 |
-| Cloud Storage | ~€1 |
-| **Totale** | **~€7-16/mese** |
+---
 
-## 📄 Licenza
+## Licenza
 
-Proprietario - CSD Station © 2024
+Software proprietario - CSD Station © 2024
+
+Tutti i diritti riservati.
