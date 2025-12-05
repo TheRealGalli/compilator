@@ -292,24 +292,14 @@ IMPORTANTE - ANALISI PDF E DOCUMENTI:
 
 Analizza TUTTI i file forniti per estrapolare le informazioni necessarie a compilare il template.` : ''}`;
 
-      // Configure model with optional Google Search grounding
-      const modelConfig: any = {
+      // Configure model without tools (tools go in generateContent)
+      const model = vertex_ai.getGenerativeModel({
         model: "gemini-2.5-flash",
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemPrompt }]
         }
-      };
-
-      // Enable Google Search grounding when webResearch is active
-      if (webResearch) {
-        modelConfig.tools = [{
-          googleSearch: {}
-        }];
-        console.log('[DEBUG Compile] Google Search grounding ENABLED');
-      }
-
-      const model = vertex_ai.getGenerativeModel(modelConfig);
+      });
 
       const userPrompt = `Compila il seguente template con informazioni coerenti e professionali.
 ${notes ? `\nNOTE AGGIUNTIVE: ${notes}` : ''}
@@ -344,12 +334,21 @@ Istruzioni:
         }
       }
 
-      const result = await model.generateContent({
+      // Build generateContent options with optional Google Search grounding
+      const generateOptions: any = {
         contents: [{ role: 'user', parts: userParts }],
         generationConfig: {
           temperature: temperature || 0.7,
         }
-      });
+      };
+
+      // Enable Google Search grounding when webResearch is active
+      if (webResearch) {
+        generateOptions.tools = [{ googleSearch: {} }];
+        console.log('[DEBUG Compile] Google Search grounding ENABLED in generateContent');
+      }
+
+      const result = await model.generateContent(generateOptions);
 
       const response = result.response;
       const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -634,29 +633,19 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
         googleAuthOptions: authOptions
       });
 
-      // Configure model with optional Google Search grounding for analyzer
-      const modelConfig: any = {
+      // Configure model
+      const model = vertex_ai.getGenerativeModel({
         model: "gemini-2.5-flash", // Latest stable Flash model
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemInstructionWithDate }]
         }
-      };
-
-      // Enable Google Search grounding when webResearch is active
-      if (webResearch) {
-        modelConfig.tools = [{
-          googleSearch: {}
-        }];
-        console.log('[DEBUG Chat] Google Search grounding ENABLED');
-      }
-
-      const model = vertex_ai.getGenerativeModel(modelConfig);
+      });
 
       // Map CoreMessages to Vertex AI format
       // Vertex AI expects 'role' to be 'user' or 'model'
       // Content parts are similar but strict on types
-      const googleHistory = coreMessages.map(msg => {
+      const googleHistory = coreMessages.map((msg: any) => {
         const role = msg.role === 'assistant' ? 'model' : 'user';
         let parts: any[] = [];
 
@@ -682,12 +671,21 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
 
       console.log('[DEBUG] Sending request to Vertex AI (europe-west1) with gemini-2.5-flash');
 
-      const result = await model.generateContent({
+      // Build generateContent options with optional Google Search grounding
+      const generateOptions: any = {
         contents: googleHistory,
         generationConfig: {
           temperature: req.body.temperature || 0.7,
         }
-      });
+      };
+
+      // Enable Google Search grounding when webResearch is active
+      if (webResearch) {
+        generateOptions.tools = [{ googleSearch: {} }];
+        console.log('[DEBUG Chat] Google Search grounding ENABLED in generateContent');
+      }
+
+      const result = await model.generateContent(generateOptions);
 
       const response = result.response;
       // Vertex AI response structure: response.candidates[0].content.parts[0].text
