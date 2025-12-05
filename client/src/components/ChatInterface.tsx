@@ -1,10 +1,13 @@
-import { Send, Bot } from "lucide-react";
+import { Send, Bot, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "./ChatMessage";
 import { TypingIndicator } from "./TypingIndicator";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -33,6 +36,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [webResearch, setWebResearch] = useState(false);
   const { toast } = useToast();
   const { selectedSources } = useSources();
 
@@ -78,6 +82,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         modelProvider: 'gemini', // Enforce Gemini
         sources: selectedSources, // Pass selected sources
         temperature: 0.7,
+        webResearch: webResearch, // Enable Google Search grounding
       });
 
       const data = await response.json();
@@ -161,12 +166,36 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
           <div className="flex flex-col gap-2">
 
+            {/* Web Research Toggle */}
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2">
+                    <Globe className={`w-4 h-4 ${webResearch ? 'text-blue-600' : 'text-muted-foreground'}`} />
+                    <Label htmlFor="web-research-chat" className="text-xs cursor-pointer">
+                      Web Research
+                    </Label>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs text-xs">
+                    Abilita ricerca Google in tempo reale per informazioni aggiornate
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+              <Switch
+                id="web-research-chat"
+                checked={webResearch}
+                onCheckedChange={setWebResearch}
+              />
+            </div>
+
             <div className="flex gap-2">
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Fai una domanda sui tuoi documenti..."
+                placeholder={webResearch ? "Fai una domanda (con ricerca web)..." : "Fai una domanda sui tuoi documenti..."}
                 className="resize-none min-h-[60px]"
                 data-testid="input-chat"
               />

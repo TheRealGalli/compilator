@@ -371,7 +371,7 @@ Istruzioni:
   // Endpoint per chat con AI (con streaming e file support)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
-      const { temperature } = req.body;
+      const { temperature, webResearch } = req.body;
       let { messages, sources } = req.body; // sources: array of {name, type, size, url: GCS URL}
 
       // Parse messages if string (multipart/form-data)
@@ -633,13 +633,25 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
         location: location,
         googleAuthOptions: authOptions
       });
-      const model = vertex_ai.getGenerativeModel({
+
+      // Configure model with optional Google Search grounding for analyzer
+      const modelConfig: any = {
         model: "gemini-2.5-flash", // Latest stable Flash model
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemInstructionWithDate }]
         }
-      });
+      };
+
+      // Enable Google Search grounding when webResearch is active
+      if (webResearch) {
+        modelConfig.tools = [{
+          googleSearch: {}
+        }];
+        console.log('[DEBUG Chat] Google Search grounding ENABLED');
+      }
+
+      const model = vertex_ai.getGenerativeModel(modelConfig);
 
       // Map CoreMessages to Vertex AI format
       // Vertex AI expects 'role' to be 'user' or 'model'
