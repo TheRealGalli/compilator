@@ -13,7 +13,9 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo" }: AppHeader
   return (
     <header className="h-14 border-b bg-background flex items-center justify-between px-4 sticky top-0 z-50">
       <div className="flex items-center gap-3">
-        <img src="/csd-logo-blue.svg" alt="CSD Station" className="w-9 h-9" />
+        <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
+          <span className="text-white font-bold text-sm">CSD</span>
+        </div>
         <h1 className="text-lg font-semibold" data-testid="text-notebook-title">{notebookTitle}</h1>
       </div>
 
