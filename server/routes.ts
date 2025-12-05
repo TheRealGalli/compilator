@@ -192,6 +192,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Build multimodal files from sources with base64
       const multimodalFiles: any[] = [];
+      const failedFiles: string[] = [];
+
       if (sources && Array.isArray(sources)) {
         for (const source of sources) {
           if (source.base64) {
@@ -212,8 +214,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               mimeType = 'audio/mpeg';
             } else if (fileName.endsWith('.wav')) {
               mimeType = 'audio/wav';
-            } else if (fileName.endsWith('.mp4')) {
-              mimeType = 'video/mp4';
+            } else if (fileName.endsWith('.flac')) {
+              mimeType = 'audio/flac';
+            }
+
+            // Reject video files
+            if (mimeType.startsWith('video/')) {
+              failedFiles.push(`${fileName} (video non supportato)`);
+              continue;
             }
 
             multimodalFiles.push({
@@ -224,8 +232,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
 
             console.log(`[DEBUG Compile] Added source: ${fileName} (${mimeType})`);
+          } else {
+            // Source exists but no base64 data
+            failedFiles.push(`${source.name || 'file'} (dati non ricevuti)`);
           }
         }
+      }
+
+      // Check if sources were expected but not received
+      if (sources && sources.length > 0 && multimodalFiles.length === 0) {
+        const errorMsg = failedFiles.length > 0
+          ? `Errore nel caricamento dei file: ${failedFiles.join(', ')}`
+          : 'Nessun file valido ricevuto. Verifica che i file siano supportati (PDF, immagini, audio).';
+
+        console.log(`[ERROR Compile] ${errorMsg}`);
+        return res.status(400).json({ error: errorMsg });
+      }
+
+      // If some files failed but others worked, log warning
+      if (failedFiles.length > 0) {
+        console.log(`[WARNING Compile] Some files failed: ${failedFiles.join(', ')}`);
       }
 
       console.log(`[DEBUG Compile] Total multimodal files: ${multimodalFiles.length}`);
@@ -439,6 +465,13 @@ Istruzioni:
               continue;
             }
 
+            // Reject video files
+            if (source.type.startsWith('video/')) {
+              console.log(`[WARN] Rejected video file: ${source.name}`);
+              filesContext += `- ${source.name} (video non supportato)\n`;
+              continue;
+            }
+
             const isImage = source.type.startsWith('image/');
 
             if (isImage) {
@@ -459,6 +492,7 @@ Istruzioni:
             filesContext += `- ${source.name} (${source.type})\n`;
           } catch (error) {
             console.error(`Error processing file ${source.name}:`, error);
+            filesContext += `- ${source.name} (errore lettura file)\n`;
           }
         }
       }

@@ -45,7 +45,7 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
         ref={inputRef}
         type="file"
         multiple
-        accept=".pdf,.txt,.docx,.doc,image/*,audio/*,video/*"
+        accept=".pdf,.txt,.docx,.doc,image/*,audio/*"
         className="hidden"
         onChange={handleFileChange}
         data-testid="input-file-hidden"
@@ -53,7 +53,7 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
       <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
       <h3 className="text-lg font-medium mb-2">Trascina i file qui o clicca per sfogliare</h3>
       <p className="text-sm text-muted-foreground">
-        Supportati: PDF, DOCX, TXT, Immagini, Audio, Video (Max 50MB)
+        Supportati: PDF, DOCX, TXT, Immagini, Audio (Max 50MB)
       </p>
     </div>
   );
