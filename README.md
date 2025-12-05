@@ -1,173 +1,113 @@
-# NotebookLM Compiler
+# CSD Station - Compilatore Documenti AI
 
-Applicazione web per la compilazione di documenti con AI, ispirata a Google NotebookLM.
+<p align="center">
+  <img src="client/public/csd-logo-blue.svg" alt="CSD Station Logo" width="120" height="120">
+</p>
 
-## Architettura
+<p align="center">
+  <strong>Compilatore AI per documenti legali e commerciali</strong><br>
+  Carica visure, contratti e foto • L'AI compila automaticamente i tuoi template
+</p>
 
-- **Frontend**: React + Vite, deployato su GitHub Pages
-- **Backend**: Express.js, deployato su Google Cloud Run
-- **Storage**: Google Cloud Storage per i file
-- **Secrets**: Google Secret Manager per le chiavi API
+---
 
-## Setup Locale
+## 🚀 Funzionalità
+
+- **📄 Compilatore Documenti**: Carica template (Privacy Policy, Contratti, Relazioni) e documenti di contesto, l'AI compila automaticamente i placeholder
+- **💬 Analizzatore Chat**: Fai domande sui tuoi documenti, ottieni risposte basate sui file caricati
+- **📷 Supporto Multimodale**: PDF, immagini, audio, video - il modello analizza visivamente i documenti
+- **🔍 OCR Nativo**: Estrae testo da documenti scansionati e foto
+
+## 🏗️ Architettura
+
+| Componente | Tecnologia |
+|------------|------------|
+| **Frontend** | React + Vite + TypeScript |
+| **Backend** | Express.js + Node.js |
+| **AI Model** | Gemini 2.5 Flash (Vertex AI) |
+| **Storage** | Google Cloud Storage |
+| **Hosting Frontend** | GitHub Pages |
+| **Hosting Backend** | Google Cloud Run |
+
+## 📦 Setup Locale
 
 ### Prerequisiti
 
 - Node.js 20+
-- Account Google Cloud Platform con progetto configurato
-- Credenziali GCP configurate (Application Default Credentials o service account key)
+- Account GCP con progetto configurato
+- Credenziali GCP (ADC o service account)
 
 ### Installazione
 
 ```bash
+git clone https://github.com/TheRealGalli/compilator.git
+cd compilator
 npm install
 ```
 
 ### Variabili d'Ambiente
 
-Crea un file `.env` nella root del progetto:
+Crea `.env` nella root:
 
 ```env
-# GCP Configuration
 GCP_PROJECT_ID=your-project-id
-GCP_STORAGE_BUCKET=notebooklm-compiler-files
-GCP_KEY_FILE=path/to/service-account-key.json  # Opzionale se usi ADC
-
-# Frontend (per sviluppo locale)
-VITE_API_URL=http://localhost:5000/api
-
-# Backend
-PORT=5000
-NODE_ENV=development
+GCP_STORAGE_BUCKET=your-bucket-name
+GCP_CREDENTIALS={"type":"service_account",...}  # JSON inline opzionale
 ```
 
-### Setup GCP
-
-1. **Crea un bucket Cloud Storage**:
-```bash
-gsutil mb -p your-project-id -l europe-west1 gs://notebooklm-compiler-files
-```
-
-2. **Crea i secrets per le chiavi API**:
-```bash
-# Per OpenAI
-echo -n "your-openai-api-key" | gcloud secrets create MODEL_API_KEY_OPENAI --data-file=-
-```
-
-3. **Configura le autorizzazioni**:
-   - Il service account deve avere i ruoli:
-     - `roles/storage.objectAdmin` per Cloud Storage
-     - `roles/secretmanager.secretAccessor` per Secret Manager
-
-### Sviluppo Locale
+### Avvio
 
 ```bash
-# Terminal 1: Backend
-npm run dev
-
-# Terminal 2: Frontend (in un altro terminale)
-cd client
 npm run dev
 ```
 
-## Deploy
+## 🌐 Deploy
 
-### Frontend su GitHub Pages
+### Frontend (GitHub Pages)
 
-Il frontend viene deployato automaticamente su GitHub Pages tramite GitHub Actions quando fai push su `main`.
+Push su `main` → deploy automatico via GitHub Actions
 
-**Configurazione GitHub Pages**:
-1. Vai su Settings > Pages nel tuo repository
-2. Seleziona "GitHub Actions" come source
-3. Il workflow `.github/workflows/deploy-frontend.yml` gestirà il deploy
-
-**Variabili d'ambiente per il build**:
-- `VITE_CLOUD_RUN_URL`: URL del backend su Cloud Run (es. `https://notebooklm-compiler-xxx.run.app`)
-
-### Backend su Google Cloud Run
-
-#### Prerequisiti
-
-1. **Abilita le API necessarie**:
-```bash
-gcloud services enable cloudbuild.googleapis.com
-gcloud services enable run.googleapis.com
-gcloud services enable storage.googleapis.com
-gcloud services enable secretmanager.googleapis.com
-```
-
-2. **Configura GitHub Secrets**:
-   - `GCP_PROJECT_ID`: Il tuo Project ID GCP
-   - `GCP_SA_KEY`: JSON del service account con permessi per Cloud Build e Cloud Run
-
-3. **Crea un service account per Cloud Build**:
-```bash
-gcloud iam service-accounts create cloud-build-sa \
-  --display-name="Cloud Build Service Account"
-
-gcloud projects add-iam-policy-binding your-project-id \
-  --member="serviceAccount:cloud-build-sa@your-project-id.iam.gserviceaccount.com" \
-  --role="roles/run.admin"
-
-gcloud projects add-iam-policy-binding your-project-id \
-  --member="serviceAccount:cloud-build-sa@your-project-id.iam.gserviceaccount.com" \
-  --role="roles/iam.serviceAccountUser"
-```
-
-#### Deploy Automatico
-
-Il backend viene deployato automaticamente quando fai push su `main` e modifichi file nel server.
-
-Il workflow `.github/workflows/deploy-backend.yml`:
-1. Builda l'immagine Docker
-2. La pusha su Container Registry
-3. Deploya su Cloud Run
-
-#### Deploy Manuale
+### Backend (Cloud Run)
 
 ```bash
-# Build e push dell'immagine
-gcloud builds submit --config=cloudbuild.yaml
-
-# Oppure deploy diretto
-gcloud run deploy notebooklm-compiler \
+gcloud run deploy csd-station \
   --source . \
   --region europe-west1 \
-  --allow-unauthenticated \
-  --set-env-vars GCP_PROJECT_ID=your-project-id,GCP_STORAGE_BUCKET=notebooklm-compiler-files
+  --allow-unauthenticated
 ```
 
-## Struttura del Progetto
+## 📁 Struttura
 
 ```
-.
-├── client/              # Frontend React
-│   └── src/
-│       ├── components/  # Componenti React
-│       ├── lib/         # Utilities e configurazione API
-│       └── pages/       # Pagine
-├── server/              # Backend Express
-│   ├── routes.ts        # Route API
-│   ├── gcp-storage.ts   # Integrazione Cloud Storage
-│   └── gcp-secrets.ts   # Integrazione Secret Manager
-├── shared/              # Codice condiviso
-├── .github/workflows/   # GitHub Actions workflows
-├── Dockerfile          # Immagine Docker per Cloud Run
-└── cloudbuild.yaml     # Configurazione Cloud Build
+├── client/                 # Frontend React
+│   ├── src/components/     # UI Components
+│   └── public/             # Assets statici
+├── server/                 # Backend Express
+│   └── routes.ts           # API endpoints
+├── .github/workflows/      # CI/CD
+└── Dockerfile              # Container Cloud Run
 ```
 
-## API Endpoints
+## 🔌 API Endpoints
 
-- `GET /api/health` - Health check
-- `POST /api/files/upload` - Upload file su GCS
-- `GET /api/files/:gcsPath` - Download file da GCS
-- `DELETE /api/files/:gcsPath` - Elimina file da GCS
-- `POST /api/compile` - Compila documento con AI
-- `POST /api/chat` - Chat con AI
+| Metodo | Endpoint | Descrizione |
+|--------|----------|-------------|
+| `POST` | `/api/compile` | Compila template con AI |
+| `POST` | `/api/chat` | Chat con documenti |
+| `POST` | `/api/files/upload` | Upload file |
+| `GET` | `/api/health` | Health check |
 
-## Note
+## 💰 Costi Stimati
 
-- Il frontend su GitHub Pages comunica con il backend su Cloud Run tramite CORS
-- Le chiavi API sono gestite tramite Secret Manager e non vengono mai esposte al frontend
-- I file vengono salvati su Cloud Storage con URL firmati per l'accesso temporaneo
+Per uno studio con ~150 documenti/mese:
 
+| Voce | Costo Mensile |
+|------|---------------|
+| Vertex AI (Gemini Flash) | ~€1-5 |
+| Cloud Run | ~€5-10 |
+| Cloud Storage | ~€1 |
+| **Totale** | **~€7-16/mese** |
+
+## 📄 Licenza
+
+Proprietario - CSD Station © 2024
