@@ -725,7 +725,7 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
         return { role, parts };
       });
 
-      console.log('[DEBUG] Sending request to Vertex AI (europe-west1) with gemini-2.5-flash');
+      console.log('[DEBUG] Sending streaming request to Vertex AI (europe-west1) with gemini-2.5-flash');
 
       // Build generateContent options with optional Google Search grounding
       const generateOptions: any = {
@@ -741,24 +741,43 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
         console.log('[DEBUG Chat] Google Search grounding ENABLED in generateContent');
       }
 
-      const result = await model.generateContent(generateOptions);
+      // Use streaming for better UX
+      const streamingResult = await model.generateContentStream(generateOptions);
 
-      const response = result.response;
-      // Vertex AI response structure: response.candidates[0].content.parts[0].text
-      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      // Set up SSE headers for streaming response
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
 
-      // Return JSON response
-      res.json({
-        success: true,
-        message: {
-          content: text,
-        },
-      });
+      let fullText = '';
+
+      // Stream chunks to client
+      for await (const chunk of streamingResult.stream) {
+        const chunkText = chunk.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (chunkText) {
+          fullText += chunkText;
+          // Send SSE formatted data
+          res.write(`data: ${JSON.stringify({ chunk: chunkText })}\n\n`);
+        }
+      }
+
+      // Send completion signal
+      res.write(`data: ${JSON.stringify({ done: true, fullText })}\n\n`);
+      res.end();
+
     } catch (error: any) {
       console.error('Errore durante chat:', error);
-      res.status(500).json({
-        error: error.message || 'Errore durante chat',
-      });
+      // If headers not sent yet, send JSON error
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: error.message || 'Errore durante chat',
+        });
+      } else {
+        // If streaming already started, send error as SSE
+        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+        res.end();
+      }
     }
   });
 
