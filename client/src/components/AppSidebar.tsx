@@ -1,4 +1,4 @@
-import { FileText, MessageSquare, Code, Sparkles, Plus } from "lucide-react";
+import { FileText, MessageSquare, Code, Sparkles, Plus, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ export function AppSidebar({
     { id: "documents" as const, label: "Documenti", icon: FileText },
     { id: "chat" as const, label: "Analizzatore", icon: MessageSquare },
     { id: "compiler" as const, label: "Compilatore", icon: Code },
-    { id: "generated" as const, label: "Generati", icon: Sparkles },
+    { id: "connectors" as const, label: "Connettori", icon: Lock },
   ];
 
   return (
@@ -35,13 +35,16 @@ export function AppSidebar({
           {sections.map((section) => {
             const Icon = section.icon;
             const isActive = activeSection === section.id;
+            const isLocked = section.id === "connectors";
+
             return (
               <Button
                 key={section.id}
                 variant={isActive ? "secondary" : "ghost"}
-                className="justify-start"
-                onClick={() => onSectionChange(section.id)}
+                className={`justify-start ${isLocked ? "opacity-70" : ""}`}
+                onClick={() => !isLocked && onSectionChange(section.id as any)}
                 data-testid={`button-section-${section.id}`}
+                disabled={isLocked}
               >
                 <Icon className="w-4 h-4 mr-2" />
                 {section.label}
@@ -57,7 +60,18 @@ export function AppSidebar({
         <SourceSelector sources={sources} onToggle={onToggleSource} />
       </div>
 
-
+      <div className="p-4 mt-auto">
+        <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 rounded-lg p-4 space-y-2">
+          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+            <Sparkles className="w-4 h-4" />
+            <span className="text-xs font-semibold uppercase tracking-wider">Coming Soon</span>
+          </div>
+          <h4 className="font-medium text-sm">Connettori & Integrazioni</h4>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Presto potrai collegare Google Drive, Notion e altre app per importare direttamente i tuoi documenti.
+          </p>
+        </div>
+      </div>
     </aside>
   );
 }
