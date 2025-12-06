@@ -745,50 +745,24 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
         console.log('[DEBUG Chat] Google Search grounding ENABLED in generateContent');
       }
 
-      // Use streaming for better UX
-      const streamingResult = await model.generateContentStream(generateOptions);
+      // Use standard (non-streaming) for stability
+      const result = await model.generateContent(generateOptions);
 
-      // Set CORS headers explicitly for SSE (middleware may not apply to streaming)
-      const origin = req.headers.origin;
-      if (origin && ['https://therealgalli.github.io', 'http://localhost:5173', 'http://localhost:3000'].some(o => origin.startsWith(o))) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
+      const response = result.response;
+      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-      // Set up SSE headers for streaming response
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
-
-      let fullText = '';
-
-      // Stream chunks to client
-      for await (const chunk of streamingResult.stream) {
-        const chunkText = chunk.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (chunkText) {
-          fullText += chunkText;
-          // Send SSE formatted data
-          res.write(`data: ${JSON.stringify({ chunk: chunkText })}\n\n`);
-        }
-      }
-
-      // Send completion signal
-      res.write(`data: ${JSON.stringify({ done: true, fullText })}\n\n`);
-      res.end();
-
+      // Return JSON response
+      res.json({
+        success: true,
+        message: {
+          content: text,
+        },
+      });
     } catch (error: any) {
       console.error('Errore durante chat:', error);
-      // If headers not sent yet, send JSON error
-      if (!res.headersSent) {
-        res.status(500).json({
-          error: error.message || 'Errore durante chat',
-        });
-      } else {
-        // If streaming already started, send error as SSE
-        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-        res.end();
-      }
+      res.status(500).json({
+        error: error.message || 'Errore durante chat',
+      });
     }
   });
 
