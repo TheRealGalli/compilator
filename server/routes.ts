@@ -744,6 +744,13 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
       // Use streaming for better UX
       const streamingResult = await model.generateContentStream(generateOptions);
 
+      // Set CORS headers explicitly for SSE (middleware may not apply to streaming)
+      const origin = req.headers.origin;
+      if (origin && ['https://therealgalli.github.io', 'http://localhost:5173', 'http://localhost:3000'].some(o => origin.startsWith(o))) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+
       // Set up SSE headers for streaming response
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
