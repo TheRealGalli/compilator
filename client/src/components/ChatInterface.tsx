@@ -61,15 +61,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     setInput("");
     setIsLoading(true);
 
-    // Add placeholder for streaming response
-    const assistantMessageId = (Date.now() + 1).toString();
-    setMessages((prev) => [...prev, {
-      id: assistantMessageId,
-      role: "assistant" as const,
-      content: "",
-      timestamp: "Ora",
-    }]);
-
     try {
       const apiMessages = [...messages, userMessage]
         .filter(msg => msg.role !== 'system')
@@ -92,11 +83,13 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         throw new Error(data.error);
       }
 
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) =>
-          msg.id === assistantMessageId ? { ...msg, content: data.text } : msg
-        )
-      );
+      // Add assistant response
+      setMessages((prev) => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.text,
+        timestamp: "Ora",
+      }]);
 
     } catch (error: any) {
       console.error('Errore durante chat:', error);
@@ -106,13 +99,12 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         variant: "destructive",
       });
 
-      setMessages((prev) =>
-        prev.map(msg =>
-          msg.id === assistantMessageId
-            ? { ...msg, content: "Mi dispiace, si è verificato un errore. Riprova più tardi." }
-            : msg
-        )
-      );
+      setMessages((prev) => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Mi dispiace, si è verificato un errore. Riprova più tardi.",
+        timestamp: "Ora",
+      }]);
     } finally {
       setIsLoading(false);
     }
