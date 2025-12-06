@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { SourceSelector } from "@/components/SourceSelector";
+import { InfoPoint } from "./InfoPoint";
 import type { Source } from "@/contexts/SourcesContext";
 
 interface AppSidebarProps {
@@ -38,17 +39,24 @@ export function AppSidebar({
             const isLocked = section.id === "connectors";
 
             return (
-              <Button
-                key={section.id}
-                variant={isActive ? "secondary" : "ghost"}
-                className={`justify-start ${isLocked ? "opacity-70" : ""}`}
-                onClick={() => !isLocked && onSectionChange(section.id as any)}
-                data-testid={`button-section-${section.id}`}
-                disabled={isLocked}
-              >
-                <Icon className="w-4 h-4 mr-2" />
-                {section.label}
-              </Button>
+              <div key={section.id} className="flex items-center gap-2 w-full">
+                <Button
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={`justify-start flex-1 ${isLocked ? "opacity-70" : ""}`}
+                  onClick={() => !isLocked && onSectionChange(section.id as any)}
+                  data-testid={`button-section-${section.id}`}
+                  disabled={isLocked}
+                >
+                  <Icon className="w-4 h-4 mr-2" />
+                  {section.label}
+                </Button>
+                {isLocked && (
+                  <InfoPoint
+                    content="Connettori & Integrazioni: Presto potrai collegare Google Drive, Notion e altre app per importare direttamente i tuoi documenti."
+                    side="right"
+                  />
+                )}
+              </div>
             );
           })}
         </div>
@@ -58,19 +66,6 @@ export function AppSidebar({
 
       <div className="flex-1 overflow-hidden flex flex-col p-4">
         <SourceSelector sources={sources} onToggle={onToggleSource} />
-      </div>
-
-      <div className="p-4 mt-auto">
-        <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 rounded-lg p-4 space-y-2">
-          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-            <Sparkles className="w-4 h-4" />
-            <span className="text-xs font-semibold uppercase tracking-wider">Coming Soon</span>
-          </div>
-          <h4 className="font-medium text-sm">Connettori & Integrazioni</h4>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Presto potrai collegare Google Drive, Notion e altre app per importare direttamente i tuoi documenti.
-          </p>
-        </div>
       </div>
     </aside>
   );
