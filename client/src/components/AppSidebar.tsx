@@ -57,19 +57,7 @@ export function AppSidebar({
         <SourceSelector sources={sources} onToggle={onToggleSource} />
       </div>
 
-      <Separator />
 
-      <div className="p-4">
-        <div className="bg-accent/50 rounded-lg p-3">
-          <p className="text-xs text-muted-foreground mb-2">Fonti Caricate</p>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">{sources.length} / 10</span>
-            <Badge variant="secondary" className="text-xs">
-              {sources.filter(s => s.selected).length} selezionate
-            </Badge>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }
