@@ -17,7 +17,7 @@ export function InfoPoint({ content, className = "", side = "top" }: InfoPointPr
             w-5 h-5 rounded-md 
             bg-muted/50 hover:bg-muted 
             border border-transparent hover:border-border
-            transition-colors cursor-help 
+            transition-colors cursor-default 
             ${className}
           `}
                 >

@@ -97,7 +97,7 @@ export function ModelSettings({
                     <Label htmlFor="web-research" className="text-xs font-medium cursor-pointer">
                       Web Research
                     </Label>
-                    <InfoPoint content="Ricerca informazioni online" />
+                    <InfoPoint content="Abilita la ricerca sul web per arricchire il contenuto con informazioni aggiornate e fonti esterne." />
                   </div>
                 </div>
                 <Switch
@@ -114,7 +114,7 @@ export function ModelSettings({
                     <Label htmlFor="detailed-analysis" className="text-xs font-medium cursor-pointer">
                       Analisi Dettagliata
                     </Label>
-                    <InfoPoint content="Analisi approfondita documenti" />
+                    <InfoPoint content="Esegue un'analisi approfondita di tutti i documenti caricati per estrarre il massimo contesto possibile." />
                   </div>
                 </div>
                 <Switch
@@ -131,7 +131,7 @@ export function ModelSettings({
                     <Label htmlFor="formal-tone" className="text-xs font-medium cursor-pointer">
                       Tono Formale
                     </Label>
-                    <InfoPoint content="Linguaggio formale e professionale" />
+                    <InfoPoint content="Utilizza un linguaggio professionale, strutturato e adatto a documenti ufficiali o legali." />
                   </div>
                 </div>
                 <Switch
