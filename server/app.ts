@@ -43,8 +43,8 @@ app.use((req, res, next) => {
       res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
   } else {
-    // If no origin (e.g. server-to-server or curl), maybe allow * for debugging?
-    // For now, keep strict unless it's OPTIONS
+    // Allow curl/postman for testing
+    res.setHeader('Access-Control-Allow-Origin', '*');
   }
 
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -52,16 +52,16 @@ app.use((req, res, next) => {
 
   if (req.method === 'OPTIONS') {
     console.log(`[DEBUG CORS] Handling OPTIONS for ${req.path}`);
-    // For OPTIONS, be permissive to ensure preflight passes
-    if (origin) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    } else {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-    }
     res.status(200).end();
     return;
   }
+
+  // Test endpoint handled directly in middleware to bypass everything else
+  if (req.path === '/api/cors-test') {
+    res.json({ status: 'ok', cors: 'active', timestamp: new Date().toISOString() });
+    return;
+  }
+
   next();
 });
 
