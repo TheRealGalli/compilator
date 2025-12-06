@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { SourceSelector } from "@/components/SourceSelector";
-import { InfoPoint } from "./InfoPoint";
 import type { Source } from "@/contexts/SourcesContext";
 
 interface AppSidebarProps {
@@ -50,12 +49,6 @@ export function AppSidebar({
                   <Icon className="w-4 h-4 mr-2" />
                   {section.label}
                 </Button>
-                {isLocked && (
-                  <InfoPoint
-                    content="Connettori & Integrazioni: Presto potrai collegare Google Drive, Notion e altre app per importare direttamente i tuoi documenti."
-                    side="right"
-                  />
-                )}
               </div>
             );
           })}

@@ -6,7 +6,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { InfoPoint } from "./InfoPoint";
 
 interface ModelSettingsProps {
   notes?: string;
@@ -64,7 +63,6 @@ export function ModelSettings({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-medium">Creatività</Label>
-              <InfoPoint content="Valori bassi (0.1-0.3) per testi formali, alti (0.7-1.0) per creatività." />
             </div>
             <div className="space-y-1.5">
               <Slider
@@ -97,7 +95,6 @@ export function ModelSettings({
                     <Label htmlFor="web-research" className="text-xs font-medium cursor-pointer">
                       Web Research
                     </Label>
-                    <InfoPoint content="Abilita la ricerca sul web per arricchire il contenuto con informazioni aggiornate e fonti esterne." />
                   </div>
                 </div>
                 <Switch
@@ -114,7 +111,6 @@ export function ModelSettings({
                     <Label htmlFor="detailed-analysis" className="text-xs font-medium cursor-pointer">
                       Analisi Dettagliata
                     </Label>
-                    <InfoPoint content="Esegue un'analisi approfondita di tutti i documenti caricati per estrarre il massimo contesto possibile." />
                   </div>
                 </div>
                 <Switch
@@ -131,7 +127,6 @@ export function ModelSettings({
                     <Label htmlFor="formal-tone" className="text-xs font-medium cursor-pointer">
                       Tono Formale
                     </Label>
-                    <InfoPoint content="Utilizza un linguaggio professionale, strutturato e adatto a documenti ufficiali o legali." />
                   </div>
                 </div>
                 <Switch
