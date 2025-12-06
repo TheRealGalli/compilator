@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import compression from "compression";
+import cors from "cors";
 import { storage } from "./storage";
 import { uploadFile, downloadFile, deleteFile, fileExists, uploadFileToPath, listFiles, saveDocumentChunks, loadMultipleDocumentChunks } from "./gcp-storage";
 import { getModelApiKey } from "./gcp-secrets";
@@ -81,8 +82,6 @@ async function getDocumentsContext(selectedDocuments: string[]): Promise<string>
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Use official cors package for robust CORS handling
-  const cors = require('cors');
-
   app.use(cors({
     origin: [
       'https://therealgalli.github.io',
