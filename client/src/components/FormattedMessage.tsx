@@ -6,10 +6,35 @@ interface FormattedMessageProps {
 }
 
 export function FormattedMessage({ content, className = '' }: FormattedMessageProps) {
-    // Format inline markdown (bold) and strip markers
+    // Format line with highlighting (bold and bullets)
     const formatLine = (text: string, lineIndex: number) => {
         if (!text) return <div key={lineIndex} className="h-4" />; // Empty line
 
+        // Check for bullet points to highlight them
+        // Matches: * text, - text, or indented versions
+        const bulletMatch = text.match(/^(\s*)([\*\-\•])(\s+)(.*)/);
+
+        if (bulletMatch) {
+            const [, indent, bullet, space, content] = bulletMatch;
+            return (
+                <div key={lineIndex} className="whitespace-pre-wrap">
+                    {indent}
+                    <span className="text-blue-600 font-bold">{bullet}</span>
+                    {space}
+                    {formatInline(content, lineIndex)}
+                </div>
+            );
+        }
+
+        return (
+            <div key={lineIndex} className="whitespace-pre-wrap">
+                {formatInline(text, lineIndex)}
+            </div>
+        );
+    };
+
+    // Format inline text (bold **...**)
+    const formatInline = (text: string, lineIndex: number) => {
         const parts: (string | JSX.Element)[] = [];
         let currentText = text;
         let keyCounter = 0;
@@ -20,11 +45,9 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         let match;
 
         while ((match = boldRegex.exec(currentText)) !== null) {
-            // Add text before the match
             if (match.index > lastIndex) {
                 parts.push(currentText.substring(lastIndex, match.index));
             }
-            // Add bold text (without the **)
             parts.push(
                 <strong key={`bold-${lineIndex}-${keyCounter++}`} className="font-semibold text-foreground">
                     {match[1]}
@@ -33,21 +56,11 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             lastIndex = match.index + match[0].length;
         }
 
-        // Add remaining text
         if (lastIndex < currentText.length) {
             parts.push(currentText.substring(lastIndex));
         }
 
-        // If no bold found, just return text
-        if (parts.length === 0) {
-            parts.push(text);
-        }
-
-        return (
-            <div key={lineIndex} className="whitespace-pre-wrap">
-                {parts}
-            </div>
-        );
+        return parts.length > 0 ? parts : text;
     };
 
     return (
