@@ -745,24 +745,41 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
         console.log('[DEBUG Chat] Google Search grounding ENABLED in generateContent');
       }
 
-      // Use standard (non-streaming) for stability
-      const result = await model.generateContent(generateOptions);
+      // Use streaming for better UX
+      console.log('[DEBUG Chat] Starting streaming response');
+      const streamingResult = await model.generateContentStream(generateOptions);
 
-      const response = result.response;
-      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      // Set SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
 
-      // Return JSON response
-      res.json({
-        success: true,
-        message: {
-          content: text,
-        },
-      });
+      let fullText = '';
+
+      // Stream chunks to client
+      for await (const chunk of streamingResult.stream) {
+        const chunkText = chunk.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (chunkText) {
+          fullText += chunkText;
+          res.write(`data: ${JSON.stringify({ chunk: chunkText })}\n\n`);
+        }
+      }
+
+      // Send completion signal
+      res.write(`data: ${JSON.stringify({ done: true, fullText })}\n\n`);
+      res.end();
+
     } catch (error: any) {
       console.error('Errore durante chat:', error);
-      res.status(500).json({
-        error: error.message || 'Errore durante chat',
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: error.message || 'Errore durante chat',
+        });
+      } else {
+        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+        res.end();
+      }
     }
   });
 

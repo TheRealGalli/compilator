@@ -61,8 +61,16 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     setInput("");
     setIsLoading(true);
 
+    // Add placeholder for streaming response
+    const assistantMessageId = (Date.now() + 1).toString();
+    setMessages((prev) => [...prev, {
+      id: assistantMessageId,
+      role: "assistant" as const,
+      content: "",
+      timestamp: "Ora",
+    }]);
+
     try {
-      // Prepara i messaggi per l'API (solo user e assistant, senza metadata)
       const apiMessages = [...messages, userMessage]
         .filter(msg => msg.role !== 'system')
         .map(msg => ({
@@ -70,45 +78,87 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           content: msg.content,
         }));
 
-      console.log('[DEBUG Frontend] Sending request');
+      console.log('[DEBUG Frontend] Sending streaming request');
 
-      const response = await apiRequest('POST', '/api/chat', {
-        messages: apiMessages,
-        modelProvider: 'gemini',
-        sources: selectedSources,
-        temperature: 0.7,
-        webResearch: webResearch,
+      // Determine API URL based on environment
+      const apiBase = import.meta.env.MODE === 'production'
+        ? 'https://compiler-983823068962.europe-west1.run.app'
+        : '';
+
+      const response = await fetch(`${apiBase}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: apiMessages,
+          modelProvider: 'gemini',
+          sources: selectedSources,
+          temperature: 0.7,
+          webResearch: webResearch,
+        }),
+        credentials: 'include',
       });
 
-      const data = await response.json();
-
-      if (data.success && data.message) {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: data.message.content,
-          timestamp: "Ora",
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-      } else {
-        throw new Error(data.error || 'Errore durante la chat');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) throw new Error('No response body');
+
+      let fullText = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE messages
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || ''; // Keep incomplete message in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.error) throw new Error(data.error);
+
+              if (data.chunk) {
+                fullText += data.chunk;
+                setMessages((prev) =>
+                  prev.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: fullText }
+                      : msg
+                  )
+                );
+              }
+            } catch (e) {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+
     } catch (error: any) {
       console.error('Errore durante chat:', error);
       toast({
         title: "Errore",
-        description: error.message || "Si è verificato un errore durante l'invio del messaggio.",
+        description: error.message || "Errore durante la chat.",
         variant: "destructive",
       });
 
-      // Add error message
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "Mi dispiace, si è verificato un errore. Riprova più tardi.",
-        timestamp: "Ora",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) =>
+        prev.map(msg =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: "Mi dispiace, si è verificato un errore. Riprova più tardi." }
+            : msg
+        )
+      );
     } finally {
       setIsLoading(false);
     }
