@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
+import compression from "compression";
 import { storage } from "./storage";
 import { uploadFile, downloadFile, deleteFile, fileExists, uploadFileToPath, listFiles, saveDocumentChunks, loadMultipleDocumentChunks } from "./gcp-storage";
 import { getModelApiKey } from "./gcp-secrets";
@@ -11,15 +12,22 @@ import { chunkText, type ChunkedDocument, selectRelevantChunks, formatContextWit
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
 
+// Max file size for multimodal processing (20MB to avoid memory issues)
+const MAX_FILE_SIZE_MB = 20;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 // Configurazione multer per gestire upload di file in memoria
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB max
+    fileSize: MAX_FILE_SIZE_BYTES, // 20MB max (reduced from 50MB)
   },
 });
 
 const BUCKET_NAME = process.env.GCP_STORAGE_BUCKET || 'notebooklm-compiler-files';
+
+// Cache VertexAI client to avoid re-initialization
+let vertexAICache: { client: any; project: string; location: string } | null = null;
 
 async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
   try {
@@ -72,6 +80,9 @@ async function getDocumentsContext(selectedDocuments: string[]): Promise<string>
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Enable gzip compression for all responses (reduces network bandwidth by ~70%)
+  app.use(compression());
+
   // Configurazione CORS
   app.use((req, res, next) => {
     const origin = req.headers.origin;
@@ -256,28 +267,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[DEBUG Compile] Total multimodal files: ${multimodalFiles.length}`);
 
-      // Use Vertex AI SDK (same as /api/chat)
-      const { VertexAI } = await import("@google-cloud/vertexai");
-
+      // Use Vertex AI SDK with caching
       const project = process.env.GCP_PROJECT_ID;
       const location = 'europe-west1';
 
-      let authOptions = undefined;
-      if (process.env.GCP_CREDENTIALS) {
-        try {
-          const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
-          authOptions = { credentials };
-          console.log('[DEBUG Compile] Using explicit GCP_CREDENTIALS from env');
-        } catch (e) {
-          console.error('[ERROR Compile] Failed to parse GCP_CREDENTIALS:', e);
-        }
-      }
+      let vertex_ai: any;
+      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+        vertex_ai = vertexAICache.client;
+      } else {
+        const { VertexAI } = await import("@google-cloud/vertexai");
 
-      const vertex_ai = new VertexAI({
-        project: project,
-        location: location,
-        googleAuthOptions: authOptions
-      });
+        let authOptions = undefined;
+        if (process.env.GCP_CREDENTIALS) {
+          try {
+            const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
+            authOptions = { credentials };
+          } catch (e) {
+            console.error('[ERROR Compile] Failed to parse GCP_CREDENTIALS:', e);
+          }
+        }
+
+        vertex_ai = new VertexAI({
+          project: project,
+          location: location,
+          googleAuthOptions: authOptions
+        });
+
+        vertexAICache = { client: vertex_ai, project: project!, location };
+        console.log('[DEBUG] VertexAI client created and cached');
+      }
 
       // Get current datetime in Italian format
       const now = new Date();
@@ -634,40 +652,42 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
       }
 
       console.log(`[DEBUG] Core messages count: ${coreMessages.length}`);
-      // Log the EXACT payload we are sending to generateText
-      try {
-        console.log('[DEBUG] Final coreMessages payload:', JSON.stringify(coreMessages, null, 2));
-      } catch (e) {
-        console.log('[DEBUG] Could not stringify coreMessages');
-      }
+      // Log summary instead of full payload to avoid memory issues with large files
+      console.log(`[DEBUG] Message roles: ${coreMessages.map((m: any) => m.role).join(', ')}`);
 
       if (coreMessages.length === 0) {
         return res.status(400).json({ error: 'No valid messages found' });
       }
 
-      // 3. Use Google Cloud Vertex AI SDK (Native GCP)
-      // This uses ADC (Application Default Credentials) automatically on Cloud Run
-      const { VertexAI } = await import("@google-cloud/vertexai");
-
+      // 3. Use Google Cloud Vertex AI SDK with caching
       const project = process.env.GCP_PROJECT_ID;
-      const location = 'europe-west1'; // Reverted to europe-west1 as requested
+      const location = 'europe-west1';
 
-      let authOptions = undefined;
-      if (process.env.GCP_CREDENTIALS) {
-        try {
-          const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
-          authOptions = { credentials };
-          console.log('[DEBUG] Using explicit GCP_CREDENTIALS from env');
-        } catch (e) {
-          console.error('[ERROR] Failed to parse GCP_CREDENTIALS:', e);
+      let vertex_ai: any;
+      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+        vertex_ai = vertexAICache.client;
+      } else {
+        const { VertexAI } = await import("@google-cloud/vertexai");
+
+        let authOptions = undefined;
+        if (process.env.GCP_CREDENTIALS) {
+          try {
+            const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
+            authOptions = { credentials };
+          } catch (e) {
+            console.error('[ERROR] Failed to parse GCP_CREDENTIALS:', e);
+          }
         }
-      }
 
-      const vertex_ai = new VertexAI({
-        project: project,
-        location: location,
-        googleAuthOptions: authOptions
-      });
+        vertex_ai = new VertexAI({
+          project: project,
+          location: location,
+          googleAuthOptions: authOptions
+        });
+
+        vertexAICache = { client: vertex_ai, project: project!, location };
+        console.log('[DEBUG] VertexAI client created and cached');
+      }
 
       // Configure model
       const model = vertex_ai.getGenerativeModel({
