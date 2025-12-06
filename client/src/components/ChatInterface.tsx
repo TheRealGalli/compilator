@@ -78,71 +78,25 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           content: msg.content,
         }));
 
-      console.log('[DEBUG Frontend] Sending streaming request');
-
-      // Determine API URL based on environment
-      const apiBase = import.meta.env.MODE === 'production'
-        ? 'https://compiler-983823068962.europe-west1.run.app'
-        : '';
-
-      const response = await fetch(`${apiBase}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: apiMessages,
-          modelProvider: 'gemini',
-          sources: selectedSources,
-          temperature: 0.7,
-          webResearch: webResearch,
-        }),
-        credentials: 'include',
+      const response = await apiRequest('POST', '/api/chat', {
+        messages: apiMessages,
+        modelProvider: 'gemini',
+        sources: selectedSources,
+        temperature: 0.7,
+        webResearch: webResearch,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) throw new Error('No response body');
-
-      let fullText = '';
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // Process complete SSE messages
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || ''; // Keep incomplete message in buffer
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.error) throw new Error(data.error);
-
-              if (data.chunk) {
-                fullText += data.chunk;
-                setMessages((prev) =>
-                  prev.map(msg =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, content: fullText }
-                      : msg
-                  )
-                );
-              }
-            } catch (e) {
-              // Skip malformed JSON
-            }
-          }
-        }
-      }
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === assistantMessageId ? { ...msg, content: data.text } : msg
+        )
+      );
 
     } catch (error: any) {
       console.error('Errore durante chat:', error);
