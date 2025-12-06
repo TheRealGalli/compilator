@@ -372,7 +372,16 @@ Istruzioni:
       const result = await model.generateContent(generateOptions);
 
       const response = result.response;
-      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      let text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      // Clean up output: remove prompt echo if present
+      // User reported that sometimes the output includes the prompt up to "TEMPLATE DA COMPILARE:"
+      if (text.includes("TEMPLATE DA COMPILARE:")) {
+        console.log('[DEBUG Compile] Stripping prompt header from output');
+        const parts = text.split("TEMPLATE DA COMPILARE:");
+        // Take the last part which should be the actual compiled content
+        text = parts[parts.length - 1].trim();
+      }
 
       console.log(`[DEBUG Compile] Generated ${text.length} characters`);
 
