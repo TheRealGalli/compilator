@@ -20,97 +20,110 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-export const app = express();
+// Factory function to create and configure the Express app
+function createApp() {
+  const app = express();
+  console.log('[DEBUG SERVER] Creating Express app and configuring middleware...');
 
-// CORS allowed origins
-const ALLOWED_ORIGINS = [
-  'https://therealgalli.github.io',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
+  // CORS allowed origins
+  const ALLOWED_ORIGINS = [
+    'https://therealgalli.github.io',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ];
 
-// CORS Middleware MUST be the first one
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
+  // CORS Middleware MUST be the first one
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
 
-  // LOG ALL REQUESTS TO DEBUG
-  console.log(`[DEBUG REQUEST] ${req.method} ${req.path} - Origin: ${origin}`);
+    // LOG ALL REQUESTS TO DEBUG
+    console.log(`[DEBUG REQUEST] ${req.method} ${req.path} - Origin: ${origin}`);
 
-  // Allow any origin that matches the pattern or is localhost
-  if (origin) {
-    if (ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.github.io')) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    // Allow any origin that matches the pattern or is localhost
+    if (origin) {
+      if (ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.github.io')) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+    } else {
+      // Allow curl/postman for testing
+      res.setHeader('Access-Control-Allow-Origin', '*');
     }
-  } else {
-    // Allow curl/postman for testing
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
 
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
 
-  if (req.method === 'OPTIONS') {
-    console.log(`[DEBUG CORS] Handling OPTIONS for ${req.path}`);
-    res.status(200).end();
-    return;
-  }
+    if (req.method === 'OPTIONS') {
+      console.log(`[DEBUG CORS] Handling OPTIONS for ${req.path}`);
+      res.status(200).end();
+      return;
+    }
 
-  // Test endpoint handled directly in middleware to bypass everything else
-  if (req.path === '/api/cors-test') {
-    res.json({ status: 'ok', cors: 'active', timestamp: new Date().toISOString() });
-    return;
-  }
+    // Test endpoint handled directly in middleware to bypass everything else
+    if (req.path === '/api/cors-test') {
+      res.json({ status: 'ok', cors: 'active', timestamp: new Date().toISOString() });
+      return;
+    }
 
-  next();
-});
+    next();
+  });
+
+  // Body parsing middleware
+  app.use(express.json({
+    limit: '50mb',
+    verify: (req, _res, buf) => {
+      (req as any).rawBody = buf;
+    }
+  }));
+  app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+
+  // Logging middleware
+  app.use((req, res, next) => {
+    const start = Date.now();
+    const path = req.path;
+    let capturedJsonResponse: Record<string, any> | undefined = undefined;
+
+    const originalResJson = res.json;
+    res.json = function (bodyJson, ...args) {
+      capturedJsonResponse = bodyJson;
+      return originalResJson.apply(res, [bodyJson, ...args]);
+    };
+
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      if (path.startsWith("/api")) {
+        let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+        if (capturedJsonResponse) {
+          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        }
+
+        if (logLine.length > 80) {
+          logLine = logLine.slice(0, 79) + "…";
+        }
+
+        log(logLine);
+      }
+    });
+
+    next();
+  });
+
+  return app;
+}
 
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
   }
 }
-app.use(express.json({
-  limit: '50mb',
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  }
-}));
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
+// Export app for backward compatibility if needed (though runApp uses local instance now)
+export const app = createApp();
 
 export default async function runApp(
   setup: (app: Express, server: Server) => Promise<void>,
 ) {
+  // Use the exported app instance which is already configured
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
