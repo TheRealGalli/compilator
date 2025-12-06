@@ -6,6 +6,7 @@ import express, {
   Response,
   NextFunction,
 } from "express";
+import compression from "compression";
 
 import { registerRoutes } from "./routes";
 
@@ -33,7 +34,7 @@ function createApp() {
   ];
 
   // CORS Middleware MUST be the first one
-  app.use((req, res, next) => {
+  const corsMiddleware = (req: Request, res: Response, next: NextFunction) => {
     const origin = req.headers.origin;
 
     // LOG ALL REQUESTS TO DEBUG
@@ -66,7 +67,16 @@ function createApp() {
     }
 
     next();
-  });
+  };
+
+  // Apply CORS middleware globally
+  app.use(corsMiddleware);
+
+  // Explicitly handle OPTIONS for all routes (just in case app.use misses it)
+  app.options('*', corsMiddleware);
+
+  // Enable gzip compression
+  app.use(compression());
 
   // Body parsing middleware
   app.use(express.json({
