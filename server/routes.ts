@@ -87,13 +87,21 @@ async function getDocumentsContext(selectedDocuments: string[]): Promise<string>
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Custom CORS middleware (cors package doesn't work with esbuild)
+  // Custom CORS middleware
   app.use((req, res, next) => {
     const origin = req.headers.origin;
 
-    if (origin && ALLOWED_ORIGINS.includes(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    // DEBUG CORS
+    if (req.method === 'OPTIONS') {
+      console.log(`[DEBUG CORS] Preflight request from origin: ${origin}`);
+    }
+
+    // Allow any origin that matches the pattern or is localhost
+    if (origin) {
+      if (ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.github.io')) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
     }
 
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
