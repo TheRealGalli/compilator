@@ -33,10 +33,8 @@ const ALLOWED_ORIGINS = [
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  // DEBUG CORS
-  if (req.method === 'OPTIONS') {
-    console.log(`[DEBUG CORS] Preflight request from origin: ${origin}`);
-  }
+  // LOG ALL REQUESTS TO DEBUG
+  console.log(`[DEBUG REQUEST] ${req.method} ${req.path} - Origin: ${origin}`);
 
   // Allow any origin that matches the pattern or is localhost
   if (origin) {
@@ -44,12 +42,23 @@ app.use((req, res, next) => {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
+  } else {
+    // If no origin (e.g. server-to-server or curl), maybe allow * for debugging?
+    // For now, keep strict unless it's OPTIONS
   }
 
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
 
   if (req.method === 'OPTIONS') {
+    console.log(`[DEBUG CORS] Handling OPTIONS for ${req.path}`);
+    // For OPTIONS, be permissive to ensure preflight passes
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
     res.status(200).end();
     return;
   }
