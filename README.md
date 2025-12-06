@@ -108,7 +108,7 @@ Il sistema è progettato per un deployment continuo e automatizzato:
 
 ## Licenza
 
-**CSD Station © 2024**
+**CSD Station © 2025**
 Software proprietario. Tutti i diritti riservati.
 
 ---
