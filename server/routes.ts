@@ -80,34 +80,19 @@ async function getDocumentsContext(selectedDocuments: string[]): Promise<string>
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // CORS middleware MUST come before compression
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
+  // Use official cors package for robust CORS handling
+  const cors = require('cors');
 
-    // Allow GitHub Pages and local development
-    const allowedOrigins = [
+  app.use(cors({
+    origin: [
       'https://therealgalli.github.io',
       'http://localhost:5173',
       'http://localhost:3000',
-    ];
-
-    // Always set CORS headers for allowed origins
-    if (origin && allowedOrigins.some(allowed => origin.startsWith(allowed))) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-
-    // Always set these for all requests
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-    // Handle preflight immediately
-    if (req.method === 'OPTIONS') {
-      res.status(200).end();
-      return;
-    }
-    next();
-  });
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
 
   // Enable gzip compression for all responses (reduces network bandwidth by ~70%)
   app.use(compression());
