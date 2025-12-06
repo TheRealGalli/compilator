@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { SourcesProvider } from "@/contexts/SourcesContext";
 import Home from "@/pages/Home";
 import NotFound from "@/pages/not-found";
+import { MobileBlocker } from "@/components/MobileBlocker";
 
 // Ottieni il base path da import.meta.env.BASE_URL (impostato da Vite)
 const basePath = import.meta.env.BASE_URL || '/';
@@ -29,6 +30,7 @@ function App() {
         <TooltipProvider>
           <ThemeProvider>
             <Toaster />
+            <MobileBlocker />
             <Router />
           </ThemeProvider>
         </TooltipProvider>
