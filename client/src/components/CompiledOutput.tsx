@@ -1,6 +1,7 @@
 import { Copy, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormattedMessage } from "./FormattedMessage";
 
 interface CompiledOutputProps {
   content: string;
@@ -38,9 +39,9 @@ export function CompiledOutput({ content, onCopy, onDownload }: CompiledOutputPr
       </CardHeader>
       <CardContent className="flex-1 min-h-0 overflow-y-auto p-6">
         {content ? (
-          <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed" data-testid="text-compiled-output">
-            {content}
-          </pre>
+          <div className="text-sm" data-testid="text-compiled-output">
+            <FormattedMessage content={content} />
+          </div>
         ) : (
           <div className="text-sm text-muted-foreground space-y-2">
             <p className="font-medium">Il Compilatore AI trasforma template in documenti completi.</p>

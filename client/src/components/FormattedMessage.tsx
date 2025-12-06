@@ -28,12 +28,43 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         lines.forEach((line, index) => {
             const trimmedLine = line.trim();
 
+            // Handle checkboxes (Markdown task lists: - [ ] or [ ])
+            if (/^(-\s)?\[([ xX])\]\s/.test(trimmedLine)) {
+                flushParagraph();
+                const match = trimmedLine.match(/^(-\s)?\[([ xX])\]\s(.+)$/);
+                if (match) {
+                    const [, , checkedState, checkboxContent] = match;
+                    const isChecked = checkedState.toLowerCase() === 'x';
+                    elements.push(
+                        <div key={`checkbox-${key++}`} className="flex gap-3 mb-2 pl-1 items-start group">
+                            <div className="mt-1 min-w-[20px]">
+                                <input
+                                    type="checkbox"
+                                    defaultChecked={isChecked}
+                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                                    onClick={(e) => {
+                                        // Allow visual toggling
+                                        const target = e.target as HTMLInputElement;
+                                        target.checked = !target.checked;
+                                        // Note: This doesn't update the underlying string content, 
+                                        // but provides the visual interactivity requested.
+                                        setTimeout(() => target.checked = !target.checked, 0); // Revert react override if needed, or just let it be uncontrolled
+                                    }}
+                                />
+                            </div>
+                            <span className={`flex-1 leading-relaxed ${isChecked ? 'text-muted-foreground line-through' : ''}`}>
+                                {formatInlineMarkdown(checkboxContent)}
+                            </span>
+                        </div>
+                    );
+                }
+            }
             // Handle bullet points (*, -, •)
-            if (/^[\*\-\•]\s/.test(trimmedLine)) {
+            else if (/^[\*\-\•]\s/.test(trimmedLine)) {
                 flushParagraph();
                 const bulletContent = trimmedLine.replace(/^[\*\-\•]\s/, '');
                 elements.push(
-                    <div key={`bullet-${key++}`} className="flex gap-3 mb-2 pl-1">
+                    <div key={`bullet-${key++}`} className="flex gap-3 mb-2 pl-1 items-start">
                         <span className="text-blue-600 font-bold text-lg leading-tight mt-0.5">•</span>
                         <span className="flex-1 leading-relaxed">{formatInlineMarkdown(bulletContent)}</span>
                     </div>
@@ -46,7 +77,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                 if (match) {
                     const [, number, listContent] = match;
                     elements.push(
-                        <div key={`numbered-${key++}`} className="flex gap-3 mb-2 pl-1">
+                        <div key={`numbered-${key++}`} className="flex gap-3 mb-2 pl-1 items-start">
                             <span className="text-blue-600 font-semibold min-w-[24px]">{number}.</span>
                             <span className="flex-1 leading-relaxed">{formatInlineMarkdown(listContent)}</span>
                         </div>
