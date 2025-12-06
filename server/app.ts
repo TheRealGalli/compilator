@@ -22,6 +22,40 @@ export function log(message: string, source = "express") {
 
 export const app = express();
 
+// CORS allowed origins
+const ALLOWED_ORIGINS = [
+  'https://therealgalli.github.io',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+// CORS Middleware MUST be the first one
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  // DEBUG CORS
+  if (req.method === 'OPTIONS') {
+    console.log(`[DEBUG CORS] Preflight request from origin: ${origin}`);
+  }
+
+  // Allow any origin that matches the pattern or is localhost
+  if (origin) {
+    if (ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.github.io')) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  next();
+});
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown

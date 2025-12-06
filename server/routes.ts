@@ -29,13 +29,6 @@ const BUCKET_NAME = process.env.GCP_STORAGE_BUCKET || 'notebooklm-compiler-files
 // Cache VertexAI client to avoid re-initialization
 let vertexAICache: { client: any; project: string; location: string } | null = null;
 
-// CORS allowed origins
-const ALLOWED_ORIGINS = [
-  'https://therealgalli.github.io',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
 async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
   try {
     console.log(`[DEBUG extractText] Processing ${mimeType}, buffer size: ${buffer.length}`);
@@ -87,33 +80,6 @@ async function getDocumentsContext(selectedDocuments: string[]): Promise<string>
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Custom CORS middleware
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-
-    // DEBUG CORS
-    if (req.method === 'OPTIONS') {
-      console.log(`[DEBUG CORS] Preflight request from origin: ${origin}`);
-    }
-
-    // Allow any origin that matches the pattern or is localhost
-    if (origin) {
-      if (ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.github.io')) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
-    }
-
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-    if (req.method === 'OPTIONS') {
-      res.status(200).end();
-      return;
-    }
-    next();
-  });
-
   // Enable gzip compression for all responses (reduces network bandwidth by ~70%)
   app.use(compression());
 
