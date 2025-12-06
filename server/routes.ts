@@ -716,11 +716,26 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
         console.log('[DEBUG Chat] Google Search grounding ENABLED in generateContent');
       }
 
-      // Use standard generation for stability (reverting from streaming due to CORS issues)
+      // Use standard generation for stability
       console.log('[DEBUG Chat] Starting standard generation response');
       const result = await model.generateContent(generateOptions);
-      const response = result.response;
-      const text = response.text();
+      const response = await result.response;
+
+      // Safely extract text from candidates
+      let text = '';
+      if (response.candidates && response.candidates.length > 0) {
+        const candidate = response.candidates[0];
+        if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+          text = candidate.content.parts[0].text || '';
+        }
+      } else if (typeof (response as any).text === 'function') {
+        text = (response as any).text();
+      }
+
+      if (!text) {
+        console.warn('[WARN Chat] Empty response text from model');
+        text = "Non sono riuscito a generare una risposta. Riprova.";
+      }
 
       res.json({ text });
     } catch (error: any) {
