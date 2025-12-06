@@ -2,7 +2,6 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import compression from "compression";
-import cors from "cors";
 import { storage } from "./storage";
 import { uploadFile, downloadFile, deleteFile, fileExists, uploadFileToPath, listFiles, saveDocumentChunks, loadMultipleDocumentChunks } from "./gcp-storage";
 import { getModelApiKey } from "./gcp-secrets";
@@ -29,6 +28,13 @@ const BUCKET_NAME = process.env.GCP_STORAGE_BUCKET || 'notebooklm-compiler-files
 
 // Cache VertexAI client to avoid re-initialization
 let vertexAICache: { client: any; project: string; location: string } | null = null;
+
+// CORS allowed origins
+const ALLOWED_ORIGINS = [
+  'https://therealgalli.github.io',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
 
 async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
   try {
@@ -81,17 +87,24 @@ async function getDocumentsContext(selectedDocuments: string[]): Promise<string>
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Use official cors package for robust CORS handling
-  app.use(cors({
-    origin: [
-      'https://therealgalli.github.io',
-      'http://localhost:5173',
-      'http://localhost:3000',
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
+  // Custom CORS middleware (cors package doesn't work with esbuild)
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+
+    if (origin && ALLOWED_ORIGINS.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+    next();
+  });
 
   // Enable gzip compression for all responses (reduces network bandwidth by ~70%)
   app.use(compression());
