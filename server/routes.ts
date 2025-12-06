@@ -80,10 +80,7 @@ async function getDocumentsContext(selectedDocuments: string[]): Promise<string>
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Enable gzip compression for all responses (reduces network bandwidth by ~70%)
-  app.use(compression());
-
-  // Configurazione CORS
+  // CORS middleware MUST come before compression
   app.use((req, res, next) => {
     const origin = req.headers.origin;
 
@@ -94,19 +91,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       'http://localhost:3000',
     ];
 
+    // Always set CORS headers for allowed origins
     if (origin && allowedOrigins.some(allowed => origin.startsWith(allowed))) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
 
+    // Always set these for all requests
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
+    // Handle preflight immediately
     if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
+      res.status(200).end();
+      return;
     }
     next();
   });
+
+  // Enable gzip compression for all responses (reduces network bandwidth by ~70%)
+  app.use(compression());
 
   // Health check endpoint
   app.get('/api/health', (_req: Request, res: Response) => {
