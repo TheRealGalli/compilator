@@ -5,115 +5,66 @@
 </p>
 
 <p align="center">
-  <strong>Piattaforma AI per la Compilazione Intelligente di Documenti</strong>
+  <strong>Document Intelligence Engine</strong>
+</p>
+
+<p align="center">
+  <em>Il Compilatore Cognitivo di Documenti</em>
 </p>
 
 ---
 
-## Panoramica
+## Visione
 
-CSD Station è una piattaforma web che sfrutta l'intelligenza artificiale per automatizzare la compilazione di documenti professionali. Il sistema analizza documenti di contesto (visure camerali, contratti, fotografie, certificati) e utilizza le informazioni estratte per compilare automaticamente template predefiniti o personalizzati.
+CSD Station ridefinisce l'automazione documentale trasformando dati non strutturati in output professionali pronti all'uso. Non è un semplice compilatore, ma un **Motore di Intelligenza Documentale** progettato per comprendere il contesto, analizzare fonti eterogenee e generare documentazione complessa con precisione chirurgica.
 
----
-
-## Funzionalità Principali
-
-### 📄 Compilatore Documenti
-
-Il cuore della piattaforma. Permette di:
-
-- **Selezionare un template** tra quelli preimpostati (Privacy Policy, Relazione Tecnica, Contratto di Servizio) oppure caricare un template personalizzato in formato `.txt` o `.md`
-- **Caricare documenti di contesto** come visure camerali, contratti esistenti, certificati, fotografie di documenti o qualsiasi file che contenga informazioni utili
-- **Compilazione automatica**: l'AI analizza i documenti caricati, estrae le informazioni rilevanti (nomi, indirizzi, codici fiscali, P.IVA, importi, date) e le inserisce nei placeholder del template
-- **Controlli avanzati**:
-  - *Creatività*: regola il livello di creatività del modello (da preciso a creativo)
-  - *Analisi Dettagliata*: attiva un'analisi più approfondita dei documenti
-  - *Tono Formale*: imposta il registro linguistico del documento generato
-  - *Web Research*: integra informazioni da fonti esterne quando appropriato
-
-### 💬 Analizzatore
-
-Un assistente conversazionale che permette di:
-
-- **Interrogare i documenti caricati** con domande in linguaggio naturale
-- **Ottenere sintesi e riassunti** dei contenuti
-- **Estrarre informazioni specifiche** dai file
-- **Verificare dati** presenti nei documenti
-
-### 📁 Gestione Documenti
-
-- **Upload drag-and-drop** per caricare velocemente i file
-- **Supporto multimodale completo**:
-  - Documenti: PDF, DOCX, TXT
-  - Immagini: JPG, PNG, WebP
-  - Audio: MP3, WAV, FLAC, AAC
-  - Video: MP4, MOV, AVI, WebM
-- **Selezione multipla** delle fonti da utilizzare per la compilazione
-- **Anteprima** dei file caricati
-
-### 📋 Output
-
-- **Visualizzazione formattata** del documento compilato
-- **Copia negli appunti** con un click
-- **Download** del documento generato
+In un mondo dove il dato è il nuovo petrolio, CSD Station è la raffineria che estrae valore da visure, contratti e certificati, orchestrando il flusso di lavoro con l'eleganza di un assistente esperto e la potenza di un modello linguistico all'avanguardia.
 
 ---
 
-## Architettura Tecnica
+## Core Capabilities
+
+### 🧠 Compilatore Cognitivo
+Il cuore pulsante del sistema. Supera il concetto di "trova e sostituisci" grazie a una comprensione semantica profonda.
+- **Analisi Contestuale**: Ingerisce visure camerali, contratti, immagini e audio, comprendendone le relazioni intrinseche.
+- **Sintesi Intelligente**: Estrae entità complesse (date, importi, clausole legali) e le armonizza all'interno di template dinamici.
+- **Adattabilità**: Dal *Tono Formale* per atti legali alla *Creatività* per bozze preliminari, il motore si adatta alle esigenze specifiche del dominio.
+
+### 🔬 Analizzatore Avanzato
+Un oracolo digitale per i tuoi archivi.
+- **Interrogazione Semantica**: Poni domande in linguaggio naturale ai tuoi documenti.
+- **Verifica Cross-Documentale**: Incrocia i dati tra diverse fonti per garantire la coerenza delle informazioni.
+- **Estrazione Mirata**: Isola clausole, scadenze e obblighi con precisione millimetrica.
+
+### 🌐 Connettività & Gestione (Coming Soon)
+- **Integrazione Cloud**: Connettori nativi per Google Drive e Notion.
+- **Multimodalità Totale**: Supporto nativo per PDF, DOCX, Immagini (OCR integrato), Audio e Video.
+
+---
+
+## Architettura Tecnologica
+
+Costruito su uno stack moderno e scalabile, progettato per performance e sicurezza enterprise-grade.
 
 ### Frontend
+- **React 18 & TypeScript**: Un'interfaccia reattiva e type-safe.
+- **Tailwind CSS & Shadcn/UI**: Design system pulito, accessibile e responsive.
+- **Vite**: Build system di nuova generazione per performance ottimali.
 
-L'interfaccia utente è costruita con:
-
-- **React 18** con TypeScript per la type-safety
-- **Vite** come build tool per sviluppo veloce e bundle ottimizzati
-- **Tailwind CSS** per lo styling utility-first
-- **Shadcn/UI** come libreria di componenti accessibili
-- **Lucide React** per l'iconografia
-
-L'applicazione è una Single Page Application (SPA) con routing client-side e stato gestito tramite React Context.
-
-### Backend
-
-Il server è implementato con:
-
-- **Node.js** runtime
-- **Express.js** come framework HTTP
-- **TypeScript** per type-safety end-to-end
-
-Il backend espone API RESTful per la gestione dei file e la comunicazione con i servizi AI.
-
-### Intelligenza Artificiale
-
-Il motore AI utilizza:
-
-- **Google Vertex AI** come piattaforma di ML
-- **Gemini 2.5 Flash** come modello generativo
-- Elaborazione **multimodale nativa**: il modello può analizzare direttamente immagini, PDF e altri formati senza necessità di preprocessing
-- **OCR integrato**: riconoscimento automatico del testo in documenti scansionati o fotografati
-
-### Cloud Infrastructure
-
-- **Google Cloud Storage** per l'archiviazione sicura dei file
-- **Google Cloud Run** per l'hosting serverless del backend (scalabilità automatica)
-- **GitHub Pages** per l'hosting statico del frontend
+### Backend & AI
+- **Node.js & Express**: Runtime robusto e scalabile.
+- **Google Vertex AI**: La potenza dei modelli **Gemini 2.5 Flash** per un ragionamento multimodale senza precedenti.
+- **Google Cloud Platform**: Infrastruttura serverless su Cloud Run e storage sicuro su GCS.
 
 ---
 
-## Requisiti di Sistema
+## Getting Started
 
-### Per l'Utilizzo
-- Browser moderno (Chrome, Firefox, Safari, Edge)
-- Connessione internet
+### Requisiti
+- **Runtime**: Node.js 20+
+- **Cloud**: Account Google Cloud Platform con Vertex AI abilitato.
 
-### Per lo Sviluppo
-- Node.js 20+
-- Account Google Cloud Platform
-- Credenziali GCP configurate
-
----
-
-## Installazione
+### Installazione Rapida
 
 ```bash
 # Clona il repository
@@ -123,11 +74,11 @@ git clone https://github.com/TheRealGalli/compilator.git
 cd compilator
 npm install
 
-# Configura le variabili d'ambiente
+# Configura l'ambiente
 cp .env.example .env
-# Modifica .env con le tue credenziali GCP
+# Inserisci le tue credenziali GCP nel file .env
 
-# Avvia in modalità sviluppo
+# Avvia il motore
 npm run dev
 ```
 
@@ -136,36 +87,32 @@ npm run dev
 ## Struttura del Progetto
 
 ```
-├── client/                 # Applicazione React
-│   ├── src/
-│   │   ├── components/     # Componenti UI riutilizzabili
-│   │   ├── contexts/       # React Context per stato globale
-│   │   ├── hooks/          # Custom hooks
-│   │   ├── lib/            # Utilities e configurazioni
-│   │   └── pages/          # Componenti pagina
-│   └── public/             # Asset statici
-├── server/                 # Backend Express
-│   ├── routes.ts           # Definizione API
-│   ├── gcp-storage.ts      # Integrazione Cloud Storage
-│   └── gcp-secrets.ts      # Gestione secrets
-├── shared/                 # Codice condiviso client/server
-└── .github/workflows/      # Pipeline CI/CD
+├── client/                 # Frontend Application (React)
+│   ├── src/components/     # UI Components Library
+│   └── src/lib/            # Core Utilities
+├── server/                 # Backend Services (Node.js)
+│   ├── routes.ts           # API Endpoints
+│   └── gcp-storage.ts      # Cloud Storage Integration
+└── shared/                 # Shared Type Definitions
 ```
 
 ---
 
-## Deploy
+## Deployment
 
-### Frontend
-Il frontend viene automaticamente deployato su GitHub Pages ad ogni push sul branch `main`.
-
-### Backend
-Il backend viene deployato su Google Cloud Run tramite GitHub Actions. Il workflow gestisce build, containerizzazione e deploy automatico.
+Il sistema è progettato per un deployment continuo e automatizzato:
+- **Frontend**: GitHub Pages (Automatic Deploy)
+- **Backend**: Google Cloud Run (Containerized via GitHub Actions)
 
 ---
 
 ## Licenza
 
-Software proprietario - CSD Station © 2024
+**CSD Station © 2024**
+Software proprietario. Tutti i diritti riservati.
 
-Tutti i diritti riservati.
+---
+
+<p align="center">
+  <em>Designed for the Future of Work.</em>
+</p>
