@@ -451,6 +451,9 @@ Istruzioni:
 
       const result = await model.generateContent({
         contents: [{ role: 'user', parts: [audioPart] }],
+        generationConfig: {
+          temperature: 0,
+        }
       });
 
       const response = await result.response;

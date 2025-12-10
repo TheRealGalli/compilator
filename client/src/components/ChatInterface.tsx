@@ -44,6 +44,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -96,14 +97,11 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   };
 
   const handleSendAudio = async (audioBlob: Blob) => {
-    if (isLoading) return;
+    if (isLoading || isTranscribing) return;
 
     // Show loading state for transcription
-    setIsLoading(true);
-    // Optional: a toast or separate state to indicate "Transcribing..." could be better, 
-    // but using isLoading/input placeholder change works for now.
+    setIsTranscribing(true);
 
-    // We update the input placeholder or add a toast to show it's transcribing?
     // Let's use a toast for specific feedback.
     toast({
       title: "Trascrizione in corso...",
@@ -147,7 +145,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsTranscribing(false);
       // Clean up local tracks if any active (already done in onstop, but good practice)
     }
   };
@@ -301,13 +299,13 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                     size="icon"
                     className={`rounded-full w-8 h-8 ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted-foreground'}`}
                     onClick={toggleRecording}
-                    disabled={isLoading}
+                    disabled={isLoading || isTranscribing}
                   >
                     {isRecording ? <Square className="w-4 h-4 fill-current" /> : <Mic className="w-4 h-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{isRecording ? "Ferma registrazione e invia" : "Attiva input vocale (Native Audio)"}</p>
+                  <p>{isRecording ? "Ferma registrazione e invia" : "Attiva input vocale (STT)"}</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -317,15 +315,15 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? "Registrazione in corso..." : "Fai una domanda sui tuoi documenti..."}
+                placeholder={webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione audio..." : "Fai una domanda sui tuoi documenti..."}
                 className="resize-none min-h-[60px]"
                 data-testid="input-chat"
-                disabled={isRecording}
+                disabled={isRecording || isTranscribing}
               />
               <Button
                 size="icon"
                 onClick={handleSend}
-                disabled={!input.trim() || isLoading || isRecording}
+                disabled={!input.trim() || isLoading || isRecording || isTranscribing}
                 data-testid="button-send-message"
               >
                 <Send className="w-4 h-4" />
