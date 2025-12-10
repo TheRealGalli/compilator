@@ -6,15 +6,17 @@ import { FormattedMessage } from "./FormattedMessage";
 interface ChatMessageProps {
   role: "user" | "assistant" | "system";
   content: string;
-  timestamp?: string;
+  timestamp: string;
   sources?: string[];
+  audioUrl?: string;
 }
 
 export function ChatMessage({
   role,
   content,
   timestamp = "Ora",
-  sources = []
+  sources = [],
+  audioUrl
 }: ChatMessageProps) {
   const isUser = role === "user";
 
@@ -28,7 +30,12 @@ export function ChatMessage({
 
       <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} max-w-[70%]`}>
         <div className={`rounded-lg p-4 ${isUser ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-          {isUser ? (
+          {audioUrl ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs opacity-70 flex items-center gap-1">🎤 Messaggio Vocale</span>
+              <audio controls src={audioUrl} className="h-8 max-w-[200px]" />
+            </div>
+          ) : isUser ? (
             <p className="text-sm whitespace-pre-wrap" data-testid={`text-message-${role}`}>{content}</p>
           ) : (
             <FormattedMessage content={content} className="text-sm" data-testid={`text-message-${role}`} />

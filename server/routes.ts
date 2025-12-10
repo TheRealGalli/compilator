@@ -581,7 +581,7 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
                   return { type: 'text', text: String(part.text || '') };
                 }
                 // Keep other parts if they look valid, otherwise fallback to text
-                if (part.type === 'image' || part.type === 'file') {
+                if (part.type === 'image' || part.type === 'file' || part.type === 'audio') {
                   return part;
                 }
                 return { type: 'text', text: '' };

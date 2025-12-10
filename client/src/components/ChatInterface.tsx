@@ -1,4 +1,4 @@
-import { Send, Bot, Globe, Mic } from "lucide-react";
+import { Send, Bot, Globe, Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useSources } from "@/contexts/SourcesContext";
@@ -19,6 +19,7 @@ interface Message {
   content: string;
   timestamp: string;
   sources?: string[];
+  audioUrl?: string; // URL blob locale per riproduzione
 }
 
 interface ChatInterfaceProps {
@@ -39,55 +40,142 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [webResearch, setWebResearch] = useState(false);
   const { toast } = useToast();
   const { selectedSources } = useSources();
-  const [isListening, setIsListening] = useState(false);
 
-  const toggleListening = () => {
-    if (isListening) {
-      setIsListening(false);
-      return;
+  // Audio Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
     }
+  };
 
+  const startRecording = async () => {
     try {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        toast({
-          title: "Errore",
-          description: "Il tuo browser non supporta il riconoscimento vocale.",
-          variant: "destructive",
-        });
-        return;
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      chunksRef.current = [];
 
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'it-IT';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => setIsListening(true);
-
-      recognition.onend = () => setIsListening(false);
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInput((prev) => prev + (prev ? " " : "") + transcript);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
       };
 
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error);
-        setIsListening(false);
-        toast({
-          title: "Errore",
-          description: "Errore nel riconoscimento vocale.",
-          variant: "destructive",
-        });
+      recorder.onstop = () => {
+        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        handleSendAudio(audioBlob);
+
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
       };
 
-      recognition.start();
-
+      recorder.start();
+      setIsRecording(true);
     } catch (error) {
-      console.error("Error initializing speech recognition", error);
-      setIsListening(false);
+      console.error("Error accessing microphone:", error);
+      toast({
+        title: "Errore Microfono",
+        description: "Impossibile accedere al microfono. Verifica i permessi del browser.",
+        variant: "destructive",
+      });
     }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handleSendAudio = async (audioBlob: Blob) => {
+    if (isLoading) return;
+
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    // Convert Blob to Base64
+    const reader = new FileReader();
+    reader.readAsDataURL(audioBlob);
+
+    reader.onloadend = async () => {
+      const base64String = (reader.result as string).split(',')[1];
+      const mimeType = audioBlob.type || 'audio/webm';
+
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: "", // Empty text content for audio message
+        timestamp: "Ora",
+        audioUrl: audioUrl
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      setIsLoading(true);
+
+      try {
+        // Prepare API payload with multimodal content
+        const apiMessages = messages
+          .filter(msg => msg.role !== 'system')
+          .map(msg => ({
+            role: msg.role,
+            content: msg.content,
+          }));
+
+        // Append the new audio message in the format expected by the backend
+        apiMessages.push({
+          role: 'user',
+          content: [
+            { type: 'audio', mimeType: mimeType, data: base64String }
+          ] as any // force type for multimodal
+        });
+
+        const response = await apiRequest('POST', '/api/chat', {
+          messages: apiMessages,
+          modelProvider: 'gemini',
+          sources: selectedSources,
+          temperature: 0.7,
+          webResearch: webResearch,
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        setMessages((prev) => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.text,
+          timestamp: "Ora",
+        }]);
+
+      } catch (error: any) {
+        console.error('Errore durante chat:', error);
+        toast({
+          title: "Errore",
+          description: error.message || "Errore durante la chat.",
+          variant: "destructive",
+        });
+
+        // Remove the failed user message or add error assistant message?
+        // Let's add error message
+        setMessages((prev) => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Si è verificato un errore nell'invio del messaggio vocale.",
+          timestamp: "Ora",
+        }]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
   };
 
   const suggestedPrompts = [
@@ -237,14 +325,15 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`rounded-full w-8 h-8 ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted-foreground'}`}
-                    onClick={toggleListening}
+                    className={`rounded-full w-8 h-8 ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted-foreground'}`}
+                    onClick={toggleRecording}
+                    disabled={isLoading}
                   >
-                    <Mic className="w-4 h-4" />
+                    {isRecording ? <Square className="w-4 h-4 fill-current" /> : <Mic className="w-4 h-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{isListening ? "Sto ascoltando... (clicca per fermare)" : "Attiva input vocale"}</p>
+                  <p>{isRecording ? "Ferma registrazione e invia" : "Attiva input vocale (Native Audio)"}</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -254,14 +343,15 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={webResearch ? "Fai una domanda (con ricerca web)..." : "Fai una domanda sui tuoi documenti..."}
+                placeholder={webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? "Registrazione in corso..." : "Fai una domanda sui tuoi documenti..."}
                 className="resize-none min-h-[60px]"
                 data-testid="input-chat"
+                disabled={isRecording}
               />
               <Button
                 size="icon"
                 onClick={handleSend}
-                disabled={!input.trim() || isLoading}
+                disabled={!input.trim() || isLoading || isRecording}
                 data-testid="button-send-message"
               >
                 <Send className="w-4 h-4" />
