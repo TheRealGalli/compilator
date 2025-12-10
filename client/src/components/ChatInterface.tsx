@@ -97,85 +97,58 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const handleSendAudio = async (audioBlob: Blob) => {
     if (isLoading) return;
 
-    const audioUrl = URL.createObjectURL(audioBlob);
+    // Show loading state for transcription
+    setIsLoading(true);
+    // Optional: a toast or separate state to indicate "Transcribing..." could be better, 
+    // but using isLoading/input placeholder change works for now.
 
-    // Convert Blob to Base64
-    const reader = new FileReader();
-    reader.readAsDataURL(audioBlob);
+    // We update the input placeholder or add a toast to show it's transcribing?
+    // Let's use a toast for specific feedback.
+    toast({
+      title: "Trascrizione in corso...",
+      description: "Sto convertendo il tuo audio in testo.",
+    });
 
-    reader.onloadend = async () => {
-      const base64String = (reader.result as string).split(',')[1];
-      const mimeType = audioBlob.type || 'audio/webm';
+    try {
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.webm');
 
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        role: "user",
-        content: "", // Empty text content for audio message
-        timestamp: "Ora",
-        audioUrl: audioUrl
-      };
+      // Use fetch directly for FormData to ensure correct headers
+      // Note: apiRequest helper might assume JSON content-type default
+      const res = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
 
-      setMessages((prev) => [...prev, userMessage]);
-      setIsLoading(true);
-
-      try {
-        // Prepare API payload with multimodal content
-        const apiMessages = messages
-          .filter(msg => msg.role !== 'system')
-          .map(msg => ({
-            role: msg.role,
-            content: msg.content,
-          }));
-
-        // Append the new audio message in the format expected by the backend
-        apiMessages.push({
-          role: 'user',
-          content: [
-            { type: 'audio', mimeType: mimeType, data: base64String }
-          ] as any // force type for multimodal
-        });
-
-        const response = await apiRequest('POST', '/api/chat', {
-          messages: apiMessages,
-          modelProvider: 'gemini',
-          sources: selectedSources,
-          temperature: 0.7,
-          webResearch: webResearch,
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        setMessages((prev) => [...prev, {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: data.text,
-          timestamp: "Ora",
-        }]);
-
-      } catch (error: any) {
-        console.error('Errore durante chat:', error);
-        toast({
-          title: "Errore",
-          description: error.message || "Errore durante la chat.",
-          variant: "destructive",
-        });
-
-        // Remove the failed user message or add error assistant message?
-        // Let's add error message
-        setMessages((prev) => [...prev, {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: "Si è verificato un errore nell'invio del messaggio vocale.",
-          timestamp: "Ora",
-        }]);
-      } finally {
-        setIsLoading(false);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Errore nella trascrizione');
       }
-    };
+
+      const data = await res.json();
+
+      // Populate input with transcribed text
+      if (data.text) {
+        setInput((prev) => prev + (prev ? " " : "") + data.text);
+      } else {
+        toast({
+          title: "Attenzione",
+          description: "Nessun testo rilevato nell'audio.",
+          variant: "warning"
+        });
+      }
+
+    } catch (error: any) {
+      console.error('Errore trascrizione:', error);
+      toast({
+        title: "Errore Trascrizione",
+        description: error.message || "Impossibile trascrivere l'audio.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      // Clean up local tracks if any active (already done in onstop, but good practice)
+    }
   };
 
   const suggestedPrompts = [

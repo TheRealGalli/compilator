@@ -397,6 +397,77 @@ Istruzioni:
     }
   });
 
+  // Endpoint per trascrizione audio (STT)
+  app.post('/api/transcribe', upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nessun file audio fornito' });
+      }
+
+      console.log(`[DEBUG Transcribe] Received audio file: ${req.file.originalname}, size: ${req.file.size}, mime: ${req.file.mimetype}`);
+
+      // Initialize Vertex AI
+      const project = process.env.GCP_PROJECT_ID;
+      const location = 'europe-west1';
+
+      let vertex_ai: any;
+      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+        vertex_ai = vertexAICache.client;
+      } else {
+        const { VertexAI } = await import("@google-cloud/vertexai");
+        let authOptions = undefined;
+        if (process.env.GCP_CREDENTIALS) {
+          try {
+            const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
+            authOptions = { credentials };
+          } catch (e) {
+            console.error('[ERROR] Failed to parse GCP_CREDENTIALS:', e);
+          }
+        }
+        vertex_ai = new VertexAI({
+          project: project,
+          location: location,
+          googleAuthOptions: authOptions
+        });
+        vertexAICache = { client: vertex_ai, project: project!, location };
+      }
+
+      // Use Gemini 1.5 Flash for speed
+      const model = vertex_ai.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        systemInstruction: {
+          role: 'system',
+          parts: [{ text: "Sei un trascrizionista esperto. Il tuo compito è trascrivere l'audio fornito in testo italiano, fedelmente e velocemente. Non aggiungere commenti, solo il testo trascritto. Se l'audio non è chiaro, scrivi [Audio non chiaro]." }]
+        }
+      });
+
+      // Prepare request
+      const audioPart = {
+        inlineData: {
+          mimeType: req.file.mimetype,
+          data: req.file.buffer.toString('base64')
+        }
+      };
+
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [audioPart] }],
+      });
+
+      const response = await result.response;
+      let text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      console.log(`[DEBUG Transcribe] Transcription result: ${text.substring(0, 50)}...`);
+
+      res.json({ text: text.trim() });
+
+    } catch (error: any) {
+      console.error('Errore durante trascrizione:', error);
+      res.status(500).json({
+        error: error.message || 'Errore durante trascrizione audio',
+      });
+    }
+  });
+
   // Endpoint per chat con AI (con streaming e file support)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
