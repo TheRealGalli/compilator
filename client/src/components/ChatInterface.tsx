@@ -1,4 +1,4 @@
-import { Send, Bot, Globe } from "lucide-react";
+import { Send, Bot, Globe, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -39,6 +39,56 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [webResearch, setWebResearch] = useState(false);
   const { toast } = useToast();
   const { selectedSources } = useSources();
+  const [isListening, setIsListening] = useState(false);
+
+  const toggleListening = () => {
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        toast({
+          title: "Errore",
+          description: "Il tuo browser non supporta il riconoscimento vocale.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'it-IT';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => setIsListening(true);
+
+      recognition.onend = () => setIsListening(false);
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput((prev) => prev + (prev ? " " : "") + transcript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        setIsListening(false);
+        toast({
+          title: "Errore",
+          description: "Errore nel riconoscimento vocale.",
+          variant: "destructive",
+        });
+      };
+
+      recognition.start();
+
+    } catch (error) {
+      console.error("Error initializing speech recognition", error);
+      setIsListening(false);
+    }
+  };
 
   const suggestedPrompts = [
     "Riassumi i punti chiave",
@@ -179,6 +229,24 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                 checked={webResearch}
                 onCheckedChange={setWebResearch}
               />
+
+              <div className="w-px h-4 bg-border mx-2" /> {/* Divider */}
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`rounded-full w-8 h-8 ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted-foreground'}`}
+                    onClick={toggleListening}
+                  >
+                    <Mic className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isListening ? "Sto ascoltando... (clicca per fermare)" : "Attiva input vocale"}</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             <div className="flex gap-2">

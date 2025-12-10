@@ -2,6 +2,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Source {
   id: string;
@@ -44,9 +49,16 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
                 data-testid={`checkbox-source-${source.id}`}
               />
               <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm flex-1 truncate" title={source.name}>
-                {truncateFilename(source.name)}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-sm flex-1 truncate cursor-default">
+                    {truncateFilename(source.name)}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{source.name}</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           ))}
         </div>

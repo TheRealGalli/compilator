@@ -10,6 +10,22 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
     const formatLine = (text: string, lineIndex: number) => {
         if (!text) return <div key={lineIndex} className="h-4" />; // Empty line
 
+        // Check for headers (Lines starting with #)
+        const headerMatch = text.match(/^(#{1,6})\s+(.*)/);
+        if (headerMatch) {
+            const [, hashes, title] = headerMatch;
+            const level = hashes.length;
+            const sizeClass = level === 1 ? "text-lg font-bold mt-4 mb-2" :
+                level === 2 ? "text-base font-bold mt-3 mb-2" :
+                    "text-sm font-bold mt-2 mb-1";
+
+            return (
+                <div key={lineIndex} className={`${sizeClass} text-foreground`}>
+                    {formatInline(title, lineIndex)}
+                </div>
+            );
+        }
+
         // Check for bullet points to highlight them
         // Matches: * text, - text, or indented versions
         const bulletMatch = text.match(/^(\s*)([\*\-\•])(\s+)(.*)/);
@@ -17,7 +33,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         if (bulletMatch) {
             const [, indent, bullet, space, content] = bulletMatch;
             return (
-                <div key={lineIndex} className="whitespace-pre-wrap">
+                <div key={lineIndex} className="whitespace-pre-wrap py-0.5">
                     {indent}
                     <span className="text-blue-600 font-bold">{bullet}</span>
                     {space}
@@ -27,7 +43,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         }
 
         return (
-            <div key={lineIndex} className="whitespace-pre-wrap">
+            <div key={lineIndex} className="whitespace-pre-wrap min-h-[1.2em]">
                 {formatInline(text, lineIndex)}
             </div>
         );
