@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { getApiUrl } from "@/lib/api-config";
 import { useSources } from "@/contexts/SourcesContext";
 
 interface Message {
@@ -115,7 +116,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
       // Use fetch directly for FormData to ensure correct headers
       // Note: apiRequest helper might assume JSON content-type default
-      const res = await fetch('/api/transcribe', {
+      const res = await fetch(getApiUrl('/api/transcribe'), {
         method: 'POST',
         body: formData,
       });
@@ -134,7 +135,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         toast({
           title: "Attenzione",
           description: "Nessun testo rilevato nell'audio.",
-          variant: "warning"
+          variant: "destructive"
         });
       }
 
