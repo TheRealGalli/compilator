@@ -720,28 +720,28 @@ Istruzioni:
       console.log(`[DEBUG] Multimodal files attached: ${multimodalFiles.length}`);
 
       // Calculate max response length based on number of documents
-      const getMaxChars = (docCount: number): number => {
-        if (docCount === 0) return 3000;
-        if (docCount === 1) return 3000;
-        if (docCount <= 5) return 3500;
-        return 4000; // 6-10+ documents
+      const getMaxChars = (docCount: number, contextLength: number): number => {
+        if (docCount === 0 && contextLength < 1000) return 3000;
+        if (docCount === 1 || contextLength < 10000) return 5000;
+        if (docCount <= 5 || contextLength < 30000) return 8000;
+        return 12000; // Large context
       };
 
-      const maxChars = getMaxChars(multimodalFiles.length);
+      const maxChars = getMaxChars(multimodalFiles.length, filesContext.length);
 
-      let systemInstruction = multimodalFiles.length > 0
+      let systemInstruction = (multimodalFiles.length > 0 || filesContext.length > 0)
         ? `Sei un assistente AI di ricerca esperto e professionale.
 
-**DOCUMENTI DISPONIBILI:**
+**DOCUMENTI E CONTESTO DISPONIBILI:**
 ${filesContext}
 
 **LIMITE LUNGHEZZA RISPOSTA:** Massimo ${maxChars} caratteri (include spazi e punteggiatura).
 
 **ISTRUZIONI BASE:**
-1. Analizza attentamente i documenti forniti prima di rispondere
+1. Analizza attentamente i documenti e il testo forniti prima di rispondere
 2. Fornisci risposte concise, precise e ben strutturate
 3. Usa liste puntate per organizzare le informazioni quando necessario
-4. Cita sempre la fonte tra parentesi, es: (da: nome_file.pdf)
+4. Cita sempre la fonte tra parentesi, es: (da: nome_file.pdf o URL)
 5. Se la risposta non è nei documenti, dichiaralo esplicitamente
 6. Evita ripetizioni e informazioni superflue
 7. Usa un tono professionale ma accessibile
