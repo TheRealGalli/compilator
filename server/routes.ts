@@ -6,6 +6,7 @@ import { storage } from "./storage";
 import { uploadFile, downloadFile, deleteFile, fileExists, uploadFileToPath, listFiles, saveDocumentChunks, loadMultipleDocumentChunks } from "./gcp-storage";
 import { getModelApiKey } from "./gcp-secrets";
 import mammoth from 'mammoth';
+import * as cheerio from 'cheerio';
 // pdf-parse is imported dynamically in extractText function
 import { chunkText, type ChunkedDocument, selectRelevantChunks, formatContextWithCitations, type DocumentChunk } from './rag-utils';
 
@@ -28,6 +29,55 @@ const BUCKET_NAME = process.env.GCP_STORAGE_BUCKET || 'notebooklm-compiler-files
 
 // Cache VertexAI client to avoid re-initialization
 let vertexAICache: { client: any; project: string; location: string } | null = null;
+
+// Helper function to fetch and extract text from a URL
+async function fetchUrlContent(url: string): Promise<string | null> {
+  try {
+    console.log(`[DEBUG Fetcher] Fetching URL: ${url}`);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      console.warn(`[DEBUG Fetcher] Failed to fetch ${url}: ${response.statusText}`);
+      return null;
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    // Remove scripts, styles, and other noise
+    $('script').remove();
+    $('style').remove();
+    $('noscript').remove();
+    $('iframe').remove();
+
+    // Extract text from body
+    // Get text from important tags directly to maintain some structure
+    let content = '';
+
+    // Try to find main content usually in article, main, or specific divs
+    const mainContent = $('article, main, #content, .content, .markdown-body').text();
+
+    if (mainContent && mainContent.length > 500) {
+      content = mainContent;
+    } else {
+      // Fallback to body text if no main container found
+      content = $('body').text();
+    }
+
+    // Clean up whitespace
+    content = content.replace(/\s+/g, ' ').trim();
+
+    // Limit content length to avoid token limits (e.g., 20k chars)
+    return content.substring(0, 20000);
+  } catch (error) {
+    console.error(`[DEBUG Fetcher] Error fetching ${url}:`, error);
+    return null;
+  }
+}
 
 async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
   try {
@@ -491,6 +541,28 @@ Istruzioni:
         return res.status(400).json({ error: 'Messaggi richiesti' });
       }
 
+      // --- URL FETCHING LOGIC ---
+      let fetchedContentContext = '';
+
+      // Check last message for URLs if user didn't disable webResearch (or we can always do it for direct links)
+      // We'll do it if webResearch is enabled OR if there's a clear URL
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === 'user' && typeof lastMessage.content === 'string') {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const urls = lastMessage.content.match(urlRegex);
+
+        if (urls && urls.length > 0) {
+          console.log(`[DEBUG Chat] Found URLs in message: ${urls.join(', ')}`);
+
+          for (const url of urls) {
+            const content = await fetchUrlContent(url);
+            if (content) {
+              fetchedContentContext += `\n--- CONTENUTO ESTRATTO DA LINK: ${url} ---\n${content}\n--- FINE CONTENUTO LINK ---\n`;
+            }
+          }
+        }
+      }
+
       // Recupera la chiave API dal Secret Manager
       const apiKey = await getModelApiKey('gemini');
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
@@ -506,6 +578,12 @@ Istruzioni:
 
       // Download and process files
       let filesContext = '';
+
+      // Append fetched content to files context
+      if (fetchedContentContext) {
+        filesContext += fetchedContentContext;
+        console.log(`[DEBUG Chat] Added fetched URL content to context, length: ${fetchedContentContext.length}`);
+      }
       const multimodalFiles: any[] = [];
 
       if (sources && Array.isArray(sources)) {
