@@ -587,8 +587,7 @@ Istruzioni:
 
       const maxChars = getMaxChars(multimodalFiles.length);
 
-      // Build enhanced system instruction for high-quality responses
-      const systemInstruction = multimodalFiles.length > 0
+      let systemInstruction = multimodalFiles.length > 0
         ? `Sei un assistente AI di ricerca esperto e professionale.
 
 **DOCUMENTI DISPONIBILI:**
@@ -596,7 +595,7 @@ ${filesContext}
 
 **LIMITE LUNGHEZZA RISPOSTA:** Massimo ${maxChars} caratteri (include spazi e punteggiatura).
 
-**ISTRUZIONI:**
+**ISTRUZIONI BASE:**
 1. Analizza attentamente i documenti forniti prima di rispondere
 2. Fornisci risposte concise, precise e ben strutturate
 3. Usa liste puntate per organizzare le informazioni quando necessario
@@ -609,11 +608,22 @@ ${filesContext}
 **FORMATO RISPOSTA:**
 - Inizia con un breve riepilogo (1-2 righe)
 - Sviluppa i punti chiave in modo chiaro
-- Concludi solo se necessario (evita conclusioni generiche)`
+- Concludi solo se necessario`
         : `Sei un assistente AI di ricerca esperto. 
 Fornisci risposte concise, precise e ben strutturate.
 Usa liste puntate per organizzare le informazioni quando necessario.
 LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
+
+      // Inject specific Web Research instructions if enabled
+      if (webResearch) {
+        systemInstruction += `
+
+**MODALITÀ WEB RESEARCH ATTIVA - REGOLE STRETTE:**
+1. **Gestione Link:** Se il messaggio dell'utente contiene un URL o un link, USA STRUMENTO DI RICERCA per analizzare quel link specifico e usalo come fonte primaria insieme ai documenti.
+2. **Assenza di Link:** Se NON vengono forniti link espliciti, dai la PRIORITÀ ASSOLUTA ai documenti caricati. Usa la ricerca web SOLO se strettamente necessario per verificare fatti o se i documenti sono insufficienti, ma NON inventare informazioni (allucinazioni).
+3. **Integrazione e Contraddizioni:** Usa la conoscenza web per arricchire il contesto. MANTIENI la coerenza, ma SE RILEVI CONTRADDIZIONI o problematiche tra i documenti e i risultati web, SEGNALALO ESPLICITAMENTE all'utente in modo professionale (es: "Nota: ho riscontrato una discrepanza tra il documento e le fonti web riguardo a...").`;
+      }
+
       console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters, max response: ${maxChars}`);
 
       // Get current datetime in Italian format for analyzer
