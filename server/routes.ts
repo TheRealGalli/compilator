@@ -31,17 +31,73 @@ const BUCKET_NAME = process.env.GCP_STORAGE_BUCKET || 'notebooklm-compiler-files
 let vertexAICache: { client: any; project: string; location: string } | null = null;
 
 // Helper function to fetch and extract text from a URL
-async function fetchUrlContent(url: string): Promise<string | null> {
+// Helper function to fetch and extract text from a URL
+async function fetchUrlContent(url: string, retryCount = 0): Promise<string | null> {
   try {
-    console.log(`[DEBUG Fetcher] Fetching URL: ${url}`);
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
+    console.log(`[DEBUG Fetcher] Fetching URL: ${url} (Attempt ${retryCount + 1})`);
+
+    // Robust headers to mimic a real browser
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"macOS"',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Upgrade-Insecure-Requests': '1'
+    };
+
+    const response = await fetch(url, { headers });
 
     if (!response.ok) {
-      console.warn(`[DEBUG Fetcher] Failed to fetch ${url}: ${response.statusText}`);
+      console.warn(`[DEBUG Fetcher] Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+
+      // GITHUB SPECIFIC FALLBACK
+      // If we get 403/429/503 from GitHub, try the API
+      if (url.includes('github.com') && !url.includes('api.github.com')) {
+        console.log('[DEBUG Fetcher] Attempting GitHub API Fallback...');
+        const gitHubRegex = /github\.com\/([^\/]+)\/([^\/]+)/;
+        const match = url.match(gitHubRegex);
+        if (match) {
+          const [_, owner, repo] = match;
+          // Fallback to fetching README from API
+          const apiUrl = `https://api.github.com/repos/${owner}/${repo}/readme`;
+          console.log(`[DEBUG Fetcher] Fallback API URL: ${apiUrl}`);
+
+          try {
+            const apiRes = await fetch(apiUrl, {
+              headers: {
+                'Accept': 'application/vnd.github.raw', // Request raw content
+                'User-Agent': 'NotebookLMCompiler-Bot'
+              }
+            });
+
+            if (apiRes.ok) {
+              const rawContent = await apiRes.text();
+              console.log(`[DEBUG Fetcher] GitHub API Fallback SUCCESS. Length: ${rawContent.length}`);
+              return `[GITHUB CONTENT FROM API]\n${rawContent.substring(0, 20000)}`;
+            } else {
+              console.warn(`[DEBUG Fetcher] GitHub API also failed: ${apiRes.status}`);
+            }
+          } catch (apiErr) {
+            console.error('[DEBUG Fetcher] GitHub API error:', apiErr);
+          }
+        }
+      }
+
+      // Retry logic for generic errors (5xx)
+      if (retryCount < 2 && response.status >= 500) {
+        console.log(`[DEBUG Fetcher] Retrying ${url} in 1000ms...`);
+        await new Promise(r => setTimeout(r, 1000));
+        return fetchUrlContent(url, retryCount + 1);
+      }
+
       return null;
     }
 
@@ -53,13 +109,16 @@ async function fetchUrlContent(url: string): Promise<string | null> {
     $('style').remove();
     $('noscript').remove();
     $('iframe').remove();
+    $('nav').remove();
+    $('footer').remove();
+    $('header').remove(); // Often contains site nav, not content
 
     // Extract text from body
     // Get text from important tags directly to maintain some structure
     let content = '';
 
     // Try to find main content usually in article, main, or specific divs
-    const mainContent = $('article, main, #content, .content, .markdown-body').text();
+    const mainContent = $('article, main, #content, .content, .markdown-body, .readme').text();
 
     if (mainContent && mainContent.length > 500) {
       content = mainContent;
@@ -75,6 +134,11 @@ async function fetchUrlContent(url: string): Promise<string | null> {
     return content.substring(0, 20000);
   } catch (error) {
     console.error(`[DEBUG Fetcher] Error fetching ${url}:`, error);
+    if (retryCount < 2) {
+      console.log(`[DEBUG Fetcher] Retrying ${url} in 1000ms...`);
+      await new Promise(r => setTimeout(r, 1000));
+      return fetchUrlContent(url, retryCount + 1);
+    }
     return null;
   }
 }
