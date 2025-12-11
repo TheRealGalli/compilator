@@ -449,7 +449,7 @@ ${formalTone ? '\nUsa un tono formale e professionale.' : ''}
 TEMPLATE DA COMPILARE:
 ${template}
 
-${multimodalFiles.length > 0 ? 'IMPORTANTE: Usa i dati che estrai dai file allegati per compilare i placeholder del template. NON inventare dati, usa SOLO quelli che trovi nei documenti.' : 'Compila i placeholder con dati di esempio realistici.'}
+${multimodalFiles.length > 0 ? 'IMPORTANTE: Usa i dati che estrai dai file allegati per compilare i placeholder del template. NON inventare dati, usa SOLO quelli che trovi nei documenti.' : 'ATTENZIONE: Nessun documento sorgente fornito. NON INVENTARE DATI. Se il template richiede informazioni specifiche (nomi, progetti, dati), RIFIUTA la compilazione e chiedi all\'utente di caricare una fonte o descrivere i dettagli nelle Note.'}
 
 Istruzioni:
 - Sostituisci tutti i placeholder tra parentesi quadre (es. [AZIENDA], [EMAIL]) con informazioni appropriate
