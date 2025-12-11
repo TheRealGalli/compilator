@@ -130,8 +130,8 @@ async function fetchUrlContent(url: string, retryCount = 0): Promise<string | nu
     // Clean up whitespace
     content = content.replace(/\s+/g, ' ').trim();
 
-    // Limit content length to avoid token limits (e.g., 20k chars)
-    return content.substring(0, 20000);
+    // Limit content length to avoid token limits (Gemini 1.5 Flash has 1M context, so 50k chars is fine)
+    return content.substring(0, 50000);
   } catch (error) {
     console.error(`[DEBUG Fetcher] Error fetching ${url}:`, error);
     if (retryCount < 2) {
