@@ -2,6 +2,7 @@ import { Bot, User, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FormattedMessage } from "./FormattedMessage";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessageProps {
   role: "user" | "assistant" | "system";
@@ -18,6 +19,7 @@ export function ChatMessage({
   sources = [],
   audioUrl
 }: ChatMessageProps) {
+  const { toast } = useToast();
   const isUser = role === "user";
 
   return (
@@ -49,6 +51,13 @@ export function ChatMessage({
             variant="ghost"
             className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity"
             data-testid="button-copy-message"
+            onClick={() => {
+              navigator.clipboard.writeText(content);
+              toast({
+                description: "Messaggio copiato negli appunti",
+                duration: 2000,
+              });
+            }}
           >
             <Copy className="w-3 h-3" />
           </Button>
