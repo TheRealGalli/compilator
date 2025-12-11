@@ -608,8 +608,7 @@ Istruzioni:
       // --- URL FETCHING LOGIC ---
       let fetchedContentContext = '';
 
-      // Check last message for URLs if user didn't disable webResearch (or we can always do it for direct links)
-      // We'll do it if webResearch is enabled OR if there's a clear URL
+      // Check last message for URLs
       const lastMessage = messages[messages.length - 1];
       if (lastMessage && lastMessage.role === 'user' && typeof lastMessage.content === 'string') {
         const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -618,11 +617,18 @@ Istruzioni:
         if (urls && urls.length > 0) {
           console.log(`[DEBUG Chat] Found URLs in message: ${urls.join(', ')}`);
 
-          for (const url of urls) {
-            const content = await fetchUrlContent(url);
-            if (content) {
-              fetchedContentContext += `\n--- CONTENUTO ESTRATTO DA LINK: ${url} ---\n${content}\n--- FINE CONTENUTO LINK ---\n`;
+          if (webResearch) {
+            // Web Research ENABLED: Fetch content
+            for (const url of urls) {
+              const content = await fetchUrlContent(url);
+              if (content) {
+                fetchedContentContext += `\n--- CONTENUTO ESTRATTO DA LINK: ${url} ---\n${content}\n--- FINE CONTENUTO LINK ---\n`;
+              }
             }
+          } else {
+            // Web Research DISABLED: Inject warning
+            console.log('[DEBUG Chat] URLs found but Web Research is DISABLED. Injecting warning.');
+            fetchedContentContext += `\n[AVVISO DI SISTEMA - IMPORTANTE]\nL'utente ha incluso uno o più URL nel messaggio (${urls.join(', ')}), ma la funzionalità "Web Research" è DISATTIVATA.\nNON HAI ACCESSO AL CONTENUTO DI QUESTI LINK.\n\nISTRUZIONE OBBLIGATORIA: Informa l'utente che non puoi analizzare link esterni corrente perché la modalità "Web Research" non è attiva. Chiedi di attivare lo switch "Web Research" in basso a sinistra se desidera che tu legga il contenuto dei link.\n`;
           }
         }
       }
