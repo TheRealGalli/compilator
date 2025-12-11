@@ -401,6 +401,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const systemPrompt = `Data e ora corrente: ${dateTimeIT}
 
 Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.
+
+**PRINCIPIO FONDAMENTALE - NO ALLUCINAZIONI:**
+Non inventare MAI dati specifici del progetto, nomi di aziende, persone o dettagli non forniti. Se non hai le informazioni necessarie per compilare un campo (es. [CLIENTE], [PROGETTO]), **LASCIALO VUOTO** o inserisci [DATO MANCANTE]. Se mancano le fonti, chiedi esplicitamente all'utente di fornire i documenti.
+
 ${detailedAnalysis ? `
 MODALITÀ ANALISI DETTAGLIATA ATTIVA:
 - Fornisci risposte approfondite e complete
@@ -408,11 +412,10 @@ MODALITÀ ANALISI DETTAGLIATA ATTIVA:
 - Espandi le sezioni con informazioni contestuali
 - Aggiungi clausole e specifiche tecniche dove appropriato` : ''}
 ${webResearch ? `
-MODALITÀ WEB RESEARCH ATTIVA:
-- Integra le informazioni con conoscenze aggiornate
-- Aggiungi riferimenti normativi e legali pertinenti
-- Includi best practices del settore
-- Suggerisci miglioramenti basati su standard attuali` : ''}
+MODALITÀ WEB RESEARCH (GROUNDING) ATTIVA:
+- **SCOPO:** Usa la ricerca web ESCLUSIVAMENTE per verificare normative attuali, leggi vigenti, standard industriali e best practices del settore.
+- **DIVIETO:** NON usare la ricerca web per cercare informazioni specifiche sul cliente o sul progetto (che devono provenire dalle fonti interne).
+- **UTILIZZO:** Aggiorna il contenuto generico del documento con riferimenti normativi recenti e accurati.` : 'MODALITÀ WEB RESEARCH DISATTIVATA: Usa solo la tua conoscenza base e i documenti forniti.'}
 ${multimodalFiles.length > 0 ? `
 Hai accesso a ${multimodalFiles.length} file multimodali (immagini, PDF, documenti, audio).
 
@@ -428,7 +431,7 @@ IMPORTANTE - AUDIO:
 - Estrai tutte le informazioni rilevanti dalla trascrizione
 - Se l'audio contiene dettature, istruzioni o dati, usali per compilare il template
 
-Analizza TUTTI i file forniti per estrapolare le informazioni necessarie a compilare il template.` : ''}`;
+Analizza TUTTI i file forniti per estrapolare le informazioni necessarie a compilare il template.` : 'NESSUNA FONTE FORNITA: Non procedere con l\'invenzione di dati. Se il template richiede dati specifici, chiedi all\'utente di caricare una fonte.'}`;
 
       // Configure model without tools (tools go in generateContent)
       const model = vertex_ai.getGenerativeModel({
