@@ -1,7 +1,7 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { Asterisk } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
@@ -83,7 +83,7 @@ export function DocumentsSection() {
           </p>
         </div>
         <Button>
-          <Sparkles className="w-4 h-4 mr-2" />
+          <Asterisk className="w-4 h-4 mr-2" />
           Genera Sommario
         </Button>
       </div>

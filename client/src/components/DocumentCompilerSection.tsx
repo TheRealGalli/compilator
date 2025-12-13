@@ -1,4 +1,4 @@
-import { Sparkles, FileText, ChevronUp } from "lucide-react";
+import { Asterisk, FileText, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TemplateEditor } from "./TemplateEditor";
@@ -393,7 +393,7 @@ export function DocumentCompilerSection({
             data-testid="button-compile"
             className="w-full sm:w-auto"
           >
-            <Sparkles className="w-4 h-4 mr-2" />
+            <Asterisk className="w-4 h-4 mr-2" />
             {isCompiling ? "Compilazione..." : "Compila con AI"}
           </Button>
         </div>
