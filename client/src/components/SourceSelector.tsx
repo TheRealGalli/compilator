@@ -44,22 +44,23 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
             return (
               <div
                 key={source.id}
-                className="flex items-center gap-3 p-2 rounded-md hover-elevate active-elevate-2"
+                className="flex items-center gap-2 p-1.5 rounded-md hover-elevate active-elevate-2 group"
                 data-testid={`source-item-${source.id}`}
               >
                 <Checkbox
                   checked={source.selected}
                   onCheckedChange={() => onToggle?.(source.id)}
                   data-testid={`checkbox-source-${source.id}`}
+                  className="w-3.5 h-3.5"
                 />
-                <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="text-sm flex-1 truncate cursor-default">
+                    <span className="text-xs flex-1 truncate cursor-default min-w-0">
                       {source.name}
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent>
+                  <TooltipContent side="right">
                     <p>{source.name}</p>
                   </TooltipContent>
                 </Tooltip>
