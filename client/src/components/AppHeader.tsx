@@ -13,7 +13,8 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo" }: AppHeader
   return (
     <header className="h-14 border-b bg-background flex items-center justify-between px-4 sticky top-0 z-50">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 flex items-center justify-center">
+        <div className="flex items-center gap-1 mr-2">
+          <Asterisk className="w-8 h-8 text-blue-600" strokeWidth={3} />
           <Asterisk className="w-8 h-8 text-blue-600" strokeWidth={3} />
         </div>
         <h1 className="text-lg font-semibold" data-testid="text-notebook-title">{notebookTitle}</h1>
