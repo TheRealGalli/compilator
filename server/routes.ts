@@ -609,6 +609,81 @@ Istruzioni:
     }
   });
 
+  // Endpoint per generare domande suggerite
+  app.post('/api/suggest-questions', async (req: Request, res: Response) => {
+    try {
+      const { messages, sources, webResearch } = req.body;
+
+      // Check validation constraints:
+      // Don't generate if no sources and no web research (or no context)
+      const hasSources = sources && Array.isArray(sources) && sources.length > 0;
+      // Check for URLs in the last user message to see if web research is relevant
+      const lastMessage = messages?.[messages.length - 1];
+      const hasUrls = lastMessage?.role === 'user' && /(https?:\/\/[^\s]+)/.test(lastMessage.content);
+      const hasContext = hasSources || (webResearch && hasUrls);
+
+      if (!hasContext) {
+        return res.json({ questions: [] });
+      }
+
+      // Initialize Vertex AI (using cache logic)
+      const project = process.env.GCP_PROJECT_ID;
+      const location = 'europe-west1';
+      let vertex_ai: any;
+      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+        vertex_ai = vertexAICache.client;
+      } else {
+        const { VertexAI } = await import("@google-cloud/vertexai");
+        let authOptions = undefined;
+        if (process.env.GCP_CREDENTIALS) {
+          try {
+            const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
+            authOptions = { credentials };
+          } catch (e) {
+            console.error('[ERROR] Failed to parse GCP_CREDENTIALS:', e);
+          }
+        }
+        vertex_ai = new VertexAI({ project, location, googleAuthOptions: authOptions });
+        vertexAICache = { client: vertex_ai, project: project!, location };
+      }
+
+      const model = vertex_ai.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        systemInstruction: {
+          role: 'system',
+          parts: [{ text: "Sei un assistente utile. Genera ESATTAMENTE 4 domande brevi (massimo 20 caratteri l'una) in italiano, pertinenti al contesto della conversazione. Restituisci SOLO un array JSON di stringhe, es: [\"domanda 1\", \"domanda 2\", ...]." }]
+        }
+      });
+
+      // Prepare simple context for generation
+      const historyText = messages.slice(-3).map((m: any) => `${m.role}: ${m.content}`).join('\n');
+      const prompt = `Contesto conversazione:\n${historyText}\n\nGenera 4 domande brevi di follow-up (max 20 caratteri). Output JSON array.`;
+
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0.5 }
+      });
+
+      const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+      let questions = [];
+      try {
+        questions = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Failed to parse suggested questions JSON:", e);
+        questions = [];
+      }
+
+      // Enforce max 20 chars hard limit
+      questions = questions.map((q: string) => q.length > 20 ? q.substring(0, 17) + "..." : q).slice(0, 4);
+
+      res.json({ questions });
+
+    } catch (error: any) {
+      console.error('Errore generazione domande suggerite:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Endpoint per chat con AI (con streaming e file support)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {

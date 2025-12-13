@@ -150,29 +150,57 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     }
   };
 
-  const suggestedPrompts = [
+  const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([
     "Riassumi i punti chiave",
-    "Quali sono i risultati principali?",
-    "Genera note di studio",
+    "Quali sono i risultati?", // Shortened to fit roughly 20 chars
+    "Note di studio",
     "Crea una FAQ",
-  ];
+  ]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const fetchSuggestedQuestions = async (currentMessages: Message[]) => {
+    try {
+      const apiMessages = currentMessages
+        .filter(msg => msg.role !== 'system')
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        }));
+
+      const res = await apiRequest('POST', '/api/suggest-questions', {
+        messages: apiMessages,
+        sources: selectedSources,
+        webResearch: webResearch,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+          setSuggestedPrompts(data.questions);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch suggested questions:", error);
+    }
+  };
+
+  const handleSend = async (forcedInput?: string) => {
+    const textToSend = forcedInput || input;
+    if (!textToSend.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: textToSend,
       timestamp: "Ora",
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInput("");
     setIsLoading(true);
 
     try {
-      const apiMessages = [...messages, userMessage]
+      const apiMessages = newMessages
         .filter(msg => msg.role !== 'system')
         .map(msg => ({
           role: msg.role,
@@ -194,12 +222,18 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       }
 
       // Add assistant response
-      setMessages((prev) => [...prev, {
+      const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: data.text,
         timestamp: "Ora",
-      }]);
+      };
+
+      const updatedMessages = [...newMessages, assistantMessage];
+      setMessages(updatedMessages);
+
+      // Fetch new suggested questions based on the updated conversation
+      fetchSuggestedQuestions(updatedMessages);
 
     } catch (error: any) {
       console.error('Errore durante chat:', error);
@@ -249,14 +283,14 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
       <div className="border-t bg-background p-4">
         <div className="max-w-3xl mx-auto">
-          {messages.length === 1 && (
+          {suggestedPrompts.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-4">
               {suggestedPrompts.map((prompt, i) => (
                 <Badge
                   key={i}
                   variant="secondary"
-                  className="cursor-pointer hover-elevate active-elevate-2"
-                  onClick={() => setInput(prompt)}
+                  className="cursor-pointer hover-elevate active-elevate-2 px-3 py-1.5 text-xs sm:text-sm"
+                  onClick={() => handleSend(prompt)}
                   data-testid={`badge-prompt-${i}`}
                 >
                   {prompt}
@@ -322,7 +356,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
               />
               <Button
                 size="icon"
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 disabled={!input.trim() || isLoading || isRecording || isTranscribing}
                 data-testid="button-send-message"
               >
