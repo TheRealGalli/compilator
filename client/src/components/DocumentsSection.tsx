@@ -83,7 +83,7 @@ export function DocumentsSection() {
           </p>
         </div>
         <Button>
-          <Asterisk className="w-4 h-4 mr-1" />
+          <Asterisk className="w-4 h-4 mr-0.5" />
           Genera Sommario
         </Button>
       </div>
