@@ -393,7 +393,9 @@ export function DocumentCompilerSection({
             data-testid="button-compile"
             className="w-full sm:w-auto"
           >
-            <Asterisk className="w-10 h-10 mr-0.5" />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 mr-0.5">
+              <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
+            </svg>
             {isCompiling ? "Compilazione..." : "Compila con AI"}
           </Button>
         </div>
