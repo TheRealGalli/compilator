@@ -10,6 +10,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  attestations: write
 
 concurrency:
   group: "pages"
@@ -43,6 +44,11 @@ jobs:
           echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
           echo "Repository name: $(echo $GITHUB_REPOSITORY | cut -d'/' -f2)"
           npm run build:frontend
+
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v1.4.3
+        with:
+          subject-path: 'dist/public/**'
 
       - name: Verify build output
         run: |
