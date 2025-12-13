@@ -651,13 +651,13 @@ Istruzioni:
         model: "gemini-2.5-flash",
         systemInstruction: {
           role: 'system',
-          parts: [{ text: "Sei un assistente utile. Genera ESATTAMENTE 4 domande brevi (massimo 20 caratteri l'una) in italiano, pertinenti al contesto della conversazione. Restituisci SOLO un array JSON di stringhe, es: [\"domanda 1\", \"domanda 2\", ...]." }]
+          parts: [{ text: "Sei un analista dati esperto e diretto. Genera ESATTAMENTE 4 domande brevissime (massimo 15 caratteri l'una) in italiano, che approfondiscono l'analisi. Usa uno stile telegrafico, non scolastico. Esempi: 'Analisi costi?', 'Trend futuri?', 'Rischi chiave?'. Restituisci SOLO un array JSON di stringhe." }]
         }
       });
 
       // Prepare simple context for generation
       const historyText = messages.slice(-3).map((m: any) => `${m.role}: ${m.content}`).join('\n');
-      const prompt = `Contesto conversazione:\n${historyText}\n\nGenera 4 domande brevi di follow-up (max 20 caratteri). Output JSON array.`;
+      const prompt = `Contesto:\n${historyText}\n\nGenera 4 domande follow-up telegrafiche (max 15 caratteri). Output JSON array.`;
 
       const result = await model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -673,8 +673,8 @@ Istruzioni:
         questions = [];
       }
 
-      // Enforce max 20 chars hard limit
-      questions = questions.map((q: string) => q.length > 20 ? q.substring(0, 17) + "..." : q).slice(0, 4);
+      // Enforce max 15 chars hard limit (and safety buffer)
+      questions = questions.map((q: string) => q.length > 15 ? q.substring(0, 14) + "." : q).slice(0, 4);
 
       res.json({ questions });
 

@@ -289,8 +289,8 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                 <Badge
                   key={i}
                   variant="secondary"
-                  className="cursor-pointer hover-elevate active-elevate-2 px-3 py-1.5 text-xs sm:text-sm"
-                  onClick={() => handleSend(prompt)}
+                  className="cursor-pointer hover-elevate active-elevate-2"
+                  onClick={() => setInput(prompt)}
                   data-testid={`badge-prompt-${i}`}
                 >
                   {prompt}
