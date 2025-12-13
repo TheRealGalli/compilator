@@ -1,4 +1,4 @@
-import { Moon, Sun, Settings, User } from "lucide-react";
+import { Moon, Sun, Settings, User, Asterisk } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useTheme } from "./ThemeProvider";
@@ -13,8 +13,8 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo" }: AppHeader
   return (
     <header className="h-14 border-b bg-background flex items-center justify-between px-4 sticky top-0 z-50">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
-          <span className="text-white font-bold text-sm">CSD</span>
+        <div className="w-9 h-9 flex items-center justify-center">
+          <Asterisk className="w-8 h-8 text-blue-600" strokeWidth={3} />
         </div>
         <h1 className="text-lg font-semibold" data-testid="text-notebook-title">{notebookTitle}</h1>
       </div>
