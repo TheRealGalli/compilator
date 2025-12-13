@@ -1,45 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-
-// ... (existing imports)
-
-// Inside the component return ...
-
-<AnimatePresence mode="wait">
-  {suggestedPrompts.length > 0 && (
-    <motion.div
-      className="flex flex-wrap gap-2 mb-4"
-      layout
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      {suggestedPrompts.map((prompt, i) => (
-        <motion.div
-          key={`${prompt}-${i}`} // Ensure unique key triggers re-render/anim on change
-          layout
-          initial={{ opacity: 0, scale: 0.8, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.8, y: -10 }}
-          transition={{
-            type: "spring",
-            stiffness: 500,
-            damping: 30,
-            delay: i * 0.1 // Stagger effect
-          }}
-        >
-          <Badge
-            variant="secondary"
-            className="cursor-pointer hover-elevate active-elevate-2 text-sm px-3 py-1.5 transition-all duration-200"
-            onClick={() => setInput(prompt)}
-            data-testid={`badge-prompt-${i}`}
-          >
-            {prompt}
-          </Badge>
-        </motion.div>
-      ))}
-    </motion.div>
-  )}
-</AnimatePresence>
+import { Send, Bot, Globe, Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
