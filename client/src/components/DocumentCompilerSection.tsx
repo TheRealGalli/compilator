@@ -393,7 +393,7 @@ export function DocumentCompilerSection({
             data-testid="button-compile"
             className="w-full sm:w-auto"
           >
-            <Asterisk className="w-4 h-4 mr-0.5" />
+            <Asterisk className="w-5 h-5 mr-0.5" />
             {isCompiling ? "Compilazione..." : "Compila con AI"}
           </Button>
         </div>
