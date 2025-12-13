@@ -52,7 +52,7 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="text-sm flex-1 truncate cursor-default">
-                    {truncateFilename(source.name)}
+                    {source.name}
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>

@@ -53,7 +53,7 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
       <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
       <h3 className="text-lg font-medium mb-2">Trascina i file qui o clicca per sfogliare</h3>
       <p className="text-sm text-muted-foreground">
-        Supportati: PDF, DOCX, TXT, Immagini, Audio (Max 50MB)
+        Testo: PDF, DOCX, TXT | Immagini: JPG, PNG, WebP | Audio: MP3, WAV, FLAC
       </p>
     </div>
   );
