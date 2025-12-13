@@ -25,7 +25,7 @@ export function FileCard({ name, size = "1.2 MB", onRemove }: FileCardProps) {
           <Icon className="w-4 h-4 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate leading-none mb-0.5" data-testid={`text-filename-${name}`}>{name}</p>
+          <p className="font-medium text-sm whitespace-normal break-all leading-tight mb-0.5" data-testid={`text-filename-${name}`}>{name}</p>
           <p className="text-[10px] text-muted-foreground leading-none" data-testid="text-filesize">{size}</p>
         </div>
         <Button

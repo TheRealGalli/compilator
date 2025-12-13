@@ -29,7 +29,7 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
     return FileText;
   };
 
-  const truncateFilename = (name: string, maxLength: number = 30): string => {
+  const truncateFilename = (name: string, maxLength: number = 26): string => {
     if (name.length <= maxLength) return name;
     return name.substring(0, maxLength) + "...";
   };
