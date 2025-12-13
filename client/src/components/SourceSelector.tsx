@@ -29,6 +29,11 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
     return FileText;
   };
 
+  const truncateFilename = (name: string, maxLength: number = 30): string => {
+    if (name.length <= maxLength) return name;
+    return name.substring(0, maxLength) + "...";
+  };
+
   return (
     <div className="h-full flex flex-col border rounded-lg bg-background overflow-hidden">
       <div className="border-b px-4 py-3 bg-muted/30 flex items-center justify-between flex-shrink-0">
@@ -56,8 +61,8 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
                 <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="text-xs flex-1 truncate cursor-default min-w-0">
-                      {source.name}
+                    <span className="text-xs flex-1 cursor-default min-w-0 break-all">
+                      {truncateFilename(source.name)}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="right">
