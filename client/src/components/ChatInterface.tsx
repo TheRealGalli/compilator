@@ -1,4 +1,45 @@
-import { Send, Bot, Globe, Mic, Square } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+
+// ... (existing imports)
+
+// Inside the component return ...
+
+<AnimatePresence mode="wait">
+  {suggestedPrompts.length > 0 && (
+    <motion.div
+      className="flex flex-wrap gap-2 mb-4"
+      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      {suggestedPrompts.map((prompt, i) => (
+        <motion.div
+          key={`${prompt}-${i}`} // Ensure unique key triggers re-render/anim on change
+          layout
+          initial={{ opacity: 0, scale: 0.8, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.8, y: -10 }}
+          transition={{
+            type: "spring",
+            stiffness: 500,
+            damping: 30,
+            delay: i * 0.1 // Stagger effect
+          }}
+        >
+          <Badge
+            variant="secondary"
+            className="cursor-pointer hover-elevate active-elevate-2 text-sm px-3 py-1.5 transition-all duration-200"
+            onClick={() => setInput(prompt)}
+            data-testid={`badge-prompt-${i}`}
+          >
+            {prompt}
+          </Badge>
+        </motion.div>
+      ))}
+    </motion.div>
+  )}
+</AnimatePresence>
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -283,21 +324,42 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
       <div className="border-t bg-background p-4">
         <div className="max-w-3xl mx-auto">
-          {suggestedPrompts.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {suggestedPrompts.map((prompt, i) => (
-                <Badge
-                  key={i}
-                  variant="secondary"
-                  className="cursor-pointer hover-elevate active-elevate-2"
-                  onClick={() => setInput(prompt)}
-                  data-testid={`badge-prompt-${i}`}
-                >
-                  {prompt}
-                </Badge>
-              ))}
-            </div>
-          )}
+          <AnimatePresence mode="wait">
+            {suggestedPrompts.length > 0 && (
+              <motion.div
+                className="flex flex-wrap gap-2 mb-4 min-h-[40px]" // min-h prevents layout jump when Empty
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                {suggestedPrompts.map((prompt, i) => (
+                  <motion.div
+                    key={`${prompt}-${i}`} // Key change triggers animation
+                    layout
+                    initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.8, y: -10 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 25,
+                      delay: i * 0.05 // Subtle stagger
+                    }}
+                  >
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover-elevate active-elevate-2"
+                      onClick={() => setInput(prompt)}
+                      data-testid={`badge-prompt-${i}`}
+                    >
+                      {prompt}
+                    </Badge>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="flex flex-col gap-2">
 
