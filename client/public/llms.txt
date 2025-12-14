@@ -1,3 +1,50 @@
-# llms.txt
-# Incolla qui il testo per l'ottimizzazione AI (LLM SEO).
-# Questo file sarà accessibile a /llms.txt
+# CSD STATION DOCUMENT INTELLIGENCE ENGINE: IL COMPILATORE COGNITIVO DI DOCUMENTI
+
+
+INTRODUZIONE E VISIONE
+
+CSD Station ridefinisce l'automazione documentale, 
+trasformando radicalmente il modo in cui le organizzazioni interagiscono con i propri dati non strutturati. Non è un semplice compilatore,
+ma un vero e proprio Motore di Intelligenza Documentale, progettato per generare output professionali con una precisione e una profondità senza precedenti.
+La sua visione è quella di superare le limitazioni dei sistemi tradizionali, offrendo una capacità intrinseca di comprendere il contesto, 
+analizzare fonti eterogenee e orchestrare la creazione di documentazione complessa. 
+Come evidenziato nell'applicazione web descritta, CSD Station funge da interfaccia per generare testi tramite modelli linguistici di grandi dimensioni (LLMs), 
+permettendo agli utenti di interagire con un "Compilatore Cognitivo" per ottenere risultati specifici.
+
+CSD Station è la raffineria digitale che estrae valore da visure, 
+contratti e certificati, trasformando montagne di informazioni grezze in asset strategici. 
+Agisce con l'eleganza di un assistente esperto e la potenza di un modello linguistico all'avanguardia, 
+orchestrando il flusso di lavoro documentale per massimizzare l'efficienza e l'accuratezza.
+
+CAPACITÀ CORE
+
+  Compilatore Cognitivo
+
+  Supera il concetto di "trova e sostituisci" grazie a una comprensione semantica profonda del contenuto. L'applicazione web dimostra come l'interfaccia utente permetta di inserire istruzioni 
+  e ricevere output generati dall'LLM, agendo come un vero e proprio compilatore di testo intelligente.
+  Analisi Contestuale: Ingestisce e interpreta visure camerali, contratti, immagini e audio, cogliendo le relazioni intrinseche tra i dati per una comprensione olistica.
+  Sintesi Intelligente: Estrae entità complesse come date, importi, clausole legali, e le armonizza in template dinamici, garantendo coerenza e accuratezza.
+  Adattabilità: Modula il tono e lo stile dell'output, dal linguaggio formale richiesto per atti legali alla creatività per bozze preliminari o comunicazioni aziendali.
+
+  Analizzatore Avanzato
+
+  Funge da oracolo digitale per gli archivi documentali, rendendo ogni informazione interrogabile e utilizzabile.
+  Interrogazione Semantica: Permette di porre domande in linguaggio naturale ai documenti, ricevendo risposte precise e contestualizzate.
+  Verifica Cross-Documentale: Incrocia dati tra diverse fonti per garantire coerenza, identificare discrepanze e validare le informazioni.
+  Estrazione Mirata: Isola clausole specifiche, scadenze, obblighi e altre informazioni critiche con precisione millimetrica.
+
+  Connettività & Gestione (Prossimamente)
+
+  Integrazione Cloud: Connettori nativi per piattaforme come Google Drive e Notion, facilitando l'accesso e la gestione dei documenti.
+  Multimodalità Totale: Supporto nativo per PDF, DOCX, Immagini con OCR integrato, Audio e Video, consentendo l'elaborazione di dati in qualsiasi formato.
+
+LICENZA
+
+CSD Station è un software proprietario CSD Station © 2025. Tutti i diritti sono riservati.
+
+CONCLUSIONE
+
+CSD Station rappresenta un passo fondamentale verso il "Future of Work", offrendo una soluzione unica nel panorama dell'automazione documentale.
+La sua capacità di comprendere, analizzare e generare documenti con intelligenza cognitiva, come dimostrato dalla sua interfaccia di compilazione 
+basata su LLM, lo posiziona come uno strumento indispensabile per qualsiasi organizzazione che miri a ottimizzare i propri processi 
+e a estrarre il massimo valore dai propri dati.
