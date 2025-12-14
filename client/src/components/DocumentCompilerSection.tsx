@@ -535,8 +535,10 @@ export function DocumentCompilerSection({
                 </>
               ) : (
                 <>
-                  <Wand2 className="mr-2 h-4 w-4" />
-                  Genera Template
+                  <>
+                    <Asterisk className="mr-2 h-4 w-4 text-white" />
+                    Genera Template
+                  </>
                 </>
               )}
             </Button>
