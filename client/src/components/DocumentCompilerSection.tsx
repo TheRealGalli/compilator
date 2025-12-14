@@ -273,7 +273,7 @@ export function DocumentCompilerSection({
       console.error('Error generating template:', error);
       toast({
         title: "Errore",
-        description: error.message || "Errore durante la generazione del template.",
+        description: "Errore generazione template. Riprova.",
         variant: "destructive",
       });
     } finally {
@@ -528,19 +528,8 @@ export function DocumentCompilerSection({
               disabled={!generatePrompt.trim() || isGeneratingTemplate}
               className="bg-indigo-600 hover:bg-indigo-700"
             >
-              {isGeneratingTemplate ? (
-                <>
-                  <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Generazione...
-                </>
-              ) : (
-                <>
-                  <>
-                    <Asterisk className="mr-2 h-4 w-4 text-white" />
-                    Genera Template
-                  </>
-                </>
-              )}
+              <Asterisk className={`mr-2 h-4 w-4 text-white ${isGeneratingTemplate ? 'animate-turbo-spin' : ''}`} />
+              {isGeneratingTemplate ? "Generazione..." : "Genera Template"}
             </Button>
           </DialogFooter>
         </DialogContent>

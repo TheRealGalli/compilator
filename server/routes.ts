@@ -748,7 +748,7 @@ Argomento: [ARGOMENTO_RIUNIONE]
 1. INTRODUZIONE
 Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
         },
-        tools: [{ googleSearchRetrieval: {} }]
+        tools: [{ googleSearch: {} }]
       });
 
       const result = await model.generateContent({
