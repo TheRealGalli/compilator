@@ -379,39 +379,59 @@ export function DocumentCompilerSection({
       const { Document: DocxDocument, Packer, Paragraph, TextRun, Footer, SimpleField, AlignmentType } = await import("docx");
       const { saveAs } = await import("file-saver");
 
-      // Simple Markdown-like parsing for better formatting
+      // Helper to strip emojis (Standard ranges without u flag for compatibility)
+      const cleanText = (text: string) => {
+        return text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDDFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+      };
+
       const lines = compiledContent.split('\n');
       const docChildren = lines.map(line => {
-        const trimmed = line.trim();
+        const rawText = cleanText(line).trim();
+
+        if (!rawText) return new Paragraph({ text: "" });
 
         // Detect Bullets
-        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        if (rawText.startsWith('- ') || rawText.startsWith('* ') || rawText.match(/^\d+\. /)) {
+          const isNumbered = rawText.match(/^\d+\. /);
+          const textContent = isNumbered ? rawText.replace(/^\d+\. /, '') : rawText.substring(2);
+
           return new Paragraph({
-            children: [new TextRun(trimmed.substring(2))],
-            bullet: { level: 0 }
+            children: [new TextRun({ text: textContent, font: "Arial", size: 22, color: "37352F" })],
+            bullet: { level: 0 }, // docx handles numbering if we use numbering objects, but simple bullet is safer for loose text
+            spacing: { after: 120, line: 360 }
           });
         }
 
-        // Detect Headers (Simple heuristic: All CAPS and short)
-        if (trimmed.length > 3 && trimmed.length < 50 && trimmed === trimmed.toUpperCase() && trimmed !== "") {
+        // Detect Headers (All CAPS, short) -> "Notion H2/H3" style
+        if (rawText.length > 3 && rawText.length < 60 && rawText === rawText.toUpperCase() && !rawText.includes('.')) {
           return new Paragraph({
-            children: [new TextRun({ text: trimmed, bold: true, size: 28 })],
-            spacing: { before: 240, after: 120 }
+            children: [new TextRun({ text: rawText, font: "Arial", bold: true, size: 28, color: "37352F" })],
+            spacing: { before: 240, after: 120, line: 360 }
           });
         }
 
-        // Empty lines
-        if (!trimmed) {
-          return new Paragraph({ text: "" });
-        }
-
+        // Standard Paragraph
         return new Paragraph({
-          children: [new TextRun(line)],
-          spacing: { after: 120 }
+          children: [new TextRun({ text: rawText, font: "Arial", size: 22, color: "37352F" })],
+          spacing: { after: 120, line: 360 }
         });
       });
 
       const doc = new DocxDocument({
+        styles: {
+          default: {
+            document: {
+              run: {
+                font: "Arial",
+                size: 22,
+                color: "37352F",
+              },
+              paragraph: {
+                spacing: { line: 360 }, // 1.5 line spacing
+              }
+            }
+          }
+        },
         sections: [{
           properties: {},
           children: docChildren,
@@ -425,6 +445,8 @@ export function DocumentCompilerSection({
                       text: "** ",
                       color: "0066CC", // Blue
                       bold: true,
+                      size: 22,
+                      font: "Arial"
                     }),
                     new SimpleField("PAGE"),
                   ],
@@ -441,7 +463,7 @@ export function DocumentCompilerSection({
 
       toast({
         title: "Download completato",
-        description: "Il documento .docx è stato scaricato con successo (con piè di pagina).",
+        description: "Il documento .docx è stato scaricato con successo (Formattazione professionale).",
       });
 
     } catch (error) {
