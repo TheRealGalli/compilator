@@ -198,6 +198,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
+    setSuggestedPrompts([]); // Clear old suggestions
     setIsLoading(true);
 
     try {

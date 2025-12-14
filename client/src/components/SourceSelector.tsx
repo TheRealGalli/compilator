@@ -29,9 +29,10 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
     return FileText;
   };
 
-  const truncateFilename = (name: string, maxLength: number = 26): string => {
+  const truncateFilename = (name: string, maxLength: number = 24): string => {
     if (name.length <= maxLength) return name;
-    return name.substring(0, maxLength) + "...";
+    // Show first 12, last 5 (roughly)
+    return `${name.slice(0, 15)}...${name.slice(-4)}`;
   };
 
   return (
@@ -59,13 +60,13 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
                   className="w-3.5 h-3.5"
                 />
                 <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                <Tooltip>
+                <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>
-                    <span className="text-xs flex-1 cursor-default min-w-0 break-all">
+                    <span className="text-xs flex-1 cursor-default min-w-0 whitespace-nowrap">
                       {truncateFilename(source.name)}
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent side="right">
+                  <TooltipContent side="right" className="z-[9999]">
                     <p>{source.name}</p>
                   </TooltipContent>
                 </Tooltip>
