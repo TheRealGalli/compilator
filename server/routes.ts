@@ -687,13 +687,13 @@ Istruzioni:
   // Endpoint per generare template di documenti con AI
   app.post('/api/generate-template', async (req: Request, res: Response) => {
     try {
-      const { prompt } = req.body;
+      const { prompt, notes } = req.body;
 
       if (!prompt) {
         return res.status(400).json({ error: 'Descrizione template richiesta' });
       }
 
-      console.log(`[DEBUG Template Gen] Request: ${prompt.substring(0, 50)}...`);
+      console.log(`[DEBUG Template Gen] Request: ${prompt.substring(0, 50)}... Notes incl: ${!!notes}`);
 
       // Initialize Vertex AI
       const project = process.env.GCP_PROJECT_ID;
@@ -751,8 +751,14 @@ Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
         tools: [{ googleSearch: {} }]
       });
 
+      // Construct rich user prompt
+      let userPrompt = `Crea un template per: ${prompt}`;
+      if (notes) {
+        userPrompt += `\n\nNOTE AGGIUNTIVE E CONTESTO UTENTE:\n${notes}\n\nUsa queste note per adattare il linguaggio, il formato o le sezioni specifiche del template.`;
+      }
+
       const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: `Crea un template per: ${prompt}` }] }],
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
         generationConfig: {
           temperature: 0.7,
         }

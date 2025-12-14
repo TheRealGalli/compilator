@@ -250,8 +250,15 @@ export function DocumentCompilerSection({
     setIsGeneratingTemplate(true);
     try {
       const { apiRequest } = await import("@/lib/queryClient");
-      const response = await apiRequest('POST', '/api/generate-template', {
-        prompt: generatePrompt
+      const response = await fetch('/api/generate-template', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: generatePrompt,
+          notes: notes // Pass model settings notes
+        }),
       });
 
       const data = await response.json();

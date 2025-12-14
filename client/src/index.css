@@ -286,3 +286,17 @@
     inset: -1px;
   }
 }
+
+@layer utilities {
+  .animate-turbo-spin {
+    animation: turbo-spin 3s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+  }
+}
+
+@keyframes turbo-spin {
+  0% { transform: rotate(0deg); }
+  20% { transform: rotate(180deg); }
+  50% { transform: rotate(1800deg); }
+  80% { transform: rotate(3420deg); }
+  100% { transform: rotate(3600deg); }
+}
