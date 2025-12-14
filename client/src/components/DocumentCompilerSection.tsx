@@ -1,4 +1,4 @@
-import { Asterisk, FileText, ChevronUp } from "lucide-react";
+import { Asterisk, FileText, ChevronUp, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TemplateEditor } from "./TemplateEditor";
@@ -11,6 +11,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSources } from "@/contexts/SourcesContext";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 const templates = {
   privacy: {
@@ -197,6 +206,11 @@ export function DocumentCompilerSection({
   const { toast } = useToast();
   const { selectedSources, toggleSource } = useSources();
 
+  // Template Generation State
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [generatePrompt, setGeneratePrompt] = useState("");
+  const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
+
   // Model settings
   const [notes, setNotes] = useState("");
   const [temperature, setTemperature] = useState(0.7);
@@ -227,6 +241,43 @@ export function DocumentCompilerSection({
     if (value && templates[value as keyof typeof templates]) {
       setTemplateContent(templates[value as keyof typeof templates].content);
       setCompiledContent("");
+    }
+  };
+
+  const handleGenerateTemplate = async () => {
+    if (!generatePrompt.trim()) return;
+
+    setIsGeneratingTemplate(true);
+    try {
+      const { apiRequest } = await import("@/lib/queryClient");
+      const response = await apiRequest('POST', '/api/generate-template', {
+        prompt: generatePrompt
+      });
+
+      const data = await response.json();
+
+      if (data.template) {
+        setTemplateContent(data.template);
+        setSelectedTemplate(""); // Clear predefined selection
+        setIsGenerateModalOpen(false);
+        setGeneratePrompt("");
+
+        toast({
+          title: "Template generato",
+          description: "Il template è stato creato con successo.",
+        });
+      } else {
+        throw new Error("Nessun template generato");
+      }
+    } catch (error: any) {
+      console.error('Error generating template:', error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore durante la generazione del template.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingTemplate(false);
     }
   };
 
@@ -346,7 +397,7 @@ export function DocumentCompilerSection({
               <SelectValue placeholder="Seleziona template" />
             </SelectTrigger>
             <SelectContent>
-              <div className="p-2 border-b">
+              <div className="p-2 border-b space-y-1">
                 <Button
                   variant="outline"
                   className="w-full justify-start"
@@ -380,6 +431,18 @@ export function DocumentCompilerSection({
                     }
                   }}
                 />
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsGenerateModalOpen(true);
+                  }}
+                  data-testid="button-generate-template"
+                >
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Genera Template
+                </Button>
               </div>
               <SelectItem value="privacy">Privacy Policy</SelectItem>
               <SelectItem value="relazione">Relazione Tecnica</SelectItem>
@@ -432,6 +495,51 @@ export function DocumentCompilerSection({
           />
         </div>
       </div>
+
+      {/* Template Generation Modal */}
+      <Dialog open={isGenerateModalOpen} onOpenChange={setIsGenerateModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-indigo-500" />
+              Genera Template con AI
+            </DialogTitle>
+            <DialogDescription>
+              Descrivi il tipo di documento che ti serve. L'AI genererà uno scheletro pronto con i placeholder corretti.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Textarea
+              placeholder="Es: Verbale di riunione del consiglio di amministrazione, formale, con elenco partecipanti e deliberazioni..."
+              value={generatePrompt}
+              onChange={(e) => setGeneratePrompt(e.target.value)}
+              className="min-h-[120px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsGenerateModalOpen(false)}>
+              Annulla
+            </Button>
+            <Button
+              onClick={handleGenerateTemplate}
+              disabled={!generatePrompt.trim() || isGeneratingTemplate}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              {isGeneratingTemplate ? (
+                <>
+                  <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Generazione...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Genera Template
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

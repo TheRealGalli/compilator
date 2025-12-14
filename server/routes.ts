@@ -684,6 +684,84 @@ Istruzioni:
     }
   });
 
+  // Endpoint per generare template di documenti con AI
+  app.post('/api/generate-template', async (req: Request, res: Response) => {
+    try {
+      const { prompt } = req.body;
+
+      if (!prompt) {
+        return res.status(400).json({ error: 'Descrizione template richiesta' });
+      }
+
+      console.log(`[DEBUG Template Gen] Request: ${prompt.substring(0, 50)}...`);
+
+      // Initialize Vertex AI
+      const project = process.env.GCP_PROJECT_ID;
+      const location = 'europe-west1';
+      let vertex_ai: any;
+      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+        vertex_ai = vertexAICache.client;
+      } else {
+        const { VertexAI } = await import("@google-cloud/vertexai");
+        let authOptions = undefined;
+        if (process.env.GCP_CREDENTIALS) {
+          try {
+            const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
+            authOptions = { credentials };
+          } catch (e) {
+            console.error('[ERROR] Failed to parse GCP_CREDENTIALS:', e);
+          }
+        }
+        vertex_ai = new VertexAI({ project, location, googleAuthOptions: authOptions });
+        vertexAICache = { client: vertex_ai, project: project!, location };
+      }
+
+      const model = vertex_ai.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        systemInstruction: {
+          role: 'system',
+          parts: [{
+            text: `Sei un esperto creatore di template documentali professionali (Document Intelligence Engine).
+Il tuo compito è creare scheletri di documenti pronti per essere compilati automaticamente.
+
+REGOLE FONDAMENTALI:
+1.  Usa SOLO lingua ITALIANA formale e professionale.
+2.  Per ogni dato variabile che dovrà essere compilato in seguito, usa ESCLUSIVAMENTE il formato placeholder con parentesi quadre e MAIUSCOLO. Esempio: [NOME_CLIENTE], [DATA], [IMPORTO], [DESCRIZIONE_PROGETTO].
+3.  NON inventare dati fittizi (es. non scrivere "Mario Rossi", scrivi [NOME_COGNOME]).
+4.  Struttura il documento con intestazioni chiare, elenchi puntati se necessari e sezioni ben definite.
+5.  All'inizio del documento inserisci sempre:
+    TITOLO DEL DOCUMENTO (TUTTO MAIUSCOLO)
+    [DATA]
+
+Esempio di output desiderato:
+VERBALE DI RIUNIONE
+Data: [DATA]
+Partecipanti: [ELENCO_PARTECIPANTI]
+Argomento: [ARGOMENTO_RIUNIONE]
+
+1. INTRODUZIONE
+Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
+        }
+      });
+
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: `Crea un template per: ${prompt}` }] }],
+        generationConfig: {
+          temperature: 0.7,
+        }
+      });
+
+      const generatedTemplate = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      console.log(`[DEBUG Template Gen] Success, length: ${generatedTemplate.length}`);
+
+      res.json({ template: generatedTemplate });
+
+    } catch (error: any) {
+      console.error('Errore generazione template:', error);
+      res.status(500).json({ error: error.message || 'Errore durante generazione template' });
+    }
+  });
+
   // Endpoint per chat con AI (con streaming e file support)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
