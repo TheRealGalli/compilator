@@ -122,6 +122,9 @@ export function DocumentsSection() {
             <p className="text-sm text-muted-foreground mt-2">
               Le fonti sono temporanee e verranno rimosse al refresh della pagina.
             </p>
+            <p className="text-xs text-orange-500/80 mt-4 font-medium uppercase tracking-wide">
+              ⚠ I modelli possono allucinare, verificare sempre i dati.
+            </p>
           </div>
         </div>
       )}
