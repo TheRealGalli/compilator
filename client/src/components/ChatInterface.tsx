@@ -34,7 +34,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       id: "1",
       role: "assistant",
       content: "Ciao! Sono il tuo assistente di ricerca AI. Posso aiutarti ad analizzare i tuoi documenti, rispondere a domande e generare approfondimenti. Come posso aiutarti?",
-      timestamp: "Ora",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
   const [input, setInput] = useState("");
