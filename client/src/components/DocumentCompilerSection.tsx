@@ -501,7 +501,10 @@ export function DocumentCompilerSection({
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-indigo-500" />
+              <div className="flex items-center -space-x-2">
+                <Asterisk className="w-5 h-5 text-blue-600" strokeWidth={3} />
+                <Asterisk className="w-5 h-5 text-blue-600" strokeWidth={3} />
+              </div>
               Genera Template con AI
             </DialogTitle>
             <DialogDescription>
