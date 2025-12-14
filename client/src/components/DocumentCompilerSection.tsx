@@ -372,24 +372,86 @@ export function DocumentCompilerSection({
     });
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!compiledContent) return;
 
-    const blob = new Blob([compiledContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const templateName = selectedTemplate ? templates[selectedTemplate].name : 'documento';
-    a.download = `${templateName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const { Document: DocxDocument, Packer, Paragraph, TextRun, Footer, SimpleField, AlignmentType } = await import("docx");
+      const { saveAs } = await import("file-saver");
 
-    toast({
-      title: "Download completato",
-      description: "Il documento è stato scaricato con successo.",
-    });
+      // Simple Markdown-like parsing for better formatting
+      const lines = compiledContent.split('\n');
+      const docChildren = lines.map(line => {
+        const trimmed = line.trim();
+
+        // Detect Bullets
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          return new Paragraph({
+            children: [new TextRun(trimmed.substring(2))],
+            bullet: { level: 0 }
+          });
+        }
+
+        // Detect Headers (Simple heuristic: All CAPS and short)
+        if (trimmed.length > 3 && trimmed.length < 50 && trimmed === trimmed.toUpperCase() && trimmed !== "") {
+          return new Paragraph({
+            children: [new TextRun({ text: trimmed, bold: true, size: 28 })],
+            spacing: { before: 240, after: 120 }
+          });
+        }
+
+        // Empty lines
+        if (!trimmed) {
+          return new Paragraph({ text: "" });
+        }
+
+        return new Paragraph({
+          children: [new TextRun(line)],
+          spacing: { after: 120 }
+        });
+      });
+
+      const doc = new DocxDocument({
+        sections: [{
+          properties: {},
+          children: docChildren,
+          footers: {
+            default: new Footer({
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.RIGHT,
+                  children: [
+                    new TextRun({
+                      text: "** ",
+                      color: "0066CC", // Blue
+                      bold: true,
+                    }),
+                    new SimpleField("PAGE"),
+                  ],
+                }),
+              ],
+            }),
+          },
+        }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const templateName = selectedTemplate ? templates[selectedTemplate as keyof typeof templates].name : 'documento';
+      saveAs(blob, `${templateName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.docx`);
+
+      toast({
+        title: "Download completato",
+        description: "Il documento .docx è stato scaricato con successo (con piè di pagina).",
+      });
+
+    } catch (error) {
+      console.error("Download failed:", error);
+      toast({
+        title: "Errore Download",
+        description: "Impossibile generare il file DOCX.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
