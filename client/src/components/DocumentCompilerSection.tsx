@@ -386,7 +386,7 @@ export function DocumentCompilerSection({
 
       const lines = compiledContent.split('\n');
       const docChildren = lines.map(line => {
-        const rawText = cleanText(line).trim();
+        const rawText = cleanText(line).replace(/\*\*/g, '').trim();
 
         if (!rawText) return new Paragraph({ text: "" });
 
@@ -439,7 +439,7 @@ export function DocumentCompilerSection({
             default: new Footer({
               children: [
                 new Paragraph({
-                  alignment: AlignmentType.RIGHT,
+                  alignment: AlignmentType.LEFT,
                   children: [
                     new TextRun({
                       text: "** ",
