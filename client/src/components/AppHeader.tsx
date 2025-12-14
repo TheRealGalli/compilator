@@ -1,4 +1,4 @@
-import { Moon, Sun, Settings, User, Asterisk } from "lucide-react";
+import { Moon, Sun, User, Asterisk } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useTheme } from "./ThemeProvider";
@@ -29,9 +29,7 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo" }: AppHeader
         >
           {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
         </Button>
-        <Button size="icon" variant="ghost" data-testid="button-settings">
-          <Settings className="w-4 h-4" />
-        </Button>
+
         <Avatar className="w-8 h-8" data-testid="avatar-user">
           <AvatarFallback>
             <User className="w-4 h-4" />
