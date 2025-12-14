@@ -1,8 +1,9 @@
-import { Bot, User, Copy } from "lucide-react";
+import { Bot, User, Copy, FilePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FormattedMessage } from "./FormattedMessage";
 import { useToast } from "@/hooks/use-toast";
+import { useSources } from "@/contexts/SourcesContext";
 
 interface ChatMessageProps {
   role: "user" | "assistant" | "system";
@@ -20,7 +21,32 @@ export function ChatMessage({
   audioUrl
 }: ChatMessageProps) {
   const { toast } = useToast();
+  const { addSource } = useSources();
   const isUser = role === "user";
+
+  const handleAddAsSource = async () => {
+    try {
+      // Create a unique filename based on time
+      const fileName = `AI_Response_${Date.now()}.txt`;
+      const file = new File([content], fileName, { type: "text/plain" });
+      const success = await addSource(file);
+
+      if (success) {
+        toast({
+          title: "Aggiunto alle fonti",
+          description: "La risposta è stata salvata come nuova fonte.",
+        });
+      } else {
+        toast({
+          title: "Impossibile aggiungere",
+          description: "Limite fonti raggiunto o errore sconosciuto.",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      console.error("Error adding source:", e);
+    }
+  };
 
   return (
     <div className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"} group`}>
@@ -46,21 +72,35 @@ export function ChatMessage({
 
         <div className="flex items-center gap-2 mt-2">
           <span className="text-xs text-muted-foreground">{timestamp}</span>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity"
-            data-testid="button-copy-message"
-            onClick={() => {
-              navigator.clipboard.writeText(content);
-              toast({
-                description: "Messaggio copiato negli appunti",
-                duration: 2000,
-              });
-            }}
-          >
-            <Copy className="w-3 h-3" />
-          </Button>
+          <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="w-6 h-6"
+              data-testid="button-copy-message"
+              onClick={() => {
+                navigator.clipboard.writeText(content);
+                toast({
+                  description: "Messaggio copiato negli appunti",
+                  duration: 2000,
+                });
+              }}
+            >
+              <Copy className="w-3 h-3" />
+            </Button>
+            {!isUser && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="w-6 h-6 ml-1"
+                data-testid="button-add-source"
+                onClick={handleAddAsSource}
+                title="Usa come fonte"
+              >
+                <FilePlus className="w-3 h-3" />
+              </Button>
+            )}
+          </div>
         </div>
 
         {sources.length > 0 && (

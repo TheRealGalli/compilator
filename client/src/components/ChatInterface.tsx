@@ -192,7 +192,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       id: Date.now().toString(),
       role: "user",
       content: textToSend,
-      timestamp: "Ora",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
     const newMessages = [...messages, userMessage];
@@ -227,7 +227,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: data.text,
-        timestamp: "Ora",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       const updatedMessages = [...newMessages, assistantMessage];
