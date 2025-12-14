@@ -258,7 +258,12 @@ export function DocumentCompilerSection({
         },
         body: JSON.stringify({
           prompt: generatePrompt,
-          notes: notes // Pass model settings notes
+          notes: notes, // Pass model settings notes
+          sources: selectedSources.map((source) => ({
+            name: source.name,
+            type: source.type,
+            base64: source.base64,
+          })),
         }),
       });
 

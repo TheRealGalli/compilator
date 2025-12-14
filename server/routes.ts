@@ -688,7 +688,7 @@ Istruzioni:
   // Endpoint per generare template di documenti con AI
   app.post('/api/generate-template', async (req: Request, res: Response) => {
     try {
-      const { prompt, notes } = req.body;
+      const { prompt, notes, sources } = req.body;
 
       if (!prompt) {
         return res.status(400).json({ error: 'Descrizione template richiesta' });
@@ -758,8 +758,33 @@ Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
         userPrompt += `\n\nNOTE AGGIUNTIVE E CONTESTO UTENTE:\n${notes}\n\nUsa queste note per adattare il linguaggio, il formato o le sezioni specifiche del template.`;
       }
 
+      const parts: any[] = [];
+
+      // Process Sources Context
+      if (sources && Array.isArray(sources) && sources.length > 0) {
+        userPrompt += `\n\n[IMPORTANTE] Ho allegato dei documenti di riferimento (PDF, Immagini o Testo). USALI come contesto primario per capire di cosa si sta parlando (es. se è un contratto SaaS o Immobiliare, il tono, i dati ricorrenti). Basati sui documenti allegati per inferire la struttura corretta.`;
+
+        console.log(`[DEBUG Template Gen] Processing ${sources.length} sources for context...`);
+
+        for (const source of sources) {
+          if (source.base64 && source.type) {
+            // Strip data URI prefix if present
+            const base64Data = source.base64.split(',')[1] || source.base64;
+            parts.push({
+              inlineData: {
+                mimeType: source.type,
+                data: base64Data
+              }
+            });
+          }
+        }
+      }
+
+      // Add text instruction
+      parts.push({ text: userPrompt });
+
       const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        contents: [{ role: 'user', parts: parts }],
         generationConfig: {
           temperature: 0.7,
         }
