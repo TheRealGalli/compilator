@@ -1,0 +1,3 @@
+# llms.txt
+# Incolla qui il testo per l'ottimizzazione AI (LLM SEO).
+# Questo file sarà accessibile a /llms.txt
