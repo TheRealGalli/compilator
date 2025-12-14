@@ -384,12 +384,6 @@ export function DocumentCompilerSection({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold">Compilatore Documenti AI</h2>
-          {isCompiling && (
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-orange-500 animate-pulse">Generazione...</span>
-            </div>
-          )}
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
@@ -440,7 +434,7 @@ export function DocumentCompilerSection({
                   }}
                   data-testid="button-generate-template"
                 >
-                  <Wand2 className="mr-2 h-4 w-4" />
+                  <span className="mr-2">✏️</span>
                   Genera Template
                 </Button>
               </div>
@@ -456,7 +450,16 @@ export function DocumentCompilerSection({
             data-testid="button-compile"
             className="w-full sm:w-auto"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 mr-0.5">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`w-10 h-10 mr-0.5 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
+            >
               <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
             </svg>
             {isCompiling ? "Compilazione..." : "Compila con AI"}
@@ -501,10 +504,7 @@ export function DocumentCompilerSection({
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <div className="flex items-center -space-x-2">
-                <Asterisk className="w-5 h-5 text-blue-600" strokeWidth={3} />
-                <Asterisk className="w-5 h-5 text-blue-600" strokeWidth={3} />
-              </div>
+              <span className="text-xl">✏️</span>
               Genera Template con AI
             </DialogTitle>
             <DialogDescription>
