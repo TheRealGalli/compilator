@@ -622,9 +622,10 @@ Istruzioni:
       const hasUrls = lastMessage?.role === 'user' && /(https?:\/\/[^\s]+)/.test(lastMessage.content);
       const hasContext = hasSources || (webResearch && hasUrls);
 
-      if (!hasContext) {
-        return res.json({ questions: [] });
-      }
+      // Relaxed constraint: Generate questions even without sources/urls if we have message history
+      // if (!hasContext) {
+      //   return res.json({ questions: [] });
+      // }
 
       // Initialize Vertex AI (using cache logic)
       const project = process.env.GCP_PROJECT_ID;
