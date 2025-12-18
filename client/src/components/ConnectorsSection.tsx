@@ -19,6 +19,12 @@ interface GmailMessage {
     date: string;
 }
 
+const GmailLogo = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
+        <path fill="#4285f4" d="M24 4.5v15c0 .85-.65 1.5-1.5 1.5H21V7.38l-9 6.75-9-6.75V21H1.5c-.85 0-1.5-.65-1.5-1.5v-15c0-.4.15-.75.4-1.05.35-.4.9-.45 1.1-.45.05 0 .1 0 .15.05L12 11.25 22.85 3.1c.05 0 .1-.05.15-.05.2 0 .75.05 1.1.45.25.3.4.65.4 1.05Z" />
+    </svg>
+);
+
 export function ConnectorsSection() {
     const [isConnected, setIsConnected] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -162,8 +168,8 @@ export function ConnectorsSection() {
                 <Card className="border-2 hover:border-primary/20 transition-all">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-red-50 rounded-lg">
-                                <Mail className="w-6 h-6 text-red-600" />
+                            <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center">
+                                <GmailLogo className="w-6 h-6" />
                             </div>
                             <div>
                                 <CardTitle className="text-lg">Gmail</CardTitle>
