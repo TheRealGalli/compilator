@@ -235,7 +235,8 @@ async function getOAuth2Client() {
   }
 
   if (clientSecret) {
-    console.log(`[OAuth] Client Secret from ${source} (Length: ${clientSecret.length})`);
+    const maskedSecret = `${clientSecret.substring(0, 5)}... (Total Length: ${clientSecret.length})`;
+    console.log(`[OAuth] Client Secret from ${source}: ${maskedSecret}`);
   } else {
     console.warn('[OAuth] Client Secret is MISSING');
   }
