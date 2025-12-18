@@ -47,15 +47,13 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
             const res = await apiRequest('GET', '/api/auth/check', undefined, getGmailHeaders());
             const data = await res.json();
             setIsConnected(data.isConnected);
-            if (data.isConnected && messages.length === 0) {
-                fetchMessages();
-            }
+            // Non chiamiamo fetchMessages qui per evitare loop, lo facciamo nel useEffect se connesso e senza messaggi
         } catch (error) {
             console.error("Check connection error:", error);
         } finally {
             setIsLoading(false);
         }
-    }, [messages.length, getGmailHeaders]);
+    }, [getGmailHeaders]);
 
     const fetchMessages = useCallback(async () => {
         setIsFetchingMessages(true);
@@ -127,7 +125,11 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
-        checkConnection();
+        // Run once on mount
+        const init = async () => {
+            await checkConnection();
+        };
+        init();
 
         const handleMessage = (event: MessageEvent) => {
             if (event.data.type === 'GMAIL_AUTH_SUCCESS') {
@@ -137,9 +139,6 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
                     sessionStorage.setItem('gmail_tokens', JSON.stringify(newTokens));
                 }
                 setIsConnected(true);
-                // Wait a bit for state to update
-                setTimeout(() => fetchMessages(), 100);
-
                 toast({
                     title: "Gmail Connesso",
                     description: "La connessione a Gmail è stata stabilita.",
@@ -149,7 +148,14 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
 
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [checkConnection, fetchMessages, toast]);
+    }, [toast]); // Solo toast e mount
+
+    // Auto-fetch messages when connection status changes or tokens are updated
+    useEffect(() => {
+        if (isConnected && messages.length === 0 && !isFetchingMessages) {
+            fetchMessages();
+        }
+    }, [isConnected, messages.length, isFetchingMessages, fetchMessages]);
 
     return (
         <GmailContext.Provider value={{
