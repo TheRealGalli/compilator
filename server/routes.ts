@@ -308,10 +308,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('[OAuth] Tokens successfully retrieved');
         (req.session as any).tokens = tokens;
 
-        // Redirect back to connectors page
+        // Redirect back to connectors page with tokens in postMessage to survive session issues
         res.send(`
         <script>
-          window.opener.postMessage({ type: 'GMAIL_AUTH_SUCCESS' }, '*');
+          const tokens = ${JSON.stringify(tokens)};
+          window.opener.postMessage({ type: 'GMAIL_AUTH_SUCCESS', tokens: tokens }, '*');
           window.close();
         </script>
       `);
@@ -328,7 +329,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get('/api/auth/check', (req, res) => {
-    const isConnected = !!(req.session as any).tokens;
+    // Check session or header (if provided in a test way, but check is usually for initial UI)
+    const isConnected = !!((req.session as any).tokens || req.headers['x-gmail-tokens']);
     res.json({ isConnected });
   });
 
@@ -337,9 +339,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
+  // Helper to get tokens from session or header
+  const getGmailTokens = (req: Request) => {
+    if ((req.session as any).tokens) return (req.session as any).tokens;
+    const header = req.headers['x-gmail-tokens'];
+    if (header && typeof header === 'string') {
+      try {
+        return JSON.parse(header);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  };
+
   // Gmail Data Routes
   app.get('/api/gmail/messages', async (req, res) => {
-    const tokens = (req.session as any).tokens;
+    const tokens = getGmailTokens(req);
     if (!tokens) return res.status(401).json({ error: 'Not connected to Gmail' });
 
     try {
@@ -384,7 +400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get('/api/gmail/message/:id', async (req, res) => {
-    const tokens = (req.session as any).tokens;
+    const tokens = getGmailTokens(req);
     const { id } = req.params;
     if (!tokens) return res.status(401).json({ error: 'Not connected to Gmail' });
 

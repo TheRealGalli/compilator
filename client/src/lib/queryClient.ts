@@ -12,13 +12,19 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  extraHeaders?: Record<string, string>
 ): Promise<Response> {
   // Se l'URL è relativo, usa getApiUrl per costruire l'URL completo
   const fullUrl = url.startsWith('http') ? url : getApiUrl(url);
-  
+
+  const headers: Record<string, string> = {
+    ...(data ? { "Content-Type": "application/json" } : {}),
+    ...(extraHeaders || {})
+  };
+
   const res = await fetch(fullUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -32,22 +38,22 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    // queryKey è un array, il primo elemento è l'URL
-    const url = queryKey[0] as string;
-    const fullUrl = url.startsWith('http') ? url : getApiUrl(url);
-    
-    const res = await fetch(fullUrl, {
-      credentials: "include",
-    });
+    async ({ queryKey }) => {
+      // queryKey è un array, il primo elemento è l'URL
+      const url = queryKey[0] as string;
+      const fullUrl = url.startsWith('http') ? url : getApiUrl(url);
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
-    }
+      const res = await fetch(fullUrl, {
+        credentials: "include",
+      });
 
-    await throwIfResNotOk(res);
-    return await res.json();
-  };
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    };
 
 export const queryClient = new QueryClient({
   defaultOptions: {

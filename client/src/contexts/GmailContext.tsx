@@ -30,15 +30,24 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const [isFetchingMessages, setIsFetchingMessages] = useState(false);
     const [messages, setMessages] = useState<GmailMessage[]>([]);
+    // Store tokens in state to survive tab active session
+    const [tokens, setTokens] = useState<any>(() => {
+        const saved = sessionStorage.getItem('gmail_tokens');
+        return saved ? JSON.parse(saved) : null;
+    });
+
     const { toast } = useToast();
+
+    const getGmailHeaders = useCallback((): Record<string, string> => {
+        return tokens ? { 'x-gmail-tokens': JSON.stringify(tokens) } : {};
+    }, [tokens]);
 
     const checkConnection = useCallback(async () => {
         try {
-            const res = await apiRequest('GET', '/api/auth/check');
+            const res = await apiRequest('GET', '/api/auth/check', undefined, getGmailHeaders());
             const data = await res.json();
             setIsConnected(data.isConnected);
             if (data.isConnected && messages.length === 0) {
-                // Only auto-fetch if connected and we don't have messages yet
                 fetchMessages();
             }
         } catch (error) {
@@ -46,24 +55,26 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setIsLoading(false);
         }
-    }, [messages.length]);
+    }, [messages.length, getGmailHeaders]);
 
     const fetchMessages = useCallback(async () => {
         setIsFetchingMessages(true);
         try {
-            const res = await apiRequest('GET', '/api/gmail/messages');
+            const res = await apiRequest('GET', '/api/gmail/messages', undefined, getGmailHeaders());
             if (res.ok) {
                 const data = await res.json();
                 setMessages(data.messages || []);
-            } else {
-                setIsConnected(false); // Token might have expired
+            } else if (res.status === 401) {
+                setIsConnected(false);
+                setTokens(null);
+                sessionStorage.removeItem('gmail_tokens');
             }
         } catch (error) {
             console.error("Fetch messages error:", error);
         } finally {
             setIsFetchingMessages(false);
         }
-    }, []);
+    }, [getGmailHeaders]);
 
     const connect = async () => {
         try {
@@ -90,6 +101,8 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
             await apiRequest('POST', '/api/auth/logout');
             setIsConnected(false);
             setMessages([]);
+            setTokens(null);
+            sessionStorage.removeItem('gmail_tokens');
         } catch (error) {
             console.error("Logout error:", error);
         }
@@ -97,7 +110,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
 
     const importEmail = async (msgId: string, subject: string): Promise<string | null> => {
         try {
-            const res = await apiRequest('GET', `/api/gmail/message/${msgId}`);
+            const res = await apiRequest('GET', `/api/gmail/message/${msgId}`, undefined, getGmailHeaders());
             if (res.ok) {
                 const data = await res.json();
                 return data.body;
@@ -118,8 +131,15 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
 
         const handleMessage = (event: MessageEvent) => {
             if (event.data.type === 'GMAIL_AUTH_SUCCESS') {
+                const newTokens = event.data.tokens;
+                if (newTokens) {
+                    setTokens(newTokens);
+                    sessionStorage.setItem('gmail_tokens', JSON.stringify(newTokens));
+                }
                 setIsConnected(true);
-                fetchMessages();
+                // Wait a bit for state to update
+                setTimeout(() => fetchMessages(), 100);
+
                 toast({
                     title: "Gmail Connesso",
                     description: "La connessione a Gmail è stata stabilita.",
