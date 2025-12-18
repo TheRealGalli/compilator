@@ -203,7 +203,7 @@ let oauth2Client: any = null;
 async function getOAuth2Client() {
   if (oauth2Client) return oauth2Client;
 
-  const cleanKey = (key: string | undefined) => key?.trim().replace(/^["']|["']$/g, '');
+  const cleanKey = (key: string | undefined) => key?.replace(/[\s"']/g, '');
 
   let clientId = cleanKey(process.env.GOOGLE_CLIENT_ID);
   let clientSecret = cleanKey(process.env.GOOGLE_CLIENT_SECRET);
