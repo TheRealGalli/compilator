@@ -5,7 +5,7 @@ import { DocumentsSection } from "@/components/DocumentsSection";
 import { ChatInterface } from "@/components/ChatInterface";
 import { DocumentCompilerSection } from "@/components/DocumentCompilerSection";
 import { GeneratedContentSection } from "@/components/GeneratedContentSection";
-import { ConnectorsSection } from "@/components/ConnectorsSection";
+import { ConnectorsSection } from "../components/ConnectorsSection";
 import { useSources } from "@/contexts/SourcesContext";
 
 type Section = "documents" | "chat" | "compiler" | "generated" | "connectors";

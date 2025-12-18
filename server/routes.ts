@@ -210,11 +210,20 @@ const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 export async function registerRoutes(app: Express): Promise<Server> {
   // Gmail Auth Routes
   app.get('/api/auth/google', (req, res) => {
+    const redirectUri = process.env.NODE_ENV === 'production'
+      ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
+      : 'http://localhost:5001/api/auth/google/callback';
+
+    console.log('[OAuth] Generating URL with redirect_uri:', redirectUri);
+
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: GMAIL_SCOPES,
-      prompt: 'consent'
+      prompt: 'consent',
+      redirect_uri: redirectUri // Explicitly passing it here to ensure it's included
     });
+
+    console.log('[OAuth] Generated URL:', url);
     res.json({ url });
   });
 
