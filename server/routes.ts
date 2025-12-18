@@ -9,6 +9,9 @@ import mammoth from 'mammoth';
 import * as cheerio from 'cheerio';
 // pdf-parse is imported dynamically in extractText function
 import { chunkText, type ChunkedDocument, selectRelevantChunks, formatContextWithCitations, type DocumentChunk } from './rag-utils';
+import { google } from 'googleapis';
+import crypto from 'crypto';
+import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
@@ -193,7 +196,137 @@ async function getDocumentsContext(selectedDocuments: string[]): Promise<string>
   return context;
 }
 
+// Google OAuth2 Config
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.NODE_ENV === 'production'
+    ? 'https://therealgalli.github.io/api/auth/google/callback'
+    : 'http://localhost:5001/api/auth/google/callback'
+);
+
+const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Gmail Auth Routes
+  app.get('/api/auth/google', (req, res) => {
+    const url = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: GMAIL_SCOPES,
+      prompt: 'consent'
+    });
+    res.json({ url });
+  });
+
+  app.get('/api/auth/google/callback', async (req, res) => {
+    const { code } = req.query;
+    if (!code) return res.status(400).json({ error: 'Code missing' });
+
+    try {
+      const { tokens } = await oauth2Client.getToken(code as string);
+      (req.session as any).tokens = tokens;
+
+      // Redirect back to connectors page
+      res.send(`
+        <script>
+          window.opener.postMessage({ type: 'GMAIL_AUTH_SUCCESS' }, '*');
+          window.close();
+        </script>
+      `);
+    } catch (error) {
+      console.error('Error exchanging code for tokens:', error);
+      res.status(500).send('Authentication failed');
+    }
+  });
+
+  app.get('/api/auth/check', (req, res) => {
+    const isConnected = !!(req.session as any).tokens;
+    res.json({ isConnected });
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    (req.session as any).tokens = null;
+    res.json({ success: true });
+  });
+
+  // Gmail Data Routes
+  app.get('/api/gmail/messages', async (req, res) => {
+    const tokens = (req.session as any).tokens;
+    if (!tokens) return res.status(401).json({ error: 'Not connected to Gmail' });
+
+    try {
+      oauth2Client.setCredentials(tokens);
+      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+      const response = await gmail.users.messages.list({
+        userId: 'me',
+        maxResults: 10,
+        q: '-category:promotions -category:social' // Filter out some spam
+      });
+
+      const messages = response.data.messages || [];
+      const detailedMessages = await Promise.all(messages.map(async (msg: any) => {
+        const detail = await gmail.users.messages.get({
+          userId: 'me',
+          id: msg.id!,
+          format: 'full'
+        });
+
+        const headers = detail.data.payload?.headers || [];
+        const subject = headers.find((h: any) => h.name === 'Subject')?.value || '(Senza Oggetto)';
+        const from = headers.find((h: any) => h.name === 'From')?.value || 'Sconosciuto';
+        const date = headers.find((h: any) => h.name === 'Date')?.value || '';
+
+        return {
+          id: msg.id,
+          threadId: msg.threadId,
+          snippet: detail.data.snippet,
+          subject,
+          from,
+          date
+        };
+      }));
+
+      res.json({ messages: detailedMessages });
+    } catch (error) {
+      console.error('Error fetching Gmail messages:', error);
+      res.status(500).json({ error: 'Failed to fetch emails' });
+    }
+  });
+
+  app.get('/api/gmail/message/:id', async (req, res) => {
+    const tokens = (req.session as any).tokens;
+    const { id } = req.params;
+    if (!tokens) return res.status(401).json({ error: 'Not connected to Gmail' });
+
+    try {
+      oauth2Client.setCredentials(tokens);
+      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+      const response = await gmail.users.messages.get({
+        userId: 'me',
+        id,
+        format: 'full'
+      });
+
+      // Helper to extract body
+      const getBody = (payload: any): string => {
+        if (payload.body?.data) {
+          return Buffer.from(payload.body.data, 'base64').toString('utf-8');
+        }
+        if (payload.parts) {
+          return payload.parts.map((part: any) => getBody(part)).join('\n');
+        }
+        return '';
+      };
+
+      const body = getBody(response.data.payload);
+      res.json({ body });
+    } catch (error) {
+      console.error('Error fetching email body:', error);
+      res.status(500).json({ error: 'Failed to fetch email body' });
+    }
+  });
+
   // Enable gzip compression for all responses (reduces network bandwidth by ~70%)
   app.use(compression());
 
@@ -1178,12 +1311,29 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
       const result = await model.generateContent(generateOptions);
       const response = await result.response;
 
-      // Safely extract text from candidates
+      // Safely extract text and grounding metadata from candidates
       let text = '';
+      let groundingMetadata = null;
+      let searchEntryPoint = null;
+
       if (response.candidates && response.candidates.length > 0) {
         const candidate = response.candidates[0];
+
+        // Extract Text
         if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
           text = candidate.content.parts[0].text || '';
+        }
+
+        // Extract Grounding Metadata (Sources and Search Suggestions)
+        if (candidate.groundingMetadata) {
+          groundingMetadata = candidate.groundingMetadata;
+          if (groundingMetadata.searchEntryPoint && groundingMetadata.searchEntryPoint.renderedContent) {
+            searchEntryPoint = groundingMetadata.searchEntryPoint.renderedContent;
+          }
+          console.log('[DEBUG Chat] Grounding Metadata extracted:', {
+            hasChunks: !!groundingMetadata.groundingChunks?.length,
+            hasEntryPoint: !!searchEntryPoint
+          });
         }
       } else if (typeof (response as any).text === 'function') {
         text = (response as any).text();
@@ -1194,7 +1344,11 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
         text = "Non sono riuscito a generare una risposta. Riprova.";
       }
 
-      res.json({ text });
+      res.json({
+        text,
+        groundingMetadata,
+        searchEntryPoint
+      });
     } catch (error: any) {
       console.error('Errore durante chat:', error);
       res.status(500).json({

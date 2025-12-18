@@ -6,8 +6,8 @@ import { SourceSelector } from "@/components/SourceSelector";
 import type { Source } from "@/contexts/SourcesContext";
 
 interface AppSidebarProps {
-  activeSection?: "documents" | "chat" | "compiler" | "generated";
-  onSectionChange?: (section: "documents" | "chat" | "compiler" | "generated") => void;
+  activeSection?: "documents" | "chat" | "compiler" | "generated" | "connectors";
+  onSectionChange?: (section: "documents" | "chat" | "compiler" | "generated" | "connectors") => void;
   sources?: Source[];
   onRemoveSource?: (id: string) => void;
   onToggleSource?: (id: string) => void;
@@ -23,7 +23,7 @@ export function AppSidebar({
     { id: "documents" as const, label: "Documenti", icon: FileText },
     { id: "chat" as const, label: "Analizzatore", icon: MessageSquare },
     { id: "compiler" as const, label: "Compilatore", icon: Code },
-    { id: "connectors" as const, label: "Connettori", icon: Lock },
+    { id: "connectors" as const, label: "Connettori", icon: Sparkles },
   ];
 
   return (
@@ -35,16 +35,14 @@ export function AppSidebar({
           {sections.map((section) => {
             const Icon = section.icon;
             const isActive = activeSection === section.id;
-            const isLocked = section.id === "connectors";
 
             return (
               <div key={section.id} className="flex items-center gap-2 w-full">
                 <Button
                   variant={isActive ? "secondary" : "ghost"}
-                  className={`justify-start flex-1 ${isLocked ? "opacity-70" : ""}`}
-                  onClick={() => !isLocked && onSectionChange(section.id as any)}
+                  className="justify-start flex-1"
+                  onClick={() => onSectionChange(section.id as any)}
                   data-testid={`button-section-${section.id}`}
-                  disabled={isLocked}
                 >
                   <Icon className="w-4 h-4 mr-2" />
                   {section.label}

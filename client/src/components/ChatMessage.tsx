@@ -11,6 +11,8 @@ interface ChatMessageProps {
   timestamp: string;
   sources?: string[];
   audioUrl?: string;
+  groundingMetadata?: any;
+  searchEntryPoint?: string;
 }
 
 export function ChatMessage({
@@ -18,7 +20,9 @@ export function ChatMessage({
   content,
   timestamp = "Ora",
   sources = [],
-  audioUrl
+  audioUrl,
+  groundingMetadata,
+  searchEntryPoint
 }: ChatMessageProps) {
   const { toast } = useToast();
   const { addSource } = useSources();
@@ -111,6 +115,39 @@ export function ChatMessage({
               </Badge>
             ))}
           </div>
+        )}
+
+        {/* Grounding Sources (Google Search) */}
+        {groundingMetadata?.groundingChunks && groundingMetadata.groundingChunks.length > 0 && (
+          <div className="mt-4 border-t pt-3 w-full">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Fonti di Ricerca</span>
+            <div className="flex flex-col gap-2">
+              {groundingMetadata.groundingChunks.map((chunk: any, i: number) => (
+                <a
+                  key={i}
+                  href={chunk.web?.uri || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 group/link"
+                >
+                  <div className="w-5 h-5 flex items-center justify-center rounded bg-blue-50 text-[10px] font-medium text-blue-600 border border-blue-100 group-hover/link:bg-blue-100 transition-colors">
+                    {i + 1}
+                  </div>
+                  <span className="text-xs text-blue-600 hover:underline line-clamp-1">
+                    {chunk.web?.title || 'Fonte Web'}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Google Search Suggestions (EntryPoint) */}
+        {searchEntryPoint && (
+          <div
+            className="mt-4 w-full google-search-entry-point"
+            dangerouslySetInnerHTML={{ __html: searchEntryPoint }}
+          />
         )}
       </div>
 

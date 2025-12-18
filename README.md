@@ -116,3 +116,65 @@ Software proprietario. Tutti i diritti riservati.
 <p align="center">
   <em>Designed for the Future of Work.</em>
 </p>
+
+Sì, il "pacchetto" che vedi nelle immagini (con l'elenco delle **Grounding Sources** e i **Google Search Suggestions**) è una funzionalità specifica chiamata **Grounding con Ricerca Google**.
+
+È possibile attivare questa stessa esperienza tramite API sia su **Google AI Studio** che su **Google Cloud Vertex AI**. Ecco come procedere per rendere la tua ricerca online esattamente come quella dello screenshot:
+
+### 1. Attivazione via API (Vertex AI)
+
+Se utilizzi il Cloud (Vertex AI), devi configurare lo strumento `Google Search` all'interno della richiesta di generazione dei contenuti.
+
+* **Il parametro chiave:** Devi includere l'oggetto `tools` con `Google Search_retrieval` nella tua chiamata API.
+* **Soglia Dinamica:** Puoi impostare un `dynamic_threshold` (da 0.0 a 1.0). Se la fiducia del modello nella propria risposta è inferiore a questa soglia, lui attiverà automaticamente la ricerca web per verificare i fatti.
+
+### 2. Risultati e Citazioni (Grounding Metadata)
+
+Quando chiami l'API con il grounding attivo, la risposta non conterrà solo testo, ma anche un oggetto chiamato **`groundingMetadata`**. Questo pacchetto dati include:
+
+* **Web Search Queries:** Le query esatte che il modello ha inviato a Google.
+* **Grounding Chunks:** L'elenco dei titoli e degli URL delle fonti trovate (quelle che vedi numerate nello screenshot).
+* **Search Entry Point:** Un frammento di codice HTML/CSS già pronto per mostrare all'utente i "Suggerimenti di ricerca di Google" che vedi in fondo alla tua immagine.
+
+### 3. Modelli Supportati
+
+Dalle tue immagini si nota l'uso di **Gemini 3 Pro Preview**. Questa funzionalità è supportata da tutti i modelli della famiglia Gemini 3 e 2.5 (Pro, Flash e Flash-Lite).
+
+### 4. Costi e Disponibilità
+
+* **AI Studio:** Puoi testare il grounding gratuitamente con limiti di quota.
+* **Vertex AI (Cloud):** Il servizio ha un costo aggiuntivo per query "grounded" (circa $35 ogni 1.000 query nel tier a pagamento).
+
+**In sintesi:** Per replicare quella schermata, non devi cercare un "pacchetto" esterno, ma semplicemente abilitare il **tool di Google Search** nella tua configurazione della Gemini API.
+
+Sì, per ottenere quell'esperienza di ricerca online (chiamata ufficialmente **Grounding with Google Search**) via API su Google Cloud, devi assicurarti di aver abilitato alcune componenti specifiche.
+
+Ecco i passaggi fondamentali:
+
+### 1. API da abilitare nella Cloud Console
+
+Per utilizzare Gemini con il grounding, devi attivare:
+
+* **Vertex AI API** (`aiplatform.googleapis.com`): È l'API principale che ospita i modelli Gemini su Google Cloud.
+* Non serve un'API separata per "Google Search" perché è integrata come **strumento (tool)** all'interno di Vertex AI.
+
+### 2. Configurazione nel codice (Il "Trucco" per le fonti)
+
+Non è un pacchetto da installare, ma un parametro da inserire nella tua chiamata API. Per vedere le fonti e i suggerimenti di ricerca come nello studio, devi configurare il tool `Google Search`:
+
+* **Il Tool:** Devi passare `tools=[Tool(google_search=GoogleSearch())]` nella configurazione del modello.
+* **I Metadati:** Nella risposta dell'API, dovrai leggere l'oggetto `grounding_metadata`. È qui che troverai gli URL delle fonti e il `searchEntryPoint` (il codice per mostrare i suggerimenti di ricerca di Google).
+
+### 3. Requisiti di visualizzazione (Importante)
+
+Google richiede che, se utilizzi questo strumento in un'applicazione di produzione, tu mostri obbligatoriamente:
+
+1. **Le citazioni:** I link diretti alle fonti web utilizzate.
+2. **Google Search Suggestions:** Quei "chip" o suggerimenti di ricerca che vedi in fondo alla chat nello screenshot.
+
+### 4. Differenza tra AI Studio e Vertex AI
+
+* **Google AI Studio:** È più semplice per testare. Vai nella sezione "Tools" sulla destra e attiva il toggle **Grounding**.
+* **Vertex AI Studio (Cloud Console):** Vai nella tab "Freeform", clicca su **Ground model responses** nel pannello laterale e seleziona **Google Search** come sorgente.
+
+**In sintesi:** Abilita la **Vertex AI API**, usa l'SDK di Gemini (Python, Node.js, ecc.) e specifica il tool `Google Search` nella richiesta. Tutto il "pacchetto" di fonti che hai visto arriverà automaticamente dentro i metadati della risposta.

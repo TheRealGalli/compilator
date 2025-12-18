@@ -22,6 +22,8 @@ interface Message {
   timestamp: string;
   sources?: string[];
   audioUrl?: string; // URL blob locale per riproduzione
+  groundingMetadata?: any;
+  searchEntryPoint?: string;
 }
 
 interface ChatInterfaceProps {
@@ -229,6 +231,8 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         role: "assistant",
         content: data.text,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        groundingMetadata: data.groundingMetadata,
+        searchEntryPoint: data.searchEntryPoint,
       };
 
       const updatedMessages = [...newMessages, assistantMessage];

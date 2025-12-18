@@ -7,6 +7,7 @@ import express, {
   NextFunction,
 } from "express";
 import compression from "compression";
+import session from "express-session";
 
 import { registerRoutes } from "./routes";
 
@@ -77,6 +78,14 @@ function createApp() {
 
   // Enable gzip compression
   app.use(compression());
+
+  // Configure session for OAuth storage
+  app.use(session({
+    secret: 'csd-station-gmail-session-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false } // Set to true if using HTTPS
+  }));
 
   // Body parsing middleware
   app.use(express.json({

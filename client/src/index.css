@@ -300,3 +300,27 @@
   80% { transform: rotate(3420deg); }
   100% { transform: rotate(3600deg); }
 }
+
+/* Google Search Grounding & Suggestions */
+.google-search-entry-point {
+  @apply text-xs mt-4 border-t pt-4 border-border/40;
+}
+
+.google-search-entry-point a {
+  @apply no-underline !important;
+}
+
+/* Generic styling for the search suggestions chips if they come as raw HTML */
+.google-search-entry-point .google-search-suggestion-text {
+  @apply text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 block;
+}
+
+/* Ensure the suggestions look like modern chips */
+.google-search-entry-point div[role="list"] {
+  @apply flex flex-wrap gap-2 mt-2 !important;
+}
+
+.google-search-entry-point div[role="listitem"], 
+.google-search-entry-point .suggestion-chip {
+  @apply inline-flex items-center px-3 py-1.5 rounded-full border border-border bg-background text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer shadow-sm !important;
+}

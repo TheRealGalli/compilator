@@ -5,9 +5,10 @@ import { DocumentsSection } from "@/components/DocumentsSection";
 import { ChatInterface } from "@/components/ChatInterface";
 import { DocumentCompilerSection } from "@/components/DocumentCompilerSection";
 import { GeneratedContentSection } from "@/components/GeneratedContentSection";
+import { ConnectorsSection } from "@/components/ConnectorsSection";
 import { useSources } from "@/contexts/SourcesContext";
 
-type Section = "documents" | "chat" | "compiler" | "generated";
+type Section = "documents" | "chat" | "compiler" | "generated" | "connectors";
 
 export default function Home() {
   const [activeSection, setActiveSection] = useState<Section>("documents");
@@ -24,6 +25,8 @@ export default function Home() {
         return <DocumentCompilerSection modelProvider={modelProvider} onModelProviderChange={setModelProvider} />;
       case "generated":
         return <GeneratedContentSection />;
+      case "connectors":
+        return <ConnectorsSection />;
       default:
         return <DocumentsSection />;
     }
