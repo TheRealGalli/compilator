@@ -121,19 +121,19 @@ export function ChatMessage({
         {groundingMetadata?.groundingChunks && groundingMetadata.groundingChunks.length > 0 && (
           <div className="mt-4 border-t pt-3 w-full">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Fonti di Ricerca</span>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
               {groundingMetadata.groundingChunks.map((chunk: any, i: number) => (
                 <a
                   key={i}
                   href={chunk.web?.uri || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 group/link"
+                  className="flex items-center gap-1.5 group/link"
                 >
-                  <div className="w-5 h-5 flex items-center justify-center rounded bg-blue-50 text-[10px] font-medium text-blue-600 border border-blue-100 group-hover/link:bg-blue-100 transition-colors">
+                  <div className="w-4 h-4 flex items-center justify-center rounded-sm bg-blue-50 text-[9px] font-bold text-blue-600 border border-blue-100 group-hover/link:bg-blue-100 transition-colors">
                     {i + 1}
                   </div>
-                  <span className="text-xs text-blue-600 hover:underline line-clamp-1">
+                  <span className="text-[11px] text-blue-600 font-medium hover:underline whitespace-nowrap">
                     {chunk.web?.title || 'Fonte Web'}
                   </span>
                 </a>
@@ -142,13 +142,6 @@ export function ChatMessage({
           </div>
         )}
 
-        {/* Google Search Suggestions (EntryPoint) */}
-        {searchEntryPoint && (
-          <div
-            className="mt-4 w-full google-search-entry-point"
-            dangerouslySetInnerHTML={{ __html: searchEntryPoint }}
-          />
-        )}
       </div>
 
       {isUser && (

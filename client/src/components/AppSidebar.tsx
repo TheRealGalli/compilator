@@ -1,4 +1,4 @@
-import { FileText, MessageSquare, Code, Sparkles, Plus, Lock } from "lucide-react";
+import { FileText, MessageSquare, Code, Plug, Plus, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ export function AppSidebar({
     { id: "documents" as const, label: "Documenti", icon: FileText },
     { id: "chat" as const, label: "Analizzatore", icon: MessageSquare },
     { id: "compiler" as const, label: "Compilatore", icon: Code },
-    { id: "connectors" as const, label: "Connettori", icon: Sparkles },
+    { id: "connectors" as const, label: "Connettori", icon: Plug },
   ];
 
   return (
