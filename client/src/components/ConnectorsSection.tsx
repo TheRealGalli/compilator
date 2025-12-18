@@ -20,14 +20,11 @@ interface GmailMessage {
 }
 
 const GmailLogo = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className={className}>
-        <path fill="#4285F4" d="M45,16.2V41c0,2.2-1.8,4-4,4h-7V16.2H45z" />
-        <path fill="#34A853" d="M3,16.2V41c0,2.2,1.8,4,4,4h7V16.2H3z" />
-        <path fill="#EA4335" d="M34,45h7c2.2,0,4-1.8,4-4V11.5L34,19.2V45z" />
-        <path fill="#FBBC05" d="M14,45H7c-2.2,0-4-1.8-4-4V11.5L14,19.2V45z" />
-        <path fill="#EA4335" d="M34,19.2l-10,7.7l-10-7.7V45h20V19.2z" />
-        <path fill="#C5221F" d="M45,11.5v-4c0-2.2-1.8-4-4-4l-11,8.5L45,11.5z" />
-        <path fill="#7B0B04" d="M3,11.5v-4c0-2.2,1.8-4,4-4l11,8.5L3,11.5z" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
+        <path fill="#EA4335" d="M20 18h-2V9.25L12 13 6 9.25V18H4V6c0-.55.45-1 1-1h1l6 3.75L18 5h1c.55 0 1 .45 1 1v12z" />
+        <path fill="#4285F4" d="M22 6v12c0 1.1-.9 2-2 2h-2V9.25L12 13 6 9.25V20H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2h3l5 3.12L17 4h3c1.1 0 2 .9 2 2z" opacity=".2" />
+        <path fill="#FBBC05" d="M12 13L6 9.25V6c0-.55.45-1 1-1h1l4 2.5L12 13z" opacity=".2" />
+        <path fill="#34A853" d="M12 13l6-3.75V6c0-.55-.45-1-1-1h-1l-4 2.5L12 13z" opacity=".2" />
     </svg>
 );
 
