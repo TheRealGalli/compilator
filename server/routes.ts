@@ -13,6 +13,7 @@ import { google } from 'googleapis';
 import crypto from 'crypto';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { getSecret } from './gcp-secrets';
+import { getSecret } from './gcp-secrets';
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
@@ -307,8 +308,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!tokens) return res.status(401).json({ error: 'Not connected to Gmail' });
 
     try {
-      oauth2Client.setCredentials(tokens);
-      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+      const client = await getOAuth2Client();
+      client.setCredentials(tokens);
+      const gmail = google.gmail({ version: 'v1', auth: client });
 
       const response = await gmail.users.messages.list({
         userId: 'me',
@@ -352,8 +354,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!tokens) return res.status(401).json({ error: 'Not connected to Gmail' });
 
     try {
-      oauth2Client.setCredentials(tokens);
-      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+      const client = await getOAuth2Client();
+      client.setCredentials(tokens);
+      const gmail = google.gmail({ version: 'v1', auth: client });
       const response = await gmail.users.messages.get({
         userId: 'me',
         id,
