@@ -201,7 +201,7 @@ const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.NODE_ENV === 'production'
-    ? 'https://therealgalli.github.io/api/auth/google/callback'
+    ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
     : 'http://localhost:5001/api/auth/google/callback'
 );
 
