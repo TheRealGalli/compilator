@@ -225,12 +225,18 @@ async function getOAuth2Client() {
   }
 
   if (clientId) {
-    console.log(`[OAuth] Using Client ID starting with: ${clientId.substring(0, 10)}... (Length: ${clientId.length})`);
+    const maskedId = `${clientId.substring(0, 10)}...${clientId.substring(clientId.length - 10)}`;
+    console.log(`[OAuth] Using Client ID: ${maskedId} (Length: ${clientId.length})`);
+  }
+  if (clientSecret) {
+    console.log(`[OAuth] Client Secret length: ${clientSecret.length}`);
   }
 
   const redirectUri = process.env.NODE_ENV === 'production'
     ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
     : 'http://localhost:5001/api/auth/google/callback';
+
+  console.log(`[OAuth] Configured with Redirect URI: ${redirectUri}`);
 
   oauth2Client = new google.auth.OAuth2(
     clientId,
