@@ -298,24 +298,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
         : 'http://localhost:5001/api/auth/google/callback';
 
-      const { tokens } = await client.getToken({
-        code: code as string,
-        redirect_uri: redirectUri
-      });
-      (req.session as any).tokens = tokens;
+      try {
+        console.log('[OAuth] Exchanging code for tokens...');
+        const { tokens } = await client.getToken({
+          code: code as string,
+          redirect_uri: redirectUri
+        });
+        console.log('[OAuth] Tokens successfully retrieved');
+        (req.session as any).tokens = tokens;
 
-      // Redirect back to connectors page
-      res.send(`
+        // Redirect back to connectors page
+        res.send(`
         <script>
           window.opener.postMessage({ type: 'GMAIL_AUTH_SUCCESS' }, '*');
           window.close();
         </script>
       `);
-    } catch (error) {
-      console.error('Error exchanging code for tokens:', error);
-      res.status(500).send('Authentication failed');
-    }
-  });
+      } catch (error) {
+        console.error('Error exchanging code for tokens:', error);
+        res.status(500).send('Authentication failed');
+      }
+    });
 
   app.get('/api/auth/check', (req, res) => {
     const isConnected = !!(req.session as any).tokens;
