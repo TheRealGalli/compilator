@@ -260,6 +260,7 @@ const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 export async function registerRoutes(app: Express): Promise<Server> {
   // Gmail Auth Routes
   app.get('/api/auth/google', async (req, res) => {
+    console.log(`[OAuth] Request to /api/auth/google from origin: ${req.headers.origin || 'unknown'}`);
     const client = await getOAuth2Client();
 
     if (!client._clientId || !client._clientSecret) {
