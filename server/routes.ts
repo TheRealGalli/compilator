@@ -207,31 +207,37 @@ async function getOAuth2Client() {
 
   let clientId = cleanKey(process.env.GOOGLE_CLIENT_ID);
   let clientSecret = cleanKey(process.env.GOOGLE_CLIENT_SECRET);
+  let source = 'environment variables';
 
-  // Fallback to Secret Manager if in production and env vars are missing
   if (process.env.NODE_ENV === 'production' && (!clientId || !clientSecret)) {
-    console.log('[OAuth] Credentials missing in env, trying Secret Manager...');
+    console.log('[OAuth] Missing credentials in environment, attempting Secret Manager fallback...');
     try {
       if (!clientId) {
         const secret = await getSecret('GOOGLE_CLIENT_ID');
         clientId = cleanKey(secret);
+        if (clientId) source = 'Secret Manager';
       }
       if (!clientSecret) {
         const secret = await getSecret('GOOGLE_CLIENT_SECRET');
         clientSecret = cleanKey(secret);
+        if (clientSecret) source = 'Secret Manager';
       }
-      console.log('[OAuth] Credentials successfully retrieved from Secret Manager');
-    } catch (e) {
-      console.warn('[OAuth] Could not retrieve credentials from Secret Manager:', e);
+    } catch (e: any) {
+      console.error('[OAuth] Secret Manager retrieval failed:', e.message);
     }
   }
 
   if (clientId) {
     const maskedId = `${clientId.substring(0, 10)}...${clientId.substring(clientId.length - 10)}`;
-    console.log(`[OAuth] Using Client ID: ${maskedId} (Length: ${clientId.length})`);
+    console.log(`[OAuth] Client ID from ${source}: ${maskedId} (Length: ${clientId.length})`);
+  } else {
+    console.warn('[OAuth] Client ID is MISSING');
   }
+
   if (clientSecret) {
-    console.log(`[OAuth] Client Secret length: ${clientSecret.length}`);
+    console.log(`[OAuth] Client Secret from ${source} (Length: ${clientSecret.length})`);
+  } else {
+    console.warn('[OAuth] Client Secret is MISSING');
   }
 
   const redirectUri = process.env.NODE_ENV === 'production'
