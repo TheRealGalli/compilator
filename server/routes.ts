@@ -318,7 +318,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Error exchanging code for tokens:', error);
         res.status(500).send('Authentication failed');
       }
-    });
+    } catch (e: any) {
+      console.error('[OAuth] Outer callback error:', e.message);
+      res.status(500).send('Internal Server Error');
+    }
+  });
 
   app.get('/api/auth/check', (req, res) => {
     const isConnected = !!(req.session as any).tokens;
