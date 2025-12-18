@@ -232,7 +232,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!code) return res.status(400).json({ error: 'Code missing' });
 
     try {
-      const { tokens } = await oauth2Client.getToken(code as string);
+      const redirectUri = process.env.NODE_ENV === 'production'
+        ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
+        : 'http://localhost:5001/api/auth/google/callback';
+
+      const { tokens } = await oauth2Client.getToken({
+        code: code as string,
+        redirect_uri: redirectUri
+      });
       (req.session as any).tokens = tokens;
 
       // Redirect back to connectors page
