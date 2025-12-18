@@ -210,6 +210,13 @@ const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 export async function registerRoutes(app: Express): Promise<Server> {
   // Gmail Auth Routes
   app.get('/api/auth/google', (req, res) => {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      console.error('[OAuth] CRITICAL ERROR: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is not set in environment variables.');
+      return res.status(500).json({
+        error: 'Configurazione OAuth mancante sul server. Assicurati che GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET siano impostate su Cloud Run.'
+      });
+    }
+
     const redirectUri = process.env.NODE_ENV === 'production'
       ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
       : 'http://localhost:5001/api/auth/google/callback';
