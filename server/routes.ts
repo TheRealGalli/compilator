@@ -203,7 +203,8 @@ let oauth2Client: any = null;
 async function getOAuth2Client() {
   if (oauth2Client) return oauth2Client;
 
-  const cleanKey = (key: string | undefined) => key?.replace(/[\s"']|%20/g, '');
+  // Rimuove spazi, virgolette, barre verticali e residui di URL encoding
+  const cleanKey = (key: string | undefined) => key?.replace(/[\s"'|]|%20/g, '');
 
   let clientId = cleanKey(process.env.GOOGLE_CLIENT_ID);
   let clientSecret = cleanKey(process.env.GOOGLE_CLIENT_SECRET);
