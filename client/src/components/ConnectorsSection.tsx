@@ -1,155 +1,20 @@
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Mail, RefreshCw, Plus, Check, Loader2, ExternalLink } from "lucide-react";
-import { useSources } from "@/contexts/SourcesContext";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from "date-fns";
-import { it } from "date-fns/locale";
+import { RefreshCw, Loader2 } from "lucide-react";
+import { useGmail } from "@/contexts/GmailContext";
 
-interface GmailMessage {
-    id: string;
-    threadId: string;
-    subject: string;
-    from: string;
-    snippet: string;
-    date: string;
-}
-
-const GmailLogo = ({ className }: { className?: string }) => (
+export const GmailLogo = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
         <path fill="#EA4335" d="M20 18h-2V9.25L12 13 6 9.25V18H4V6c0-.55.45-1 1-1h1l6 3.75L18 5h1c.55 0 1 .45 1 1v12z" />
         <path fill="#4285F4" d="M22 6v12c0 1.1-.9 2-2 2h-2V9.25L12 13 6 9.25V20H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2h3l5 3.12L17 4h3c1.1 0 2 .9 2 2z" opacity=".2" />
         <path fill="#FBBC05" d="M12 13L6 9.25V6c0-.55.45-1 1-1h1l4 2.5L12 13z" opacity=".2" />
-        <path fill="#34A853" d="M12 13l6-3.75V6c0-.55-.45-1-1-1h-1l-4 2.5L12 13z" opacity=".2" />
+        <path fill="#34A853" d="M12 13l6-3.75V6c0-.55.45-1-1-1h-1l-4 2.5L12 13z" opacity=".2" />
     </svg>
 );
 
 export function ConnectorsSection() {
-    const [isConnected, setIsConnected] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isFetchingMessages, setIsFetchingMessages] = useState(false);
-    const [messages, setMessages] = useState<GmailMessage[]>([]);
-    const { toast } = useToast();
-    const { addSource } = useSources();
-
-    useEffect(() => {
-        checkConnection();
-
-        const handleMessage = (event: MessageEvent) => {
-            if (event.data.type === 'GMAIL_AUTH_SUCCESS') {
-                setIsConnected(true);
-                fetchMessages();
-                toast({
-                    title: "Gmail Connesso",
-                    description: "La connessione a Gmail è stata stabilita per questa sessione.",
-                });
-            }
-        };
-
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
-    }, []);
-
-    const checkConnection = async () => {
-        try {
-            const res = await apiRequest('GET', '/api/auth/check');
-            const data = await res.json();
-            setIsConnected(data.isConnected);
-            if (data.isConnected) {
-                fetchMessages();
-            }
-        } catch (error) {
-            console.error("Check connection error:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleConnect = async () => {
-        try {
-            const res = await apiRequest('GET', '/api/auth/google');
-            const data = await res.json();
-            if (data.url) {
-                // Open OAuth in a popup
-                const width = 500;
-                const height = 600;
-                const left = window.screenX + (window.outerWidth - width) / 2;
-                const top = window.screenY + (window.outerHeight - height) / 2;
-                window.open(data.url, 'google-auth', `width=${width},height=${height},left=${left},top=${top}`);
-            }
-        } catch (error) {
-            toast({
-                title: "Errore Connessione",
-                description: "Impossibile avviare il processo di autenticazione.",
-                variant: "destructive",
-            });
-        }
-    };
-
-    const handleLogout = async () => {
-        try {
-            await apiRequest('POST', '/api/auth/logout');
-            setIsConnected(false);
-            setMessages([]);
-            toast({
-                title: "Scollegato",
-                description: "Connessione Gmail rimossa.",
-            });
-        } catch (error) {
-            console.error("Logout error:", error);
-        }
-    };
-
-    const fetchMessages = async () => {
-        setIsFetchingMessages(true);
-        try {
-            const res = await apiRequest('GET', '/api/gmail/messages');
-            if (res.ok) {
-                const data = await res.json();
-                setMessages(data.messages || []);
-            }
-        } catch (error) {
-            console.error("Fetch messages error:", error);
-            toast({
-                title: "Errore Gmail",
-                description: "Impossibile recuperare le email.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsFetchingMessages(false);
-        }
-    };
-
-    const importMessage = async (msg: GmailMessage) => {
-        try {
-            const res = await apiRequest('GET', `/api/gmail/message/${msg.id}`);
-            if (res.ok) {
-                const data = await res.json();
-
-                // Create a File object from the email content
-                const fileName = `Email_${msg.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
-                const file = new File([data.body], fileName, { type: 'text/plain' });
-
-                await addSource(file);
-
-                toast({
-                    title: "Email Importata",
-                    description: `"${msg.subject}" è stata aggiunta alle fonti.`,
-                });
-            }
-        } catch (error) {
-            console.error("Import email error:", error);
-            toast({
-                title: "Errore Importazione",
-                description: "Impossibile importare il contenuto dell'email.",
-                variant: "destructive",
-            });
-        }
-    };
+    const { isConnected, isLoading, isFetchingMessages, connect, logout, fetchMessages } = useGmail();
 
     if (isLoading) {
         return (
@@ -193,7 +58,7 @@ export function ConnectorsSection() {
                         </p>
                         {isConnected ? (
                             <div className="flex gap-2">
-                                <Button variant="outline" className="flex-1" onClick={handleLogout}>
+                                <Button variant="outline" className="flex-1" onClick={logout}>
                                     Disconnetti
                                 </Button>
                                 <Button size="icon" variant="outline" onClick={fetchMessages} disabled={isFetchingMessages}>
@@ -201,14 +66,14 @@ export function ConnectorsSection() {
                                 </Button>
                             </div>
                         ) : (
-                            <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={handleConnect}>
+                            <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={connect}>
                                 Connetti Gmail
                             </Button>
                         )}
                     </CardContent>
                 </Card>
 
-                {/* Placeholder cards for future integrations */}
+                {/* Placeholder cards */}
                 <Card className="opacity-60 border-dashed">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div className="flex items-center gap-3">
@@ -237,53 +102,6 @@ export function ConnectorsSection() {
                     </CardHeader>
                 </Card>
             </div>
-
-            {isConnected && (
-                <Card className="mt-8 overflow-hidden">
-                    <CardHeader className="flex flex-row items-center justify-between bg-muted/30">
-                        <div>
-                            <CardTitle>Email Recenti</CardTitle>
-                            <CardDescription>Seleziona un'email da importare nell'Analizzatore</CardDescription>
-                        </div>
-                        {isFetchingMessages && <Loader2 className="w-4 h-4 animate-spin" />}
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <ScrollArea className="h-[400px]">
-                            {messages.length === 0 && !isFetchingMessages ? (
-                                <div className="p-8 text-center text-muted-foreground">
-                                    Nessuna email trovata o filtrata.
-                                </div>
-                            ) : (
-                                <div className="divide-y">
-                                    {messages.map((msg) => (
-                                        <div key={msg.id} className="p-4 hover:bg-muted/30 transition-colors flex items-start justify-between gap-4 group">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="font-semibold text-sm truncate">{msg.subject}</span>
-                                                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                                        {msg.date ? format(new Date(msg.date), 'dd MMM HH:mm', { locale: it }) : ''}
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground truncate mb-1">Da: {msg.from}</p>
-                                                <p className="text-xs text-muted-foreground/80 line-clamp-1 italic">{msg.snippet}</p>
-                                            </div>
-                                            <Button
-                                                size="sm"
-                                                variant="secondary"
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
-                                                onClick={() => importMessage(msg)}
-                                            >
-                                                <Plus className="w-3 h-3 mr-2" />
-                                                Importa
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-            )}
         </div>
     );
 }

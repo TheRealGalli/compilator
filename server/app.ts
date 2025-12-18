@@ -79,12 +79,20 @@ function createApp() {
   // Enable gzip compression
   app.use(compression());
 
+  // Trust proxy is required for Cloud Run to handle HTTPS cookies correctly
+  app.set('trust proxy', 1);
+
   // Configure session for OAuth storage
   app.use(session({
     secret: 'csd-station-gmail-session-secret',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false } // Set to true if using HTTPS
+    resave: true, // Forcing resave to help session persistence
+    saveUninitialized: true, // Save empty sessions to ensure cookie is set
+    name: 'csd.sid', // Custom cookie name
+    cookie: {
+      secure: true, // MUST be true for SameSite: none
+      sameSite: 'none', // Required for cross-site (GitHub Pages -> Cloud Run)
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
   }));
 
   // Body parsing middleware

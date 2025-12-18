@@ -8,6 +8,7 @@ import { SourcesProvider } from "@/contexts/SourcesContext";
 import Home from "@/pages/Home";
 import NotFound from "@/pages/not-found";
 import { MobileBlocker } from "@/components/MobileBlocker";
+import { GmailProvider } from "@/contexts/GmailContext";
 
 // Ottieni il base path da import.meta.env.BASE_URL (impostato da Vite)
 const basePath = import.meta.env.BASE_URL || '/';
@@ -26,15 +27,17 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <SourcesProvider>
-        <TooltipProvider>
-          <ThemeProvider>
-            <Toaster />
-            <MobileBlocker />
-            <Router />
-          </ThemeProvider>
-        </TooltipProvider>
-      </SourcesProvider>
+      <GmailProvider>
+        <SourcesProvider>
+          <TooltipProvider>
+            <ThemeProvider>
+              <Toaster />
+              <MobileBlocker />
+              <Router />
+            </ThemeProvider>
+          </TooltipProvider>
+        </SourcesProvider>
+      </GmailProvider>
     </QueryClientProvider>
   );
 }
