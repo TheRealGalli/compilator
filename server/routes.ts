@@ -12,6 +12,7 @@ import { chunkText, type ChunkedDocument, selectRelevantChunks, formatContextWit
 import { google } from 'googleapis';
 import crypto from 'crypto';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
+import { getSecret } from './gcp-secrets';
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
@@ -234,11 +235,13 @@ const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Gmail Auth Routes
-  app.get('/api/auth/google', (req, res) => {
-    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-      console.error('[OAuth] CRITICAL ERROR: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is not set in environment variables.');
+  app.get('/api/auth/google', async (req, res) => {
+    const client = await getOAuth2Client();
+
+    if (!client._clientId || !client._clientSecret) {
+      console.error('[OAuth] CRITICAL ERROR: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is not set.');
       return res.status(500).json({
-        error: 'Configurazione OAuth mancante sul server. Assicurati che GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET siano impostate su Cloud Run.'
+        error: 'Configurazione OAuth mancante sul server. Assicurati che GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET siano impostate su Cloud Run o Secret Manager.'
       });
     }
 
@@ -248,11 +251,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     console.log('[OAuth] Generating URL with redirect_uri:', redirectUri);
 
-    const url = oauth2Client.generateAuthUrl({
+    const url = client.generateAuthUrl({
       access_type: 'offline',
       scope: GMAIL_SCOPES,
       prompt: 'consent',
-      redirect_uri: redirectUri // Explicitly passing it here to ensure it's included
+      redirect_uri: redirectUri
     });
 
     console.log('[OAuth] Generated URL:', url);
@@ -260,6 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get('/api/auth/google/callback', async (req, res) => {
+    const client = await getOAuth2Client();
     const { code } = req.query;
     if (!code) return res.status(400).json({ error: 'Code missing' });
 
@@ -268,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
         : 'http://localhost:5001/api/auth/google/callback';
 
-      const { tokens } = await oauth2Client.getToken({
+      const { tokens } = await client.getToken({
         code: code as string,
         redirect_uri: redirectUri
       });
