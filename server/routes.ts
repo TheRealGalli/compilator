@@ -196,14 +196,39 @@ async function getDocumentsContext(selectedDocuments: string[]): Promise<string>
   return context;
 }
 
-// Google OAuth2 Config
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.NODE_ENV === 'production'
+// Google OAuth2 Config - placeholder to be initialized dynamically
+let oauth2Client: any = null;
+
+async function getOAuth2Client() {
+  if (oauth2Client) return oauth2Client;
+
+  let clientId = process.env.GOOGLE_CLIENT_ID;
+  let clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  // Fallback to Secret Manager if in production and env vars are missing
+  if (process.env.NODE_ENV === 'production' && (!clientId || !clientSecret)) {
+    console.log('[OAuth] Credentials missing in env, trying Secret Manager...');
+    try {
+      clientId = clientId || await getSecret('GOOGLE_CLIENT_ID');
+      clientSecret = clientSecret || await getSecret('GOOGLE_CLIENT_SECRET');
+      console.log('[OAuth] Credentials successfully retrieved from Secret Manager');
+    } catch (e) {
+      console.warn('[OAuth] Could not retrieve credentials from Secret Manager:', e);
+    }
+  }
+
+  const redirectUri = process.env.NODE_ENV === 'production'
     ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
-    : 'http://localhost:5001/api/auth/google/callback'
-);
+    : 'http://localhost:5001/api/auth/google/callback';
+
+  oauth2Client = new google.auth.OAuth2(
+    clientId,
+    clientSecret,
+    redirectUri
+  );
+
+  return oauth2Client;
+}
 
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 
