@@ -299,7 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : 'http://localhost:5001/api/auth/google/callback';
 
       try {
-        console.log('[OAuth] Exchanging code for tokens...');
+        console.log('[OAuth] Exchanging code for tokens with Redirect URI:', redirectUri);
         const { tokens } = await client.getToken({
           code: code as string,
           redirect_uri: redirectUri
@@ -314,9 +314,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           window.close();
         </script>
       `);
-      } catch (error) {
-        console.error('Error exchanging code for tokens:', error);
-        res.status(500).send('Authentication failed');
+      } catch (error: any) {
+        const errorData = error.response?.data;
+        console.error('[OAuth] Token exchange FAILED:', errorData || error.message);
+        console.error('[OAuth] Error details:', JSON.stringify(errorData, null, 2));
+        res.status(500).send(`Authentication failed: ${error.message}`);
       }
     } catch (e: any) {
       console.error('[OAuth] Outer callback error:', e.message);
