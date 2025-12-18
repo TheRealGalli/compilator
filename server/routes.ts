@@ -203,8 +203,10 @@ let oauth2Client: any = null;
 async function getOAuth2Client() {
   if (oauth2Client) return oauth2Client;
 
-  let clientId = process.env.GOOGLE_CLIENT_ID?.trim();
-  let clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+  const cleanKey = (key: string | undefined) => key?.trim().replace(/^["']|["']$/g, '');
+
+  let clientId = cleanKey(process.env.GOOGLE_CLIENT_ID);
+  let clientSecret = cleanKey(process.env.GOOGLE_CLIENT_SECRET);
 
   // Fallback to Secret Manager if in production and env vars are missing
   if (process.env.NODE_ENV === 'production' && (!clientId || !clientSecret)) {
@@ -212,11 +214,11 @@ async function getOAuth2Client() {
     try {
       if (!clientId) {
         const secret = await getSecret('GOOGLE_CLIENT_ID');
-        clientId = secret.trim();
+        clientId = cleanKey(secret);
       }
       if (!clientSecret) {
         const secret = await getSecret('GOOGLE_CLIENT_SECRET');
-        clientSecret = secret.trim();
+        clientSecret = cleanKey(secret);
       }
       console.log('[OAuth] Credentials successfully retrieved from Secret Manager');
     } catch (e) {
