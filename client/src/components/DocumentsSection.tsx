@@ -170,7 +170,6 @@ export function DocumentsSection() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   setSearchQuery(localSearch);
-                  fetchMessages();
                 }
               }}
             />
@@ -179,7 +178,6 @@ export function DocumentsSection() {
                 onClick={() => {
                   setLocalSearch("");
                   setSearchQuery("");
-                  fetchMessages();
                 }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-full transition-colors"
               >

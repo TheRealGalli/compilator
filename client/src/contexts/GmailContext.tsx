@@ -40,7 +40,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
     const [messages, setMessages] = useState<GmailMessage[]>([]);
     const [nextPageToken, setNextPageToken] = useState<string | null>(null);
     const [currentCategory, setCurrentCategory] = useState<GmailCategory>('primary');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQueryState] = useState('');
     // Store tokens in state to survive tab active session
     const [tokens, setTokens] = useState<any>(() => {
         const saved = sessionStorage.getItem('gmail_tokens');
@@ -80,10 +80,9 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
             const params = new URLSearchParams();
             if (pageToken) params.append('pageToken', pageToken);
 
+            params.append('category', currentCategory);
             if (searchQuery) {
                 params.append('q', searchQuery);
-            } else {
-                params.append('category', currentCategory);
             }
 
             const url = `${baseUrl}?${params.toString()}`;
@@ -167,11 +166,19 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
     const setCategory = useCallback((category: GmailCategory) => {
         if (category === currentCategory && !searchQuery) return;
         setCurrentCategory(category);
-        setSearchQuery('');
+        setSearchQueryState('');
         setMessages([]);
         setNextPageToken(null);
         setHasFetchFailed(false);
     }, [currentCategory, searchQuery]);
+
+    const setSearchQuery = useCallback((query: string) => {
+        if (query === searchQuery) return;
+        setSearchQueryState(query);
+        setMessages([]);
+        setNextPageToken(null);
+        setHasFetchFailed(false);
+    }, [searchQuery]);
 
     useEffect(() => {
         // Run once on mount
