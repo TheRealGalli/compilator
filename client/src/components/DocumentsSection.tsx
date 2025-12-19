@@ -1,7 +1,7 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
@@ -17,7 +17,9 @@ export function DocumentsSection() {
   const [isImporting, setIsImporting] = useState<string | null>(null);
   const { toast } = useToast();
   const { sources, addSource, removeSource, maxSources } = useSources();
-  const { isConnected, messages, isFetchingMessages, fetchMessages, importEmail, nextPageToken, currentCategory, setCategory } = useGmail();
+  const { isConnected, messages, isFetchingMessages, fetchMessages, importEmail, nextPageToken, currentCategory, setCategory, searchQuery, setSearchQuery } = useGmail();
+  const [localSearch, setLocalSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
 
   const handleFilesSelected = async (selectedFiles: File[]) => {
     setIsUploading(true);
@@ -118,9 +120,19 @@ export function DocumentsSection() {
               <p className="text-muted-foreground text-sm mt-1">Seleziona un'email da aggiungere come fonte</p>
             </div>
           </div>
-          <Button size="icon" variant="ghost" onClick={() => fetchMessages()} disabled={isFetchingMessages}>
-            <RefreshCw className={`w-4 h-4 ${isFetchingMessages ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="icon"
+              variant={showSearch ? "secondary" : "ghost"}
+              onClick={() => setShowSearch(!showSearch)}
+              className={`w-9 h-9 border border-transparent transition-all ${showSearch ? 'border-primary/20 shadow-sm' : ''}`}
+            >
+              <Search className={`w-4 h-4 ${showSearch ? 'text-primary' : ''}`} />
+            </Button>
+            <Button size="icon" variant="ghost" className="w-9 h-9" onClick={() => fetchMessages()} disabled={isFetchingMessages}>
+              <RefreshCw className={`w-4 h-4 ${isFetchingMessages ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
 
         <div className="flex px-6 border-b border-border/40 gap-8 overflow-x-auto">
@@ -144,6 +156,37 @@ export function DocumentsSection() {
               {tab.label}
             </button>
           ))}
+        </div>
+
+        <div className={`px-6 py-2 bg-muted/20 border-b border-border/40 transition-all duration-300 overflow-hidden ${showSearch ? 'h-auto opacity-100' : 'h-0 opacity-0'}`}>
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors" />
+            <input
+              type="text"
+              placeholder="Cerca tra le tue email con la potenza dell'AI..."
+              className="w-full bg-background/50 border border-border/60 rounded-lg pl-10 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setSearchQuery(localSearch);
+                  fetchMessages();
+                }
+              }}
+            />
+            {localSearch && (
+              <button
+                onClick={() => {
+                  setLocalSearch("");
+                  setSearchQuery("");
+                  fetchMessages();
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-full transition-colors"
+              >
+                <X className="w-3.5 h-3.5 text-muted-foreground/50" />
+              </button>
+            )}
+          </div>
         </div>
 
         <ScrollArea className="flex-1 border rounded-xl bg-card shadow-sm overflow-hidden">

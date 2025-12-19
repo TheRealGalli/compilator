@@ -362,12 +362,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const client = await getOAuth2Client();
       client.setCredentials(tokens);
       const gmail = google.gmail({ version: 'v1', auth: client });
-      const { pageToken, category } = req.query;
+      const { pageToken, category, q } = req.query;
 
-      let searchQuery = 'category:primary';
-      if (category === 'social') searchQuery = 'category:social';
-      else if (category === 'promotions') searchQuery = 'category:promotions';
-      else if (category === 'updates') searchQuery = 'category:updates';
+      let searchQuery = '';
+      if (q) {
+        searchQuery = q as string;
+      } else {
+        searchQuery = 'category:primary';
+        if (category === 'social') searchQuery = 'category:social';
+        else if (category === 'promotions') searchQuery = 'category:promotions';
+        else if (category === 'updates') searchQuery = 'category:updates';
+      }
 
       const response = await gmail.users.messages.list({
         userId: 'me',
