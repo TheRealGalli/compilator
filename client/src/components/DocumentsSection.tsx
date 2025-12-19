@@ -34,7 +34,7 @@ export function DocumentsSection() {
         } else if (result === 'file_too_large') {
           toast({
             title: "File troppo grande",
-            description: `"${file.name}": caricamento fonte file troppo grande (max 25MB)`,
+            description: `"${file.name}": caricamento fonte file troppo grande (max 30MB)`,
             variant: "destructive",
           });
         } else if (result === 'limit_reached') {
