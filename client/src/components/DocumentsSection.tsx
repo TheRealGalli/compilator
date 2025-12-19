@@ -124,7 +124,13 @@ export function DocumentsSection() {
             <Button
               size="icon"
               variant={showSearch ? "secondary" : "ghost"}
-              onClick={() => setShowSearch(!showSearch)}
+              onClick={() => {
+                if (showSearch) {
+                  setSearchQuery("");
+                  setLocalSearch("");
+                }
+                setShowSearch(!showSearch);
+              }}
               className={`w-9 h-9 border border-transparent transition-all ${showSearch ? 'border-primary/20 shadow-sm' : ''}`}
             >
               <Search className={`w-4 h-4 ${showSearch ? 'text-primary' : ''}`} />
