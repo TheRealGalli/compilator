@@ -1,7 +1,7 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, RefreshCw } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
@@ -17,7 +17,7 @@ export function DocumentsSection() {
   const [isImporting, setIsImporting] = useState<string | null>(null);
   const { toast } = useToast();
   const { sources, addSource, removeSource, maxSources } = useSources();
-  const { isConnected, messages, isFetchingMessages, fetchMessages, importEmail, nextPageToken } = useGmail();
+  const { isConnected, messages, isFetchingMessages, fetchMessages, importEmail, nextPageToken, currentCategory, setCategory } = useGmail();
 
   const handleFilesSelected = async (selectedFiles: File[]) => {
     setIsUploading(true);
@@ -121,6 +121,29 @@ export function DocumentsSection() {
           <Button size="icon" variant="ghost" onClick={() => fetchMessages()} disabled={isFetchingMessages}>
             <RefreshCw className={`w-4 h-4 ${isFetchingMessages ? 'animate-spin' : ''}`} />
           </Button>
+        </div>
+
+        <div className="flex px-6 border-b border-border/40 gap-8 overflow-x-auto">
+          {[
+            { id: 'primary', label: 'Principali', icon: Inbox, color: 'text-blue-600', border: 'border-blue-600' },
+            { id: 'promotions', label: 'Promozioni', icon: Tag, color: 'text-green-600', border: 'border-green-600' },
+            { id: 'social', label: 'Social', icon: Users, color: 'text-purple-600', border: 'border-purple-600' },
+            { id: 'updates', label: 'Aggiornamenti', icon: Info, color: 'text-orange-600', border: 'border-orange-600' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setCategory(tab.id as any)}
+              disabled={isFetchingMessages}
+              className={`flex items-center gap-2.5 py-3.5 text-xs font-semibold transition-all border-b-2 -mb-[1px] outline-none whitespace-nowrap
+                ${currentCategory === tab.id
+                  ? `${tab.color} ${tab.border} opacity-100`
+                  : 'text-muted-foreground/60 border-transparent hover:text-muted-foreground hover:border-muted-foreground/20 opacity-80'
+                } ${isFetchingMessages ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <tab.icon className={`w-3.5 h-3.5 ${currentCategory === tab.id ? tab.color : 'text-muted-foreground/40'}`} />
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         <ScrollArea className="flex-1 border rounded-xl bg-card shadow-sm overflow-hidden">

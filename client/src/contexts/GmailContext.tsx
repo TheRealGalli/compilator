@@ -11,12 +11,16 @@ interface GmailMessage {
     date: string;
 }
 
+export type GmailCategory = 'primary' | 'social' | 'promotions' | 'updates';
+
 interface GmailContextType {
     isConnected: boolean;
     isLoading: boolean;
     messages: GmailMessage[];
     isFetchingMessages: boolean;
     nextPageToken: string | null;
+    currentCategory: GmailCategory;
+    setCategory: (category: GmailCategory) => void;
     checkConnection: () => Promise<void>;
     connect: () => Promise<void>;
     logout: () => Promise<void>;
@@ -33,6 +37,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
     const [hasFetchFailed, setHasFetchFailed] = useState(false);
     const [messages, setMessages] = useState<GmailMessage[]>([]);
     const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+    const [currentCategory, setCurrentCategory] = useState<GmailCategory>('primary');
     // Store tokens in state to survive tab active session
     const [tokens, setTokens] = useState<any>(() => {
         const saved = sessionStorage.getItem('gmail_tokens');
@@ -68,7 +73,12 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
             setNextPageToken(null);
         }
         try {
-            const url = pageToken ? `/api/gmail/messages?pageToken=${pageToken}` : '/api/gmail/messages';
+            const baseUrl = '/api/gmail/messages';
+            const params = new URLSearchParams();
+            if (pageToken) params.append('pageToken', pageToken);
+            params.append('category', currentCategory);
+
+            const url = `${baseUrl}?${params.toString()}`;
             const res = await apiRequest('GET', url, undefined, getGmailHeaders());
             if (res.ok) {
                 const data = await res.json();
@@ -92,7 +102,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setIsFetchingMessages(false);
         }
-    }, [getGmailHeaders, isFetchingMessages]);
+    }, [getGmailHeaders, isFetchingMessages, currentCategory]);
 
     const connect = async () => {
         try {
@@ -146,6 +156,14 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
         return null;
     };
 
+    const setCategory = useCallback((category: GmailCategory) => {
+        if (category === currentCategory) return;
+        setCurrentCategory(category);
+        setMessages([]);
+        setNextPageToken(null);
+        setHasFetchFailed(false);
+    }, [currentCategory]);
+
     useEffect(() => {
         // Run once on mount
         const init = async () => {
@@ -188,6 +206,8 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
             messages,
             isFetchingMessages,
             nextPageToken,
+            currentCategory,
+            setCategory,
             checkConnection,
             connect,
             logout,
