@@ -164,13 +164,12 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
     };
 
     const setCategory = useCallback((category: GmailCategory) => {
-        if (category === currentCategory && !searchQuery) return;
+        if (category === currentCategory) return;
         setCurrentCategory(category);
-        setSearchQueryState('');
         setMessages([]);
         setNextPageToken(null);
         setHasFetchFailed(false);
-    }, [currentCategory, searchQuery]);
+    }, [currentCategory]);
 
     const setSearchQuery = useCallback((query: string) => {
         if (query === searchQuery) return;
