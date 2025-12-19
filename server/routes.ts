@@ -1198,24 +1198,30 @@ Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
               continue;
             }
 
-            const isImage = source.type.startsWith('image/');
+            const isMultimodal =
+              source.type.startsWith('image/') ||
+              source.type === 'application/pdf' ||
+              source.type.startsWith('audio/');
 
-            if (isImage) {
+            if (isMultimodal) {
+              const type = source.type.startsWith('image/') ? 'image' : 'file';
               multimodalFiles.push({
-                type: 'image',
-                image: base64,
+                type,
+                [type === 'image' ? 'image' : 'data']: base64,
                 mimeType: source.type,
               });
+              console.log(`[DEBUG] Added ${source.name} as ${type} attachment`);
+              filesContext += `- ${source.name} (${source.type})\n`;
             } else {
-              multimodalFiles.push({
-                type: 'file',
-                data: base64,
-                mimeType: source.type,
-              });
+              // Extract text for non-multimodal files (DOCX, TXT, etc.)
+              console.log(`[DEBUG] Extracting text for non-multimodal source: ${source.name} (${source.type})`);
+              const textContent = await extractText(buffer!, source.type);
+              if (textContent) {
+                filesContext += `\n--- CONTENUTO FILE: ${source.name} ---\n${textContent}\n--- FINE CONTENUTO FILE ---\n`;
+              } else {
+                filesContext += `- ${source.name} (errore estrazione testo)\n`;
+              }
             }
-
-            console.log(`[DEBUG] Added ${source.name} as ${isImage ? 'image' : 'file'} attachment`);
-            filesContext += `- ${source.name} (${source.type})\n`;
           } catch (error) {
             console.error(`Error processing file ${source.name}:`, error);
             filesContext += `- ${source.name} (errore lettura file)\n`;
