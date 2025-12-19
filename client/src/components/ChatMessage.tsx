@@ -53,15 +53,15 @@ export function ChatMessage({
   };
 
   return (
-    <div className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"} group`}>
+    <div className={`flex w-full gap-3 ${isUser ? "justify-end" : "justify-start"} group mb-1`}>
       {!isUser && (
         <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
           <Bot className="w-4 h-4 text-primary-foreground" />
         </div>
       )}
 
-      <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} max-w-[70%]`}>
-        <div className={`rounded-lg p-4 ${isUser ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+      <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} max-w-[80%] md:max-w-[70%] lg:max-w-[650px]`}>
+        <div className={`rounded-lg p-4 shadow-sm relative break-words overflow-hidden w-full ${isUser ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
           {audioUrl ? (
             <div className="flex flex-col gap-2">
               <span className="text-xs opacity-70 flex items-center gap-1">🎤 Messaggio Vocale</span>
@@ -133,7 +133,7 @@ export function ChatMessage({
                   <div className="w-4 h-4 flex items-center justify-center rounded-sm bg-blue-50 text-[9px] font-bold text-blue-600 border border-blue-100 group-hover/link:bg-blue-100 transition-colors">
                     {i + 1}
                   </div>
-                  <span className="text-[11px] text-blue-600 font-medium hover:underline whitespace-nowrap">
+                  <span className="text-[11px] text-blue-600 font-medium hover:underline line-clamp-1 max-w-[200px]">
                     {chunk.web?.title || 'Fonte Web'}
                   </span>
                 </a>

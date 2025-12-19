@@ -81,10 +81,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
 
     return (
         <div
-            className={`formatted-message font-mono text-sm leading-relaxed ${className}`}
-            style={{
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-            }}
+            className={`formatted-message text-sm leading-relaxed ${className} break-words overflow-wrap-anywhere`}
         >
             {content.split('\n').map((line, index) => formatLine(line, index))}
         </div>
