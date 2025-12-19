@@ -118,7 +118,27 @@ export function DocumentsSection() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isConnected && (
+          <Button className="gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
+            </svg>
+            Genera Sommario
+          </Button>
+        </div>
+      </div>
+
+      <FileUploadZone
+        onFilesSelected={handleFilesSelected}
+        disabled={isUploading}
+      />
+
+      {isConnected && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Connessioni</h3>
+            <div className="h-[1px] w-full bg-border" />
+          </div>
+          <div className="flex">
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="outline" className="gap-2 border-red-100 hover:bg-red-50 hover:text-red-600 transition-colors" onClick={() => fetchMessages()}>
@@ -180,20 +200,9 @@ export function DocumentsSection() {
                 </ScrollArea>
               </DialogContent>
             </Dialog>
-          )}
-          <Button className="gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-              <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
-            </svg>
-            Genera Sommario
-          </Button>
+          </div>
         </div>
-      </div>
-
-      <FileUploadZone
-        onFilesSelected={handleFilesSelected}
-        disabled={isUploading}
-      />
+      )}
 
       {sources.length > 0 && (
         <div className="flex-1 overflow-auto">
@@ -214,7 +223,7 @@ export function DocumentsSection() {
       )}
 
       {sources.length === 0 && (
-        <div className="flex-1 flex items-center justify-center text-center">
+        <div className="flex-1 flex items-center justify-center text-center px-4">
           <div className="max-w-md">
             <p className="text-muted-foreground">
               Nessuna fonte caricata. Trascina file qui sopra o clicca per selezionarli.
