@@ -18,7 +18,7 @@ import { getSecret } from './gcp-secrets';
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
 
 // Max file size for multimodal processing (20MB to avoid memory issues)
-const MAX_FILE_SIZE_MB = 20;
+const MAX_FILE_SIZE_MB = 250;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // Configurazione multer per gestire upload di file in memoria

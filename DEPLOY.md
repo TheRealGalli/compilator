@@ -165,6 +165,13 @@ gcloud run deploy notebooklm-compiler \
   --set-env-vars GCP_PROJECT_ID=your-project-id,GCP_STORAGE_BUCKET=notebooklm-compiler-files
 ```
 
+### Gestione File Grandi (250MB+)
+
+L'applicazione è configurata per supportare file fino a 250MB. Per gestire questi volumi:
+1. **Memoria**: Cloud Run deve avere almeno 4Gi di memoria assegnata (`--memory 4Gi`).
+2. **Timeout**: Il timeout deve essere alzato a 3600s (`--timeout 3600`) per permettere l'upload di file pesanti.
+3. **CORS**: Assicurati che il backend sia aggiornato per accettare payload di queste dimensioni.
+
 ## Verifica del Deploy
 
 ### Verifica Backend
