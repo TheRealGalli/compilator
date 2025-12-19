@@ -211,6 +211,12 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           content: msg.content,
         }));
 
+      // Check total size of selected sources (Cloud Run/JSON limit)
+      const totalSize = selectedSources.reduce((acc, s) => acc + (s.size || 0), 0);
+      if (totalSize > 25 * 1024 * 1024) { // 25MB limit to stay under 32MB Cloud Run cap with base64 overhead
+        throw new Error("Il totale dei documenti selezionati è troppo grande per l'invio. Deseleziona alcuni file.");
+      }
+
       const response = await apiRequest('POST', '/api/chat', {
         messages: apiMessages,
         modelProvider: 'gemini',

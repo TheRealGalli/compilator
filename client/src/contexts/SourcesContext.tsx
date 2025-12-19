@@ -13,7 +13,7 @@ export interface Source {
 
 interface SourcesContextType {
     sources: Source[];
-    addSource: (file: File) => Promise<boolean>;
+    addSource: (file: File) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'>;
     removeSource: (id: string) => void;
     toggleSource: (id: string) => void;
     selectedSources: Source[];
@@ -23,18 +23,25 @@ interface SourcesContextType {
 const SourcesContext = createContext<SourcesContextType | undefined>(undefined);
 
 const MAX_SOURCES = 10;
+const MAX_FILE_SIZE_MB = 25; // Technical limit for Cloud Run JSON payload (32MB) with base64 overhead
 
 export function SourcesProvider({ children }: { children: ReactNode }) {
     const [sources, setSources] = useState<Source[]>([]);
 
-    const addSource = useCallback(async (file: File): Promise<boolean> => {
+    const addSource = useCallback(async (file: File): Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'> => {
         if (sources.length >= MAX_SOURCES) {
-            return false; // Max limit reached
+            return 'limit_reached';
         }
 
         // Check if file with same name already exists
         if (sources.some(s => s.name === file.name)) {
-            return false; // Duplicate name
+            return 'duplicate';
+        }
+
+        // Check file size (client-side check for Cloud Run limits)
+        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+            console.warn(`File too large: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+            return 'file_too_large';
         }
 
         try {
@@ -61,10 +68,10 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
             };
 
             setSources(prev => [...prev, newSource]);
-            return true;
+            return 'success';
         } catch (error) {
             console.error('Error reading file:', error);
-            return false;
+            return 'error';
         }
     }, [sources]);
 

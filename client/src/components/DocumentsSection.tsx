@@ -25,36 +25,50 @@ export function DocumentsSection() {
     setIsUploading(true);
     try {
       let successCount = 0;
-      let failedCount = 0;
 
       for (const file of selectedFiles) {
-        const success = await addSource(file);
-        if (success) {
+        const result = await addSource(file);
+
+        if (result === 'success') {
           successCount++;
+        } else if (result === 'file_too_large') {
+          toast({
+            title: "File troppo grande",
+            description: `"${file.name}": caricamento fonte file troppo grande (max 25MB)`,
+            variant: "destructive",
+          });
+        } else if (result === 'limit_reached') {
+          toast({
+            title: "Limite raggiunto",
+            description: `Limite massimo di ${maxSources} fonti raggiunto.`,
+            variant: "destructive",
+          });
+        } else if (result === 'duplicate') {
+          toast({
+            title: "File duplicato",
+            description: `"${file.name}" è già presente nelle fonti.`,
+            variant: "destructive",
+          });
         } else {
-          failedCount++;
+          toast({
+            title: "Errore",
+            description: `Errore durante l'aggiunta di "${file.name}"`,
+            variant: "destructive",
+          });
         }
       }
 
       if (successCount > 0) {
         toast({
-          title: "File aggiunti alle fonti",
-          description: `${successCount} file${successCount > 1 ? ' aggiunti' : ' aggiunto'} alle fonti (max ${maxSources})`,
-        });
-      }
-
-      if (failedCount > 0) {
-        toast({
-          title: "Limite raggiunto",
-          description: `${failedCount} file non ${failedCount > 1 ? 'aggiunti' : 'aggiunto'} - limite massimo ${maxSources} fonti`,
-          variant: "destructive",
+          title: "Fonti aggiornate",
+          description: `${successCount} file aggiunti con successo.`,
         });
       }
     } catch (error: any) {
       console.error('Error adding files:', error);
       toast({
-        title: "Errore",
-        description: "Errore durante l'aggiunta dei file",
+        title: "Errore critico",
+        description: "Si è verificato un errore durante l'upload.",
         variant: "destructive",
       });
     } finally {
@@ -69,11 +83,17 @@ export function DocumentsSection() {
       if (content) {
         const fileName = `Gmail_${subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
         const file = new File([content], fileName, { type: 'text/plain' });
-        const success = await addSource(file);
-        if (success) {
+        const result = await addSource(file);
+        if (result === 'success') {
           toast({
             title: "Email Importata",
             description: `"${subject}" aggiunta alle fonti.`,
+          });
+        } else if (result === 'file_too_large') {
+          toast({
+            title: "Email Too Large",
+            description: "Il contenuto dell'email supera il limite di dimensione.",
+            variant: "destructive",
           });
         }
       }
