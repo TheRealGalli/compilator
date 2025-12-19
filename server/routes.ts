@@ -1408,7 +1408,7 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
 
       // Configure model
       const model = vertex_ai.getGenerativeModel({
-        model: "gemini-1.5-flash", // Latest stable Flash model
+        model: "gemini-2.5-flash", // Latest stable Flash model
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemInstructionWithDate }]
