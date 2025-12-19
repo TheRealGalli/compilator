@@ -23,7 +23,7 @@ interface SourcesContextType {
 const SourcesContext = createContext<SourcesContextType | undefined>(undefined);
 
 const MAX_SOURCES = 10;
-const MAX_FILE_SIZE_MB = 25; // Technical limit for Cloud Run JSON payload (32MB) with base64 overhead
+const MAX_FILE_SIZE_MB = 30; // Technical limit for Cloud Run JSON payload (32MB) with base64 overhead
 
 export function SourcesProvider({ children }: { children: ReactNode }) {
     const [sources, setSources] = useState<Source[]>([]);
