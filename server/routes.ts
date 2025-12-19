@@ -257,9 +257,27 @@ async function getOAuth2Client() {
   return oauth2Client;
 }
 
-const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+const GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive.metadata.readonly'
+];
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Helper to get tokens from session or header
+  const getGoogleTokens = (req: Request) => {
+    if ((req.session as any).tokens) return (req.session as any).tokens;
+    const header = req.headers['x-gmail-tokens'];
+    if (header && typeof header === 'string') {
+      try {
+        return JSON.parse(header);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  };
+
   // Gmail Auth Routes
   app.get('/api/auth/google', async (req, res) => {
     console.log(`[OAuth] Request to /api/auth/google from origin: ${req.headers.origin || 'unknown'}`);
@@ -280,7 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const url = client.generateAuthUrl({
       access_type: 'offline',
-      scope: GMAIL_SCOPES,
+      scope: GOOGLE_SCOPES,
       prompt: 'consent',
       redirect_uri: redirectUri
     });
@@ -339,23 +357,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
-  // Helper to get tokens from session or header
-  const getGmailTokens = (req: Request) => {
-    if ((req.session as any).tokens) return (req.session as any).tokens;
-    const header = req.headers['x-gmail-tokens'];
-    if (header && typeof header === 'string') {
-      try {
-        return JSON.parse(header);
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  };
 
   // Gmail Data Routes
   app.get('/api/gmail/messages', async (req, res) => {
-    const tokens = getGmailTokens(req);
+    const tokens = getGoogleTokens(req);
     if (!tokens) return res.status(401).json({ error: 'Not connected to Gmail' });
 
     try {
@@ -406,13 +411,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nextPageToken: response.data.nextPageToken || null
       });
     } catch (error) {
-      console.error('Error fetching Gmail messages:', error);
-      res.status(500).json({ error: 'Failed to fetch emails' });
+      console.error('Error fetching Gmail metadata:', error);
+      res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+  });
+
+  // --- GOOGLE DRIVE ROUTES ---
+
+  app.get('/api/drive/files', async (req, res) => {
+    const tokens = getGoogleTokens(req);
+    if (!tokens) return res.status(401).json({ error: 'Not connected to Google' });
+
+    try {
+      const client = await getOAuth2Client();
+      client.setCredentials(tokens);
+      const drive = google.drive({ version: 'v3', auth: client });
+      const { pageToken, category, q } = req.query;
+
+      let query = "trashed = false";
+
+      // Filter by category
+      if (category === 'docs') {
+        query += " and mimeType = 'application/vnd.google-apps.document'";
+      } else if (category === 'sheets') {
+        query += " and mimeType = 'application/vnd.google-apps.spreadsheet'";
+      } else if (category === 'pdfs') {
+        query += " and mimeType = 'application/pdf'";
+      } else if (category === 'folders') {
+        query += " and mimeType = 'application/vnd.google-apps.folder'";
+      }
+
+      // Add search text if present
+      if (q) {
+        query += ` and name contains '${(q as string).replace(/'/g, "\\'")}'`;
+      }
+
+      const response = await drive.files.list({
+        pageSize: 20,
+        pageToken: pageToken as string,
+        fields: 'nextPageToken, files(id, name, mimeType, size, modifiedTime, iconLink, thumbnailLink)',
+        q: query,
+        orderBy: 'modifiedTime desc'
+      });
+
+      res.json({
+        files: response.data.files || [],
+        nextPageToken: response.data.nextPageToken || null
+      });
+    } catch (error) {
+      console.error('Error fetching Drive files:', error);
+      res.status(500).json({ error: 'Failed to fetch Drive files' });
+    }
+  });
+
+  app.get('/api/drive/export/:id', async (req, res) => {
+    const tokens = getGoogleTokens(req);
+    const { id } = req.params;
+    if (!tokens) return res.status(401).json({ error: 'Not connected to Google' });
+
+    try {
+      const client = await getOAuth2Client();
+      client.setCredentials(tokens);
+      const drive = google.drive({ version: 'v3', auth: client });
+
+      // 1. Get file metadata
+      const file = await drive.files.get({
+        fileId: id,
+        fields: 'id, name, mimeType, size'
+      });
+
+      const mimeType = file.data.mimeType || 'application/octet-stream';
+      const fileName = file.data.name || 'documento';
+
+      console.log(`[DEBUG Drive] Exporting file: ${fileName} (${mimeType})`);
+
+      let data: Buffer;
+      let finalMimeType = mimeType;
+      let finalFileName = fileName;
+
+      if (mimeType === 'application/vnd.google-apps.document') {
+        // Export Google Doc as text
+        const exportRes = await drive.files.export({
+          fileId: id,
+          mimeType: 'text/plain'
+        }, { responseType: 'arraybuffer' });
+        data = Buffer.from(exportRes.data as ArrayBuffer);
+        finalMimeType = 'text/plain';
+        finalFileName = fileName.endsWith('.txt') ? fileName : `${fileName}.txt`;
+      } else if (mimeType === 'application/vnd.google-apps.spreadsheet') {
+        // Export Google Sheet as CSV
+        const exportRes = await drive.files.export({
+          fileId: id,
+          mimeType: 'text/csv'
+        }, { responseType: 'arraybuffer' });
+        data = Buffer.from(exportRes.data as ArrayBuffer);
+        finalMimeType = 'text/csv';
+        finalFileName = fileName.endsWith('.csv') ? fileName : `${fileName}.csv`;
+      } else {
+        // Download binary file (PDF, etc.)
+        const downloadRes = await drive.files.get({
+          fileId: id,
+          alt: 'media'
+        }, { responseType: 'arraybuffer' });
+        data = Buffer.from(downloadRes.data as ArrayBuffer);
+      }
+
+      res.json({
+        name: finalFileName,
+        mimeType: finalMimeType,
+        base64: data.toString('base64'),
+        size: data.length
+      });
+
+    } catch (error) {
+      console.error('Error exporting Drive file:', error);
+      res.status(500).json({ error: 'Failed to export file' });
     }
   });
 
   app.get('/api/gmail/message/:id', async (req, res) => {
-    const tokens = getGmailTokens(req);
+    const tokens = getGoogleTokens(req);
     const { id } = req.params;
     const includeAttachments = req.query.attachments === 'true';
     if (!tokens) return res.status(401).json({ error: 'Not connected to Gmail' });

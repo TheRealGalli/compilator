@@ -11,14 +11,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useGoogleDrive, DriveCategory } from "@/contexts/GoogleDriveContext";
+import { DriveLogo } from "./ConnectorsSection";
 
 export function DocumentsSection() {
-  const [view, setView] = useState<'main' | 'gmail'>('main');
+  const [view, setView] = useState<'main' | 'gmail' | 'drive'>('main');
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState<string | null>(null);
   const { toast } = useToast();
   const { sources, addSource, removeSource, maxSources } = useSources();
   const { isConnected, messages, isFetchingMessages, fetchMessages, importEmail, nextPageToken, currentCategory, setCategory, searchQuery, setSearchQuery } = useGmail();
+  const { files, isFetchingFiles, fetchFiles, importFile, currentCategory: driveCategory, setCategory: setDriveCategory, searchQuery: driveSearch, setSearchQuery: setDriveSearch, nextPageToken: driveNextToken } = useGoogleDrive();
   const [localSearch, setLocalSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
@@ -129,6 +132,41 @@ export function DocumentsSection() {
       toast({
         title: "Errore",
         description: "Si è verificato un errore durante l'importazione.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(null);
+    }
+  };
+
+  const handleImportDriveFile = async (fileId: string, name: string) => {
+    setIsImporting(fileId);
+    try {
+      const data = await importFile(fileId, name);
+      if (data) {
+        // Create a File object from the base64 data
+        const byteCharacters = atob(data.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: data.mimeType });
+        const file = new File([blob], data.name, { type: data.mimeType });
+
+        const result = await addSource(file);
+        if (result === 'success') {
+          toast({
+            title: "File Importato",
+            description: `"${data.name}" aggiunto alle fonti.`,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error importing Drive file:", error);
+      toast({
+        title: "Errore",
+        description: "Impossibile importare il file selezionato.",
         variant: "destructive",
       });
     } finally {
@@ -343,6 +381,128 @@ export function DocumentsSection() {
     );
   }
 
+  if (view === 'drive') {
+    return (
+      <div className="h-full p-6 flex flex-col gap-6 overflow-hidden">
+        <div className="flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => setView('main')} className="gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+              Indietro
+            </Button>
+            <div>
+              <h2 className="text-2xl font-semibold flex items-center gap-2">
+                <DriveLogo className="w-6 h-6" />
+                Google Drive
+              </h2>
+              <p className="text-muted-foreground text-sm mt-1">Esplora i tuoi documenti e fogli di calcolo</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="icon" variant="ghost" className="w-9 h-9" onClick={() => fetchFiles()} disabled={isFetchingFiles}>
+              <RefreshCw className={`w-4 h-4 ${isFetchingFiles ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex px-6 border-b border-border/40 gap-8 overflow-x-auto">
+          {[
+            { id: 'all', label: 'Tutti i file', icon: FileText, color: 'text-slate-600', border: 'border-slate-600' },
+            { id: 'docs', label: 'Documenti', icon: FileText, color: 'text-blue-600', border: 'border-blue-600' },
+            { id: 'sheets', label: 'Fogli di calcolo', icon: Tag, color: 'text-green-600', border: 'border-green-600' },
+            { id: 'pdfs', label: 'PDF', icon: Info, color: 'text-red-600', border: 'border-red-600' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setDriveCategory(tab.id as any)}
+              disabled={isFetchingFiles}
+              className={`flex items-center gap-2.5 py-3.5 text-xs font-semibold transition-all border-b-2 -mb-[1px] outline-none whitespace-nowrap
+                ${driveCategory === tab.id
+                  ? `${tab.color} ${tab.border} opacity-100`
+                  : 'text-muted-foreground/60 border-transparent hover:text-muted-foreground hover:border-muted-foreground/20 opacity-80'
+                } ${isFetchingFiles ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <tab.icon className={`w-3.5 h-3.5 ${driveCategory === tab.id ? tab.color : 'text-muted-foreground/40'}`} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <ScrollArea className="flex-1 border rounded-xl bg-card shadow-sm overflow-hidden">
+          {isFetchingFiles && files.length === 0 ? (
+            <div className="p-12 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Caricamento file...</p>
+            </div>
+          ) : files.length === 0 ? (
+            <div className="p-12 text-center text-muted-foreground">
+              Nessun file trovato in questa categoria.
+            </div>
+          ) : (
+            <div className="divide-y">
+              {files.map((file) => (
+                <div key={file.id} className="p-4 hover:bg-muted/30 transition-colors flex items-center justify-between gap-6 group">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="shrink-0 w-10 h-10 flex items-center justify-center bg-muted rounded-lg border border-border/40">
+                      {file.iconLink ? (
+                        <img src={file.iconLink} alt="" className="w-5 h-5" />
+                      ) : (
+                        <FileText className="w-5 h-5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{file.name}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                        {file.mimeType.split('.').pop()?.replace('vnd.google-apps.', '') || 'File'}
+                        {file.modifiedTime && ` • Modificato ${format(new Date(file.modifiedTime), 'dd MMM yyyy', { locale: it })}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    {file.mimeType !== 'application/vnd.google-apps.folder' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-2 text-xs font-medium bg-background hover:bg-muted"
+                        onClick={() => handleImportDriveFile(file.id, file.name)}
+                        disabled={isImporting === file.id}
+                      >
+                        {isImporting === file.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="w-3.5 h-3.5" />
+                        )}
+                        Importa
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {driveNextToken && (
+                <div className="p-6 flex justify-center bg-muted/5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchFiles(driveNextToken)}
+                    disabled={isFetchingFiles}
+                    className="gap-2"
+                  >
+                    {isFetchingFiles ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                    Carica altri file
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full p-6 flex flex-col gap-6 overflow-auto">
       <div className="flex items-center justify-between">
@@ -373,7 +533,7 @@ export function DocumentsSection() {
             <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
             <div className="h-[1px] w-full bg-border/60" />
           </div>
-          <div className="flex">
+          <div className="flex gap-3">
             <Button
               variant="outline"
               className="gap-2 border-red-50 hover:bg-red-50 hover:text-red-600 transition-all hover:border-red-200 shadow-sm"
@@ -384,6 +544,17 @@ export function DocumentsSection() {
             >
               <GmailLogo className="w-4 h-4" />
               Gmail
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
+              onClick={() => {
+                fetchFiles();
+                setView('drive');
+              }}
+            >
+              <DriveLogo className="w-4 h-4" />
+              Google Drive
             </Button>
           </div>
         </div>

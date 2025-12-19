@@ -13,6 +13,15 @@ export const GmailLogo = ({ className }: { className?: string }) => (
     </svg>
 );
 
+export const DriveLogo = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
+        <path fill="#FFC107" d="M17.17 18.253H6.84a1.2 1.2 0 01-1.036-.595l-1.04-1.78a1.21 1.21 0 010-1.214l5.16-8.88a1.2 1.2 0 011.038-.598h10.33a1.2 1.2 0 011.037.598l1.04 1.78a1.206 1.206 0 010 1.214l-5.165 8.88a1.2 1.2 0 01-1.04.595z" opacity=".2" />
+        <path fill="#FFC107" d="M11.517 8.016L6.84 16.03l-1.04-1.78 4.676-8.016z" />
+        <path fill="#4CAF50" d="M6.84 16.03h10.33l1.04 1.78H7.88a1.2 1.2 0 01-1.04-.595z" />
+        <path fill="#2196F3" d="M17.17 16.03l5.165-8.88-1.04-1.78-5.165 8.88a1.206 1.206 0 010 1.214z" />
+    </svg>
+);
+
 export function ConnectorsSection() {
     const { isConnected, isLoading, isFetchingMessages, connect, logout, fetchMessages } = useGmail();
 
@@ -61,7 +70,7 @@ export function ConnectorsSection() {
                                 <Button variant="outline" className="flex-1" onClick={logout}>
                                     Disconnetti
                                 </Button>
-                                <Button size="icon" variant="outline" onClick={fetchMessages} disabled={isFetchingMessages}>
+                                <Button size="icon" variant="outline" onClick={() => fetchMessages()} disabled={isFetchingMessages}>
                                     <RefreshCw className={`w-4 h-4 ${isFetchingMessages ? 'animate-spin' : ''}`} />
                                 </Button>
                             </div>
@@ -73,19 +82,40 @@ export function ConnectorsSection() {
                     </CardContent>
                 </Card>
 
-                {/* Placeholder cards */}
-                <Card className="opacity-60 border-dashed">
+                {/* Google Drive Card */}
+                <Card className={`border-2 transition-all ${isConnected ? 'hover:border-primary/20' : 'opacity-60 border-dashed'}`}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-muted rounded-lg">
-                                <div className="w-6 h-6 bg-slate-300 rounded-sm" />
+                            <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center">
+                                <DriveLogo className="w-6 h-6" />
                             </div>
                             <div>
                                 <CardTitle className="text-lg">Google Drive</CardTitle>
-                                <CardDescription>Coming Soon</CardDescription>
+                                <CardDescription>{isConnected ? 'Live Session Auth' : 'Pronto all\'uso'}</CardDescription>
                             </div>
                         </div>
+                        {isConnected ? (
+                            <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100">
+                                Connesso
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline">Non collegato</Badge>
+                        )}
                     </CardHeader>
+                    <CardContent className="pt-4">
+                        <p className="text-sm text-muted-foreground mb-6">
+                            Importa Google Docs, Sheets e PDF direttamente dal tuo Drive nelle fonti dell'app.
+                        </p>
+                        {isConnected ? (
+                            <Button variant="outline" className="w-full" disabled>
+                                Già Connesso (via Google)
+                            </Button>
+                        ) : (
+                            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={connect}>
+                                Connetti Drive
+                            </Button>
+                        )}
+                    </CardContent>
                 </Card>
 
                 <Card className="opacity-60 border-dashed">
