@@ -17,6 +17,9 @@ const getBaseUrl = () => {
 export const API_BASE_URL = getBaseUrl();
 
 console.log('[API Config] Using Base URL:', API_BASE_URL);
+if (typeof window !== 'undefined') {
+  console.log('[API Config] Current Origin:', window.location.origin);
+}
 
 export function getApiUrl(endpoint: string): string {
   // Rimuovi lo slash iniziale se presente

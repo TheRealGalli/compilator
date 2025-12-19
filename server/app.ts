@@ -41,9 +41,19 @@ function createApp() {
     // LOG ALL REQUESTS TO DEBUG
     console.log(`[DEBUG REQUEST] ${req.method} ${req.path} - Origin: ${origin}`);
 
+    // Set Vary: Origin to prevent cache issues
+    res.setHeader('Vary', 'Origin');
+
     // Allow any origin that matches the pattern or is localhost
     if (origin) {
       if (ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.github.io')) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      } else if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      } else {
+        // Default to a safe fallback instead of nothing
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
       }
@@ -53,11 +63,11 @@ function createApp() {
     }
 
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-gmail-tokens');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-gmail-tokens, Accept, Origin');
 
     if (req.method === 'OPTIONS') {
       console.log(`[DEBUG CORS] Handling OPTIONS for ${req.path}`);
-      res.status(200).end();
+      res.status(204).end();
       return;
     }
 
