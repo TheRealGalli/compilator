@@ -574,9 +574,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[DEBUG Compile] Received sources:`, sources?.length || 0);
 
-      // Build multimodal files from sources with base64
+      // Build multimodal files and extract text for non-multimodal sources
       const multimodalFiles: any[] = [];
       const failedFiles: string[] = [];
+      let compileTextContext = '';
 
       if (sources && Array.isArray(sources)) {
         for (const source of sources) {
@@ -600,6 +601,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               mimeType = 'audio/wav';
             } else if (fileName.endsWith('.flac')) {
               mimeType = 'audio/flac';
+            } else if (fileName.endsWith('.docx')) {
+              mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            } else if (fileName.endsWith('.txt')) {
+              mimeType = 'text/plain';
             }
 
             // Reject video files
@@ -608,14 +613,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
               continue;
             }
 
-            multimodalFiles.push({
-              type: mimeType.startsWith('image/') ? 'image' : 'file',
-              data: source.base64,
-              mimeType: mimeType,
-              name: fileName
-            });
+            const isMultimodal =
+              mimeType.startsWith('image/') ||
+              mimeType === 'application/pdf' ||
+              mimeType.startsWith('audio/');
 
-            console.log(`[DEBUG Compile] Added source: ${fileName} (${mimeType})`);
+            if (isMultimodal) {
+              multimodalFiles.push({
+                type: mimeType.startsWith('image/') ? 'image' : 'file',
+                data: source.base64,
+                mimeType: mimeType,
+                name: fileName
+              });
+              console.log(`[DEBUG Compile] Added multimodal source: ${fileName} (${mimeType})`);
+            } else {
+              // Extract text for non-multimodal files
+              try {
+                const buffer = Buffer.from(source.base64, 'base64');
+                const textContent = await extractText(buffer, mimeType);
+                if (textContent) {
+                  compileTextContext += `\n--- CONTENUTO FILE (${fileName}): ---\n${textContent}\n--- FINE CONTENUTO FILE ---\n`;
+                  console.log(`[DEBUG Compile] Extracted text from: ${fileName} (${textContent.length} chars)`);
+                } else {
+                  failedFiles.push(`${fileName} (errore estrazione testo)`);
+                }
+              } catch (err) {
+                console.error(`[ERROR Compile] Failed to process ${fileName}:`, err);
+                failedFiles.push(`${fileName} (errore lettura)`);
+              }
+            }
           } else {
             // Source exists but no base64 data
             failedFiles.push(`${source.name || 'file'} (dati non ricevuti)`);
@@ -624,10 +650,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if sources were expected but not received
-      if (sources && sources.length > 0 && multimodalFiles.length === 0) {
+      if (sources && sources.length > 0 && multimodalFiles.length === 0 && compileTextContext.length === 0) {
         const errorMsg = failedFiles.length > 0
           ? `Errore nel caricamento dei file: ${failedFiles.join(', ')}`
-          : 'Nessun file valido ricevuto. Verifica che i file siano supportati (PDF, immagini, audio).';
+          : 'Nessun file valido ricevuto. Verifica che i file siano supportati (PDF, immagini, documenti, audio).';
 
         console.log(`[ERROR Compile] ${errorMsg}`);
         return res.status(400).json({ error: errorMsg });
@@ -725,16 +751,19 @@ MODALITÀ WEB RESEARCH (GROUNDING & FONTI ESTERNE):
 - **PRIORITÀ DATI:** I dati anagrafici (Cliente, Date, Responsabili) devono provenire prioritariamente dai **FILE CARICATI**. Usa il LINK WEB per descrivere *l'argomento* del documento.
 - **GROUNDING:** Usa la conoscenza web generale per riferimenti normativi e standard.` : 'MODALITÀ WEB RESEARCH DISATTIVATA: Usa solo la tua conoscenza base e i documenti forniti.'}
 
-${multimodalFiles.length > 0 ? `
-Hai accesso a ${multimodalFiles.length} file multimodali (immagini, PDF, documenti, audio).
-
-**IMPORTANTE - ANALISI MULTIMODALE (PRIORITÀ ALTA):**
-- **PDF/Immagini:** Analizza testo e layout. Usa l'OCR per leggere scansioni, tabelle e moduli. Estrai dati precisi (nomi, date, importi).
+${multimodalFiles.length > 0 || compileTextContext.length > 0 ? `
+Hai accesso a ${multimodalFiles.length + (compileTextContext.length > 0 ? 1 : 0)} fonti documentali (file multimodali e/o testo estratto).
+ 
+**IMPORTANTE - ANALISI FONTI (PRIORITÀ ALTA):**
+- **Documenti/Testo:** Analizza attentamente il testo estratto e il contenuto dei file PDF per trovare i dati richiesti.
+- **Immagini:** Usa l'OCR per leggere scansioni, tabelle e moduli nelle immagini.
 - **Audio:** Usa la trascrizione dei file audio per estrarre istruzioni o dettature.
-
+ 
+${compileTextContext.length > 0 ? `**TESTO ESTRATTO DAI DOCUMENTI:**\n${compileTextContext}` : ''}
+ 
 **ISTRUZIONE DI SINTESI:**
-Incrocia i dati dei FILE (fatti, persone, date) con le informazioni di contesto del LINK WEB (descrizione progetto, tech stack, dettagli argomento) per compilare il template.` : 'NESSUN FILE SORGENTE: Se presenti Link Web, usali per il contesto, ma non inventare i dati anagrafici mancanti.'}
-
+Incrocia i dati dei FILE e del TESTO ESTRATTO (fatti, persone, date) con le informazioni di contesto del LINK WEB per compilare il template.` : 'NESSUN FILE SORGENTE: Se presenti Link Web, usali per il contesto, ma non inventare i dati anagrafici mancanti.'}
+ 
 ${hasExternalSources ? `
 **CONTENUTO DA LINK WEB (DA USARE PER CONTESTO E DETTAGLI):**
 ${fetchedCompilerContext}
