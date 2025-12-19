@@ -161,9 +161,9 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
       const result = await mammoth.extractRawText({ buffer });
       console.log(`[DEBUG extractText] DOCX parsed, text length: ${result.value.length}`);
       return result.value;
-    } else if (mimeType === 'text/plain') {
+    } else if (mimeType === 'text/plain' || mimeType === 'text/csv' || mimeType === 'text/tab-separated-values') {
       const text = buffer.toString('utf-8');
-      console.log(`[DEBUG extractText] Text file, length: ${text.length}`);
+      console.log(`[DEBUG extractText] Text-based file (${mimeType}), length: ${text.length}`);
       return text;
     }
     console.log(`[DEBUG extractText] Unsupported mime type: ${mimeType}`);

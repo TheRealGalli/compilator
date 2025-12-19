@@ -2,7 +2,7 @@ import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
 import { useGmail } from "@/contexts/GmailContext";
@@ -198,7 +198,9 @@ export function DocumentsSection() {
   };
 
   const formatSize = (bytes: number): string => {
-    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
   if (view === 'gmail') {
