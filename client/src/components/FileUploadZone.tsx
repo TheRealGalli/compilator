@@ -55,6 +55,9 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
       <p className="text-sm text-muted-foreground">
         Testo: PDF, DOCX, TXT | Immagini: JPG, PNG, WebP | Audio: MP3, WAV, FLAC
       </p>
+      <p className="text-xs text-muted-foreground/60 mt-2">
+        Max 30MB per fonte supportati
+      </p>
     </div>
   );
 }
