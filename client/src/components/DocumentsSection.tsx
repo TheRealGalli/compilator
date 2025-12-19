@@ -110,7 +110,11 @@ export function DocumentsSection() {
           }
           const byteArray = new Uint8Array(byteNumbers);
           const blob = new Blob([byteArray], { type: attach.mimeType });
-          const attachFile = new File([blob], attach.name, { type: attach.mimeType });
+
+          // Rename attachment to link it to the email
+          const safeSubject = subject.replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 30);
+          const attachName = `Allegato_da_${safeSubject}_${attach.name}`;
+          const attachFile = new File([blob], attachName, { type: attach.mimeType });
 
           await addSource(attachFile);
         }

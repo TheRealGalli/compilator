@@ -1245,7 +1245,8 @@ ${filesContext}
 
 **ISTRUZIONI BASE:**
 1. Analizza attentamente i documenti e il testo forniti prima di rispondere
-2. Fornisci risposte concise, precise e ben strutturate
+2. **Allegati Gmail**: I file che iniziano con "Allegato_da_..." sono allegati dell'email corrispondente. Considerali come parte integrante di quel documento.
+3. Fornisci risposte concise, precise e ben strutturate
 3. Usa liste puntate per organizzare le informazioni quando necessario
 4. Cita sempre la fonte tra parentesi, es: (da: nome_file.pdf o URL)
 5. Se la risposta non è nei documenti, dichiaralo esplicitamente
@@ -1407,7 +1408,7 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
 
       // Configure model
       const model = vertex_ai.getGenerativeModel({
-        model: "gemini-2.5-flash", // Latest stable Flash model
+        model: "gemini-1.5-flash", // Latest stable Flash model
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemInstructionWithDate }]
