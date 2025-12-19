@@ -109,7 +109,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setIsFetchingMessages(false);
         }
-    }, [getGmailHeaders, isFetchingMessages, currentCategory, searchQuery]);
+    }, [getGmailHeaders, currentCategory, searchQuery]);
 
     const connect = async () => {
         try {
@@ -207,12 +207,12 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
         return () => window.removeEventListener('message', handleMessage);
     }, [toast, checkConnection]); // Solo toast e mount
 
-    // Auto-fetch messages when connection status changes or tokens are updated
+    // Auto-fetch messages when connection status or filters change
     useEffect(() => {
-        if (isConnected && messages.length === 0 && !isFetchingMessages && !hasFetchFailed) {
+        if (isConnected && !isFetchingMessages && !hasFetchFailed) {
             fetchMessages();
         }
-    }, [isConnected, messages.length, isFetchingMessages, hasFetchFailed, fetchMessages]);
+    }, [isConnected, currentCategory, searchQuery, fetchMessages]);
 
     return (
         <GmailContext.Provider value={{
