@@ -414,6 +414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/gmail/message/:id', async (req, res) => {
     const tokens = getGmailTokens(req);
     const { id } = req.params;
+    const includeAttachments = req.query.attachments === 'true';
     if (!tokens) return res.status(401).json({ error: 'Not connected to Gmail' });
 
     try {
@@ -438,10 +439,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const body = getBody(response.data.payload);
-      res.json({ body });
+      const attachments: any[] = [];
+
+      if (includeAttachments && response.data.payload?.parts) {
+        const fetchAttachments = async (parts: any[]) => {
+          for (const part of parts) {
+            if (part.filename && part.body?.attachmentId) {
+              try {
+                const attachRes = await gmail.users.messages.attachments.get({
+                  userId: 'me',
+                  messageId: id,
+                  id: part.body.attachmentId
+                });
+
+                if (attachRes.data.data) {
+                  attachments.push({
+                    name: part.filename,
+                    mimeType: part.mimeType,
+                    size: part.body.size,
+                    base64: attachRes.data.data // Already base64 from Gmail API
+                  });
+                }
+              } catch (err) {
+                console.error(`Error fetching attachment ${part.filename}:`, err);
+              }
+            } else if (part.parts) {
+              await fetchAttachments(part.parts);
+            }
+          }
+        };
+        await fetchAttachments(response.data.payload.parts);
+      }
+
+      res.json({ body, attachments });
     } catch (error) {
-      console.error('Error fetching email body:', error);
-      res.status(500).json({ error: 'Failed to fetch email body' });
+      console.error('Error fetching email details:', error);
+      res.status(500).json({ error: 'Failed to fetch email details' });
     }
   });
 

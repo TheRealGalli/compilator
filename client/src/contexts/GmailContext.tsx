@@ -27,7 +27,7 @@ interface GmailContextType {
     connect: () => Promise<void>;
     logout: () => Promise<void>;
     fetchMessages: (pageToken?: string) => Promise<void>;
-    importEmail: (msgId: string, subject: string) => Promise<string | null>;
+    importEmail: (msgId: string, subject: string, includeAttachments?: boolean) => Promise<{ body: string, attachments: any[] } | null>;
 }
 
 const GmailContext = createContext<GmailContextType | undefined>(undefined);
@@ -145,12 +145,15 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const importEmail = async (msgId: string, subject: string): Promise<string | null> => {
+    const importEmail = async (msgId: string, subject: string, includeAttachments: boolean = false): Promise<{ body: string, attachments: any[] } | null> => {
         try {
-            const res = await apiRequest('GET', `/api/gmail/message/${msgId}`, undefined, getGmailHeaders());
+            const res = await apiRequest('GET', `/api/gmail/message/${msgId}?attachments=${includeAttachments}`, undefined, getGmailHeaders());
             if (res.ok) {
                 const data = await res.json();
-                return data.body;
+                return {
+                    body: data.body,
+                    attachments: data.attachments || []
+                };
             }
         } catch (error) {
             console.error("Import email error:", error);

@@ -1,13 +1,14 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
 import { useGmail } from "@/contexts/GmailContext";
 import { GmailLogo } from "./ConnectorsSection";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -76,27 +77,56 @@ export function DocumentsSection() {
     }
   };
 
-  const handleImportEmail = async (msgId: string, subject: string) => {
+  const handleImportEmail = async (msgId: string, subject: string, includeAttachments: boolean = false) => {
     setIsImporting(msgId);
     try {
-      const content = await importEmail(msgId, subject);
-      if (content) {
-        const fileName = `Gmail_${subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
-        const file = new File([content], fileName, { type: 'text/plain' });
-        const result = await addSource(file);
-        if (result === 'success') {
+      const data = await importEmail(msgId, subject, includeAttachments);
+      if (data) {
+        const emailContentSize = new Blob([data.body]).size;
+        const attachmentsSize = data.attachments.reduce((acc, a) => acc + (a.size || 0), 0);
+        const totalSize = emailContentSize + attachmentsSize;
+
+        if (totalSize > 30 * 1024 * 1024) {
           toast({
-            title: "Email Importata",
-            description: `"${subject}" aggiunta alle fonti.`,
-          });
-        } else if (result === 'file_too_large') {
-          toast({
-            title: "Email Too Large",
-            description: "Il contenuto dell'email supera il limite di dimensione.",
+            title: "Errore caricamento mail",
+            description: "caricamento mail tra le fonti file troppo grande supera 30 MB",
             variant: "destructive",
           });
+          return;
         }
+
+        // Add email body
+        const fileName = `Gmail_${subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+        const file = new File([data.body], fileName, { type: 'text/plain' });
+        await addSource(file);
+
+        // Add attachments
+        for (const attach of data.attachments) {
+          // Convert base64 to File object
+          const byteCharacters = atob(attach.base64.replace(/-/g, '+').replace(/_/g, '/'));
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: attach.mimeType });
+          const attachFile = new File([blob], attach.name, { type: attach.mimeType });
+
+          await addSource(attachFile);
+        }
+
+        toast({
+          title: includeAttachments ? "Email e Allegati Importati" : "Email Importata",
+          description: `"${subject}" ${includeAttachments ? 'e i suoi allegati sono stati aggiunti' : 'aggiunta'} alle fonti.`,
+        });
       }
+    } catch (error) {
+      console.error("Error importing email:", error);
+      toast({
+        title: "Errore",
+        description: "Si è verificato un errore durante l'importazione.",
+        variant: "destructive",
+      });
     } finally {
       setIsImporting(null);
     }
@@ -237,19 +267,51 @@ export function DocumentsSection() {
                     <p className="text-xs text-muted-foreground truncate mb-1.5 opacity-80 font-medium">Da: {msg.from}</p>
                     <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed opacity-90">{msg.snippet}</p>
                   </div>
-                  <Button
-                    size="sm"
-                    className="shrink-0"
-                    disabled={isImporting === msg.id}
-                    onClick={() => handleImportEmail(msg.id, msg.subject)}
-                  >
-                    {isImporting === msg.id ? (
-                      <Loader2 className="w-3 h-3 animate-spin mr-2" />
-                    ) : (
-                      <Plus className="w-3 h-3 mr-2" />
-                    )}
-                    Importa
-                  </Button>
+                  <div className="flex gap-1">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleImportEmail(msg.id, msg.subject, false)}
+                            disabled={isImporting === msg.id}
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                          >
+                            {isImporting === msg.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <FileText className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Importa solo testo</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleImportEmail(msg.id, msg.subject, true)}
+                            disabled={isImporting === msg.id}
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                          >
+                            {isImporting === msg.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Paperclip className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Importa testo e allegati</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
               ))}
               {nextPageToken && (
