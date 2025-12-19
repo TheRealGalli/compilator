@@ -48,8 +48,8 @@ export function ConnectorsSection() {
                                 <GmailLogo className="w-6 h-6" />
                             </div>
                             <div>
-                                <CardTitle className="text-lg">Google Workspace</CardTitle>
-                                <CardDescription>Gmail & Drive</CardDescription>
+                                <CardTitle className="text-lg">Gmail</CardTitle>
+                                <CardDescription>Posta elettronica</CardDescription>
                             </div>
                         </div>
                         {isConnected ? (
@@ -62,7 +62,7 @@ export function ConnectorsSection() {
                     </CardHeader>
                     <CardContent className="pt-4">
                         <p className="text-sm text-muted-foreground mb-6">
-                            Integra direttamente col modello la tua casella di posta, i tuoi documenti e fogli di calcolo.
+                            Analizza le tue email recenti per estrarre informazioni e contesto utile.
                         </p>
                         {isConnected ? (
                             <div className="flex gap-2">
@@ -90,7 +90,7 @@ export function ConnectorsSection() {
                             </div>
                             <div>
                                 <CardTitle className="text-lg">Google Drive</CardTitle>
-                                <CardDescription>{isConnected ? 'Live Session Auth' : 'Pronto all\'uso'}</CardDescription>
+                                <CardDescription>File & Documenti</CardDescription>
                             </div>
                         </div>
                         {isConnected ? (
@@ -120,15 +120,25 @@ export function ConnectorsSection() {
                 <Card className="opacity-60 border-dashed">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-muted rounded-lg">
-                                <div className="w-6 h-6 bg-slate-300 rounded-sm" />
+                            <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center">
+                                <div className="w-6 h-6 bg-slate-100 rounded-sm flex items-center justify-center">
+                                    <span className="text-[10px] font-bold text-slate-400">OD</span>
+                                </div>
                             </div>
                             <div>
                                 <CardTitle className="text-lg">OneDrive</CardTitle>
-                                <CardDescription>Coming Soon</CardDescription>
+                                <CardDescription>Prossimamente</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
+                    <CardContent className="pt-4">
+                        <p className="text-sm text-muted-foreground mb-6">
+                            In arrivo: l'integrazione con Microsoft OneDrive per i tuoi file business.
+                        </p>
+                        <Button variant="outline" className="w-full" disabled>
+                            Coming Soon
+                        </Button>
+                    </CardContent>
                 </Card>
             </div>
         </div>

@@ -51,7 +51,7 @@ export function ModelSettings({
               id="notes"
               value={notes}
               onChange={(e) => onNotesChange?.(e.target.value)}
-              placeholder="Formati supportati:&#10;Testo: PDF, DOCX, TXT&#10;Immagini: JPG, PNG, WebP&#10;Audio: MP3, WAV, FLAC"
+              placeholder="Formati supportati:&#10;Testo: PDF, DOCX, TXT, CSV&#10;Immagini: JPG, PNG, WebP&#10;Audio: MP3, WAV, FLAC"
               className="min-h-[186px] text-xs resize-none"
               data-testid="textarea-notes"
             />
