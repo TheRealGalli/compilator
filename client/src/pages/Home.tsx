@@ -34,7 +34,7 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      <AppHeader notebookTitle="Gromit" />
+      <AppHeader notebookTitle="Gromit" onHomeClick={() => setActiveSection("documents")} />
       <div className="flex-1 flex overflow-hidden">
         <AppSidebar
           activeSection={activeSection}

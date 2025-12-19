@@ -7,19 +7,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
 import { useGmail } from "@/contexts/GmailContext";
 import { GmailLogo } from "./ConnectorsSection";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
 export function DocumentsSection() {
+  const [view, setView] = useState<'main' | 'gmail'>('main');
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState<string | null>(null);
   const { toast } = useToast();
@@ -108,17 +101,85 @@ export function DocumentsSection() {
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   };
 
+  if (view === 'gmail') {
+    return (
+      <div className="h-full p-6 flex flex-col gap-6 overflow-hidden">
+        <div className="flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => setView('main')} className="gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+              Indietro
+            </Button>
+            <div>
+              <h2 className="text-2xl font-semibold flex items-center gap-2">
+                <GmailLogo className="w-6 h-6" />
+                Importa da Gmail
+              </h2>
+              <p className="text-muted-foreground text-sm mt-1">Seleziona un'email da aggiungere come fonte</p>
+            </div>
+          </div>
+          <Button size="icon" variant="ghost" onClick={() => fetchMessages()} disabled={isFetchingMessages}>
+            <RefreshCw className={`w-4 h-4 ${isFetchingMessages ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+
+        <ScrollArea className="flex-1 border rounded-xl bg-card shadow-sm overflow-hidden">
+          {isFetchingMessages && messages.length === 0 ? (
+            <div className="p-12 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Recupero email in corso...</p>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="p-12 text-center text-muted-foreground">
+              Nessuna email trovata in questa sessione. Clicca il tasto aggiorna per riprovare.
+            </div>
+          ) : (
+            <div className="divide-y">
+              {messages.map((msg) => (
+                <div key={msg.id} className="p-5 hover:bg-muted/30 transition-colors flex items-start justify-between gap-6 group">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-1.5 wrap">
+                      <span className="font-semibold text-sm truncate max-w-[400px]">{msg.subject}</span>
+                      <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
+                        {msg.date ? format(new Date(msg.date), 'dd MMM yyyy HH:mm', { locale: it }) : ''}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mb-1.5 opacity-80 font-medium">Da: {msg.from}</p>
+                    <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed opacity-90">{msg.snippet}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    disabled={isImporting === msg.id}
+                    onClick={() => handleImportEmail(msg.id, msg.subject)}
+                  >
+                    {isImporting === msg.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin mr-2" />
+                    ) : (
+                      <Plus className="w-3 h-3 mr-2" />
+                    )}
+                    Importa
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full p-6 flex flex-col gap-6 overflow-auto">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold">Gestione Documenti</h2>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm">
             Carica fino a {maxSources} fonti per l'analisi (solo sessione corrente)
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button className="gap-2">
+          <Button className="gap-2 shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
               <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
             </svg>
@@ -135,71 +196,21 @@ export function DocumentsSection() {
       {isConnected && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Connessioni</h3>
-            <div className="h-[1px] w-full bg-border" />
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
+            <div className="h-[1px] w-full bg-border/60" />
           </div>
           <div className="flex">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2 border-red-100 hover:bg-red-50 hover:text-red-600 transition-colors" onClick={() => fetchMessages()}>
-                  <GmailLogo className="w-4 h-4" />
-                  Gmail
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
-                <DialogHeader className="flex flex-row items-center justify-between pr-8">
-                  <div>
-                    <DialogTitle>Importa da Gmail</DialogTitle>
-                    <DialogDescription>Seleziona un'email da aggiungere come fonte</DialogDescription>
-                  </div>
-                  <Button size="icon" variant="ghost" onClick={() => fetchMessages()} disabled={isFetchingMessages}>
-                    <RefreshCw className={`w-4 h-4 ${isFetchingMessages ? 'animate-spin' : ''}`} />
-                  </Button>
-                </DialogHeader>
-                <ScrollArea className="flex-1 mt-4 border rounded-md">
-                  {isFetchingMessages && messages.length === 0 ? (
-                    <div className="p-8 flex flex-col items-center justify-center gap-4">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground">Recupero email in corso...</p>
-                    </div>
-                  ) : messages.length === 0 ? (
-                    <div className="p-8 text-center text-muted-foreground">
-                      Nessuna email trovata. Prova a ricaricare.
-                    </div>
-                  ) : (
-                    <div className="divide-y">
-                      {messages.map((msg) => (
-                        <div key={msg.id} className="p-4 hover:bg-muted/30 transition-colors flex items-start justify-between gap-4 group">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-sm truncate">{msg.subject}</span>
-                              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                {msg.date ? format(new Date(msg.date), 'dd MMM HH:mm', { locale: it }) : ''}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate mb-1">Da: {msg.from}</p>
-                            <p className="text-xs text-muted-foreground/80 line-clamp-1 italic">{msg.snippet}</p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={isImporting === msg.id}
-                            onClick={() => handleImportEmail(msg.id, msg.subject)}
-                          >
-                            {isImporting === msg.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <Plus className="w-3 h-3 mr-1" />
-                            )}
-                            Importa
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
+            <Button
+              variant="outline"
+              className="gap-2 border-red-50 hover:bg-red-50 hover:text-red-600 transition-all hover:border-red-200 shadow-sm"
+              onClick={() => {
+                fetchMessages();
+                setView('gmail');
+              }}
+            >
+              <GmailLogo className="w-4 h-4" />
+              Gmail
+            </Button>
           </div>
         </div>
       )}
@@ -228,12 +239,12 @@ export function DocumentsSection() {
             <p className="text-muted-foreground">
               Nessuna fonte caricata. Trascina file qui sopra o clicca per selezionarli.
             </p>
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="text-sm text-muted-foreground mt-2 opacity-70">
               Le fonti sono temporanee e verranno rimosse al refresh della pagina.
             </p>
-            <p className="text-xs text-orange-500/80 mt-4 font-medium uppercase tracking-wide">
+            <div className="mt-8 p-3 px-4 rounded-full bg-orange-500/5 text-orange-500/80 text-[10px] font-bold uppercase tracking-widest inline-block border border-orange-500/10">
               ⚠ I modelli possono allucinare, verificare sempre i dati.
-            </p>
+            </div>
           </div>
         </div>
       )}
