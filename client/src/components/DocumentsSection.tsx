@@ -17,7 +17,7 @@ export function DocumentsSection() {
   const [isImporting, setIsImporting] = useState<string | null>(null);
   const { toast } = useToast();
   const { sources, addSource, removeSource, maxSources } = useSources();
-  const { isConnected, messages, isFetchingMessages, fetchMessages, importEmail } = useGmail();
+  const { isConnected, messages, isFetchingMessages, fetchMessages, importEmail, nextPageToken } = useGmail();
 
   const handleFilesSelected = async (selectedFiles: File[]) => {
     setIsUploading(true);
