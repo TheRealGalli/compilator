@@ -1168,6 +1168,7 @@ Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
             if (source.base64) {
               console.log(`[DEBUG] Using client-side base64 for ${source.name}`);
               base64 = source.base64;
+              buffer = Buffer.from(base64, 'base64');
             }
             // Fallback to GCS download (Legacy/Compiler)
             else if (source.url) {
