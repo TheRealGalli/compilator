@@ -39,105 +39,115 @@ export function ConnectorsSection() {
                 <p className="text-muted-foreground">Collega i tuoi account esterni per analizzare i tuoi dati direttamente.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
                 {/* Gmail Card */}
-                <Card className="border-2 hover:border-primary/20 transition-all">
+                <Card className="border-2 hover:border-primary/20 transition-all flex flex-col">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center">
+                            <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
                                 <GmailLogo className="w-6 h-6" />
                             </div>
-                            <div>
-                                <CardTitle className="text-lg">Gmail</CardTitle>
-                                <CardDescription>Posta elettronica</CardDescription>
+                            <div className="min-w-0">
+                                <CardTitle className="text-lg truncate">Gmail</CardTitle>
+                                <CardDescription className="truncate">Posta elettronica</CardDescription>
                             </div>
                         </div>
-                        {isConnected ? (
-                            <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100">
-                                Connesso
-                            </Badge>
-                        ) : (
-                            <Badge variant="outline">Non collegato</Badge>
-                        )}
+                        <div className="shrink-0 ml-2">
+                            {isConnected ? (
+                                <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100">
+                                    Connesso
+                                </Badge>
+                            ) : (
+                                <Badge variant="outline">Non collegato</Badge>
+                            )}
+                        </div>
                     </CardHeader>
-                    <CardContent className="pt-4">
+                    <CardContent className="pt-4 flex-1 flex flex-col">
                         <p className="text-sm text-muted-foreground mb-6">
                             Analizza le tue email recenti per estrarre informazioni e contesto utile.
                         </p>
-                        {isConnected ? (
-                            <div className="flex gap-2">
-                                <Button variant="outline" className="flex-1" onClick={logout}>
-                                    Disconnetti
+                        <div className="mt-auto">
+                            {isConnected ? (
+                                <div className="flex gap-2">
+                                    <Button variant="outline" className="flex-1" onClick={logout}>
+                                        Disconnetti
+                                    </Button>
+                                    <Button size="icon" variant="outline" onClick={() => fetchMessages()} disabled={isFetchingMessages}>
+                                        <RefreshCw className={`w-4 h-4 ${isFetchingMessages ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={connect}>
+                                    Connetti Gmail
                                 </Button>
-                                <Button size="icon" variant="outline" onClick={() => fetchMessages()} disabled={isFetchingMessages}>
-                                    <RefreshCw className={`w-4 h-4 ${isFetchingMessages ? 'animate-spin' : ''}`} />
-                                </Button>
-                            </div>
-                        ) : (
-                            <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={connect}>
-                                Connetti Gmail
-                            </Button>
-                        )}
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 
                 {/* Google Drive Card */}
-                <Card className={`border-2 transition-all ${isConnected ? 'hover:border-primary/20' : 'opacity-60 border-dashed'}`}>
+                <Card className={`border-2 transition-all flex flex-col ${isConnected ? 'hover:border-primary/20' : 'opacity-60 border-dashed'}`}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center">
+                            <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
                                 <DriveLogo className="w-6 h-6" />
                             </div>
-                            <div>
-                                <CardTitle className="text-lg">Google Drive</CardTitle>
-                                <CardDescription>File & Documenti</CardDescription>
+                            <div className="min-w-0">
+                                <CardTitle className="text-lg truncate">Google Drive</CardTitle>
+                                <CardDescription className="truncate">File & Documenti</CardDescription>
                             </div>
                         </div>
-                        {isConnected ? (
-                            <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100">
-                                Connesso
-                            </Badge>
-                        ) : (
-                            <Badge variant="outline">Non collegato</Badge>
-                        )}
+                        <div className="shrink-0 ml-2">
+                            {isConnected ? (
+                                <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100">
+                                    Connesso
+                                </Badge>
+                            ) : (
+                                <Badge variant="outline">Non collegato</Badge>
+                            )}
+                        </div>
                     </CardHeader>
-                    <CardContent className="pt-4">
+                    <CardContent className="pt-4 flex-1 flex flex-col">
                         <p className="text-sm text-muted-foreground mb-6">
                             Sfoglia i tuoi documenti, fogli di calcolo e PDF salvati su Drive per l'analisi intelligente.
                         </p>
-                        {isConnected ? (
-                            <Button variant="outline" className="w-full" disabled>
-                                Già Connesso (via Google)
-                            </Button>
-                        ) : (
-                            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={connect}>
-                                Connetti Drive
-                            </Button>
-                        )}
+                        <div className="mt-auto">
+                            {isConnected ? (
+                                <Button variant="outline" className="w-full" disabled>
+                                    Già Connesso (via Google)
+                                </Button>
+                            ) : (
+                                <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={connect}>
+                                    Connetti Drive
+                                </Button>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 
-                <Card className="opacity-60 border-dashed">
+                <Card className="opacity-60 border-dashed flex flex-col">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center">
+                            <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
                                 <div className="w-6 h-6 bg-slate-100 rounded-sm flex items-center justify-center">
                                     <span className="text-[10px] font-bold text-slate-400">OD</span>
                                 </div>
                             </div>
-                            <div>
-                                <CardTitle className="text-lg">OneDrive</CardTitle>
-                                <CardDescription>Prossimamente</CardDescription>
+                            <div className="min-w-0">
+                                <CardTitle className="text-lg truncate">OneDrive</CardTitle>
+                                <CardDescription className="truncate">Prossimamente</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="pt-4">
+                    <CardContent className="pt-4 flex-1 flex flex-col">
                         <p className="text-sm text-muted-foreground mb-6">
                             In arrivo: l'integrazione con Microsoft OneDrive per i tuoi file business.
                         </p>
-                        <Button variant="outline" className="w-full" disabled>
-                            Coming Soon
-                        </Button>
+                        <div className="mt-auto">
+                            <Button variant="outline" className="w-full" disabled>
+                                Coming Soon
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
