@@ -29,6 +29,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
     const [isConnected, setIsConnected] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isFetchingMessages, setIsFetchingMessages] = useState(false);
+    const [hasFetchFailed, setHasFetchFailed] = useState(false);
     const [messages, setMessages] = useState<GmailMessage[]>([]);
     // Store tokens in state to survive tab active session
     const [tokens, setTokens] = useState<any>(() => {
@@ -47,7 +48,9 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
             const res = await apiRequest('GET', '/api/auth/check', undefined, getGmailHeaders());
             const data = await res.json();
             setIsConnected(data.isConnected);
-            // Non chiamiamo fetchMessages qui per evitare loop, lo facciamo nel useEffect se connesso e senza messaggi
+            if (data.isConnected) {
+                setHasFetchFailed(false); // Reset on check
+            }
         } catch (error) {
             console.error("Check connection error:", error);
         } finally {
@@ -56,23 +59,29 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
     }, [getGmailHeaders]);
 
     const fetchMessages = useCallback(async () => {
+        if (isFetchingMessages) return;
         setIsFetchingMessages(true);
+        setHasFetchFailed(false);
         try {
             const res = await apiRequest('GET', '/api/gmail/messages', undefined, getGmailHeaders());
             if (res.ok) {
                 const data = await res.json();
                 setMessages(data.messages || []);
+                setHasFetchFailed(false);
             } else if (res.status === 401) {
                 setIsConnected(false);
                 setTokens(null);
                 sessionStorage.removeItem('gmail_tokens');
+            } else {
+                setHasFetchFailed(true);
             }
         } catch (error) {
             console.error("Fetch messages error:", error);
+            setHasFetchFailed(true);
         } finally {
             setIsFetchingMessages(false);
         }
-    }, [getGmailHeaders]);
+    }, [getGmailHeaders, isFetchingMessages]);
 
     const connect = async () => {
         try {
@@ -100,6 +109,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
             setIsConnected(false);
             setMessages([]);
             setTokens(null);
+            setHasFetchFailed(false);
             sessionStorage.removeItem('gmail_tokens');
         } catch (error) {
             console.error("Logout error:", error);
@@ -139,6 +149,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
                     sessionStorage.setItem('gmail_tokens', JSON.stringify(newTokens));
                 }
                 setIsConnected(true);
+                setHasFetchFailed(false);
                 toast({
                     title: "Gmail Connesso",
                     description: "La connessione a Gmail è stata stabilita.",
@@ -148,14 +159,14 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
 
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [toast]); // Solo toast e mount
+    }, [toast, checkConnection]); // Solo toast e mount
 
     // Auto-fetch messages when connection status changes or tokens are updated
     useEffect(() => {
-        if (isConnected && messages.length === 0 && !isFetchingMessages) {
+        if (isConnected && messages.length === 0 && !isFetchingMessages && !hasFetchFailed) {
             fetchMessages();
         }
-    }, [isConnected, messages.length, isFetchingMessages, fetchMessages]);
+    }, [isConnected, messages.length, isFetchingMessages, hasFetchFailed, fetchMessages]);
 
     return (
         <GmailContext.Provider value={{
