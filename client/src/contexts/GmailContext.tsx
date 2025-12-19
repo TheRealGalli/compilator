@@ -16,10 +16,11 @@ interface GmailContextType {
     isLoading: boolean;
     messages: GmailMessage[];
     isFetchingMessages: boolean;
+    nextPageToken: string | null;
     checkConnection: () => Promise<void>;
     connect: () => Promise<void>;
     logout: () => Promise<void>;
-    fetchMessages: () => Promise<void>;
+    fetchMessages: (pageToken?: string) => Promise<void>;
     importEmail: (msgId: string, subject: string) => Promise<string | null>;
 }
 
@@ -31,6 +32,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
     const [isFetchingMessages, setIsFetchingMessages] = useState(false);
     const [hasFetchFailed, setHasFetchFailed] = useState(false);
     const [messages, setMessages] = useState<GmailMessage[]>([]);
+    const [nextPageToken, setNextPageToken] = useState<string | null>(null);
     // Store tokens in state to survive tab active session
     const [tokens, setTokens] = useState<any>(() => {
         const saved = sessionStorage.getItem('gmail_tokens');
@@ -58,15 +60,24 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
         }
     }, [getGmailHeaders]);
 
-    const fetchMessages = useCallback(async () => {
+    const fetchMessages = useCallback(async (pageToken?: string) => {
         if (isFetchingMessages) return;
         setIsFetchingMessages(true);
-        setHasFetchFailed(false);
+        if (!pageToken) {
+            setHasFetchFailed(false);
+            setNextPageToken(null);
+        }
         try {
-            const res = await apiRequest('GET', '/api/gmail/messages', undefined, getGmailHeaders());
+            const url = pageToken ? `/api/gmail/messages?pageToken=${pageToken}` : '/api/gmail/messages';
+            const res = await apiRequest('GET', url, undefined, getGmailHeaders());
             if (res.ok) {
                 const data = await res.json();
-                setMessages(data.messages || []);
+                if (pageToken) {
+                    setMessages(prev => [...prev, ...(data.messages || [])]);
+                } else {
+                    setMessages(data.messages || []);
+                }
+                setNextPageToken(data.nextPageToken || null);
                 setHasFetchFailed(false);
             } else if (res.status === 401) {
                 setIsConnected(false);
@@ -110,6 +121,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
             setMessages([]);
             setTokens(null);
             setHasFetchFailed(false);
+            setNextPageToken(null);
             sessionStorage.removeItem('gmail_tokens');
         } catch (error) {
             console.error("Logout error:", error);
@@ -150,6 +162,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
                 }
                 setIsConnected(true);
                 setHasFetchFailed(false);
+                setNextPageToken(null);
                 toast({
                     title: "Gmail Connesso",
                     description: "La connessione a Gmail è stata stabilita.",
@@ -174,6 +187,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
             isLoading,
             messages,
             isFetchingMessages,
+            nextPageToken,
             checkConnection,
             connect,
             logout,

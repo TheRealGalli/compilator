@@ -162,6 +162,24 @@ export function DocumentsSection() {
                   </Button>
                 </div>
               ))}
+              {nextPageToken && (
+                <div className="p-6 flex justify-center bg-muted/5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchMessages(nextPageToken)}
+                    disabled={isFetchingMessages}
+                    className="gap-2 shadow-sm"
+                  >
+                    {isFetchingMessages ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                    Carica altre email
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </ScrollArea>

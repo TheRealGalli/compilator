@@ -362,10 +362,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const client = await getOAuth2Client();
       client.setCredentials(tokens);
       const gmail = google.gmail({ version: 'v1', auth: client });
+      const { pageToken } = req.query;
 
       const response = await gmail.users.messages.list({
         userId: 'me',
         maxResults: 10,
+        pageToken: pageToken as string,
         q: '-category:promotions -category:social' // Filter out some spam
       });
 
@@ -392,7 +394,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }));
 
-      res.json({ messages: detailedMessages });
+      res.json({
+        messages: detailedMessages,
+        nextPageToken: response.data.nextPageToken || null
+      });
     } catch (error) {
       console.error('Error fetching Gmail messages:', error);
       res.status(500).json({ error: 'Failed to fetch emails' });
