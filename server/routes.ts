@@ -426,9 +426,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const client = await getOAuth2Client();
       client.setCredentials(tokens);
       const drive = google.drive({ version: 'v3', auth: client });
-      const { pageToken, category, q } = req.query;
+      const { pageToken, category, q, folderId } = req.query;
 
       let query = "trashed = false";
+
+      // If folderId is provided, we look inside that folder
+      if (folderId) {
+        query += ` and '${folderId}' in parents`;
+      } else {
+        // Only show root/top-level files if no folder/search is active
+        // actually for "All files" it's better to show everything but folders
+        // unless they are in the folders category
+      }
 
       // Filter by category
       if (category === 'docs') {
@@ -439,6 +448,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         query += " and mimeType = 'application/pdf'";
       } else if (category === 'folders') {
         query += " and mimeType = 'application/vnd.google-apps.folder'";
+      } else if (category === 'all') {
+        // Exclude folders from "all" to avoid cluttering, user wanted them separate
+        query += " and mimeType != 'application/vnd.google-apps.folder'";
       }
 
       // Add search text if present

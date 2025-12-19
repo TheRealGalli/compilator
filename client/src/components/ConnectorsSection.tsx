@@ -15,10 +15,9 @@ export const GmailLogo = ({ className }: { className?: string }) => (
 
 export const DriveLogo = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
-        <path fill="#FFC107" d="M17.17 18.253H6.84a1.2 1.2 0 01-1.036-.595l-1.04-1.78a1.21 1.21 0 010-1.214l5.16-8.88a1.2 1.2 0 011.038-.598h10.33a1.2 1.2 0 011.037.598l1.04 1.78a1.206 1.206 0 010 1.214l-5.165 8.88a1.2 1.2 0 01-1.04.595z" opacity=".2" />
-        <path fill="#FFC107" d="M11.517 8.016L6.84 16.03l-1.04-1.78 4.676-8.016z" />
-        <path fill="#4CAF50" d="M6.84 16.03h10.33l1.04 1.78H7.88a1.2 1.2 0 01-1.04-.595z" />
-        <path fill="#2196F3" d="M17.17 16.03l5.165-8.88-1.04-1.78-5.165 8.88a1.206 1.206 0 010 1.214z" />
+        <path fill="#0066da" d="M12.4 12.3l4.5 7.8 4.4-7.8h-8.9zm-1.8 1.1l-4.5 7.8h8.9l-4.4-7.8zm-1.1-1.8L5 3.8 0.6 11.6h8.9zM13.6 1L9.1 8.8h8.9L13.6 1z" />
+        <path fill="#00ac47" d="M13.6 1L9.1 8.8h8.9L13.6 1z" opacity=".8" />
+        <path fill="#ffba00" d="M5 3.8L0.6 11.6h8.9L5 3.8z" opacity=".8" />
     </svg>
 );
 
@@ -49,8 +48,8 @@ export function ConnectorsSection() {
                                 <GmailLogo className="w-6 h-6" />
                             </div>
                             <div>
-                                <CardTitle className="text-lg">Gmail</CardTitle>
-                                <CardDescription>Live Session Auth</CardDescription>
+                                <CardTitle className="text-lg">Google Workspace</CardTitle>
+                                <CardDescription>Gmail & Drive</CardDescription>
                             </div>
                         </div>
                         {isConnected ? (
@@ -63,7 +62,7 @@ export function ConnectorsSection() {
                     </CardHeader>
                     <CardContent className="pt-4">
                         <p className="text-sm text-muted-foreground mb-6">
-                            Analizza le tue email recenti senza uscire dall'app. I dati non vengono salvati permanentemente.
+                            Integra direttamente col modello la tua casella di posta, i tuoi documenti e fogli di calcolo.
                         </p>
                         {isConnected ? (
                             <div className="flex gap-2">
@@ -104,7 +103,7 @@ export function ConnectorsSection() {
                     </CardHeader>
                     <CardContent className="pt-4">
                         <p className="text-sm text-muted-foreground mb-6">
-                            Importa Google Docs, Sheets e PDF direttamente dal tuo Drive nelle fonti dell'app.
+                            Sfoglia i tuoi documenti, fogli di calcolo e PDF salvati su Drive per l'analisi intelligente.
                         </p>
                         {isConnected ? (
                             <Button variant="outline" className="w-full" disabled>

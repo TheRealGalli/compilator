@@ -21,7 +21,13 @@ export function DocumentsSection() {
   const { toast } = useToast();
   const { sources, addSource, removeSource, maxSources } = useSources();
   const { isConnected, messages, isFetchingMessages, fetchMessages, importEmail, nextPageToken, currentCategory, setCategory, searchQuery, setSearchQuery } = useGmail();
-  const { files, isFetchingFiles, fetchFiles, importFile, currentCategory: driveCategory, setCategory: setDriveCategory, searchQuery: driveSearch, setSearchQuery: setDriveSearch, nextPageToken: driveNextToken } = useGoogleDrive();
+  const {
+    files, isFetchingFiles, fetchFiles, importFile,
+    currentCategory: driveCategory, setCategory: setDriveCategory,
+    searchQuery: driveSearch, setSearchQuery: setDriveSearch,
+    nextPageToken: driveNextToken, currentFolderId, folderPath,
+    navigateToFolder, goToParentFolder, resetNavigation
+  } = useGoogleDrive();
   const [localSearch, setLocalSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
@@ -386,28 +392,57 @@ export function DocumentsSection() {
       <div className="h-full p-6 flex flex-col gap-6 overflow-hidden">
         <div className="flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => setView('main')} className="gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                resetNavigation();
+                setView('main');
+              }}
+              className="gap-2"
+            >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
               Indietro
             </Button>
             <div>
               <h2 className="text-2xl font-semibold flex items-center gap-2">
-                <DriveLogo className="w-6 h-6" />
+                <DriveLogo className="w-8 h-8" />
                 Google Drive
               </h2>
               <p className="text-muted-foreground text-sm mt-1">Esplora i tuoi documenti e fogli di calcolo</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="icon" variant="ghost" className="w-9 h-9" onClick={() => fetchFiles()} disabled={isFetchingFiles}>
+            <Button size="icon" variant="ghost" className="w-9 h-9" onClick={() => fetchFiles(undefined, true)} disabled={isFetchingFiles}>
               <RefreshCw className={`w-4 h-4 ${isFetchingFiles ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
 
+        {/* Breadcrumbs */}
+        {folderPath.length > 0 && (
+          <div className="flex items-center gap-2 px-3 text-xs text-muted-foreground bg-muted/30 py-2 rounded-lg border border-border/40 max-w-full overflow-hidden">
+            <button onClick={resetNavigation} className="hover:text-primary transition-colors flex items-center gap-1 shrink-0">
+              Drive
+            </button>
+            {folderPath.map((folder, idx) => (
+              <React.Fragment key={folder.id}>
+                <span className="shrink-0">/</span>
+                <button
+                  className={`hover:text-primary transition-colors truncate max-w-[200px] ${idx === folderPath.length - 1 ? 'text-foreground font-medium' : ''}`}
+                  disabled={idx === folderPath.length - 1}
+                >
+                  {folder.name}
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+
         <div className="flex px-6 border-b border-border/40 gap-8 overflow-x-auto">
           {[
             { id: 'all', label: 'Tutti i file', icon: FileText, color: 'text-slate-600', border: 'border-slate-600' },
+            { id: 'folders', label: 'Cartelle', icon: Inbox, color: 'text-amber-500', border: 'border-amber-500' },
             { id: 'docs', label: 'Documenti', icon: FileText, color: 'text-blue-600', border: 'border-blue-600' },
             { id: 'sheets', label: 'Fogli di calcolo', icon: Tag, color: 'text-green-600', border: 'border-green-600' },
             { id: 'pdfs', label: 'PDF', icon: Info, color: 'text-red-600', border: 'border-red-600' },
@@ -441,10 +476,20 @@ export function DocumentsSection() {
           ) : (
             <div className="divide-y">
               {files.map((file) => (
-                <div key={file.id} className="p-4 hover:bg-muted/30 transition-colors flex items-center justify-between gap-6 group">
+                <div
+                  key={file.id}
+                  className={`p-4 hover:bg-muted/30 transition-colors flex items-center justify-between gap-6 group ${file.mimeType === 'application/vnd.google-apps.folder' ? 'cursor-pointer' : ''}`}
+                  onClick={() => {
+                    if (file.mimeType === 'application/vnd.google-apps.folder') {
+                      navigateToFolder(file.id, file.name);
+                    }
+                  }}
+                >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="shrink-0 w-10 h-10 flex items-center justify-center bg-muted rounded-lg border border-border/40">
-                      {file.iconLink ? (
+                      {file.mimeType === 'application/vnd.google-apps.folder' ? (
+                        <Inbox className="w-5 h-5 text-amber-500" />
+                      ) : file.iconLink ? (
                         <img src={file.iconLink} alt="" className="w-5 h-5" />
                       ) : (
                         <FileText className="w-5 h-5 text-muted-foreground" />
@@ -459,12 +504,15 @@ export function DocumentsSection() {
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    {file.mimeType !== 'application/vnd.google-apps.folder' && (
+                    {file.mimeType !== 'application/vnd.google-apps.folder' ? (
                       <Button
                         variant="outline"
                         size="sm"
                         className="h-8 gap-2 text-xs font-medium bg-background hover:bg-muted"
-                        onClick={() => handleImportDriveFile(file.id, file.name)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleImportDriveFile(file.id, file.name);
+                        }}
                         disabled={isImporting === file.id}
                       >
                         {isImporting === file.id ? (
@@ -474,6 +522,8 @@ export function DocumentsSection() {
                         )}
                         Importa
                       </Button>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/40 group-hover:text-amber-500 transition-colors"><path d="m9 18 6-6-6-6" /></svg>
                     )}
                   </div>
                 </div>

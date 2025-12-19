@@ -12,6 +12,11 @@ interface DriveFile {
     thumbnailLink?: string;
 }
 
+interface FolderInfo {
+    id: string;
+    name: string;
+}
+
 export type DriveCategory = 'all' | 'folders' | 'docs' | 'sheets' | 'pdfs';
 
 interface GoogleDriveContextType {
@@ -20,10 +25,15 @@ interface GoogleDriveContextType {
     nextPageToken: string | null;
     currentCategory: DriveCategory;
     searchQuery: string;
+    currentFolderId: string | null;
+    folderPath: FolderInfo[];
     setCategory: (category: DriveCategory) => void;
     setSearchQuery: (query: string) => void;
-    fetchFiles: (pageToken?: string) => Promise<void>;
+    fetchFiles: (pageToken?: string, reset?: boolean) => Promise<void>;
     importFile: (fileId: string, name: string) => Promise<{ name: string, mimeType: string, base64: string, size: number } | null>;
+    navigateToFolder: (folderId: string, folderName: string) => void;
+    goToParentFolder: () => void;
+    resetNavigation: () => void;
 }
 
 const GoogleDriveContext = createContext<GoogleDriveContextType | undefined>(undefined);
@@ -34,6 +44,8 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
     const [nextPageToken, setNextPageToken] = useState<string | null>(null);
     const [currentCategory, setCurrentCategory] = useState<DriveCategory>('all');
     const [searchQuery, setSearchQueryState] = useState('');
+    const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+    const [folderPath, setFolderPath] = useState<FolderInfo[]>([]);
     const { toast } = useToast();
 
     // Re-use tokens from session storage (shared with Gmail)
@@ -42,12 +54,27 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
         return saved ? { 'x-gmail-tokens': saved } : {};
     }, []);
 
-    const fetchFiles = useCallback(async (pageToken?: string) => {
+    const fetchFiles = useCallback(async (pageToken?: string, reset: boolean = false) => {
         setIsFetchingFiles(true);
+        if (reset) {
+            setFiles([]);
+            setNextPageToken(null);
+        }
+
         try {
             const params = new URLSearchParams();
             if (pageToken) params.append('pageToken', pageToken);
-            if (currentCategory !== 'all') params.append('category', currentCategory);
+
+            // If we are in "Cartelle" category, we only show folders
+            // If we are in any other category and have a folderId, we show content of that folder
+            if (currentCategory !== 'all') {
+                params.append('category', currentCategory);
+            } else if (currentFolderId) {
+                // If "All files" but inside a folder, we show content of the folder
+                // (Backend will need to handle folderId + all category)
+            }
+
+            if (currentFolderId) params.append('folderId', currentFolderId);
             if (searchQuery) params.append('q', searchQuery);
 
             const res = await apiRequest('GET', `/api/drive/files?${params.toString()}`, undefined, getGoogleHeaders());
@@ -70,7 +97,7 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
         } finally {
             setIsFetchingFiles(false);
         }
-    }, [getGoogleHeaders, currentCategory, searchQuery, toast]);
+    }, [getGoogleHeaders, currentCategory, currentFolderId, searchQuery, toast]);
 
     const importFile = async (fileId: string, name: string) => {
         try {
@@ -90,18 +117,49 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
     };
 
     const setCategory = useCallback((category: DriveCategory) => {
-        if (category === currentCategory) return;
         setCurrentCategory(category);
-        setFiles([]);
-        setNextPageToken(null);
-    }, [currentCategory]);
+        if (category === 'folders') {
+            // Cartelle tab should show root folders
+            setCurrentFolderId(null);
+            setFolderPath([]);
+        }
+        // Force reset and fetch will be handled by the caller or useEffect
+    }, []);
 
     const setSearchQuery = useCallback((query: string) => {
-        if (query === searchQuery) return;
         setSearchQueryState(query);
-        setFiles([]);
-        setNextPageToken(null);
-    }, [searchQuery]);
+    }, []);
+
+    // Auto-fetch on dependencies change
+    React.useEffect(() => {
+        const tokens = sessionStorage.getItem('gmail_tokens');
+        if (tokens) {
+            fetchFiles(undefined, true);
+        }
+    }, [currentCategory, currentFolderId, searchQuery, fetchFiles]);
+
+    const navigateToFolder = useCallback((folderId: string, folderName: string) => {
+        setCurrentFolderId(folderId);
+        setFolderPath(prev => [...prev, { id: folderId, name: folderName }]);
+        // When navigating to a folder, we should show "all" files in it
+        setCurrentCategory('all');
+    }, []);
+
+    const goToParentFolder = useCallback(() => {
+        setFolderPath(prev => {
+            const newPath = [...prev];
+            newPath.pop();
+            const parent = newPath[newPath.length - 1];
+            setCurrentFolderId(parent ? parent.id : null);
+            return newPath;
+        });
+    }, []);
+
+    const resetNavigation = useCallback(() => {
+        setCurrentFolderId(null);
+        setFolderPath([]);
+        setCurrentCategory('all');
+    }, []);
 
     return (
         <GoogleDriveContext.Provider value={{
@@ -110,10 +168,15 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
             nextPageToken,
             currentCategory,
             searchQuery,
+            currentFolderId,
+            folderPath,
             setCategory,
             setSearchQuery,
             fetchFiles,
-            importFile
+            importFile,
+            navigateToFolder,
+            goToParentFolder,
+            resetNavigation
         }}>
             {children}
         </GoogleDriveContext.Provider>
