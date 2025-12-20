@@ -144,16 +144,24 @@ async function fillPdfBinary(base64Original: string, fields: { text: string, box
 
       if (field.preciseBox) {
         // Use Document AI precise coordinates (normalized 0-1)
-        // We use the first vertex (top-left) but adjust for PDF bottom-left origin
         const vertices = field.preciseBox.normalizedVertices || field.preciseBox.vertices;
-        if (vertices && vertices.length > 0) {
-          const x = vertices[0].x * width;
-          const y = (1 - vertices[0].y) * height;
+        if (vertices && vertices.length >= 4) {
+          // Document AI vertices are usually [top-left, top-right, bottom-right, bottom-left]
+          // We want the bottom-left vertex for pdf-lib text placement (which is the origin for text)
+          const bl = vertices[3];
+          const tr = vertices[1];
+
+          const x = bl.x * width;
+          const y = (1 - bl.y) * height;
+
+          // Estimate optimal font size based on bounding box height
+          const boxHeight = (bl.y - tr.y) * height;
+          const fontSize = Math.max(7, Math.min(11, boxHeight * 0.7)); // 70% of box height, clamped
 
           page.drawText(field.text, {
-            x: x,
-            y: y - 2, // Slight baseline adjustment
-            size: 9,
+            x: x + 1, // Small margin
+            y: y + 2, // Sit safely ABOVE the line (baseline adjustment)
+            size: fontSize,
             font: font,
             color: rgb(0, 0, 0.5),
           });
@@ -1088,10 +1096,13 @@ ${pinnedSource ? `
 **FORMATO OUTPUT SPECIALE (SOLO SE PRESENTE PINNED SOURCE):**
 Se è presente un DOCUMENTO MASTER, devi rispondere con un oggetto JSON strutturato che permetta di mappare i dati sulle coordinate o sui tag del file originale.
 
-1. **Se Master è PDF**: 
-   ${preciseFields.length > 0 ? `Abbiamo rilevato i seguenti campi precisi nel PDF:
+   ${preciseFields.length > 0 ? `Abbiamo rilevato i seguenti campi precisi nel PDF Master tramite analisi layout. 
+   PER OGNI CAMPO CHE DESIDERI COMPILARE, usa esattamente il 'fieldName' corrispondente nel tuo JSON sotto la chiave "preciseData".
+   
+   CAMPI RILEVATI:
    ${preciseFields.map(f => `- "${f.name}"`).join('\n')}
-   Usa i nomi di questi campi nel tuo JSON sotto la chiave "preciseData".` : `Identifica i punti del documento dove mancano dati (es. righe vuote o underscore). Restituisci per ogni campo individuato le coordinate bounding box [ymin, xmin, ymax, xmax] in scala 0-1000 e il testo corrispondente.`}
+   
+   IMPORTANTE: Se compili un campo presente in questa lista, NON aggiungerlo a "data" con le coordinate [ymin, xmin, ymax, xmax], usa solo "preciseData".` : `Identifica i punti del documento dove mancano dati (es. righe vuote o underscore). Restituisci per ogni campo individuato le coordinate bounding box [ymin, xmin, ymax, xmax] in scala 0-1000 e il testo corrispondente.`}
    
 2. **Se Master è DOCX**: Identifica le chiavi/placeholder del documento originale.
 
@@ -1099,10 +1110,10 @@ Restituisci un blocco JSON finale nel formato:
 {
   "fillingMode": "pdf_coordinates" | "docx_tags" | "fallback_text",
   "data": [
-    {"text": "Valore da inserire", "box": [ymin, xmin, ymax, xmax]}, ... (solo se NON hai preciseData)
+    {"text": "Valore da inserire", "box": [ymin, xmin, ymax, xmax]}, ... (solo per campi NON rilevati dall'analisi layout)
   ],
   "preciseData": [
-    {"text": "Valore da inserire", "fieldName": "nome_campo_rilevato"}, ... (solo per PDF con campi rilevati)
+    {"text": "Valore da inserire", "fieldName": "nome_campo_rilevato"}, ... (PRIORITÀ per PDF con campi rilevati sopra)
   ],
   "tagData": {"TAG_NAME": "Valore", ...} (per DOCX)
 }
@@ -1700,6 +1711,13 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
 
       // Add pinned source instruction if present
       const pinnedSource = req.body.pinnedSource;
+      let preciseFields: any[] = [];
+
+      if (pinnedSource && pinnedSource.type === 'application/pdf') {
+        // Precise analysis for Analyzer too
+        preciseFields = await analyzePdfLayout(pinnedSource.base64);
+      }
+
       if (pinnedSource) {
         systemInstruction += `
 
@@ -1708,13 +1726,22 @@ L'utente ha contrassegnato "${pinnedSource.name}" come documento master.
 Se l'utente ti chiede di "compilare", "salvare" o "aggiornare" questo documento con i dati trovati nelle altre fonti o nella chat corrente, USA LO STRUMENTO generate_filled_document per generare i dati di compilazione.
 
 **REGOLE PER IL FILLING BINARIO:**
-1. **Se Master è PDF**: Individua le coordinate spaziali [ymin, xmin, ymax, xmax] (0-1000) dei placeholder o delle righe vuote da riempire.
+1. **Se Master è PDF**: 
+   ${preciseFields.length > 0 ? `Abbiamo rilevato i seguenti campi precisi nel PDF Master tramite analisi layout. 
+   PER OGNI CAMPO CHE DESIDERI COMPILARE, usa esattamente il 'fieldName' corrispondente nel tuo JSON sotto la chiave "preciseData".
+   
+   CAMPI RILEVATI:
+   ${preciseFields.map(f => `- "${f.name}"`).join('\n')}
+   
+   IMPORTANTE: Priorità assoluta a "preciseData" per i campi elencati sopra.` : `Individua le coordinate spaziali [ymin, xmin, ymax, xmax] (0-1000) dei placeholder o delle righe vuote da riempire.`}
+   
 2. **Se Master è DOCX**: Fornisci i dati come coppie chiave-valore per i tag del template.
 
 Nel parametro 'content', restituisci un oggetto JSON strutturato:
 {
   "fillingMode": "pdf_coordinates" | "docx_tags" | "fallback_text",
-  "data": [{"text": "Valore", "box": [ymin, xmin, ymax, xmax]}, ...],
+  "data": [{"text": "Valore", "box": [ymin, xmin, ymax, xmax]}, ...], (solo per campi NON rilevati)
+  "preciseData": [{"text": "Valore", "fieldName": "nome_campo_rilevato"}, ...], (PRIORITÀ per PDF con campi rilevati sopra)
   "tagData": {"CHIAVE": "Valore", ...},
   "previewText": "Testo completo compilato (fallback)"
 }`;
@@ -1907,7 +1934,7 @@ Nel parametro 'content', restituisci un oggetto JSON strutturato:
 
       // Pinned source tool handled above (const pinnedSource = req.body.pinnedSource)
       if (pinnedSource) {
-        const docTool = {
+        const tools = [{
           functionDeclarations: [{
             name: "generate_filled_document",
             description: "Genera un documento compilato partendo dal file master (puntina rossa) e dai dati estratti. Usa questa funzione se l'utente chiede esplicitamente di 'compilare il file', 'riempire il modulo' o 'salvare i dati nel documento' basandosi sul file master.",
@@ -1926,15 +1953,14 @@ Nel parametro 'content', restituisci un oggetto JSON strutturato:
               required: ["content"]
             }
           }]
-        };
+        }];
 
-        if (!generateOptions.tools) {
-          generateOptions.tools = [docTool];
+        if (webResearch) {
+          generateOptions.tools = [{ googleSearch: {} }, ...tools];
         } else {
-          // Add to existing tools (e.g. googleSearch)
-          generateOptions.tools.push(docTool);
+          generateOptions.tools = tools;
         }
-        console.log('[DEBUG Chat] Pinned source tool ENABLED');
+        console.log('[DEBUG Chat] Pinned source tool ENABLED with Vertex SDK');
       }
 
       // Use standard generation for stability
@@ -1950,42 +1976,61 @@ Nel parametro 'content', restituisci un oggetto JSON strutturato:
       if (response.candidates && response.candidates.length > 0) {
         const candidate = response.candidates[0];
 
-        // Check for function call
-        const funcCall = candidate.content?.parts?.find((p: any) => p.functionCall);
 
-        if (funcCall && funcCall.functionCall.name === "generate_filled_document") {
-          const args: any = funcCall.functionCall.args;
-          console.log('[DEBUG Chat] Function call received:', funcCall.functionCall.name);
+        // Process function calls from Vertex AI SDK
+        const functionCalls = candidate.content?.parts?.filter((p: any) => p.functionCall);
 
-          text = args.summary || "Ho generato il documento compilato basandomi sulla tua richiesta.";
+        if (functionCalls && functionCalls.length > 0) {
+          const funcCall = functionCalls[0].functionCall;
+          if (funcCall.name === "generate_filled_document") {
+            const args: any = funcCall.args;
+            console.log('[DEBUG Chat] Function call received via SDK:', funcCall.name);
 
-          let binaryBase64 = '';
-          let finalMimeType = pinnedSource.type;
+            text = args.summary || "Ho generato il documento compilato basandomi sulla tua richiesta.";
 
-          try {
-            const fillingData = JSON.parse(args.content);
-            if (pinnedSource.type === 'application/pdf' && fillingData.fillingMode === 'pdf_coordinates') {
-              binaryBase64 = await fillPdfBinary(pinnedSource.base64, fillingData.data);
-            } else if (pinnedSource.type.includes('wordprocessingml.document') && fillingData.fillingMode === 'docx_tags') {
-              binaryBase64 = await fillDocxBinary(pinnedSource.base64, fillingData.tagData);
-            } else {
-              binaryBase64 = await generateProfessionalDocxBase64(fillingData.previewText || args.content);
+            let binaryBase64 = '';
+            let finalMimeType = pinnedSource.type;
+
+            try {
+              const fillingData = typeof args.content === 'string' ? JSON.parse(args.content) : args.content;
+              if (pinnedSource.type === 'application/pdf' && fillingData.fillingMode === 'pdf_coordinates') {
+                const finalFields = (fillingData.data || []).map((f: any) => ({ ...f }));
+
+                if (fillingData.preciseData && preciseFields.length > 0) {
+                  for (const pd of fillingData.preciseData) {
+                    const match = preciseFields.find(pf => pf.name === pd.fieldName);
+                    if (match) {
+                      finalFields.push({
+                        text: pd.text,
+                        preciseBox: match.boundingPoly,
+                        pageIndex: match.pageIndex
+                      });
+                    }
+                  }
+                }
+
+                binaryBase64 = await fillPdfBinary(pinnedSource.base64, finalFields);
+              } else if (pinnedSource.type.includes('wordprocessingml.document') && fillingData.fillingMode === 'docx_tags') {
+                binaryBase64 = await fillDocxBinary(pinnedSource.base64, fillingData.tagData);
+              } else {
+                binaryBase64 = await generateProfessionalDocxBase64(fillingData.previewText || args.content);
+                finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+              }
+            } catch (e) {
+              console.warn('[WARN Chat] Failed to parse filling JSON from tool, falling back to reproduction');
+              binaryBase64 = await generateProfessionalDocxBase64(args.content);
               finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
             }
-          } catch (e) {
-            console.warn('[WARN Chat] Failed to parse filling JSON from tool, falling back to reproduction');
-            binaryBase64 = await generateProfessionalDocxBase64(args.content);
-            finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-          }
 
-          return res.json({
-            text,
-            file: {
-              name: (binaryBase64 === pinnedSource.base64 ? 'Non_Modificato_' : 'Compilato_') + pinnedSource.name,
-              type: finalMimeType,
-              base64: binaryBase64
-            }
-          });
+            return res.json({
+              text,
+              file: {
+                name: (binaryBase64 === pinnedSource.base64 ? 'Non_Modificato_' : 'Compilato_') + pinnedSource.name,
+                type: finalMimeType,
+                base64: binaryBase64
+              }
+            });
+          }
         }
 
         // Extract Text
