@@ -267,12 +267,14 @@ async function fillPdfBinary(
           let x = bl.x * width;
           let y = (1 - bl.y) * height;
 
-          // Apply manual adjustments (assuming they were calculated relative to an 800px width preview)
+          // Apply manual adjustments (pixels relative to 800px width preview)
           if (field.offsetX !== undefined) {
             x += (field.offsetX / 800) * width;
           }
           if (field.offsetY !== undefined) {
-            y -= (field.offsetY / 1000) * height; // Simplified scaling for now
+            // Scale Y offset using the same ratio as X (width/800) because pixels are square
+            // Subtract because dragging down (positive pixel Y) means moving towards 0 in PDF coords (bottom-left origin)
+            y -= field.offsetY * (width / 800);
           }
 
           // Estimate optimal font size based on bounding box height

@@ -346,6 +346,8 @@ export function DocumentCompilerSection({
         fields: discoveredFieldNames
       });
 
+      console.log('[DEBUG Frontend] Calling /api/compile with fields:', discoveredFieldNames);
+
       const data = await response.json();
       if (data.values) {
         setStudioValues(data.values);

@@ -97,8 +97,10 @@ export function DocumentStudio({
 
             const data = await response.json();
             if (data.fields) {
+                console.log("[DEBUG DocumentStudio] Fields discovered:", data.fields.length);
                 setFields(data.fields.map((f: any) => ({ ...f, value: "", offsetX: 0, offsetY: 0, rotation: 0 })));
                 if (onFieldsDiscovered) {
+                    console.log("[DEBUG DocumentStudio] Notifying parent of fields:", data.fields.map((f: any) => f.name));
                     onFieldsDiscovered(data.fields.map((f: any) => f.name));
                 }
             }
@@ -124,8 +126,8 @@ export function DocumentStudio({
             <CardHeader className="flex-shrink-0 px-0 pb-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="px-3 py-2 bg-blue-50 rounded-lg">
-                            <span className="text-2xl font-bold text-blue-600">***</span>
+                        <div className="flex items-center">
+                            <span className="text-4xl font-bold text-blue-600 p-0 m-0 leading-none" style={{ letterSpacing: '2px' }}>***</span>
                         </div>
                         <div>
                             <CardTitle className="text-lg">Document Studio</CardTitle>
@@ -142,6 +144,17 @@ export function DocumentStudio({
                             <Download className="w-4 h-4" />
                             Scarica PDF
                         </Button>
+                        {fields.length === 0 && !isLoadingFields && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => analyzeLayout()}
+                                className="gap-2"
+                            >
+                                <Wand2 className="w-4 h-4" />
+                                Riprova Analisi
+                            </Button>
+                        )}
                     </div>
                 </div>
             </CardHeader>
