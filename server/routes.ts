@@ -97,13 +97,16 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
     }
 
     console.log(`[DEBUG analyzePdfLayout] Cache MISS, calling Document AI for hash ${contentHash}...`);
-    const client = new DocumentProcessorServiceClient();
+    // For locations other than 'us', we must specify the apiEndpoint
+    const client = new DocumentProcessorServiceClient({
+      apiEndpoint: `${location}-documentai.googleapis.com`
+    });
     const name = `projects/${projectId}/locations/${location}/processors/${processorId}`;
 
     const request = {
       name,
       rawDocument: {
-        content: base64Pdf,
+        content: Buffer.from(base64Pdf, 'base64'),
         mimeType: 'application/pdf',
       },
     };
