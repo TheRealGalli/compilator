@@ -136,12 +136,12 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
       for (const entity of document.entities) {
         const entityName = entity.type || entity.mentionText || "Entity";
         // Precision check: try normalized vertices first
-        const poly = entity.pageAnchor?.pageRefs?.[0]?.boundingPoly || entity.normalizedBoundingPoly;
+        const poly = (entity.pageAnchor?.pageRefs?.[0] as any)?.boundingPoly || (entity as any).normalizedBoundingPoly;
         if (poly) {
           discoveredFields.push({
             name: entityName,
             boundingPoly: poly,
-            pageIndex: (entity.pageAnchor?.pageRefs?.[0]?.page || 1) - 1,
+            pageIndex: (Number((entity.pageAnchor?.pageRefs?.[0] as any)?.page || 1)) - 1,
             source: 'entity'
           });
         }
@@ -157,8 +157,8 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
             const fieldName = getTextFromAnchor(field.fieldName?.textAnchor);
             const boundingPoly =
               field.fieldValue?.boundingPoly ||
-              field.fieldValue?.layout?.boundingPoly ||
-              field.fieldName?.layout?.boundingPoly;
+              (field.fieldValue as any)?.layout?.boundingPoly ||
+              (field.fieldName as any)?.layout?.boundingPoly;
 
             if (fieldName && boundingPoly) {
               discoveredFields.push({
@@ -984,15 +984,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint per compilare documenti con AI
+  // NEW: Layout analysis for Document Studio
+  app.post('/api/analyze-layout', async (req, res) => {
+    try {
+      const { base64 } = req.body;
+      if (!base64) return res.status(400).json({ error: 'Missing base64 content' });
+
+      const fields = await analyzePdfLayout(base64);
+      res.json({ fields });
+    } catch (error: any) {
+      console.error('[API analyze-layout] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post('/api/compile', async (req: Request, res: Response) => {
     try {
-      const { template, notes, temperature, formalTone, detailedAnalysis, webResearch, sources } = req.body;
+      const {
+        template,
+        notes,
+        temperature,
+        formalTone,
+        detailedAnalysis,
+        webResearch,
+        sources,
+        pinnedSource,
+        fillingMode, // New: 'studio'
+        fields: requestedFields // New: list of fields to fill
+      } = req.body;
 
-      const pinnedSource = req.body.pinnedSource; // {name, type, base64}
-
-      if (!template && !pinnedSource) {
+      if (!template && !pinnedSource && fillingMode !== 'studio') { // Adjusted condition for studio mode
         return res.status(400).json({ error: 'Template o fonte master (ping rosso) richiesti' });
       }
+      if (fillingMode === 'studio' && (!requestedFields || requestedFields.length === 0)) {
+        return res.status(400).json({ error: 'In modalità studio, sono richiesti i campi da compilare.' });
+      }
+
 
       console.log(`[DEBUG Compile] Received sources:`, sources?.length || 0);
 
@@ -1156,7 +1183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         preciseFields = await analyzePdfLayout(pinnedSource.base64);
       }
 
-      const systemPrompt = `Data e ora corrente: ${dateTimeIT}
+      let systemPrompt = `Data e ora corrente: ${dateTimeIT}
 
 Sei un assistente AI esperto nella compilazione di documenti. 
 
@@ -1181,7 +1208,7 @@ MODALITÀ ANALISI DETTAGLIATA ATTIVA:
 
 ${webResearch ? `
 MODALITÀ WEB RESEARCH (GROUNDING & FONTI ESTERNE):
-- **SCOPO LINK NELLE NOTE:** Se l'utente fornisce un URL nelle note, USA il contenuto di quel link per arricchire il **contesto**, la **descrizione tecnica** e i **dettagli del contenuto** del documento.
+- **SCOPO LINK NELLE NOTE:** Se l'utente fornisce un URL nelle note, USA il contenuto di quel link per arricchire il **contest**o, la **descrizione tecnica** e i **dettagli del contenuto** del documento.
 - **PRIORITÀ DATI:** I dati anagrafici (Cliente, Date, Responsabili) devono provenire prioritariamente dai **FILE CARICATI**. Usa il LINK WEB per descrivere *l'argomento* del documento.
 - **GROUNDING:** Usa la conoscenza web generale per riferimenti normativi e standard.` : 'MODALITÀ WEB RESEARCH DISATTIVATA: Usa solo la tua conoscenza base e i documenti forniti.'}
 
@@ -1228,10 +1255,24 @@ Restituisci un blocco JSON finale nel formato:
 }
 ` : ''}`;
 
+      if (fillingMode === 'studio') {
+        systemPrompt += `
+**MODALITÀ STUDIO ATTIVA:**
+Devi rispondere ESCLUSIVAMENTE con un oggetto JSON che mappa i nomi dei campi richiesti ai valori estratti dai documenti o generati in base alle istruzioni.
+Non includere alcun testo aggiuntivo, spiegazioni o formattazione oltre al JSON.
+I campi richiesti sono: ${requestedFields?.join(', ')}.
+Se un campo non può essere compilato, usa null o una stringa vuota.
+Esempio di output:
+{
+  "nome_cliente": "Mario Rossi",
+  "data_contratto": "2023-10-26",
+  "oggetto_progetto": "Sviluppo App Mobile"
+}`;
+      }
 
 
       // Configure model without tools (tools go in generateContent)
-      const model = vertex_ai.getGenerativeModel({
+      const modelInstance = vertex_ai.getGenerativeModel({
         model: "gemini-2.5-flash",
         systemInstruction: {
           role: 'system',
@@ -1239,7 +1280,18 @@ Restituisci un blocco JSON finale nel formato:
         }
       });
 
-      const userPrompt = `Compila il seguente template con informazioni coerenti e professionali.
+      // Build prompt for filling
+      let userPrompt = ``;
+      if (fillingMode === 'studio') {
+        userPrompt = `You are a professional document compiler.
+${notes ? `Additional Instructions: ${notes}` : ""}
+
+Analyze the provided documents and fill the requested fields.
+IMPORTANT: You must return ONLY a JSON object mapping the field names to their values.
+Fields to fill: ${requestedFields?.join(', ')}
+`;
+      } else {
+        userPrompt = `Compila il seguente template con informazioni coerenti e professionali.
       ${notes ? `\nNOTE AGGIUNTIVE: ${notes}` : ''}
 ${formalTone ? '\nUsa un tono formale e professionale.' : ''}
 
@@ -1254,33 +1306,47 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
 - Sfrutta i FILE(se presenti) per i dati anagrafici precisi.
 - Se mancano dati: "Errore di compilazione"(solo se bloccante) o[DATO MANCANTE].
 ${pinnedSource ? `\n\nIMPORTANTE: Dato che c'è un DOCUMENTO MASTER, DEVI generare il JSON di filling descritto sopra per una modifica binaria precisa. Se è un PDF, individua gli underscore o gli spazi vuoti e forniscimi le coordinate BOX.` : ''} `;
+      }
 
       // Build contents with multimodal files
-      const userParts: any[] = [{ text: userPrompt }];
+      const messageParts: any[] = [{ text: userPrompt }];
 
       // Add multimodal files as inline data
       for (const file of multimodalFiles) {
-        userParts.push({
+        messageParts.push({
           inlineData: { mimeType: file.mimeType, data: file.data }
         });
       }
 
       // Add pinned source as image/pdf for structural guide if applicable
       if (pinnedSource && (pinnedSource.type.startsWith('image/') || pinnedSource.type === 'application/pdf')) {
-        userParts.push({
+        messageParts.push({
           inlineData: { mimeType: pinnedSource.type, data: pinnedSource.base64 }
         });
       }
 
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: userParts }],
+      const result = await modelInstance.generateContent({
+        contents: [{ role: 'user', parts: messageParts }],
         generationConfig: {
           temperature: temperature || 0.7,
-        }
+        },
       });
 
-      const response = await result.response;
-      let compiledContent = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (fillingMode === 'studio') {
+        try {
+          // Extract JSON from response
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          const values = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+          return res.json({ success: true, values });
+        } catch (e) {
+          console.error('[API compile] JSON parse error in studio mode:', e);
+          return res.status(500).json({ error: 'Failed to generate structured values' });
+        }
+      }
+
+      let compiledContent = text;
 
       if (pinnedSource) {
         console.log(`[DEBUG Compile] Pinned source detected: ${pinnedSource.name} (${pinnedSource.type})`);

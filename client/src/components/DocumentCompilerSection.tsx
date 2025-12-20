@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSources } from "@/contexts/SourcesContext";
+import { DocumentStudio } from "./DocumentStudio";
 import {
   Dialog,
   DialogContent,
@@ -590,36 +591,89 @@ export function DocumentCompilerSection({
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 overflow-hidden">
-        <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full overflow-auto">
-          <ModelSettings
-            notes={notes}
-            temperature={temperature}
-            webResearch={webResearch}
-            detailedAnalysis={detailedAnalysis}
-            formalTone={formalTone}
-            modelProvider={modelProvider}
-            onNotesChange={setNotes}
-            onTemperatureChange={setTemperature}
-            onWebResearchChange={setWebResearch}
-            onDetailedAnalysisChange={setDetailedAnalysis}
-            onFormalToneChange={setFormalTone}
-            onModelProviderChange={setModelProvider}
-          />
-        </div>
-        <div className="lg:col-span-4 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
-          <TemplateEditor
-            value={templateContent}
-            onChange={setTemplateContent}
-          />
-        </div>
-        <div className="lg:col-span-5 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
-          <CompiledOutput
-            content={compiledContent}
-            onCopy={handleCopy}
-            onDownload={handleDownload}
-          />
-        </div>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {pinnedSource ? (
+          pinnedSource.type === 'application/pdf' || pinnedSource.type.startsWith('image/') ? (
+            <DocumentStudio
+              pdfBase64={pinnedSource.base64}
+              fileName={pinnedSource.name}
+              onDownload={async (filledFields) => {
+                // Final PDF generation logic
+                setIsCompiling(true);
+                try {
+                  const { apiRequest } = await import("@/lib/queryClient");
+                  const response = await apiRequest('POST', '/api/compile', {
+                    template: "", // Using pinnedSource
+                    notes,
+                    sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
+                    pinnedSource: {
+                      name: pinnedSource.name,
+                      type: pinnedSource.type,
+                      base64: pinnedSource.base64
+                    },
+                    // We send the specific data for pdflib filling
+                    data: filledFields.reduce((acc, f) => ({ ...acc, [f.name]: f.value }), {})
+                  });
+                  const data = await response.json();
+                  if (data.file) {
+                    const { saveAs } = await import("file-saver");
+                    const byteCharacters = atob(data.file.base64);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    const blob = new Blob([new Uint8Array(byteNumbers)], { type: data.file.type });
+                    saveAs(blob, data.file.name);
+                  }
+                } catch (e) {
+                  console.error("Final download failed:", e);
+                } finally {
+                  setIsCompiling(false);
+                }
+              }}
+              isProcessing={isCompiling}
+
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center bg-muted/20 rounded-xl border-dashed border-2">
+              <div className="text-center space-y-2">
+                <FileText className="w-12 h-12 text-muted-foreground mx-auto opacity-20" />
+                <p className="font-medium">Visual Studio - Coming Soon</p>
+                <p className="text-xs text-muted-foreground">La visualizzazione real-time per questo tipo di file è in fase di sviluppo.</p>
+              </div>
+            </div>
+          )
+        ) : (
+          <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full overflow-auto">
+              <ModelSettings
+                notes={notes}
+                temperature={temperature}
+                webResearch={webResearch}
+                detailedAnalysis={detailedAnalysis}
+                formalTone={formalTone}
+                modelProvider={modelProvider}
+                onNotesChange={setNotes}
+                onTemperatureChange={setTemperature}
+                onWebResearchChange={setWebResearch}
+                onDetailedAnalysisChange={setDetailedAnalysis}
+                onFormalToneChange={setFormalTone}
+                onModelProviderChange={setModelProvider}
+              />
+            </div>
+            <div className="lg:col-span-4 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
+              <TemplateEditor
+                value={templateContent}
+                onChange={setTemplateContent}
+              />
+            </div>
+            <div className="lg:col-span-5 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
+              <CompiledOutput
+                content={compiledContent}
+                onCopy={handleCopy}
+                onDownload={handleDownload}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Template Generation Modal */}
