@@ -17,6 +17,8 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } f
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
+import { v1 as documentai } from '@google-cloud/documentai';
+const { DocumentProcessorServiceClient } = documentai;
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
@@ -71,35 +73,104 @@ async function generateProfessionalDocxBase64(content: string): Promise<string> 
 }
 
 /**
+ * Helper to analyze PDF layout using Document AI Form Parser
+ */
+async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
+  try {
+    const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
+    const location = 'eu'; // or 'us'
+    const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
+
+    if (!processorId) {
+      console.warn('[analyzePdfLayout] DOCUMENT_AI_PROCESSOR_ID not set, skipping precision analysis');
+      return [];
+    }
+
+    const client = new DocumentProcessorServiceClient();
+    const name = `projects/${projectId}/locations/${location}/processors/${processorId}`;
+
+    const request = {
+      name,
+      rawDocument: {
+        content: base64Pdf,
+        mimeType: 'application/pdf',
+      },
+    };
+
+    const [result] = await client.processDocument(request);
+    const { document } = result;
+
+    const discoveredFields: any[] = [];
+    if (document && document.pages) {
+      for (const page of document.pages) {
+        if (page.formFields) {
+          for (const field of page.formFields) {
+            const fieldName = field.fieldName?.textAnchor?.content?.replace(/\n/g, ' ').trim();
+            const boundingPoly = field.fieldValue?.boundingPoly;
+            if (fieldName && boundingPoly) {
+              discoveredFields.push({
+                name: fieldName,
+                boundingPoly,
+                pageIndex: (page.pageNumber || 1) - 1
+              });
+            }
+          }
+        }
+      }
+    }
+    console.log(`[DEBUG analyzePdfLayout] Discovered ${discoveredFields.length} fields`);
+    return discoveredFields;
+  } catch (err) {
+    console.error('[ERROR analyzePdfLayout]', err);
+    return [];
+  }
+}
+
+/**
  * Helper to overlay text on a PDF at specific coordinates
  * coordinateBox is expected to be [ymin, xmin, ymax, xmax] in 0-1000 scale (Gemini output)
+ * OR precise coordinates if coming from Document AI
  */
-async function fillPdfBinary(base64Original: string, fields: { text: string, box: number[] }[]): Promise<string> {
+async function fillPdfBinary(base64Original: string, fields: { text: string, box?: number[], preciseBox?: any }[]): Promise<string> {
   try {
     const pdfDoc = await PDFDocument.load(Buffer.from(base64Original, 'base64'));
     const pages = pdfDoc.getPages();
-    const firstPage = pages[0]; // Assuming single page for now or need page index from AI
-    const { width, height } = firstPage.getSize();
     const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     for (const field of fields) {
-      if (!field.box || field.box.length !== 4) continue;
+      const pageIndex = (field as any).pageIndex || 0;
+      const page = pages[pageIndex] || pages[0];
+      const { width, height } = page.getSize();
 
-      // Convert Gemini 0-1000 coordinates to PDF points
-      // Gemini: [ymin, xmin, ymax, xmax]
-      // PDF-Lib origins are bottom-left
-      const yMin = (1000 - field.box[0]) * height / 1000;
-      const xMin = field.box[1] * width / 1000;
-      const yMax = (1000 - field.box[2]) * height / 1000;
+      if (field.preciseBox) {
+        // Use Document AI precise coordinates (normalized 0-1)
+        // We use the first vertex (top-left) but adjust for PDF bottom-left origin
+        const vertices = field.preciseBox.normalizedVertices || field.preciseBox.vertices;
+        if (vertices && vertices.length > 0) {
+          const x = vertices[0].x * width;
+          const y = (1 - vertices[0].y) * height;
 
-      // We want to write at xMin, yMin (adjusting for font height)
-      firstPage.drawText(field.text, {
-        x: xMin,
-        y: yMin - 10, // Slight offset to align with baseline
-        size: 10,
-        font: font,
-        color: rgb(0, 0, 0.4), // Dark blue to distinguish filled data
-      });
+          page.drawText(field.text, {
+            x: x,
+            y: y - 2, // Slight baseline adjustment
+            size: 9,
+            font: font,
+            color: rgb(0, 0, 0.5),
+          });
+        }
+      } else if (field.box && field.box.length === 4) {
+        // Fallback to Gemini 0-1000 coordinates
+        const yMin = (1000 - field.box[0]) * height / 1000;
+        const xMin = field.box[1] * width / 1000;
+
+        page.drawText(field.text, {
+          x: xMin,
+          y: yMin - 10,
+          size: 10,
+          font: font,
+          color: rgb(0, 0, 0.4),
+        });
+      }
     }
 
     const pdfBytes = await pdfDoc.save();
@@ -964,6 +1035,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasExternalSources = fetchedCompilerContext.length > 0;
       const totalSources = multimodalFiles.length + (hasExternalSources ? 1 : 0);
 
+
+      // AI Precision Layout Analysis (Document AI) if PDF is pinned
+      let preciseFields: any[] = [];
+      if (pinnedSource && pinnedSource.type === 'application/pdf') {
+        preciseFields = await analyzePdfLayout(pinnedSource.base64);
+      }
+
       const systemPrompt = `Data e ora corrente: ${dateTimeIT}
 
 Sei un assistente AI esperto nella compilazione di documenti. 
@@ -1004,24 +1082,32 @@ Hai accesso a ${multimodalFiles.length + (compileTextContext.length > 0 ? 1 : 0)
 ${compileTextContext.length > 0 ? `**TESTO ESTRATTO DAI DOCUMENTI:**\n${compileTextContext}` : ''}
  
 **ISTRUZIONE DI SINTESI:**
-Incrocia i dati dei FILE e del TESTO ESTRATTO (fatti, persone, date) con le informazioni di contesto del LINK WEB per compilare il template.` : 'NESSUN FILE SORGENTE: Se presenti Link Web, usali per il contesto, ma non inventare i dati anagrafici mancanti.'}
+Incrocia i dati dei FILE e del TESTO ESTRATTO (fatti, persone, date) con le informazioni di contesto del LINK WEB per compilare il template.` : 'NESSUN FILE SORGENTE: Se presenti Link Web, usali per il contesto, mas non inventare i dati anagrafici mancanti.'}
 
 ${pinnedSource ? `
 **FORMATO OUTPUT SPECIALE (SOLO SE PRESENTE PINNED SOURCE):**
 Se è presente un DOCUMENTO MASTER, devi rispondere con un oggetto JSON strutturato che permetta di mappare i dati sulle coordinate o sui tag del file originale.
 
-1. **Se Master è PDF**: Identifica i punti del documento dove mancano dati (es. righe vuote o underscore). Restituisci per ogni campo individuato le coordinate bounding box [ymin, xmin, ymax, xmax] in scala 0-1000 e il testo corrispondente.
+1. **Se Master è PDF**: 
+   ${preciseFields.length > 0 ? `Abbiamo rilevato i seguenti campi precisi nel PDF:
+   ${preciseFields.map(f => `- "${f.name}"`).join('\n')}
+   Usa i nomi di questi campi nel tuo JSON sotto la chiave "preciseData".` : `Identifica i punti del documento dove mancano dati (es. righe vuote o underscore). Restituisci per ogni campo individuato le coordinate bounding box [ymin, xmin, ymax, xmax] in scala 0-1000 e il testo corrispondente.`}
+   
 2. **Se Master è DOCX**: Identifica le chiavi/placeholder del documento originale.
 
 Restituisci un blocco JSON finale nel formato:
 {
   "fillingMode": "pdf_coordinates" | "docx_tags" | "fallback_text",
   "data": [
-    {"text": "Valore da inserire", "box": [ymin, xmin, ymax, xmax]}, ... (per PDF)
+    {"text": "Valore da inserire", "box": [ymin, xmin, ymax, xmax]}, ... (solo se NON hai preciseData)
+  ],
+  "preciseData": [
+    {"text": "Valore da inserire", "fieldName": "nome_campo_rilevato"}, ... (solo per PDF con campi rilevati)
   ],
   "tagData": {"TAG_NAME": "Valore", ...} (per DOCX)
 }
 ` : ''}`;
+
 
 
       // Configure model without tools (tools go in generateContent)
@@ -1091,11 +1177,28 @@ ${pinnedSource ? `\n\nIMPORTANTE: Dato che c'è un DOCUMENTO MASTER, DEVI genera
           console.warn('[WARN Compile] Failed to parse filling JSON, falling back to reproduction');
         }
 
+
         let binaryBase64 = '';
         let finalMimeType = pinnedSource.type;
 
         if (pinnedSource.type === 'application/pdf' && fillingData?.fillingMode === 'pdf_coordinates') {
-          binaryBase64 = await fillPdfBinary(pinnedSource.base64, fillingData.data);
+          // Map preciseData to preciseBox if available
+          const finalFields = (fillingData.data || []).map((f: any) => ({ ...f }));
+
+          if (fillingData.preciseData && preciseFields.length > 0) {
+            for (const pd of fillingData.preciseData) {
+              const match = preciseFields.find(pf => pf.name === pd.fieldName);
+              if (match) {
+                finalFields.push({
+                  text: pd.text,
+                  preciseBox: match.boundingPoly,
+                  pageIndex: match.pageIndex
+                });
+              }
+            }
+          }
+
+          binaryBase64 = await fillPdfBinary(pinnedSource.base64, finalFields);
           console.log('[DEBUG Compile] PDF binary modification successful');
         } else if (pinnedSource.type.includes('wordprocessingml.document') && fillingData?.fillingMode === 'docx_tags') {
           binaryBase64 = await fillDocxBinary(pinnedSource.base64, fillingData.tagData);
