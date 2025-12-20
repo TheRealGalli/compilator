@@ -1173,21 +1173,29 @@ Restituisci un blocco JSON finale nel formato:
 ` : ''}`;
 
       if (fillingMode === 'studio') {
-        const fieldsToFill = (requestedFields && requestedFields.length > 0)
-          ? requestedFields
-          : preciseFields.map(f => f.name); // Fallback to discovered fields
+        const isAutoMode = (!requestedFields || requestedFields.length === 0);
+
+        const fieldsList = isAutoMode
+          ? "TUTTI i campi pertinenti identificabili nel documento"
+          : fieldsToFill.join(', ');
 
         systemPrompt += `
 **MODALITÀ STUDIO ATTIVA:**
-Devi rispondere ESCLUSIVAMENTE con un oggetto JSON che mappa i nomi dei campi richiesti ai valori estratti dai documenti o generati in base alle istruzioni.
-Non includere alcun testo aggiuntivo, spiegazioni o formattazione oltre al JSON.
-I campi da compilare sono: ${fieldsToFill.join(', ')}.
-Se un campo non può essere compilato, usa null o una stringa vuota.
+${isAutoMode ? "Hai PIENA AUTONOMIA decisionale." : "Segui le richieste utente."}
+Devi rispondere ESCLUSIVAMENTE con un oggetto JSON che mappa i nomi dei campi ai valori estratti.
+Non includere alcun testo aggiuntivo.
+
+${isAutoMode ? `
+REGOLE AUTONOMIA:
+1. Esamina il documento visivamente.
+2. Identifica tutti i campi che richiedono dati (non limitarti a quelli rilevati dall'AI se ne vedi altri).
+3. Usa nomi di campo semantici (es. "cognome_cliente", "data_firma").
+` : `I campi da compilare sono: ${fieldsList}.`}
+
 Esempio di output:
 {
   "nome_cliente": "Mario Rossi",
-  "data_contratto": "2023-10-26",
-  "oggetto_progetto": "Sviluppo App Mobile"
+  "data_contratto": "2023-10-26"
 }`;
       }
 
@@ -1196,16 +1204,19 @@ Esempio di output:
       // Build prompt for filling
       let userPrompt = ``;
       if (fillingMode === 'studio') {
-        const fieldsToFill = (requestedFields && requestedFields.length > 0)
-          ? requestedFields
-          : preciseFields.map(f => f.name); // Fallback
+        const isAutoMode = (!requestedFields || requestedFields.length === 0);
 
         userPrompt = `
-Sei un assistente intelligente che compila documenti.
-Analizza il documento fornito (immagine/PDF) e le fonti di supporto (testo/altri file).
+Sei un compilatore esperto e autonomo.
+Hai PIENO CONTROLLO del documento.
+Il tuo compito è completarlo usando i dati disponibili.
 
-Il tuo compito è compilare i seguenti campi del form:
-${fieldsToFill.map((f: string) => `- ${f}`).join('\n')}
+${isAutoMode ? `
+ISTRUZIONI AUTONOMIA:
+- Non aspettare una lista di campi.
+- Osserva il documento e riempi tutto ciò che ha senso riempire.
+- Usa i campi rilevati dall'AI come suggerimento posizionale, ma sentiti libero di aggiungere altri campi se necessario.
+` : `Compila i seguenti campi:\n${fieldsToFill.map((f: string) => `- ${f}`).join('\n')}`}
 
 IMPORTANTE:
 ${notes ? `NOTE UTENTE AGGIUNTIVE: ${notes}` : ""}
