@@ -1255,13 +1255,23 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
 
       console.log('[DEBUG Compile] Delegating to AiService (Gemini 2.5 Flash)...');
 
-      const text = await aiService.compileDocument({
-        systemPrompt,
-        userPrompt,
-        multimodalFiles,
-        pinnedSource
-      });
-      console.log('[DEBUG Compile] AI Response received.');
+      let text = "";
+      // OPTIMIZATION & FIX: If we have direct data (Download Flow), skip LLM and use it.
+      if (req.body.data && pinnedSource && pinnedSource.type === 'application/pdf') {
+        console.log('[DEBUG Compile] FAST PATH: Direct data present, skipping LLM generation.');
+        text = JSON.stringify({
+          fillingMode: 'pdf_coordinates',
+          info: "Generated from direct user input"
+        });
+      } else {
+        text = await aiService.compileDocument({
+          systemPrompt,
+          userPrompt,
+          multimodalFiles,
+          pinnedSource
+        });
+      }
+      console.log('[DEBUG Compile] AI Response processed.');
 
       if (fillingMode === 'studio') {
         try {
@@ -1355,36 +1365,76 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
         let binaryBase64 = '';
         let finalMimeType = pinnedSource.type;
 
-        if (pinnedSource.type === 'application/pdf' && fillingData?.fillingMode === 'pdf_coordinates') {
-          // Map preciseData to preciseBox if available
-          const finalFields = (fillingData.data || []).map((f: any) => ({ ...f }));
+        if (pinnedSource.type === 'application/pdf') {
+          let finalFields: any[] = [];
 
-          if (fillingData.preciseData && preciseFields.length > 0) {
-            console.log(`[DEBUG Compile] Fuzzy-mapping ${fillingData.preciseData.length} inputs against ${preciseFields.length} detected fields...`);
-            for (const pd of fillingData.preciseData) {
-              const cleanedInputName = (pd.fieldName || "").trim().toLowerCase();
-              const match = preciseFields.find(pf => {
-                const cleanedDetectedName = (pf.name || "").trim().toLowerCase();
-                return cleanedDetectedName === cleanedInputName ||
-                  cleanedDetectedName.includes(cleanedInputName) ||
-                  cleanedInputName.includes(cleanedDetectedName);
-              });
+          // FAST PATH: Check for direct data from frontend (Download PDF flow)
+          if (req.body.data) {
+            console.log('[DEBUG Compile] FAST PATH: Direct data provided for PDF filling.');
+            const inputData = req.body.data;
 
-              if (match) {
-                console.log(`[DEBUG Compile] MAPPED: "${pd.fieldName}" -> "${match.name}"`);
-                finalFields.push({
-                  text: pd.text,
-                  preciseBox: match.boundingPoly,
-                  pageIndex: match.pageIndex
+            // Map inputData keys to preciseFields
+            // preciseFields are available from earlier analyzeLayout call
+            if (preciseFields.length > 0) {
+              for (const pf of preciseFields) {
+                // Check exact match first
+                let val = inputData[pf.name];
+
+                // If no exact match, try lenient ? (maybe not needed if names are stable)
+                if (val === undefined) {
+                  // Try finding case-insensitive match from inputData keys
+                  const key = Object.keys(inputData).find(k => k.toLowerCase() === pf.name.toLowerCase());
+                  if (key) val = inputData[key];
+                }
+
+                if (val !== undefined && val !== null && String(val).trim() !== "") {
+                  console.log(`[DEBUG Compile] FAST MATCH: "${pf.name}" = "${val}"`);
+                  finalFields.push({
+                    text: String(val),
+                    preciseBox: pf.boundingPoly,
+                    pageIndex: pf.pageIndex
+                  });
+                }
+              }
+            } else {
+              console.warn('[WARN Compile] Direct data provided but no preciseFields detected via Layout Analysis.');
+            }
+
+          } else if (fillingData?.fillingMode === 'pdf_coordinates') {
+            // ... Existing Fuzzy Logic for Autonomous Mode ...
+            const aiDataFields = (fillingData.data || []).map((f: any) => ({ ...f }));
+            finalFields.push(...aiDataFields); // Add loose coordinates if any
+
+            if (fillingData.preciseData && preciseFields.length > 0) {
+              // ... (fuzzy mapping logic) ...
+              for (const pd of fillingData.preciseData) {
+                const cleanedInputName = (pd.fieldName || "").trim().toLowerCase();
+                const match = preciseFields.find(pf => {
+                  const cleanedDetectedName = (pf.name || "").trim().toLowerCase();
+                  return cleanedDetectedName === cleanedInputName ||
+                    cleanedDetectedName.includes(cleanedInputName) ||
+                    cleanedInputName.includes(cleanedDetectedName);
                 });
-              } else {
-                console.warn(`[DEBUG Compile] NO MATCH for "${pd.fieldName}".`);
+
+                if (match) {
+                  finalFields.push({
+                    text: pd.text,
+                    preciseBox: match.boundingPoly,
+                    pageIndex: match.pageIndex
+                  });
+                }
               }
             }
           }
 
-          binaryBase64 = await fillPdfBinary(pinnedSource.base64, finalFields);
-          console.log(`[DEBUG Compile] PDF binary modification successful. Total fields filled: ${finalFields.length}`);
+          if (finalFields.length > 0) {
+            binaryBase64 = await fillPdfBinary(pinnedSource.base64, finalFields);
+            console.log(`[DEBUG Compile] PDF binary modification successful. Total fields filled: ${finalFields.length}`);
+          } else {
+            console.log('[DEBUG Compile] No fields to fill found (Manual or AI). returning original.');
+          }
+
+        } else if (pinnedSource.type.includes('wordprocessingml.document') && fillingData?.fillingMode === 'docx_tags') {
         } else if (pinnedSource.type.includes('wordprocessingml.document') && fillingData?.fillingMode === 'docx_tags') {
           binaryBase64 = await fillDocxBinary(pinnedSource.base64, fillingData.tagData);
           console.log('[DEBUG Compile] DOCX binary modification successful');
