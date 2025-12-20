@@ -606,6 +606,49 @@ export function DocumentCompilerSection({
                   fileName={pinnedSource!.name}
                   onFieldsDiscovered={setDiscoveredFieldNames}
                   externalValues={studioValues}
+                  onCompile={async (currentFields) => {
+                    // Trigger compile with user's current schema
+                    console.log("Star 2 Clicked: Compiling with fields", currentFields);
+                    setIsCompiling(true);
+                    try {
+                      const { apiRequest } = await import("@/lib/queryClient");
+                      // We need to pass the current fields to the backend to respect user edits
+                      // Assuming backend respects `requestedFields` or `discoveredFields`.
+                      // For now we pass them as detailed names in notes or explicit param if backend supports.
+                      // Based on plan: we need backend to accept preciseFields overrides. 
+                      // But strictly for now, we'll rely on the existing prompt logic which uses mapped names.
+                      // Ideally we send `preciseFields` in body.
+
+                      const response = await apiRequest('POST', '/api/compile', {
+                        template: "",
+                        notes,
+                        sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
+                        pinnedSource: {
+                          name: pinnedSource.name,
+                          type: pinnedSource.type,
+                          base64: pinnedSource.base64
+                        },
+                        // We use requestedFields to guide the AI with the User's defined schema
+                        requestedFields: currentFields.map(f => f.name),
+                        modelProvider,
+                        temperature,
+                        webResearch,
+                        detailedAnalysis,
+                        formalTone,
+                        fillingMode: 'studio'
+                      });
+
+                      const data = await response.json();
+                      if (data.values) {
+                        setStudioValues(data.values);
+                      }
+                    } catch (error) {
+                      console.error('Compilation failed', error);
+                      toast({ variant: "destructive", title: "Errore compilazione", description: "Riprova." });
+                    } finally {
+                      setIsCompiling(false);
+                    }
+                  }}
                   onDownload={async (filledFields) => {
                     // Final PDF generation logic
                     setIsCompiling(true);
