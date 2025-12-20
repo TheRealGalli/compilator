@@ -27,6 +27,9 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
 const MAX_FILE_SIZE_MB = 250;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+// Cache for Document AI layout results (Key: base64 hash, Value: discovered fields)
+const pdfLayoutCache = new Map<string, any[]>();
+
 // Configurazione multer per gestire upload di file in memoria
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -77,6 +80,13 @@ async function generateProfessionalDocxBase64(content: string): Promise<string> 
  */
 async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
   try {
+    // Generate a hash of the PDF to check the cache
+    const contentHash = crypto.createHash('md5').update(base64Pdf).digest('hex');
+    if (pdfLayoutCache.has(contentHash)) {
+      console.log(`[DEBUG analyzePdfLayout] Cache HIT for hash ${contentHash}`);
+      return pdfLayoutCache.get(contentHash)!;
+    }
+
     const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
     const location = 'eu'; // or 'us'
     const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
@@ -86,6 +96,7 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
       return [];
     }
 
+    console.log(`[DEBUG analyzePdfLayout] Cache MISS, calling Document AI for hash ${contentHash}...`);
     const client = new DocumentProcessorServiceClient();
     const name = `projects/${projectId}/locations/${location}/processors/${processorId}`;
 
@@ -118,7 +129,9 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
         }
       }
     }
-    console.log(`[DEBUG analyzePdfLayout] Discovered ${discoveredFields.length} fields`);
+
+    console.log(`[DEBUG analyzePdfLayout] Discovered ${discoveredFields.length} fields:`, discoveredFields.map(f => f.name).join(', '));
+    pdfLayoutCache.set(contentHash, discoveredFields);
     return discoveredFields;
   } catch (err) {
     console.error('[ERROR analyzePdfLayout]', err);
@@ -156,14 +169,16 @@ async function fillPdfBinary(base64Original: string, fields: { text: string, box
 
           // Estimate optimal font size based on bounding box height
           const boxHeight = (bl.y - tr.y) * height;
-          const fontSize = Math.max(7, Math.min(11, boxHeight * 0.7)); // 70% of box height, clamped
+          const fontSize = Math.max(7, Math.min(11, boxHeight * 0.75));
+
+          console.log(`[DEBUG fillPdfBinary] MAPPING SUCCESS for field value: "${field.text}" at (x: ${x.toFixed(1)}, y: ${y.toFixed(1)})`);
 
           page.drawText(field.text, {
-            x: x + 1, // Small margin
-            y: y + 2, // Sit safely ABOVE the line (baseline adjustment)
+            x: x + 1.5, // Small horizontal margin
+            y: y + 2.5, // Refined baseline offset to sit safely ABOVE the line
             size: fontSize,
             font: font,
-            color: rgb(0, 0, 0.5),
+            color: rgb(0, 0, 0.55), // Professional dark blue
           });
         }
       } else if (field.box && field.box.length === 4) {
@@ -171,12 +186,14 @@ async function fillPdfBinary(base64Original: string, fields: { text: string, box
         const yMin = (1000 - field.box[0]) * height / 1000;
         const xMin = field.box[1] * width / 1000;
 
+        console.log(`[DEBUG fillPdfBinary] FALLBACK (Imprecise visual guess) for text: "${field.text}"`);
+
         page.drawText(field.text, {
           x: xMin,
           y: yMin - 10,
           size: 10,
           font: font,
-          color: rgb(0, 0, 0.4),
+          color: rgb(0.55, 0, 0), // RED to indicate fallback in debug
         });
       }
     }
@@ -1096,13 +1113,14 @@ ${pinnedSource ? `
 **FORMATO OUTPUT SPECIALE (SOLO SE PRESENTE PINNED SOURCE):**
 Se è presente un DOCUMENTO MASTER, devi rispondere con un oggetto JSON strutturato che permetta di mappare i dati sulle coordinate o sui tag del file originale.
 
-   ${preciseFields.length > 0 ? `Abbiamo rilevato i seguenti campi precisi nel PDF Master tramite analisi layout. 
-   PER OGNI CAMPO CHE DESIDERI COMPILARE, usa esattamente il 'fieldName' corrispondente nel tuo JSON sotto la chiave "preciseData".
+   ${preciseFields.length > 0 ? `Abbiamo rilevato i seguenti campi precisi nel PDF Master tramite l'analisi del layout. 
+   **REGOLE DI COMPILAZIONE (PRIORITÀ ASSOLUTA):**
+   1. Se un campo che desideri compilare è nella lista qui sotto, DEVI usare esattamente il suo 'fieldName' nel tuo JSON sotto la chiave "preciseData".
+   2. SE USI "preciseData", NON devi aggiungere lo stesso campo a "data" con le coordinate approssimative [ymin, xmin, ymax, xmax].
+   3. "data" deve essere usato solo per campi NON presenti nella lista qui sotto.
    
-   CAMPI RILEVATI:
-   ${preciseFields.map(f => `- "${f.name}"`).join('\n')}
-   
-   IMPORTANTE: Se compili un campo presente in questa lista, NON aggiungerlo a "data" con le coordinate [ymin, xmin, ymax, xmax], usa solo "preciseData".` : `Identifica i punti del documento dove mancano dati (es. righe vuote o underscore). Restituisci per ogni campo individuato le coordinate bounding box [ymin, xmin, ymax, xmax] in scala 0-1000 e il testo corrispondente.`}
+   ELENCO CAMPI RILEVATI (usa questi nomi in "preciseData"):
+   ${preciseFields.map(f => `- "${f.name}"`).join('\n')}` : `Identifica i punti del documento dove mancano dati (es. righe vuote o underscore). Restituisci per ogni campo individuato le coordinate bounding box [ymin, xmin, ymax, xmax] in scala 0-1000.`}
    
 2. **Se Master è DOCX**: Identifica le chiavi/placeholder del documento originale.
 
@@ -1110,10 +1128,10 @@ Restituisci un blocco JSON finale nel formato:
 {
   "fillingMode": "pdf_coordinates" | "docx_tags" | "fallback_text",
   "data": [
-    {"text": "Valore da inserire", "box": [ymin, xmin, ymax, xmax]}, ... (solo per campi NON rilevati dall'analisi layout)
+    {"text": "Valore", "box": [ymin, xmin, ymax, xmax]}, ... (SOLO per campi NON rilevati sopra)
   ],
   "preciseData": [
-    {"text": "Valore da inserire", "fieldName": "nome_campo_rilevato"}, ... (PRIORITÀ per PDF con campi rilevati sopra)
+    {"text": "Valore", "fieldName": "nome_campo_rilevato"}, ... (USA SEMPRE QUESTO per i campi rilevati sopra)
   ],
   "tagData": {"TAG_NAME": "Valore", ...} (per DOCX)
 }
@@ -1727,13 +1745,13 @@ Se l'utente ti chiede di "compilare", "salvare" o "aggiornare" questo documento 
 
 **REGOLE PER IL FILLING BINARIO:**
 1. **Se Master è PDF**: 
-   ${preciseFields.length > 0 ? `Abbiamo rilevato i seguenti campi precisi nel PDF Master tramite analisi layout. 
-   PER OGNI CAMPO CHE DESIDERI COMPILARE, usa esattamente il 'fieldName' corrispondente nel tuo JSON sotto la chiave "preciseData".
+   ${preciseFields.length > 0 ? `Abbiamo rilevato i seguenti campi precisi tramite l'analisi del layout. 
+   **REGOLE DI COMPILAZIONE (MOLTO IMPORTANTE):**
+   - Per ogni campo compilato che corrisponde a uno di questi nomi, usa la chiave "preciseData" e il 'fieldName' esatto.
+   - NON usare le coordinate approssimative [ymin, xmin, ymax, xmax] per questi campi.
    
-   CAMPI RILEVATI:
-   ${preciseFields.map(f => `- "${f.name}"`).join('\n')}
-   
-   IMPORTANTE: Priorità assoluta a "preciseData" per i campi elencati sopra.` : `Individua le coordinate spaziali [ymin, xmin, ymax, xmax] (0-1000) dei placeholder o delle righe vuote da riempire.`}
+   ELENCO CAMPI RILEVATI:
+   ${preciseFields.map(f => `- "${f.name}"`).join('\n')}` : `Individua le coordinate spaziali [ymin, xmin, ymax, xmax] (0-1000) dei placeholder o delle righe vuote da riempire.`}
    
 2. **Se Master è DOCX**: Fornisci i dati come coppie chiave-valore per i tag del template.
 
@@ -1741,7 +1759,7 @@ Nel parametro 'content', restituisci un oggetto JSON strutturato:
 {
   "fillingMode": "pdf_coordinates" | "docx_tags" | "fallback_text",
   "data": [{"text": "Valore", "box": [ymin, xmin, ymax, xmax]}, ...], (solo per campi NON rilevati)
-  "preciseData": [{"text": "Valore", "fieldName": "nome_campo_rilevato"}, ...], (PRIORITÀ per PDF con campi rilevati sopra)
+  "preciseData": [{"text": "Valore", "fieldName": "nome_campo_rilevato"}, ...], (USA QUESTO per i campi rilevati sopra)
   "tagData": {"CHIAVE": "Valore", ...},
   "previewText": "Testo completo compilato (fallback)"
 }`;
