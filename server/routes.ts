@@ -14,6 +14,9 @@ import crypto from 'crypto';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { getSecret } from './gcp-secrets';
 import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } from "docx";
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import Docxtemplater from 'docxtemplater';
+import PizZip from 'pizzip';
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
@@ -65,6 +68,72 @@ async function generateProfessionalDocxBase64(content: string): Promise<string> 
 
   const buffer = await Packer.toBuffer(doc);
   return buffer.toString('base64');
+}
+
+/**
+ * Helper to overlay text on a PDF at specific coordinates
+ * coordinateBox is expected to be [ymin, xmin, ymax, xmax] in 0-1000 scale (Gemini output)
+ */
+async function fillPdfBinary(base64Original: string, fields: { text: string, box: number[] }[]): Promise<string> {
+  try {
+    const pdfDoc = await PDFDocument.load(Buffer.from(base64Original, 'base64'));
+    const pages = pdfDoc.getPages();
+    const firstPage = pages[0]; // Assuming single page for now or need page index from AI
+    const { width, height } = firstPage.getSize();
+    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    for (const field of fields) {
+      if (!field.box || field.box.length !== 4) continue;
+
+      // Convert Gemini 0-1000 coordinates to PDF points
+      // Gemini: [ymin, xmin, ymax, xmax]
+      // PDF-Lib origins are bottom-left
+      const yMin = (1000 - field.box[0]) * height / 1000;
+      const xMin = field.box[1] * width / 1000;
+      const yMax = (1000 - field.box[2]) * height / 1000;
+
+      // We want to write at xMin, yMin (adjusting for font height)
+      firstPage.drawText(field.text, {
+        x: xMin,
+        y: yMin - 10, // Slight offset to align with baseline
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0.4), // Dark blue to distinguish filled data
+      });
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    return Buffer.from(pdfBytes).toString('base64');
+  } catch (err) {
+    console.error('[ERROR fillPdfBinary]', err);
+    throw err;
+  }
+}
+
+/**
+ * Helper to fill DOCX using smart template replacement
+ */
+async function fillDocxBinary(base64Original: string, data: Record<string, string>): Promise<string> {
+  try {
+    const zip = new PizZip(Buffer.from(base64Original, 'base64'));
+    const doc = new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true,
+    });
+
+    // Populate data
+    doc.render(data);
+
+    const buf = doc.getZip().generate({
+      type: "nodebuffer",
+      compression: "DEFLATE",
+    });
+
+    return buf.toString('base64');
+  } catch (err) {
+    console.error('[ERROR fillDocxBinary]', err);
+    throw err;
+  }
 }
 
 // Cache VertexAI client to avoid re-initialization
@@ -936,11 +1005,24 @@ ${compileTextContext.length > 0 ? `**TESTO ESTRATTO DAI DOCUMENTI:**\n${compileT
  
 **ISTRUZIONE DI SINTESI:**
 Incrocia i dati dei FILE e del TESTO ESTRATTO (fatti, persone, date) con le informazioni di contesto del LINK WEB per compilare il template.` : 'NESSUN FILE SORGENTE: Se presenti Link Web, usali per il contesto, ma non inventare i dati anagrafici mancanti.'}
- 
-${hasExternalSources ? `
-**CONTENUTO DA LINK WEB (DA USARE PER CONTESTO E DETTAGLI):**
-${fetchedCompilerContext}
+
+${pinnedSource ? `
+**FORMATO OUTPUT SPECIALE (SOLO SE PRESENTE PINNED SOURCE):**
+Se è presente un DOCUMENTO MASTER, devi rispondere con un oggetto JSON strutturato che permetta di mappare i dati sulle coordinate o sui tag del file originale.
+
+1. **Se Master è PDF**: Identifica i punti del documento dove mancano dati (es. righe vuote o underscore). Restituisci per ogni campo individuato le coordinate bounding box [ymin, xmin, ymax, xmax] in scala 0-1000 e il testo corrispondente.
+2. **Se Master è DOCX**: Identifica le chiavi/placeholder del documento originale.
+
+Restituisci un blocco JSON finale nel formato:
+{
+  "fillingMode": "pdf_coordinates" | "docx_tags" | "fallback_text",
+  "data": [
+    {"text": "Valore da inserire", "box": [ymin, xmin, ymax, xmax]}, ... (per PDF)
+  ],
+  "tagData": {"TAG_NAME": "Valore", ...} (per DOCX)
+}
 ` : ''}`;
+
 
       // Configure model without tools (tools go in generateContent)
       const model = vertex_ai.getGenerativeModel({
@@ -952,7 +1034,7 @@ ${fetchedCompilerContext}
       });
 
       const userPrompt = `Compila il seguente template con informazioni coerenti e professionali.
-${notes ? `\nNOTE AGGIUNTIVE: ${notes}` : ''}
+      ${notes ? `\nNOTE AGGIUNTIVE: ${notes}` : ''}
 ${formalTone ? '\nUsa un tono formale e professionale.' : ''}
 
 TEMPLATE DA COMPILARE:
@@ -960,11 +1042,12 @@ ${template}
 
 ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai FILE (per i fatti specifici) e dai LINK WEB (per il contesto e l\'argomento) per compilare il template. NON inventare dati.' : 'ATTENZIONE: Nessuna fonte (nè file nè link). RIFIUTA la compilazione se mancano i dati.'}
 
-Istruzioni:
-- Sostituisci i placeholder ([...]) con i dati estratti.
-- Sfrutta il LINK WEB (se presente) per descrivere in dettaglio il progetto/argomento.
-- Sfrutta i FILE (se presenti) per i dati anagrafici precisi.
-- Se mancano dati: "Errore di compilazione" (solo se bloccante) o [DATO MANCANTE].`;
+    Istruzioni:
+    - Sostituisci i placeholder([...]) con i dati estratti.
+- Sfrutta il LINK WEB(se presente) per descrivere in dettaglio il progetto / argomento.
+- Sfrutta i FILE(se presenti) per i dati anagrafici precisi.
+- Se mancano dati: "Errore di compilazione"(solo se bloccante) o[DATO MANCANTE].
+${pinnedSource ? `\n\nIMPORTANTE: Dato che c'è un DOCUMENTO MASTER, DEVI generare il JSON di filling descritto sopra per una modifica binaria precisa. Se è un PDF, individua gli underscore o gli spazi vuoti e forniscimi le coordinate BOX.` : ''} `;
 
       // Build contents with multimodal files
       const userParts: any[] = [{ text: userPrompt }];
@@ -991,17 +1074,49 @@ Istruzioni:
       });
 
       const response = await result.response;
-      const compiledContent = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      let compiledContent = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
       if (pinnedSource) {
-        // Return directly filled file
+        console.log(`[DEBUG Compile] Pinned source detected: ${pinnedSource.name} (${pinnedSource.type})`);
+
+        // Try to parse JSON for binary filling
+        let fillingData: any = null;
+        try {
+          const jsonMatch = compiledContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            fillingData = JSON.parse(jsonMatch[0]);
+            console.log(`[DEBUG Compile] Extracted filling JSON, mode: ${fillingData.fillingMode} `);
+          }
+        } catch (e) {
+          console.warn('[WARN Compile] Failed to parse filling JSON, falling back to reproduction');
+        }
+
+        let binaryBase64 = '';
+        let finalMimeType = pinnedSource.type;
+
+        if (pinnedSource.type === 'application/pdf' && fillingData?.fillingMode === 'pdf_coordinates') {
+          binaryBase64 = await fillPdfBinary(pinnedSource.base64, fillingData.data);
+          console.log('[DEBUG Compile] PDF binary modification successful');
+        } else if (pinnedSource.type.includes('wordprocessingml.document') && fillingData?.fillingMode === 'docx_tags') {
+          binaryBase64 = await fillDocxBinary(pinnedSource.base64, fillingData.tagData);
+          console.log('[DEBUG Compile] DOCX binary modification successful');
+        } else {
+          // Fallback to old reproduction method
+          binaryBase64 = await generateProfessionalDocxBase64(compiledContent);
+          finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          console.log('[DEBUG Compile] Falling back to text reproduction');
+        }
+
+        // Clean up compiledContent from JSON for preview
+        const previewContent = compiledContent.replace(/\{[\s\S]*\}/, '').trim() || "Documento modificato correttamente preservando il layout originale.";
+
         return res.json({
           success: true,
-          compiledContent,
+          compiledContent: previewContent,
           file: {
-            name: `Compilato_${pinnedSource.name.split('.')[0]}.docx`,
-            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            base64: await generateProfessionalDocxBase64(compiledContent)
+            name: (binaryBase64 === pinnedSource.base64 ? 'Non_Modificato_' : 'Compilato_') + pinnedSource.name,
+            type: finalMimeType,
+            base64: binaryBase64
           }
         });
       }
@@ -1026,7 +1141,7 @@ Istruzioni:
         return res.status(400).json({ error: 'Nessun file audio fornito' });
       }
 
-      console.log(`[DEBUG Transcribe] Received audio file: ${req.file.originalname}, size: ${req.file.size}, mime: ${req.file.mimetype}`);
+      console.log(`[DEBUG Transcribe] Received audio file: ${req.file.originalname}, size: ${req.file.size}, mime: ${req.file.mimetype} `);
 
       // Initialize Vertex AI
       const project = process.env.GCP_PROJECT_ID;
@@ -1141,8 +1256,8 @@ Istruzioni:
       });
 
       // Prepare simple context for generation
-      const historyText = messages.slice(-3).map((m: any) => `${m.role}: ${m.content}`).join('\n');
-      const prompt = `Contesto:\n${historyText}\n\nGenera 4 domande follow-up brevi (max 25 caratteri). Output JSON array.`;
+      const historyText = messages.slice(-3).map((m: any) => `${m.role}: ${m.content} `).join('\n');
+      const prompt = `Contesto: \n${historyText} \n\nGenera 4 domande follow - up brevi(max 25 caratteri).Output JSON array.`;
 
       const result = await model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -1178,7 +1293,7 @@ Istruzioni:
         return res.status(400).json({ error: 'Descrizione template richiesta' });
       }
 
-      console.log(`[DEBUG Template Gen] Request: ${prompt.substring(0, 50)}... Notes incl: ${!!notes}`);
+      console.log(`[DEBUG Template Gen]Request: ${prompt.substring(0, 50)}... Notes incl: ${!!notes} `);
 
       // Initialize Vertex AI
       const project = process.env.GCP_PROJECT_ID;
@@ -1206,47 +1321,47 @@ Istruzioni:
         systemInstruction: {
           role: 'system',
           parts: [{
-            text: `Sei un esperto creatore di template documentali professionali (Document Intelligence Engine) dotato di un LABORATORIO DI RICERCA in background.
+            text: `Sei un esperto creatore di template documentali professionali(Document Intelligence Engine) dotato di un LABORATORIO DI RICERCA in background.
 
-TUO PROCESSO OPERATIVO (Back-ground Laboratory):
-1.  Usa i tuoi strumenti (Google Search) per ANALIZZARE il settore specifico della richiesta dell'utente. Cerca standard aggiornati, normative recenti e best practices per quel tipo di documento oggi.
-2.  COMPRENDI profondamente il contesto professionale (legale, tecnico, amministrativo).
+TUO PROCESSO OPERATIVO(Back - ground Laboratory):
+  1.  Usa i tuoi strumenti(Google Search) per ANALIZZARE il settore specifico della richiesta dell'utente. Cerca standard aggiornati, normative recenti e best practices per quel tipo di documento oggi.
+  2.  COMPRENDI profondamente il contesto professionale(legale, tecnico, amministrativo).
 3.  SPECIALIZZATI nella creazione del template perfetto per quel caso specifico.
 
-REGOLE FONDAMENTALI DI OUTPUT (IMPORTANTE):
-1.  Usa SOLO TESTO PURO. NON usare MAI sintassi Markdown (niente grassetto **, niente corsivo *, niente hashtag #).
+REGOLE FONDAMENTALI DI OUTPUT(IMPORTANTE):
+  1.  Usa SOLO TESTO PURO.NON usare MAI sintassi Markdown(niente grassetto **, niente corsivo *, niente hashtag #).
 2.  L'output deve essere pulito e ordinato, pronto per essere incollato in un editor di testo semplice.
-3.  Usa SOLO lingua ITALIANA formale e professionale.
-4.  Per ogni dato variabile che dovrà essere compilato in seguito, usa ESCLUSIVAMENTE il formato placeholder con parentesi quadre e MAIUSCOLO. Esempio: [NOME_CLIENTE], [DATA], [IMPORTO], [DESCRIZIONE_PROGETTO].
-5.  NON inventare dati fittizi (es. non scrivere "Mario Rossi", scrivi [NOME_COGNOME]).
-6.  Struttura il documento con intestazioni chiare (usa il MAIUSCOLO per i titoli), elenchi puntati se necessari (usa semplici trattini -) e sezioni ben definite con spaziature.
+  3.  Usa SOLO lingua ITALIANA formale e professionale.
+4.  Per ogni dato variabile che dovrà essere compilato in seguito, usa ESCLUSIVAMENTE il formato placeholder con parentesi quadre e MAIUSCOLO.Esempio: [NOME_CLIENTE], [DATA], [IMPORTO], [DESCRIZIONE_PROGETTO].
+5.  NON inventare dati fittizi(es.non scrivere "Mario Rossi", scrivi[NOME_COGNOME]).
+6.  Struttura il documento con intestazioni chiare(usa il MAIUSCOLO per i titoli), elenchi puntati se necessari(usa semplici trattini -) e sezioni ben definite con spaziature.
 7.  All'inizio del documento inserisci sempre:
-    TITOLO DEL DOCUMENTO (TUTTO MAIUSCOLO)
-    [DATA]
+    TITOLO DEL DOCUMENTO(TUTTO MAIUSCOLO)
+  [DATA]
 
-Esempio di output desiderato (formato corretto):
+Esempio di output desiderato(formato corretto):
 VERBALE DI RIUNIONE
-Data: [DATA]
-Partecipanti: [ELENCO_PARTECIPANTI]
-Argomento: [ARGOMENTO_RIUNIONE]
+  Data: [DATA]
+  Partecipanti: [ELENCO_PARTECIPANTI]
+  Argomento: [ARGOMENTO_RIUNIONE]
 
-1. INTRODUZIONE
-Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
+  1. INTRODUZIONE
+Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
         },
         tools: [{ googleSearch: {} }]
       });
 
       // Construct rich user prompt
-      let userPrompt = `Crea un template per: ${prompt}`;
+      let userPrompt = `Crea un template per: ${prompt} `;
       if (notes) {
-        userPrompt += `\n\nNOTE AGGIUNTIVE E CONTESTO UTENTE:\n${notes}\n\nUsa queste note per adattare il linguaggio, il formato o le sezioni specifiche del template.`;
+        userPrompt += `\n\nNOTE AGGIUNTIVE E CONTESTO UTENTE: \n${notes} \n\nUsa queste note per adattare il linguaggio, il formato o le sezioni specifiche del template.`;
       }
 
       const parts: any[] = [];
 
       // Process Sources Context
       if (sources && Array.isArray(sources) && sources.length > 0) {
-        userPrompt += `\n\n[IMPORTANTE] Ho allegato dei documenti di riferimento (PDF, Immagini o Testo). USALI come contesto primario per capire di cosa si sta parlando (es. se è un contratto SaaS o Immobiliare, il tono, i dati ricorrenti). Basati sui documenti allegati per inferire la struttura corretta.`;
+        userPrompt += `\n\n[IMPORTANTE] Ho allegato dei documenti di riferimento(PDF, Immagini o Testo).USALI come contesto primario per capire di cosa si sta parlando(es.se è un contratto SaaS o Immobiliare, il tono, i dati ricorrenti).Basati sui documenti allegati per inferire la struttura corretta.`;
 
         console.log(`[DEBUG Template Gen] Processing ${sources.length} sources for context...`);
 
@@ -1275,7 +1390,7 @@ Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
       });
 
       const generatedTemplate = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      console.log(`[DEBUG Template Gen] Success, length: ${generatedTemplate.length}`);
+      console.log(`[DEBUG Template Gen]Success, length: ${generatedTemplate.length} `);
 
       res.json({ template: generatedTemplate });
 
@@ -1315,20 +1430,20 @@ Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
         const urls = lastMessage.content.match(urlRegex);
 
         if (urls && urls.length > 0) {
-          console.log(`[DEBUG Chat] Found URLs in message: ${urls.join(', ')}`);
+          console.log(`[DEBUG Chat] Found URLs in message: ${urls.join(', ')} `);
 
           if (webResearch) {
             // Web Research ENABLED: Fetch content
             for (const url of urls) {
               const content = await fetchUrlContent(url);
               if (content) {
-                fetchedContentContext += `\n--- CONTENUTO ESTRATTO DA LINK: ${url} ---\n${content}\n--- FINE CONTENUTO LINK ---\n`;
+                fetchedContentContext += `\n-- - CONTENUTO ESTRATTO DA LINK: ${url} ---\n${content} \n-- - FINE CONTENUTO LINK-- -\n`;
               }
             }
           } else {
             // Web Research DISABLED: Inject warning
             console.log('[DEBUG Chat] URLs found but Web Research is DISABLED. Injecting warning.');
-            fetchedContentContext += `\n[AVVISO DI SISTEMA - IMPORTANTE]\nL'utente ha incluso uno o più URL nel messaggio (${urls.join(', ')}), ma la funzionalità "Web Research" è DISATTIVATA.\nNON HAI ACCESSO AL CONTENUTO DI QUESTI LINK.\n\nISTRUZIONE OBBLIGATORIA: Informa l'utente che non puoi analizzare link esterni corrente perché la modalità "Web Research" non è attiva. Chiedi di attivare lo switch "Web Research" in basso a sinistra se desidera che tu legga il contenuto dei link.\n`;
+            fetchedContentContext += `\n[AVVISO DI SISTEMA - IMPORTANTE]\nL'utente ha incluso uno o più URL nel messaggio (${urls.join(', ')}), ma la funzionalità "Web Research" è DISATTIVATA.\nNON HAI ACCESSO AL CONTENUTO DI QUESTI LINK.\n\nISTRUZIONE OBBLIGATORIA: Informa l'utente che non puoi analizzare link esterni corrente perché la modalità "Web Research" non è attiva.Chiedi di attivare lo switch "Web Research" in basso a sinistra se desidera che tu legga il contenuto dei link.\n`;
           }
         }
       }
@@ -1338,9 +1453,9 @@ Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
       console.log(`[DEBUG] Received ${sources?.length || 0} sources`);
-      console.log(`[DEBUG] Messages type: ${typeof messages}, isArray: ${Array.isArray(messages)}`);
-      console.log(`[DEBUG] Sources type:`, typeof sources);
-      console.log(`[DEBUG] Sources is array:`, Array.isArray(sources));
+      console.log(`[DEBUG] Messages type: ${typeof messages}, isArray: ${Array.isArray(messages)} `);
+      console.log(`[DEBUG] Sources type: `, typeof sources);
+      console.log(`[DEBUG] Sources is array: `, Array.isArray(sources));
 
       if (sources && sources.length > 0) {
         console.log('[DEBUG] Sources:', sources.map((s: any) => ({ name: s.name, type: s.type, url: s.url?.substring(0, 100) })));
@@ -1352,7 +1467,7 @@ Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
       // Append fetched content to files context
       if (fetchedContentContext) {
         filesContext += fetchedContentContext;
-        console.log(`[DEBUG Chat] Added fetched URL content to context, length: ${fetchedContentContext.length}`);
+        console.log(`[DEBUG Chat] Added fetched URL content to context, length: ${fetchedContentContext.length} `);
       }
       const multimodalFiles: any[] = [];
 
@@ -1366,16 +1481,16 @@ Si è riunito il giorno [DATA] presso [LUOGO] il consiglio...` }]
 
             // Check if we have direct base64 content (Client-side RAG)
             if (source.base64) {
-              console.log(`[DEBUG] Using client-side base64 for ${source.name}`);
+              console.log(`[DEBUG] Using client - side base64 for ${source.name}`);
               base64 = source.base64;
               buffer = Buffer.from(base64, 'base64');
             }
             // Fallback to GCS download (Legacy/Compiler)
             else if (source.url) {
-              console.log(`[DEBUG] Downloading from GCS: ${source.url}`);
+              console.log(`[DEBUG] Downloading from GCS: ${source.url} `);
               // Extract path from URL
               // URL format: https://storage.googleapis.com/BUCKET_NAME/path/to/file
-              const urlParts = source.url.split(`/${BUCKET_NAME}/`);
+              const urlParts = source.url.split(`/ ${BUCKET_NAME}/`);
               if (urlParts.length < 2) {
                 console.error(`Invalid GCS URL format: ${source.url}`);
                 continue;
@@ -1487,7 +1602,19 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
 
 **DOCUMENTO MASTER (PUNTINA ROSSA) RILEVATO:**
 L'utente ha contrassegnato "${pinnedSource.name}" come documento master.
-Se l'utente ti chiede di "compilare", "salvare" o "aggiornare" questo documento con i dati trovati nelle altre fonti o nella chat corrente, USA LO STRUMENTO generate_filled_document per generare il file compilato.`;
+Se l'utente ti chiede di "compilare", "salvare" o "aggiornare" questo documento con i dati trovati nelle altre fonti o nella chat corrente, USA LO STRUMENTO generate_filled_document per generare i dati di compilazione.
+
+**REGOLE PER IL FILLING BINARIO:**
+1. **Se Master è PDF**: Individua le coordinate spaziali [ymin, xmin, ymax, xmax] (0-1000) dei placeholder o delle righe vuote da riempire.
+2. **Se Master è DOCX**: Fornisci i dati come coppie chiave-valore per i tag del template.
+
+Nel parametro 'content', restituisci un oggetto JSON strutturato:
+{
+  "fillingMode": "pdf_coordinates" | "docx_tags" | "fallback_text",
+  "data": [{"text": "Valore", "box": [ymin, xmin, ymax, xmax]}, ...],
+  "tagData": {"CHIAVE": "Valore", ...},
+  "previewText": "Testo completo compilato (fallback)"
+}`;
       }
 
       console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters, max response: ${maxChars}`);
@@ -1686,7 +1813,7 @@ Se l'utente ti chiede di "compilare", "salvare" o "aggiornare" questo documento 
               properties: {
                 content: {
                   type: "string",
-                  description: "Il testo completo del documento da generare, formattato professionalmente."
+                  description: "Oggetto JSON con fillingMode, data (per PDF) o tagData (per DOCX), e previewText."
                 },
                 summary: {
                   type: "string",
@@ -1729,14 +1856,31 @@ Se l'utente ti chiede di "compilare", "salvare" o "aggiornare" questo documento 
 
           text = args.summary || "Ho generato il documento compilato basandomi sulla tua richiesta.";
 
-          const fileBase64 = await generateProfessionalDocxBase64(args.content);
+          let binaryBase64 = '';
+          let finalMimeType = pinnedSource.type;
+
+          try {
+            const fillingData = JSON.parse(args.content);
+            if (pinnedSource.type === 'application/pdf' && fillingData.fillingMode === 'pdf_coordinates') {
+              binaryBase64 = await fillPdfBinary(pinnedSource.base64, fillingData.data);
+            } else if (pinnedSource.type.includes('wordprocessingml.document') && fillingData.fillingMode === 'docx_tags') {
+              binaryBase64 = await fillDocxBinary(pinnedSource.base64, fillingData.tagData);
+            } else {
+              binaryBase64 = await generateProfessionalDocxBase64(fillingData.previewText || args.content);
+              finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            }
+          } catch (e) {
+            console.warn('[WARN Chat] Failed to parse filling JSON from tool, falling back to reproduction');
+            binaryBase64 = await generateProfessionalDocxBase64(args.content);
+            finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          }
 
           return res.json({
             text,
             file: {
-              name: `Compilato_${pinnedSource.name.split('.')[0]}.docx`,
-              type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              base64: fileBase64
+              name: (binaryBase64 === pinnedSource.base64 ? 'Non_Modificato_' : 'Compilato_') + pinnedSource.name,
+              type: finalMimeType,
+              base64: binaryBase64
             }
           });
         }
