@@ -1173,11 +1173,15 @@ Restituisci un blocco JSON finale nel formato:
 ` : ''}`;
 
       if (fillingMode === 'studio') {
+        const fieldsToFill = (requestedFields && requestedFields.length > 0)
+          ? requestedFields
+          : preciseFields.map(f => f.name); // Fallback to discovered fields
+
         systemPrompt += `
 **MODALITÀ STUDIO ATTIVA:**
 Devi rispondere ESCLUSIVAMENTE con un oggetto JSON che mappa i nomi dei campi richiesti ai valori estratti dai documenti o generati in base alle istruzioni.
 Non includere alcun testo aggiuntivo, spiegazioni o formattazione oltre al JSON.
-I campi richiesti sono: ${requestedFields?.join(', ')}.
+I campi da compilare sono: ${fieldsToFill.join(', ')}.
 Se un campo non può essere compilato, usa null o una stringa vuota.
 Esempio di output:
 {
@@ -1192,12 +1196,16 @@ Esempio di output:
       // Build prompt for filling
       let userPrompt = ``;
       if (fillingMode === 'studio') {
+        const fieldsToFill = (requestedFields && requestedFields.length > 0)
+          ? requestedFields
+          : preciseFields.map(f => f.name); // Fallback
+
         userPrompt = `
 Sei un assistente intelligente che compila documenti.
 Analizza il documento fornito (immagine/PDF) e le fonti di supporto (testo/altri file).
 
 Il tuo compito è compilare i seguenti campi del form:
-${requestedFields?.map((f: string) => `- ${f}`).join('\n')}
+${fieldsToFill.map((f: string) => `- ${f}`).join('\n')}
 
 IMPORTANTE:
 ${notes ? `NOTE UTENTE AGGIUNTIVE: ${notes}` : ""}
