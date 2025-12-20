@@ -14,11 +14,14 @@ import crypto from 'crypto';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { getSecret } from './gcp-secrets';
 import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } from "docx";
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
-import { v1 as documentai } from '@google-cloud/documentai';
-const { DocumentProcessorServiceClient } = documentai;
+// [Removed legacy Document AI import]
+import { AiService } from './ai'; // Import new AI Service
+
+// Initialize AI Service
+const aiService = new AiService(process.env.GCP_PROJECT_ID || 'compilator-479214');
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
@@ -28,7 +31,7 @@ const MAX_FILE_SIZE_MB = 250;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // Cache for Document AI layout results (Key: base64 hash, Value: discovered fields)
-const pdfLayoutCache = new Map<string, any[]>();
+// [Removed legacy layout cache]
 
 // Configurazione multer per gestire upload di file in memoria
 const upload = multer({
@@ -75,218 +78,10 @@ async function generateProfessionalDocxBase64(content: string): Promise<string> 
   return buffer.toString('base64');
 }
 
-/**
- * Helper to analyze PDF layout using Document AI Form Parser
- */
-async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
-  try {
-    // Generate a hash of the PDF to check the cache
-    const contentHash = crypto.createHash('md5').update(base64Pdf).digest('hex');
-    if (pdfLayoutCache.has(contentHash)) {
-      console.log(`[DEBUG analyzePdfLayout] Cache HIT for hash ${contentHash}`);
-      return pdfLayoutCache.get(contentHash)!;
-    }
-
-    const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
-    const location = process.env.GCP_LOCATION || 'eu';
-    const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
-
-    if (!processorId) {
-      console.warn('[analyzePdfLayout] DOCUMENT_AI_PROCESSOR_ID not set, skipping precision analysis');
-      return [];
-    }
-
-    console.log(`[DEBUG analyzePdfLayout] Cache MISS for ${contentHash}. Using location: ${location}`);
-
-    // Regional endpoint logic: 'us' uses the global endpoint, others use regional ones
-    const apiEndpoint = location === 'us' ? 'documentai.googleapis.com' : `${location}-documentai.googleapis.com`;
-    const client = new DocumentProcessorServiceClient({ apiEndpoint });
-    const name = `projects/${projectId}/locations/${location}/processors/${processorId}`;
-
-    const request = {
-      name,
-      rawDocument: {
-        content: Buffer.from(base64Pdf, 'base64'),
-        mimeType: 'application/pdf',
-      },
-    };
-
-    const [result] = await client.processDocument(request);
-    const { document } = result;
-    const documentText = document?.text || "";
-
-    const getTextFromAnchor = (textAnchor: any) => {
-      if (!textAnchor || !textAnchor.textSegments) return "";
-      return textAnchor.textSegments
-        .map((segment: any) => {
-          const start = Number(segment.startIndex || 0);
-          const end = Number(segment.endIndex || 0);
-          return documentText.substring(start, end);
-        })
-        .join("")
-        .replace(/\n/g, ' ')
-        .trim();
-    };
-
-    const discoveredFields: any[] = [];
-
-    // Support for specialized/custom processors using entities
-    if (document && document.entities) {
-      console.log(`[DEBUG analyzePdfLayout] Entities property present: ${document.entities.length} detected`);
-      for (const entity of document.entities) {
-        const entityName = entity.type || entity.mentionText || "Entity";
-        // Precision check: try normalized vertices first
-        const poly = (entity.pageAnchor?.pageRefs?.[0] as any)?.boundingPoly || (entity as any).normalizedBoundingPoly;
-        if (poly) {
-          discoveredFields.push({
-            name: entityName,
-            boundingPoly: poly,
-            pageIndex: (Number((entity.pageAnchor?.pageRefs?.[0] as any)?.page || 1)) - 1,
-            source: 'entity'
-          });
-        }
-      }
-    }
-
-    // Support for Form Parser using formFields
-    if (document && document.pages) {
-      for (const page of document.pages) {
-        if (page.formFields && page.formFields.length > 0) {
-          console.log(`[DEBUG analyzePdfLayout] Page ${page.pageNumber} formFields count: ${page.formFields.length}`);
-          for (const field of page.formFields) {
-            const fieldName = getTextFromAnchor(field.fieldName?.textAnchor);
-            const boundingPoly =
-              field.fieldValue?.boundingPoly ||
-              (field.fieldValue as any)?.layout?.boundingPoly ||
-              (field.fieldName as any)?.layout?.boundingPoly;
-
-            if (fieldName && boundingPoly) {
-              discoveredFields.push({
-                name: fieldName,
-                boundingPoly,
-                pageIndex: (page.pageNumber || 1) - 1,
-                source: 'formField'
-              });
-            }
-          }
-        } else {
-          console.log(`[DEBUG analyzePdfLayout] Page ${page.pageNumber}: NO formFields property found in page object.`);
-        }
-      }
-    }
-
-    // LANDMARK MODE: If structured fields are zero or low, we perform OCR-based structural analysis
-    if (discoveredFields.length < 5 && document && document.pages) {
-      console.log(`[DEBUG analyzePdfLayout] Entering LANDMARK MODE (Discovered fields were only ${discoveredFields.length})`);
-      for (const page of document.pages) {
-        // Find all lines (underscores)
-        const underscoreLines: any[] = [];
-        if (page.visualElements) {
-          for (const ve of page.visualElements) {
-            if (ve.type === 'horizontal_line' || ve.type === 'form_field_underline') underscoreLines.push(ve);
-          }
-        }
-
-        // Scan paragraphs for labels and underscores
-        if (page.paragraphs) {
-          for (let i = 0; i < page.paragraphs.length; i++) {
-            const para = page.paragraphs[i];
-            const text = getTextFromAnchor(para.layout?.textAnchor);
-
-            // Check if paragraph contains underscore or is likely a label for the next element
-            if (text.includes('___')) {
-              discoveredFields.push({
-                name: `Rigo_${text.substring(0, 15).replace(/_/g, '').trim() || i}`,
-                boundingPoly: para.layout?.boundingPoly,
-                pageIndex: (page.pageNumber || 1) - 1,
-                source: 'landmark'
-              });
-            } else if (text.endsWith(':') || text.length < 30) {
-              // Potential label, check if next paragraph is an underscore landmark or if there is a line nearby
-              discoveredFields.push({
-                name: text.replace(':', '').trim(),
-                boundingPoly: para.layout?.boundingPoly,
-                pageIndex: (page.pageNumber || 1) - 1,
-                source: 'landmark'
-              });
-            }
-          }
-        }
-      }
-    }
-
-    console.log(`[DEBUG analyzePdfLayout] Discovered ${discoveredFields.map(f => f.name).join(', ')}`);
-    if (discoveredFields.length > 0) pdfLayoutCache.set(contentHash, discoveredFields);
-    return discoveredFields;
-  } catch (err) {
-    console.error('[ERROR analyzePdfLayout]', err);
-    return [];
-  }
-}
+// [Removed legacy analyzePdfLayout function - replaced by AiService]
 
 // NEW: Gemini-powered Layout Analysis
-async function analyzeLayoutWithGemini(base64Pdf: string): Promise<any[]> {
-  try {
-    // Ensure VertexAI is initialized
-    const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
-    const location = 'europe-west1';
-    const vertex_ai = new VertexAI({ project: projectId, location });
-
-    const model = vertex_ai.getGenerativeModel({
-      model: 'gemini-1.5-flash-002', // Using Flash for speed and vision capabilities
-      generationConfig: { responseMimeType: "application/json" }
-    });
-
-    const prompt = `
-     You are a layout analysis engine.
-     Detect all form fields in this document (underscores, boxes, empty areas for text).
-     For each field, provide:
-     1. "name": A concise semantic label (e.g. "Name", "Date", "Signature").
-     2. "box_2d": The bounding box as [ymin, xmin, ymax, xmax] on a 0-1000 scale.
-
-     Return JSON: { "data": [ { "name": "...", "box_2d": [0,0,0,0] } ] }
-     `;
-
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: 'application/pdf', data: base64Pdf } }
-          ]
-        }
-      ]
-    });
-
-    const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const json = JSON.parse(responseText.replace(/```json|```/g, '').trim());
-
-    if (!json.data || !Array.isArray(json.data)) return [];
-
-    return json.data.map((item: any) => {
-      const [ymin, xmin, ymax, xmax] = item.box_2d;
-      return {
-        name: item.name,
-        // Convert 1000-scale [ymin, xmin, ymax, xmax] to normalized vertices 0-1
-        boundingPoly: {
-          normalizedVertices: [
-            { x: xmin / 1000, y: ymin / 1000 }, // TL
-            { x: xmax / 1000, y: ymin / 1000 }, // TR
-            { x: xmax / 1000, y: ymax / 1000 }, // BR
-            { x: xmin / 1000, y: ymax / 1000 }  // BL
-          ]
-        },
-        pageIndex: 0, // Gemini assumes single page or first page context usually
-        source: 'gemini'
-      };
-    });
-
-  } catch (error) {
-    console.error('[ERROR analyzeLayoutWithGemini]', error);
-    return [];
-  }
-}
+// [Removed legacy analyzeLayoutWithGemini function - replaced by AiService]
 
 /**
  * Helper to overlay text on a PDF at specific coordinates
@@ -1066,22 +861,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint per compilare documenti con AI
-  // NEW: Layout analysis for Document Studio (Gemini-First)
+  // NEW: Layout analysis for Document Studio (Gemini-Native via AiService)
   app.post('/api/analyze-layout', async (req, res) => {
     try {
       const { base64 } = req.body;
       if (!base64) return res.status(400).json({ error: 'Missing base64 content' });
 
-      console.log('[DEBUG analyze-layout] Starting layout analysis via Gemini Vision...');
+      console.log('[DEBUG analyze-layout] Delegating to AiService (Gemini Vision)...');
 
-      // Try Gemini First (Smart Analysis)
-      let fields = await analyzeLayoutWithGemini(base64);
-
-      // Fallback to Document AI if Gemini finds nothing
-      if (!fields || fields.length === 0) {
-        console.warn('[WARN analyze-layout] Gemini found no fields, falling back to Document AI...');
-        fields = await analyzePdfLayout(base64);
-      }
+      const fields = await aiService.analyzeLayout(base64);
 
       console.log(`[DEBUG analyze-layout] Analysis complete. Found ${fields.length} fields.`);
       res.json({ fields });
@@ -1397,15 +1185,7 @@ Esempio di output:
       }
 
 
-      // Configure model without tools (tools go in generateContent)
-      const modelInstance = vertex_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        systemInstruction: {
-          role: 'system',
-          parts: [{ text: systemPrompt }]
-        }
-      });
-
+      // Model handling delegated to AiService
       // Build prompt for filling
       let userPrompt = ``;
       if (fillingMode === 'studio') {
@@ -1414,7 +1194,7 @@ Sei un assistente intelligente che compila documenti.
 Analizza il documento fornito (immagine/PDF) e le fonti di supporto (testo/altri file).
 
 Il tuo compito è compilare i seguenti campi del form:
-${requestedFields?.map(f => `- ${f}`).join('\n')}
+${requestedFields?.map((f: string) => `- ${f}`).join('\n')}
 
 IMPORTANTE:
 ${notes ? `NOTE UTENTE AGGIUNTIVE: ${notes}` : ""}
@@ -1451,31 +1231,15 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
    `;
       }
 
-      // Build contents with multimodal files
-      const messageParts: any[] = [{ text: userPrompt }];
+      console.log('[DEBUG Compile] Delegating to AiService (Gemini 2.5 Flash)...');
 
-      // Add multimodal files as inline data
-      for (const file of multimodalFiles) {
-        messageParts.push({
-          inlineData: { mimeType: file.mimeType, data: file.data }
-        });
-      }
-
-      // Add pinned source as image/pdf for structural guide if applicable
-      if (pinnedSource && (pinnedSource.type.startsWith('image/') || pinnedSource.type === 'application/pdf')) {
-        messageParts.push({
-          inlineData: { mimeType: pinnedSource.type, data: pinnedSource.base64 }
-        });
-      }
-
-      const result = await modelInstance.generateContent({
-        contents: [{ role: 'user', parts: messageParts }],
-        generationConfig: {
-          temperature: temperature || 0.7,
-        },
+      const text = await aiService.compileDocument({
+        systemPrompt,
+        userPrompt,
+        multimodalFiles,
+        pinnedSource
       });
-
-      const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      console.log('[DEBUG Compile] AI Response received.');
 
       if (fillingMode === 'studio') {
         try {
