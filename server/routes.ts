@@ -1215,14 +1215,23 @@ ${pinnedSource ? `\n\nIMPORTANTE: Dato che c'è un DOCUMENTO MASTER, DEVI genera
           const finalFields = (fillingData.data || []).map((f: any) => ({ ...f }));
 
           if (fillingData.preciseData && preciseFields.length > 0) {
+            console.log(`[DEBUG Compile] Mapping ${fillingData.preciseData.length} precise fields...`);
             for (const pd of fillingData.preciseData) {
-              const match = preciseFields.find(pf => pf.name === pd.fieldName);
+              const cleanedFieldName = (pd.fieldName || "").trim().toLowerCase();
+              const match = preciseFields.find(pf => {
+                const pfName = (pf.name || "").trim().toLowerCase();
+                return pfName === cleanedFieldName || pfName.includes(cleanedFieldName) || cleanedFieldName.includes(pfName);
+              });
+
               if (match) {
+                console.log(`[DEBUG Compile] MAPPED field: "${pd.fieldName}" -> Document AI: "${match.name}"`);
                 finalFields.push({
                   text: pd.text,
                   preciseBox: match.boundingPoly,
                   pageIndex: match.pageIndex
                 });
+              } else {
+                console.warn(`[DEBUG Compile] MAPPING FAILED for field: "${pd.fieldName}". Available: ${preciseFields.map(f => f.name).join(', ')}`);
               }
             }
           }
@@ -2015,14 +2024,23 @@ Nel parametro 'content', restituisci un oggetto JSON strutturato:
                 const finalFields = (fillingData.data || []).map((f: any) => ({ ...f }));
 
                 if (fillingData.preciseData && preciseFields.length > 0) {
+                  console.log(`[DEBUG Chat] Mapping ${fillingData.preciseData.length} precise fields...`);
                   for (const pd of fillingData.preciseData) {
-                    const match = preciseFields.find(pf => pf.name === pd.fieldName);
+                    const cleanedFieldName = (pd.fieldName || "").trim().toLowerCase();
+                    const match = preciseFields.find(pf => {
+                      const pfName = (pf.name || "").trim().toLowerCase();
+                      return pfName === cleanedFieldName || pfName.includes(cleanedFieldName) || cleanedFieldName.includes(pfName);
+                    });
+
                     if (match) {
+                      console.log(`[DEBUG Chat] MAPPED field: "${pd.fieldName}" -> Document AI: "${match.name}"`);
                       finalFields.push({
                         text: pd.text,
                         preciseBox: match.boundingPoly,
                         pageIndex: match.pageIndex
                       });
+                    } else {
+                      console.warn(`[DEBUG Chat] MAPPING FAILED for field: "${pd.fieldName}". Available: ${preciseFields.map(f => f.name).join(', ')}`);
                     }
                   }
                 }
