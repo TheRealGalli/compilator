@@ -132,11 +132,11 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
 
     // Support for specialized/custom processors using entities
     if (document && document.entities) {
-      console.log(`[DEBUG analyzePdfLayout] Detected ${document.entities.length} entities (Specialized/Custom Processor)`);
+      console.log(`[DEBUG analyzePdfLayout] Entities property present: ${document.entities.length} detected`);
       for (const entity of document.entities) {
         const entityName = entity.type || entity.mentionText || "Entity";
-        // Use the normalized vertices if available for precision
-        const poly = entity.pageAnchor?.pageRefs?.[0]?.boundingPoly;
+        // Precision check: try normalized vertices first
+        const poly = entity.pageAnchor?.pageRefs?.[0]?.boundingPoly || entity.normalizedBoundingPoly;
         if (poly) {
           discoveredFields.push({
             name: entityName,
@@ -152,13 +152,15 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
     if (document && document.pages) {
       for (const page of document.pages) {
         if (page.formFields) {
-          console.log(`[DEBUG analyzePdfLayout] Page ${page.pageNumber}: Detected ${page.formFields.length} formFields`);
+          console.log(`[DEBUG analyzePdfLayout] Page ${page.pageNumber} formFields count: ${page.formFields.length}`);
           for (const field of page.formFields) {
             const fieldName = getTextFromAnchor(field.fieldName?.textAnchor);
 
-            // For an empty form, the fieldValue might not have text, but it MUST have a location (boundingPoly)
-            // Sometimes it's in fieldValue.boundingPoly, sometimes in fieldValue.layout.boundingPoly
-            const boundingPoly = field.fieldValue?.boundingPoly || field.fieldValue?.layout?.boundingPoly;
+            // The "Stupid Error" check: Sometimes bounding poly is in the parent layout, not the value link
+            const boundingPoly =
+              field.fieldValue?.boundingPoly ||
+              field.fieldValue?.layout?.boundingPoly ||
+              field.fieldName?.layout?.boundingPoly; // Fallback to label area if value area is missing
 
             if (fieldName && boundingPoly) {
               discoveredFields.push({
@@ -167,8 +169,15 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
                 pageIndex: (page.pageNumber || 1) - 1,
                 source: 'formField'
               });
+            } else {
+              // Log missing properties for debugging the "zero fields"
+              if (fieldName && !boundingPoly) {
+                console.warn(`[DEBUG analyzePdfLayout] RILEVATO CAMPO "${fieldName}" MA MANCANO COORDINATE (boundingPoly)`);
+              }
             }
           }
+        } else {
+          console.log(`[DEBUG analyzePdfLayout] Page ${page.pageNumber}: NO formFields property found in page object.`);
         }
       }
     }
