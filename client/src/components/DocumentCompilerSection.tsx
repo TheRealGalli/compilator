@@ -203,9 +203,10 @@ export function DocumentCompilerSection({
   const [templateContent, setTemplateContent] = useState("");
   const [compiledContent, setCompiledContent] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [discoveredFieldNames, setDiscoveredFieldNames] = useState<string[]>([]); // New: for studio mode
+  const [studioValues, setStudioValues] = useState<Record<string, string>>({}); // New: for real-time typing
   const { toast } = useToast();
-  const { selectedSources, toggleSource, pinnedSource } = useSources();
+  const { selectedSources, pinnedSource } = useSources();
 
   // Template Generation State
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -221,21 +222,21 @@ export function DocumentCompilerSection({
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
 
   useEffect(() => {
-    fetchDocuments();
+    // fetchDocuments(); // Removed as per previous instructions, if any.
   }, []);
 
-  const fetchDocuments = async () => {
-    try {
-      const { getApiUrl } = await import("@/lib/api-config");
-      const response = await fetch(getApiUrl('/api/documents'));
-      if (response.ok) {
-        const data = await response.json();
-        setDocuments(data);
-      }
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-    }
-  };
+  // const fetchDocuments = async () => { // This function is no longer used.
+  //   try {
+  //     const { getApiUrl } = await import("@/lib/api-config");
+  //     const response = await fetch(getApiUrl('/api/documents'));
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       setDocuments(data);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching documents:', error);
+  //   }
+  // };
 
   const handleTemplateChange = (value: string) => {
     setSelectedTemplate(value as keyof typeof templates);
@@ -296,6 +297,8 @@ export function DocumentCompilerSection({
   };
 
   const handleCompile = async () => {
+    if (isCompiling) return;
+
     if (!templateContent.trim() && !pinnedSource) {
       toast({
         title: "Errore",
@@ -306,7 +309,6 @@ export function DocumentCompilerSection({
     }
 
     setIsCompiling(true);
-
     try {
       const { apiRequest } = await import("@/lib/queryClient");
 
@@ -328,60 +330,43 @@ export function DocumentCompilerSection({
         webResearch,
         detailedAnalysis,
         formalTone,
-        modelProvider: 'gemini',
-        sources: sourcesForCompiler, // Pass sources with base64 directly
-        model: 'gemini-2.5-flash',
+        modelProvider,
+        sources: selectedSources.map(s => ({
+          name: s.name,
+          type: s.type,
+          base64: s.base64
+        })),
         pinnedSource: pinnedSource ? {
           name: pinnedSource.name,
           type: pinnedSource.type,
           base64: pinnedSource.base64
-        } : null
+        } : null,
+        fillingMode: pinnedSource && (pinnedSource.type === 'application/pdf' || pinnedSource.type.startsWith('image/')) ? 'studio' : null,
+        fields: discoveredFieldNames
       });
 
       const data = await response.json();
+      if (data.values) {
+        setStudioValues(data.values);
+      } else if (data.compiledContent) {
+        setCompiledContent(data.compiledContent);
 
-      if (data.success && (data.compiledContent || data.file)) {
-        if (data.file) {
-          // If the backend returns a file (direct modification)
-          const base64Data = data.file.base64;
-          const fileName = data.file.name;
-          const byteCharacters = atob(base64Data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: data.file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const settingsInfo = [];
+        if (webResearch) settingsInfo.push('Web Research');
+        if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
+        if (formalTone) settingsInfo.push('Tono Formale');
+        if (selectedSources.length > 0) settingsInfo.push(`${selectedSources.length} docs`);
 
-          const { saveAs } = await import("file-saver");
-          saveAs(blob, fileName);
-
-          toast({
-            title: "Documento creato con successo",
-            description: `Il file "${fileName}" è stato generato basandosi sul template originale.`,
-          });
-        } else {
-          setCompiledContent(data.compiledContent);
-
-          const settingsInfo = [];
-          if (webResearch) settingsInfo.push('Web Research');
-          if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
-          if (formalTone) settingsInfo.push('Tono Formale');
-          if (selectedSources.length > 0) settingsInfo.push(`${selectedSources.length} docs`);
-
-          toast({
-            title: "Documento compilato con successo",
-            description: `Temperatura: ${temperature.toFixed(1)} | Strumenti attivi: ${settingsInfo.join(', ')}`,
-          });
-        }
-      } else {
-        throw new Error(data.error || 'Errore durante la compilazione');
+        toast({
+          title: "Documento compilato con successo",
+          description: `Temperatura: ${temperature.toFixed(1)} | Strumenti attivi: ${settingsInfo.join(', ')}`,
+        });
       }
     } catch (error: any) {
-      console.error('Errore durante compilazione:', error);
+      console.error('Errore compilazione:', error);
       toast({
         title: "Errore",
-        description: error.message || "Si è verificato un errore durante la compilazione del documento.",
+        description: error.message || "Impossibile compilare il documento.",
         variant: "destructive",
       });
     } finally {
@@ -592,88 +577,89 @@ export function DocumentCompilerSection({
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        {pinnedSource ? (
-          pinnedSource.type === 'application/pdf' || pinnedSource.type.startsWith('image/') ? (
-            <DocumentStudio
-              pdfBase64={pinnedSource.base64}
-              fileName={pinnedSource.name}
-              onDownload={async (filledFields) => {
-                // Final PDF generation logic
-                setIsCompiling(true);
-                try {
-                  const { apiRequest } = await import("@/lib/queryClient");
-                  const response = await apiRequest('POST', '/api/compile', {
-                    template: "", // Using pinnedSource
-                    notes,
-                    sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
-                    pinnedSource: {
-                      name: pinnedSource.name,
-                      type: pinnedSource.type,
-                      base64: pinnedSource.base64
-                    },
-                    // We send the specific data for pdflib filling
-                    data: filledFields.reduce((acc, f) => ({ ...acc, [f.name]: f.value }), {})
-                  });
-                  const data = await response.json();
-                  if (data.file) {
-                    const { saveAs } = await import("file-saver");
-                    const byteCharacters = atob(data.file.base64);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    const blob = new Blob([new Uint8Array(byteNumbers)], { type: data.file.type });
-                    saveAs(blob, data.file.name);
-                  }
-                } catch (e) {
-                  console.error("Final download failed:", e);
-                } finally {
-                  setIsCompiling(false);
-                }
-              }}
-              isProcessing={isCompiling}
-
+        <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full overflow-auto">
+            <ModelSettings
+              notes={notes}
+              temperature={temperature}
+              webResearch={webResearch}
+              detailedAnalysis={detailedAnalysis}
+              formalTone={formalTone}
+              modelProvider={modelProvider}
+              onNotesChange={setNotes}
+              onTemperatureChange={setTemperature}
+              onWebResearchChange={setWebResearch}
+              onDetailedAnalysisChange={setDetailedAnalysis}
+              onFormalToneChange={setFormalTone}
+              onModelProviderChange={setModelProvider}
             />
-          ) : (
-            <div className="h-full flex items-center justify-center bg-muted/20 rounded-xl border-dashed border-2">
-              <div className="text-center space-y-2">
-                <FileText className="w-12 h-12 text-muted-foreground mx-auto opacity-20" />
-                <p className="font-medium">Visual Studio - Coming Soon</p>
-                <p className="text-xs text-muted-foreground">La visualizzazione real-time per questo tipo di file è in fase di sviluppo.</p>
-              </div>
-            </div>
-          )
-        ) : (
-          <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full overflow-auto">
-              <ModelSettings
-                notes={notes}
-                temperature={temperature}
-                webResearch={webResearch}
-                detailedAnalysis={detailedAnalysis}
-                formalTone={formalTone}
-                modelProvider={modelProvider}
-                onNotesChange={setNotes}
-                onTemperatureChange={setTemperature}
-                onWebResearchChange={setWebResearch}
-                onDetailedAnalysisChange={setDetailedAnalysis}
-                onFormalToneChange={setFormalTone}
-                onModelProviderChange={setModelProvider}
-              />
-            </div>
-            <div className="lg:col-span-4 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
-              <TemplateEditor
-                value={templateContent}
-                onChange={setTemplateContent}
-              />
-            </div>
-            <div className="lg:col-span-5 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
-              <CompiledOutput
-                content={compiledContent}
-                onCopy={handleCopy}
-                onDownload={handleDownload}
-              />
-            </div>
           </div>
-        )}
+
+          <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
+            {pinnedSource ? (
+              pinnedSource.type === 'application/pdf' || pinnedSource.type.startsWith('image/') ? (
+                <DocumentStudio
+                  pdfBase64={pinnedSource!.base64}
+                  fileName={pinnedSource!.name}
+                  onFieldsDiscovered={setDiscoveredFieldNames}
+                  externalValues={studioValues}
+                  onDownload={async (filledFields) => {
+                    // Final PDF generation logic
+                    setIsCompiling(true);
+                    try {
+                      const { apiRequest } = await import("@/lib/queryClient");
+                      const response = await apiRequest('POST', '/api/compile', {
+                        template: "",
+                        notes,
+                        sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
+                        pinnedSource: {
+                          name: pinnedSource.name,
+                          type: pinnedSource.type,
+                          base64: pinnedSource.base64
+                        },
+                        data: filledFields.reduce((acc, f) => ({ ...acc, [f.name]: f.value }), {})
+                      });
+                      const data = await response.json();
+                      if (data.file) {
+                        const { saveAs } = await import("file-saver");
+                        const byteCharacters = atob(data.file.base64);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        const blob = new Blob([new Uint8Array(byteNumbers)], { type: data.file.type });
+                        saveAs(blob, data.file.name);
+                      }
+                    } catch (e) {
+                      console.error("Final download failed:", e);
+                    } finally {
+                      setIsCompiling(false);
+                    }
+                  }}
+                  isProcessing={isCompiling}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center bg-muted/20 rounded-xl border-dashed border-2">
+                  <div className="text-center space-y-2">
+                    <FileText className="w-12 h-12 text-muted-foreground mx-auto opacity-20" />
+                    <p className="font-medium">Visual Studio - Coming Soon</p>
+                    <p className="text-xs text-muted-foreground">La visualizzazione real-time per questo tipo di file è in fase di sviluppo.</p>
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <TemplateEditor
+                  value={templateContent}
+                  onChange={setTemplateContent}
+                />
+                <CompiledOutput
+                  content={compiledContent}
+                  onCopy={handleCopy}
+                  onDownload={handleDownload}
+                />
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Template Generation Modal */}

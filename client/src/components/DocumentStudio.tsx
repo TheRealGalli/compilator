@@ -26,13 +26,21 @@ interface DocumentStudioProps {
     fileName: string;
     onDownload: (filledFields: DiscoveredField[]) => void;
     isProcessing?: boolean;
+    externalValues?: Record<string, string>; // New: values from parent
+    onFieldsDiscovered?: (fieldNames: string[]) => void; // New: notify parent of found fields
 }
 
-export function DocumentStudio({ pdfBase64, fileName, onDownload, isProcessing = false }: DocumentStudioProps) {
+export function DocumentStudio({
+    pdfBase64,
+    fileName,
+    onDownload,
+    isProcessing = false,
+    externalValues,
+    onFieldsDiscovered
+}: DocumentStudioProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [fields, setFields] = useState<DiscoveredField[]>([]);
     const [isLoadingFields, setIsLoadingFields] = useState(false);
-    const [isFilling, setIsFilling] = useState(false);
     const { toast } = useToast();
     const pdfContainerRef = useRef<HTMLDivElement>(null);
 
@@ -42,6 +50,30 @@ export function DocumentStudio({ pdfBase64, fileName, onDownload, isProcessing =
             analyzeLayout();
         }
     }, [pdfBase64]);
+
+    // Watch for external values to trigger "typing" effect
+    useEffect(() => {
+        if (externalValues && Object.keys(externalValues).length > 0) {
+            const keys = Object.keys(externalValues);
+            const newFields = [...fields];
+
+            const applyTyping = async () => {
+                for (const key of keys) {
+                    const index = newFields.findIndex(f =>
+                        f.name.toLowerCase().includes(key.toLowerCase()) ||
+                        key.toLowerCase().includes(f.name.toLowerCase())
+                    );
+                    if (index !== -1) {
+                        newFields[index] = { ...newFields[index], value: externalValues[key] };
+                        setFields([...newFields]);
+                        await new Promise(r => setTimeout(r, 100)); // Visual spacing for "typing"
+                    }
+                }
+            };
+
+            applyTyping();
+        }
+    }, [externalValues]);
 
     const analyzeLayout = async () => {
         setIsLoadingFields(true);
@@ -56,6 +88,9 @@ export function DocumentStudio({ pdfBase64, fileName, onDownload, isProcessing =
             const data = await response.json();
             if (data.fields) {
                 setFields(data.fields.map((f: any) => ({ ...f, value: "" })));
+                if (onFieldsDiscovered) {
+                    onFieldsDiscovered(data.fields.map((f: any) => f.name));
+                }
             }
         } catch (error) {
             console.error("Layout analysis failed:", error);
@@ -68,36 +103,6 @@ export function DocumentStudio({ pdfBase64, fileName, onDownload, isProcessing =
         const newFields = [...fields];
         newFields[index].value = value;
         setFields(newFields);
-    };
-
-    const handleAiFill = async () => {
-        if (isFilling) return;
-        setIsFilling(true);
-        try {
-            const { apiRequest } = await import("@/lib/queryClient");
-            const response = await apiRequest('POST', '/api/compile', {
-                fillingMode: 'studio',
-                fields: fields.map(f => f.name),
-                pdfBase64: pdfBase64
-            });
-
-            const data = await response.json();
-            if (data.values) {
-                // "Type" effect
-                const keys = Object.keys(data.values);
-                for (const key of keys) {
-                    const index = fields.findIndex(f => f.name.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(f.name.toLowerCase()));
-                    if (index !== -1) {
-                        handleFieldChange(index, data.values[key]);
-                        await new Promise(r => setTimeout(r, 100)); // Visual spacing
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("AI filling failed:", error);
-        } finally {
-            setIsFilling(false);
-        }
     };
 
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
@@ -119,19 +124,9 @@ export function DocumentStudio({ pdfBase64, fileName, onDownload, isProcessing =
                     </div>
                     <div className="flex gap-2">
                         <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleAiFill}
-                            disabled={isLoadingFields || isFilling || fields.length === 0}
-                            className="gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
-                        >
-                            <Wand2 className={`w-4 h-4 ${isFilling ? 'animate-pulse' : ''}`} />
-                            Compila con AI
-                        </Button>
-                        <Button
                             size="sm"
                             onClick={() => onDownload(fields)}
-                            disabled={fields.length === 0}
+                            disabled={fields.length === 0 || isProcessing}
                             className="gap-2 bg-blue-600 hover:bg-blue-700"
                         >
                             <Download className="w-4 h-4" />
@@ -141,9 +136,9 @@ export function DocumentStudio({ pdfBase64, fileName, onDownload, isProcessing =
                 </div>
             </CardHeader>
 
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
-                {/* Left Pane: PDF Viewer with Overlay */}
-                <div className="lg:col-span-8 bg-muted/30 rounded-xl overflow-hidden relative flex justify-center p-4 border shadow-inner">
+            <div className="flex-1 grid grid-cols-1 gap-6 min-h-0">
+                {/* Full-width PDF Workspace */}
+                <div className="bg-muted/30 rounded-xl overflow-hidden relative flex justify-center p-4 border shadow-inner">
                     <ScrollArea className="h-full w-full">
                         <div className="flex flex-col items-center gap-4 relative" ref={pdfContainerRef}>
                             <Document
@@ -157,7 +152,7 @@ export function DocumentStudio({ pdfBase64, fileName, onDownload, isProcessing =
                                             pageNumber={index + 1}
                                             renderTextLayer={false}
                                             renderAnnotationLayer={false}
-                                            width={600}
+                                            width={800} // Increased width for better visibility
                                         />
                                         {/* Overlay Layer */}
                                         <div className="absolute inset-0 pointer-events-none">
@@ -173,7 +168,7 @@ export function DocumentStudio({ pdfBase64, fileName, onDownload, isProcessing =
                                                 return (
                                                     <div
                                                         key={`overlay_${fIdx}`}
-                                                        className="absolute text-[10px] text-blue-900 font-medium whitespace-nowrap animate-in fade-in slide-in-from-bottom-1 duration-500"
+                                                        className="absolute text-[12px] text-blue-900 font-medium whitespace-nowrap animate-in fade-in slide-in-from-bottom-1 duration-700"
                                                         style={{
                                                             left: `${left}%`,
                                                             top: `${top}%`,
@@ -188,51 +183,6 @@ export function DocumentStudio({ pdfBase64, fileName, onDownload, isProcessing =
                                     </div>
                                 ))}
                             </Document>
-                        </div>
-                    </ScrollArea>
-                </div>
-
-                {/* Right Pane: Field List */}
-                <div className="lg:col-span-4 flex flex-col min-h-0 bg-white rounded-xl border p-4 shadow-sm">
-                    <div className="text-sm font-semibold mb-3 border-b pb-2 flex items-center justify-between">
-                        Campi Identificati
-                        <span className="text-xs bg-muted px-2 py-0.5 rounded-full font-normal">
-                            {fields.length} trovati
-                        </span>
-                    </div>
-                    <ScrollArea className="flex-1">
-                        <div className="space-y-4 pr-3">
-                            {isLoadingFields ? (
-                                Array.from({ length: 5 }).map((_, i) => (
-                                    <Skeleton key={i} className="h-12 w-full" />
-                                ))
-                            ) : fields.length > 0 ? (
-                                fields.map((field, idx) => (
-                                    <div key={idx} className="space-y-1 group">
-                                        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block">
-                                            {field.name}
-                                        </label>
-                                        <div className="relative">
-                                            <Input
-                                                value={field.value}
-                                                onChange={(e) => handleFieldChange(idx, e.target.value)}
-                                                className="h-9 text-sm focus:ring-blue-500/20"
-                                                placeholder={`Inserisci ${field.name.toLowerCase()}...`}
-                                            />
-                                            {field.value && (
-                                                <Check className="w-3 h-3 text-green-500 absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-12 text-muted-foreground flex flex-col items-center gap-2">
-                                    <div className="p-3 bg-muted/50 rounded-full">
-                                        <X className="w-6 h-6 opacity-20" />
-                                    </div>
-                                    <p className="text-xs">Nessun campo rilevabile.<br />Usa Documenti standard o PDF carichi.</p>
-                                </div>
-                            )}
                         </div>
                     </ScrollArea>
                 </div>
