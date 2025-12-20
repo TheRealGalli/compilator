@@ -21,13 +21,13 @@ export class AiService {
             });
 
             const prompt = `
-      You are a layout analysis engine.
-      Detect all form fields where data should be entered (underscores, boxes, empty spaces).
-      For each field, provide:
-      1. "name": A specific, semantic label (e.g. "Surname", "Date of Birth", "Signature").
-      2. "box_2d": The bounding box as [ymin, xmin, ymax, xmax] on a 0-1000 scale.
+      Agisci come un motore di analisi layout per documenti.
+      Rileva tutti i campi del modulo dove dovrebbero essere inseriti dati (underscore, caselle, spazi vuoti, righe di firma).
+      Per ogni campo, fornisci:
+      1. "name": Un'etichetta semantica specifica in ITALIANO (es. "Cognome", "Data di Nascita", "Firma", "Indirizzo").
+      2. "box_2d": Il bounding box come [ymin, xmin, ymax, xmax] su scala 0-1000.
 
-      Return JSON: { "data": [ { "name": "...", "box_2d": [0,0,0,0] } ] }
+      Restituisci JSON: { "data": [ { "name": "...", "box_2d": [0,0,0,0] } ] }
       `;
 
             const result = await model.generateContent({

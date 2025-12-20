@@ -205,7 +205,7 @@ export function DocumentStudio({
             <CardHeader className="flex-shrink-0 px-0 pb-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 mr-4">
+                        <div className="flex items-center gap-1 mr-4 select-none">
                             {/* Star 1: Add Field Mode */}
                             <TooltipWrapper text="Aggiungi Campi">
                                 <motion.div
@@ -218,24 +218,23 @@ export function DocumentStudio({
                                             description: isAddingField ? "Modifiche terminate" : "Clicca sul documento per aggiungere campi"
                                         });
                                     }}
-                                    className={`cursor-pointer p-1 rounded-full ${isAddingField ? 'bg-blue-100 text-blue-700' : 'text-blue-500 hover:text-blue-600'}`}
+                                    className={`cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 ${isAddingField ? 'scale-125' : 'hover:scale-110'}`}
                                 >
-                                    <Sparkles className="w-6 h-6 fill-current" />
+                                    <span className="text-4xl font-bold text-blue-600 pb-2">*</span>
                                 </motion.div>
                             </TooltipWrapper>
 
                             {/* Star 2: Compile */}
                             <TooltipWrapper text="Compila con AI">
                                 <motion.div
-                                    animate={{ rotate: star2Rotation }}
+                                    animate={{ rotateY: star2Rotation }}
                                     onClick={() => {
-                                        setStar2Rotation(prev => prev === 0 ? 720 : 0); // Rotate twice (360*2)
-                                        // "Cambia direzione" implemented by alternating 0 and 720? Or just flip.
+                                        setStar2Rotation(prev => prev + 360);
                                         onCompile(fields);
                                     }}
-                                    className="cursor-pointer p-1 text-blue-500 hover:text-blue-600"
+                                    className="cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 hover:scale-110"
                                 >
-                                    <Sparkles className="w-6 h-6 fill-current" />
+                                    <span className="text-4xl font-bold text-blue-600 pb-2">*</span>
                                 </motion.div>
                             </TooltipWrapper>
 
@@ -247,13 +246,11 @@ export function DocumentStudio({
                                     onClick={() => {
                                         setStar3Spinning(true);
                                         onDownload(fields);
-                                        // Stop spinning after a delay or when download completes?
-                                        // Parent usually handles async, we can just spin for a bit.
                                         setTimeout(() => setStar3Spinning(false), 3000);
                                     }}
-                                    className="cursor-pointer p-1 text-blue-500 hover:text-blue-600"
+                                    className="cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 hover:scale-110"
                                 >
-                                    <Sparkles className="w-6 h-6 fill-current" />
+                                    <span className="text-4xl font-bold text-blue-600 pb-2">*</span>
                                 </motion.div>
                             </TooltipWrapper>
                         </div>
