@@ -74,7 +74,11 @@ export function DocumentStudio({
                         // Ensure we strictly cast to string to prevent React Error #31
                         const val = externalValues[key];
                         const safeVal = typeof val === 'object' ? JSON.stringify(val) : String(val || "");
-                        newFields[index] = { ...newFields[index], value: safeVal, offsetX: 0, offsetY: 0, rotation: 0 };
+                        newFields[index] = {
+                            ...newFields[index],
+                            value: safeVal
+                            // Preserving manual offsets/rotation (removed explicit reset to 0)
+                        };
                         setFields([...newFields]);
                         await new Promise(r => setTimeout(r, 60)); // Faster visual spacing
                     }
