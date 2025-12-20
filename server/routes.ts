@@ -1371,8 +1371,12 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
       - Se il dato manca completamente, scrivi "[MANCANTE]".
       - Se il campo è una firma o una data, prova a dedurlo dal contesto o usa la data odierna.
 
-   IMPORTANTE: Non limitarti ai soli metadati. Usa la tua intelligenza per collegare semanticamente i dati delle fonti ai campi del modulo e posizionarli nel posto giusto.
-   Restituisci un JSON piatto: { "Nome Campo 1": "Valore 1", "Nome Campo 2": "Valore 2" ... }
+   IMPORTANTE:
+   1. ANALIZZA tutto il documento e le note.
+   2. Se non trovi il valore per un campo, restituisci stringa vuota "".
+   3. NON restituire MAI oggetti o array (es. {} o []). Solo stringhe piatte.
+
+   Restituisci un JSON piatto: { "Nome Campo": "Valore Stringa" }
    `;
       }
 
@@ -1404,6 +1408,8 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
 
       if (fillingMode === 'studio') {
         try {
+          console.log('[DEBUG Studio] Raw AI response:', text);
+
           // Extract JSON from response, handling potential Markdown code blocks
           let cleanText = text.trim();
           if (cleanText.includes('```')) {
@@ -1414,10 +1420,13 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
           const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
           let values = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
 
-          // Ensure all values are strings or numbers, not objects
+          // FIX: Ensure all values are simple strings. If object/array, force empty string.
           for (const key in values) {
-            if (typeof values[key] === 'object' && values[key] !== null) {
-              values[key] = JSON.stringify(values[key]);
+            const v = values[key];
+            if (typeof v === 'object' && v !== null) {
+              values[key] = ""; // Was JSON.stringify, caused "{}" artifact. Now empty.
+            } else if (v === null || v === undefined || v === "null") {
+              values[key] = "";
             }
           }
 
