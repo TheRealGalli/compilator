@@ -1,4 +1,5 @@
-import { Asterisk, FileText, ChevronUp, Sparkles, Wand2 } from "lucide-react";
+import { Asterisk, FileText, ChevronUp, Wand2 } from "lucide-react";
+import { ThreeStars } from "@/components/ui/three-stars";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TemplateEditor } from "./TemplateEditor";
