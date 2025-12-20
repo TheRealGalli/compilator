@@ -1277,17 +1277,57 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
           const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
           let values = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
 
-          // FIX: Ensure all values are simple strings. If object/array, force empty string.
-          for (const key in values) {
-            const v = values[key];
-            if (typeof v === 'object' && v !== null) {
-              values[key] = ""; // Was JSON.stringify, caused "{}" artifact. Now empty.
-            } else if (v === null || v === undefined || v === "null") {
-              values[key] = "";
+          // FIX: Handle complex structures (preciseData, data) from Autonomous Mode
+          const flatValues: Record<string, string> = {};
+
+          // Helper to process arrays of { fieldName, text, ... }
+          const processArray = (arr: any[]) => {
+            if (!Array.isArray(arr)) return;
+            for (const item of arr) {
+              if (item && typeof item === 'object') {
+                const key = item.fieldName || item.name || item.label;
+                const val = item.text || item.value || item.content;
+                if (key && val !== undefined) {
+                  flatValues[key] = String(val);
+                }
+              }
+            }
+          };
+
+          if (values.preciseData && Array.isArray(values.preciseData)) {
+            processArray(values.preciseData);
+          } else if (values.data && Array.isArray(values.data)) {
+            processArray(values.data);
+          } else {
+            // Fallback: It might be a flat object already, or mix
+            for (const key in values) {
+              const v = values[key];
+              // If value is a string/number, keep it.
+              // If it's an object/array (and not processed above), ignore or try to extract text
+              if (typeof v === 'string' || typeof v === 'number') {
+                flatValues[key] = String(v);
+              } else if (key !== 'preciseData' && key !== 'data' && key !== 'fillingMode') {
+                // Try to be safe, maybe it's { value: "..." }
+                if (v && typeof v === 'object' && (v.text || v.value)) {
+                  flatValues[key] = String(v.text || v.value);
+                }
+              }
             }
           }
 
-          return res.json({ success: true, values });
+          // If we found nothing structured but there are keys in original (and not special keys), use original
+          if (Object.keys(flatValues).length === 0 && Object.keys(values).length > 0) {
+            for (const key in values) {
+              if (key !== 'fillingMode' && key !== 'preciseData' && key !== 'data') {
+                const v = values[key];
+                if (typeof v === 'string' || typeof v === 'number') {
+                  flatValues[key] = String(v);
+                }
+              }
+            }
+          }
+
+          return res.json({ success: true, values: flatValues });
         } catch (e) {
           console.error('[API compile] JSON parse error in studio mode:', e, 'Text:', text);
           return res.status(500).json({ error: 'Failed to generate structured values' });
