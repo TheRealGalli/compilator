@@ -134,16 +134,7 @@ export function DocumentStudio({
                             <p className="text-xs text-muted-foreground">{fileName}</p>
                         </div>
                     </div>
-                    <div className="flex gap-2">
-                        <Button
-                            size="sm"
-                            onClick={() => onDownload(fields)}
-                            disabled={fields.length === 0 || isProcessing}
-                            className="gap-2 bg-blue-600 hover:bg-blue-700"
-                        >
-                            <Download className="w-4 h-4" />
-                            Scarica PDF
-                        </Button>
+                        {/* Download button removed as requested */}
                         {fields.length === 0 && !isLoadingFields && (
                             <Button
                                 size="sm"
@@ -195,6 +186,14 @@ export function DocumentStudio({
                                                 const left = isNormalized ? v[0].x * 100 : (v[0].x / 1000) * 100;
                                                 const top = isNormalized ? v[0].y * 100 : (v[0].y / 1000) * 100;
 
+                                                // Calculate generic width based on bounding box if available, else auto
+                                                let width = 'auto';
+                                                if (isNormalized && v.length === 4) {
+                                                    const w = (v[1].x - v[0].x) * 100;
+                                                     // If width is tiny, default to auto/min-width to be usable
+                                                     if (w > 2) width = `${w}%`;
+                                                }
+
                                                 return (
                                                     <motion.div
                                                         key={`overlay_${globalIdx}`}
@@ -219,46 +218,49 @@ export function DocumentStudio({
                                                         style={{
                                                             left: `${left}%`,
                                                             top: `${top}%`,
-                                                            transform: 'translateY(-100%)' // Text anchor correction
+                                                            transform: 'translateY(-100%)', // Text anchor
+                                                            width: width === 'auto' ? 'auto' : width,
+                                                            maxWidth: '400px' // Prevent huge boxes
                                                         }}
                                                     >
                                                         <div className={`
-                                                            relative px-1 rounded border border-transparent transition-colors
-                                                            ${isSelected ? 'border-blue-500 bg-blue-50/50 shadow-lg' : 'hover:border-blue-300 hover:bg-blue-50/20'}
+                                                            relative px-1 rounded border transition-colors flex items-center
+                                                            ${isSelected ? 'border-blue-500 bg-blue-50/90 shadow-lg' : 'border-transparent hover:border-blue-300 hover:bg-blue-50/50'}
                                                         `}>
-                                                            <span className="text-[12px] text-blue-900 font-medium whitespace-nowrap block min-h-[1.2rem] min-w-[20px]">
-                                                                {(field.value === null || field.value === undefined || field.value === "null") ? "" : String(field.value)}
-                                                            </span>
+                                                            {/* Editable Input */}
+                                                            <input
+                                                                type="text"
+                                                                value={(field.value === null || field.value === undefined || field.value === "null") ? "" : String(field.value)}
+                                                                placeholder={field.name}
+                                                                className="bg-transparent border-none outline-none w-full p-0 m-0 text-[12px] text-blue-900 font-medium placeholder:text-blue-300/50 min-w-[30px]"
+                                                                onChange={(e) => updateFieldProperty(globalIdx, { value: e.target.value })}
+                                                                onPointerDown={(e) => e.stopPropagation()} // Allow interaction without dragging
+                                                                onKeyDown={(e) => e.stopPropagation()}
+                                                            />
 
                                                             {isSelected && (
                                                                 <>
-                                                                    {/* Rotation Control - All 4 corners behave the same for simplicity and consistency */}
+                                                                    {/* Rotation Control */}
                                                                     {[
-                                                                        { top: -2, left: -2, cursor: 'nw-resize' }, // Top-left
-                                                                        { top: -2, right: -2, cursor: 'ne-resize' }, // Top-right
-                                                                        { bottom: -2, left: -2, cursor: 'sw-resize' }, // Bottom-left
-                                                                        { bottom: -2, right: -2, cursor: 'se-resize' }  // Bottom-right
+                                                                        { top: -3, left: -3, cursor: 'nw-resize' },
+                                                                        { top: -3, right: -3, cursor: 'ne-resize' },
+                                                                        { bottom: -3, left: -3, cursor: 'sw-resize' },
+                                                                        { bottom: -3, right: -3, cursor: 'se-resize' }
                                                                     ].map((pos, i) => (
                                                                         <div
                                                                             key={i}
-                                                                            className="absolute w-3 h-3 bg-blue-600 rounded-full shadow-sm hover:scale-125 transition-transform z-50"
+                                                                            className="absolute w-2 h-2 bg-blue-600 rounded-full shadow-sm hover:scale-150 transition-transform z-50"
                                                                             style={{ ...pos, cursor: 'crosshair' }}
                                                                             onMouseDown={(e) => {
                                                                                 e.stopPropagation();
                                                                                 const rect = e.currentTarget.parentElement!.getBoundingClientRect();
                                                                                 const centerX = rect.left + rect.width / 2;
                                                                                 const centerY = rect.top + rect.height / 2;
-
-                                                                                // Calculate initial angle of the mouse relative to center
                                                                                 const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
                                                                                 const initialFieldRotation = field.rotation || 0;
 
                                                                                 const handleMouseMove = (mv: MouseEvent) => {
-                                                                                    // Calculate new angle
                                                                                     const currentAngle = Math.atan2(mv.clientY - centerY, mv.clientX - centerX) * (180 / Math.PI);
-
-                                                                                    // Apply the difference (delta) to the initial field rotation
-                                                                                    // This ensures smooth rotation from the current state without jumping
                                                                                     const delta = currentAngle - startAngle;
                                                                                     updateFieldProperty(globalIdx, { rotation: initialFieldRotation + delta });
                                                                                 };
@@ -287,6 +289,6 @@ export function DocumentStudio({
                     </ScrollArea>
                 </div>
             </div>
-        </Card>
+        </Card >
     );
 }
