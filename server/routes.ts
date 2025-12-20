@@ -88,7 +88,7 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
     }
 
     const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
-    const location = 'eu'; // or 'us'
+    const location = process.env.GCP_LOCATION || 'eu';
     const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
 
     if (!processorId) {
@@ -96,11 +96,11 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
       return [];
     }
 
-    console.log(`[DEBUG analyzePdfLayout] Cache MISS, calling Document AI for hash ${contentHash}...`);
-    // For locations other than 'us', we must specify the apiEndpoint
-    const client = new DocumentProcessorServiceClient({
-      apiEndpoint: `${location}-documentai.googleapis.com`
-    });
+    console.log(`[DEBUG analyzePdfLayout] Cache MISS for ${contentHash}. Using location: ${location}`);
+
+    // Regional endpoint logic: 'us' uses the global endpoint, others use regional ones
+    const apiEndpoint = location === 'us' ? 'documentai.googleapis.com' : `${location}-documentai.googleapis.com`;
+    const client = new DocumentProcessorServiceClient({ apiEndpoint });
     const name = `projects/${projectId}/locations/${location}/processors/${processorId}`;
 
     const request = {
@@ -115,7 +115,6 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
     const { document } = result;
     const documentText = document?.text || "";
 
-    // Helper to extract text from a textAnchor using the root document text
     const getTextFromAnchor = (textAnchor: any) => {
       if (!textAnchor || !textAnchor.textSegments) return "";
       return textAnchor.textSegments
@@ -149,13 +148,12 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
       }
     }
 
-    console.log(`[DEBUG analyzePdfLayout] Discovered ${discoveredFields.length} fields:`, discoveredFields.map(f => f.name).join(', '));
+    console.log(`[DEBUG analyzePdfLayout] Discovered ${discoveredFields.length} fields: ${discoveredFields.map(f => f.name).join(', ')}`);
 
-    // Only cache if we actually found something, to avoid poisoning the cache during debugging
+    // Session-safe caching: only store if we found fields
     if (discoveredFields.length > 0) {
       pdfLayoutCache.set(contentHash, discoveredFields);
     }
-
     return discoveredFields;
   } catch (err) {
     console.error('[ERROR analyzePdfLayout]', err);
@@ -1241,23 +1239,25 @@ ${pinnedSource ? `\n\nIMPORTANTE: Dato che c'è un DOCUMENTO MASTER, DEVI genera
           const finalFields = (fillingData.data || []).map((f: any) => ({ ...f }));
 
           if (fillingData.preciseData && preciseFields.length > 0) {
-            console.log(`[DEBUG Compile] Mapping ${fillingData.preciseData.length} precise fields...`);
+            console.log(`[DEBUG Compile] Fuzzy-mapping ${fillingData.preciseData.length} inputs against ${preciseFields.length} detected fields...`);
             for (const pd of fillingData.preciseData) {
-              const cleanedFieldName = (pd.fieldName || "").trim().toLowerCase();
+              const cleanedInputName = (pd.fieldName || "").trim().toLowerCase();
               const match = preciseFields.find(pf => {
-                const pfName = (pf.name || "").trim().toLowerCase();
-                return pfName === cleanedFieldName || pfName.includes(cleanedFieldName) || cleanedFieldName.includes(pfName);
+                const cleanedDetectedName = (pf.name || "").trim().toLowerCase();
+                return cleanedDetectedName === cleanedInputName ||
+                  cleanedDetectedName.includes(cleanedInputName) ||
+                  cleanedInputName.includes(cleanedDetectedName);
               });
 
               if (match) {
-                console.log(`[DEBUG Compile] MAPPED field: "${pd.fieldName}" -> Document AI: "${match.name}"`);
+                console.log(`[DEBUG Compile] MAPPED: "${pd.fieldName}" -> "${match.name}"`);
                 finalFields.push({
                   text: pd.text,
                   preciseBox: match.boundingPoly,
                   pageIndex: match.pageIndex
                 });
               } else {
-                console.warn(`[DEBUG Compile] MAPPING FAILED for field: "${pd.fieldName}". Available: ${preciseFields.map(f => f.name).join(', ')}`);
+                console.warn(`[DEBUG Compile] NO MATCH for "${pd.fieldName}".`);
               }
             }
           }
@@ -2050,23 +2050,21 @@ Nel parametro 'content', restituisci un oggetto JSON strutturato:
                 const finalFields = (fillingData.data || []).map((f: any) => ({ ...f }));
 
                 if (fillingData.preciseData && preciseFields.length > 0) {
-                  console.log(`[DEBUG Chat] Mapping ${fillingData.preciseData.length} precise fields...`);
                   for (const pd of fillingData.preciseData) {
-                    const cleanedFieldName = (pd.fieldName || "").trim().toLowerCase();
+                    const cleanedInputName = (pd.fieldName || "").trim().toLowerCase();
                     const match = preciseFields.find(pf => {
-                      const pfName = (pf.name || "").trim().toLowerCase();
-                      return pfName === cleanedFieldName || pfName.includes(cleanedFieldName) || cleanedFieldName.includes(pfName);
+                      const cleanedDetectedName = (pf.name || "").trim().toLowerCase();
+                      return cleanedDetectedName === cleanedInputName ||
+                        cleanedDetectedName.includes(cleanedInputName) ||
+                        cleanedInputName.includes(cleanedDetectedName);
                     });
 
                     if (match) {
-                      console.log(`[DEBUG Chat] MAPPED field: "${pd.fieldName}" -> Document AI: "${match.name}"`);
                       finalFields.push({
                         text: pd.text,
                         preciseBox: match.boundingPoly,
                         pageIndex: match.pageIndex
                       });
-                    } else {
-                      console.warn(`[DEBUG Chat] MAPPING FAILED for field: "${pd.fieldName}". Available: ${preciseFields.map(f => f.name).join(', ')}`);
                     }
                   }
                 }
