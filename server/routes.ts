@@ -898,7 +898,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Template o fonte master (ping rosso) richiesti' });
       }
       if (fillingMode === 'studio' && (!requestedFields || requestedFields.length === 0)) {
-        return res.status(400).json({ error: 'In modalità studio, sono richiesti i campi da compilare.' });
+        // Allow if we have a pinned PDF source to analyze automatically
+        if (!pinnedSource || pinnedSource.type !== 'application/pdf') {
+          return res.status(400).json({ error: 'In modalità studio, sono richiesti i campi da compilare.' });
+        }
       }
 
 
@@ -999,7 +1002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // FAST PATH: Direct data filling (Studio Download)
       if (req.body.data && pinnedSource && pinnedSource.type === 'application/pdf') {
         console.log(`[DEBUG Compile] FAST PATH: Direct data provided for PDF filling.`);
-        const preciseFields = await analyzePdfLayout(pinnedSource.base64);
+        const preciseFields = await aiService.analyzeLayout(pinnedSource.base64);
         const finalFields: any[] = [];
         const rawData = req.body.data; // This is the record: { fieldName: value }
 
@@ -1094,7 +1097,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // AI Precision Layout Analysis (Document AI) if PDF is pinned
       let preciseFields: any[] = [];
       if (pinnedSource && pinnedSource.type === 'application/pdf') {
-        preciseFields = await analyzePdfLayout(pinnedSource.base64);
+        preciseFields = await aiService.analyzeLayout(pinnedSource.base64);
       }
 
       let systemPrompt = `Data e ora corrente: ${dateTimeIT}
@@ -1827,7 +1830,7 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
 
       if (pinnedSource && pinnedSource.type === 'application/pdf') {
         // Precise analysis for Analyzer too
-        preciseFields = await analyzePdfLayout(pinnedSource.base64);
+        preciseFields = await aiService.analyzeLayout(pinnedSource.base64);
       }
 
       if (pinnedSource) {
