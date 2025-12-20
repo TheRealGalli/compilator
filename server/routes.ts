@@ -233,7 +233,18 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
  * coordinateBox is expected to be [ymin, xmin, ymax, xmax] in 0-1000 scale (Gemini output)
  * OR precise coordinates if coming from Document AI
  */
-async function fillPdfBinary(base64Original: string, fields: { text: string, box?: number[], preciseBox?: any }[]): Promise<string> {
+async function fillPdfBinary(
+  base64Original: string,
+  fields: {
+    text: string,
+    box?: number[],
+    preciseBox?: any,
+    pageIndex?: number,
+    offsetX?: number,
+    offsetY?: number,
+    rotation?: number
+  }[]
+): Promise<string> {
   try {
     const pdfDoc = await PDFDocument.load(Buffer.from(base64Original, 'base64'));
     const pages = pdfDoc.getPages();
@@ -253,20 +264,29 @@ async function fillPdfBinary(base64Original: string, fields: { text: string, box
           const bl = vertices[3];
           const tr = vertices[1];
 
-          const x = bl.x * width;
-          const y = (1 - bl.y) * height;
+          let x = bl.x * width;
+          let y = (1 - bl.y) * height;
+
+          // Apply manual adjustments (assuming they were calculated relative to an 800px width preview)
+          if (field.offsetX !== undefined) {
+            x += (field.offsetX / 800) * width;
+          }
+          if (field.offsetY !== undefined) {
+            y -= (field.offsetY / 1000) * height; // Simplified scaling for now
+          }
 
           // Estimate optimal font size based on bounding box height
           const boxHeight = (bl.y - tr.y) * height;
           const fontSize = Math.max(7, Math.min(11, boxHeight * 0.75));
 
-          console.log(`[DEBUG fillPdfBinary] MAPPING SUCCESS for field value: "${field.text}" at (x: ${x.toFixed(1)}, y: ${y.toFixed(1)})`);
+          console.log(`[DEBUG fillPdfBinary] MAPPING SUCCESS for field value: "${field.text}" at (x: ${x.toFixed(1)}, y: ${y.toFixed(1)}) with rot: ${field.rotation || 0}`);
 
           page.drawText(field.text, {
             x: x + 1.5, // Small horizontal margin
-            y: y + 2.5, // Refined baseline offset to sit safely ABOVE the line
+            y: y + 1.5, // Refined baseline offset
             size: fontSize,
             font: font,
+            rotate: degrees(field.rotation || 0),
             color: rgb(0, 0, 0.55), // Professional dark blue
           });
         }
@@ -1115,7 +1135,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[DEBUG Compile] Total multimodal files: ${multimodalFiles.length}`);
 
-      // Use Vertex AI SDK with caching
+      // FAST PATH: Direct data filling (Studio Download)
+      if (req.body.data && pinnedSource && pinnedSource.type === 'application/pdf') {
+        console.log(`[DEBUG Compile] FAST PATH: Direct data provided for PDF filling.`);
+        const preciseFields = await analyzePdfLayout(pinnedSource.base64);
+        const finalFields: any[] = [];
+        const rawData = req.body.data; // This is the record: { fieldName: value }
+
+        // We match rawData keys against preciseFields
+        for (const fieldName in rawData) {
+          const match = preciseFields.find(pf => pf.name === fieldName);
+          if (match) {
+            finalFields.push({
+              text: String(rawData[fieldName] || ""),
+              preciseBox: match.boundingPoly,
+              pageIndex: match.pageIndex,
+              // Add interactive adjustments if provided in the body
+              offsetX: req.body.adjustments?.[fieldName]?.offsetX,
+              offsetY: req.body.adjustments?.[fieldName]?.offsetY,
+              rotation: req.body.adjustments?.[fieldName]?.rotation
+            });
+          }
+        }
+
+        const binaryBase64 = await fillPdfBinary(pinnedSource.base64, finalFields);
+        return res.json({
+          success: true,
+          compiledContent: "Documento generato con successo.",
+          file: {
+            name: `compilato_${pinnedSource.name}`,
+            type: 'application/pdf',
+            base64: binaryBase64
+          }
+        });
+      }
       const project = process.env.GCP_PROJECT_ID;
       const location = 'europe-west1';
 
@@ -1336,12 +1389,26 @@ ${pinnedSource ? `\n\nIMPORTANTE: Dato che c'è un DOCUMENTO MASTER, DEVI genera
 
       if (fillingMode === 'studio') {
         try {
-          // Extract JSON from response
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          const values = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+          // Extract JSON from response, handling potential Markdown code blocks
+          let cleanText = text.trim();
+          if (cleanText.includes('```')) {
+            const match = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            if (match) cleanText = match[1];
+          }
+
+          const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+          let values = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+
+          // Ensure all values are strings or numbers, not objects
+          for (const key in values) {
+            if (typeof values[key] === 'object' && values[key] !== null) {
+              values[key] = JSON.stringify(values[key]);
+            }
+          }
+
           return res.json({ success: true, values });
         } catch (e) {
-          console.error('[API compile] JSON parse error in studio mode:', e);
+          console.error('[API compile] JSON parse error in studio mode:', e, 'Text:', text);
           return res.status(500).json({ error: 'Failed to generate structured values' });
         }
       }

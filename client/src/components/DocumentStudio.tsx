@@ -7,6 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles, Download, Wand2, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { motion, useMotionValue, useTransform } from "framer-motion";
+import { RotateCcw, GripVertical, MousePointer2 } from "lucide-react";
 
 // Setup pdfjs worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -19,6 +21,10 @@ interface DiscoveredField {
     };
     pageIndex: number;
     value?: string;
+    // Local state for interactive positioning
+    offsetX?: number;
+    offsetY?: number;
+    rotation?: number;
 }
 
 interface DocumentStudioProps {
@@ -41,6 +47,7 @@ export function DocumentStudio({
     const [numPages, setNumPages] = useState<number>(0);
     const [fields, setFields] = useState<DiscoveredField[]>([]);
     const [isLoadingFields, setIsLoadingFields] = useState(false);
+    const [selectedFieldIndex, setSelectedFieldIndex] = useState<number | null>(null);
     const { toast } = useToast();
     const pdfContainerRef = useRef<HTMLDivElement>(null);
 
@@ -64,9 +71,12 @@ export function DocumentStudio({
                         key.toLowerCase().includes(f.name.toLowerCase())
                     );
                     if (index !== -1) {
-                        newFields[index] = { ...newFields[index], value: externalValues[key] };
+                        // Ensure we strictly cast to string to prevent React Error #31
+                        const val = externalValues[key];
+                        const safeVal = typeof val === 'object' ? JSON.stringify(val) : String(val || "");
+                        newFields[index] = { ...newFields[index], value: safeVal, offsetX: 0, offsetY: 0, rotation: 0 };
                         setFields([...newFields]);
-                        await new Promise(r => setTimeout(r, 100)); // Visual spacing for "typing"
+                        await new Promise(r => setTimeout(r, 60)); // Faster visual spacing
                     }
                 }
             };
@@ -87,7 +97,7 @@ export function DocumentStudio({
 
             const data = await response.json();
             if (data.fields) {
-                setFields(data.fields.map((f: any) => ({ ...f, value: "" })));
+                setFields(data.fields.map((f: any) => ({ ...f, value: "", offsetX: 0, offsetY: 0, rotation: 0 })));
                 if (onFieldsDiscovered) {
                     onFieldsDiscovered(data.fields.map((f: any) => f.name));
                 }
@@ -99,9 +109,9 @@ export function DocumentStudio({
         }
     };
 
-    const handleFieldChange = (index: number, value: string) => {
+    const updateFieldProperty = (index: number, updates: Partial<DiscoveredField>) => {
         const newFields = [...fields];
-        newFields[index].value = value;
+        newFields[index] = { ...newFields[index], ...updates };
         setFields(newFields);
     };
 
@@ -140,25 +150,32 @@ export function DocumentStudio({
                 {/* Full-width PDF Workspace */}
                 <div className="bg-muted/30 rounded-xl overflow-hidden relative flex justify-center p-4 border shadow-inner">
                     <ScrollArea className="h-full w-full">
-                        <div className="flex flex-col items-center gap-4 relative" ref={pdfContainerRef}>
+                        <div className="flex flex-col items-center gap-4 relative py-8" ref={pdfContainerRef}>
                             <Document
                                 file={`data:application/pdf;base64,${pdfBase64}`}
                                 onLoadSuccess={onDocumentLoadSuccess}
-                                loading={<Skeleton className="w-[600px] h-[800px]" />}
+                                loading={
+                                    <div className="space-y-4">
+                                        <Skeleton className="w-[800px] h-[1000px]" />
+                                    </div>
+                                }
                             >
                                 {Array.from(new Array(numPages), (el, index) => (
-                                    <div key={`page_${index + 1}`} className="relative shadow-2xl mb-8 bg-white overflow-hidden">
+                                    <div key={`page_${index + 1}`} className="relative shadow-2xl mb-8 bg-white overflow-hidden select-none">
                                         <Page
                                             pageNumber={index + 1}
                                             renderTextLayer={false}
                                             renderAnnotationLayer={false}
-                                            width={800} // Increased width for better visibility
+                                            width={800}
                                         />
                                         {/* Overlay Layer */}
-                                        <div className="absolute inset-0 pointer-events-none">
+                                        <div className="absolute inset-0">
                                             {fields.filter(f => f.pageIndex === index).map((field, fIdx) => {
                                                 const v = field.boundingPoly.normalizedVertices || field.boundingPoly.vertices;
                                                 if (!v || v.length < 1) return null;
+
+                                                const globalIdx = fields.indexOf(field);
+                                                const isSelected = selectedFieldIndex === globalIdx;
 
                                                 // Determine position (assuming 0-1 scale for normalized)
                                                 const isNormalized = !!field.boundingPoly.normalizedVertices;
@@ -166,17 +183,71 @@ export function DocumentStudio({
                                                 const top = isNormalized ? v[0].y * 100 : (v[0].y / 1000) * 100;
 
                                                 return (
-                                                    <div
-                                                        key={`overlay_${fIdx}`}
-                                                        className="absolute text-[12px] text-blue-900 font-medium whitespace-nowrap animate-in fade-in slide-in-from-bottom-1 duration-700"
+                                                    <motion.div
+                                                        key={`overlay_${globalIdx}`}
+                                                        drag
+                                                        dragMomentum={false}
+                                                        onDragEnd={(e, info) => {
+                                                            updateFieldProperty(globalIdx, {
+                                                                offsetX: (field.offsetX || 0) + info.offset.x,
+                                                                offsetY: (field.offsetY || 0) + info.offset.y,
+                                                            });
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedFieldIndex(isSelected ? null : globalIdx);
+                                                        }}
+                                                        className={`absolute cursor-move group z-10`}
+                                                        animate={{
+                                                            x: field.offsetX || 0,
+                                                            y: field.offsetY || 0,
+                                                            rotate: field.rotation || 0
+                                                        }}
                                                         style={{
                                                             left: `${left}%`,
                                                             top: `${top}%`,
-                                                            transform: 'translateY(-100%)' // Move text above the coordinate
+                                                            transform: 'translateY(-100%)' // Text anchor correction
                                                         }}
                                                     >
-                                                        {field.value}
-                                                    </div>
+                                                        <div className={`
+                                                            relative px-1 rounded border border-transparent transition-colors
+                                                            ${isSelected ? 'border-blue-500 bg-blue-50/50 shadow-lg' : 'hover:border-blue-300 hover:bg-blue-50/20'}
+                                                        `}>
+                                                            <span className="text-[12px] text-blue-900 font-medium whitespace-nowrap block min-h-[1.2rem] min-w-[20px]">
+                                                                {String(field.value || "")}
+                                                            </span>
+
+                                                            {/* Selection Controls */}
+                                                            {isSelected && (
+                                                                <>
+                                                                    {/* Rotation Handle */}
+                                                                    <div
+                                                                        className="absolute -top-8 left-1/2 -translate-x-1/2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center cursor-alias shadow-md hover:scale-110 active:rotate-45 transition-transform"
+                                                                        onMouseDown={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const startY = e.clientY;
+                                                                            const startRot = field.rotation || 0;
+                                                                            const handleMouseMove = (mv: MouseEvent) => {
+                                                                                const diff = mv.clientY - startY;
+                                                                                updateFieldProperty(globalIdx, { rotation: startRot + diff });
+                                                                            };
+                                                                            const handleMouseUp = () => {
+                                                                                window.removeEventListener('mousemove', handleMouseMove);
+                                                                                window.removeEventListener('mouseup', handleMouseUp);
+                                                                            };
+                                                                            window.addEventListener('mousemove', handleMouseMove);
+                                                                            window.addEventListener('mouseup', handleMouseUp);
+                                                                        }}
+                                                                    >
+                                                                        <RotateCcw className="w-3 h-3 text-white" />
+                                                                    </div>
+                                                                    <div className="absolute -top-3 -left-3 w-4 h-4 bg-white border border-blue-500 rounded-full flex items-center justify-center">
+                                                                        <MousePointer2 className="w-2 h-2 text-blue-600" />
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </motion.div>
                                                 );
                                             })}
                                         </div>

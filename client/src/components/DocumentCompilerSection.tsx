@@ -617,7 +617,15 @@ export function DocumentCompilerSection({
                           type: pinnedSource.type,
                           base64: pinnedSource.base64
                         },
-                        data: filledFields.reduce((acc, f) => ({ ...acc, [f.name]: f.value }), {})
+                        data: filledFields.reduce((acc, f) => ({ ...acc, [f.name]: f.value }), {}),
+                        adjustments: filledFields.reduce((acc, f) => ({
+                          ...acc,
+                          [f.name]: {
+                            offsetX: f.offsetX,
+                            offsetY: f.offsetY,
+                            rotation: f.rotation
+                          }
+                        }), {})
                       });
                       const data = await response.json();
                       if (data.file) {
