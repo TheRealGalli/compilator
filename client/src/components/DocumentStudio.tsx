@@ -227,93 +227,52 @@ export function DocumentStudio({
                                                             ${isSelected ? 'border-blue-500 bg-blue-50/50 shadow-lg' : 'hover:border-blue-300 hover:bg-blue-50/20'}
                                                         `}>
                                                             <span className="text-[12px] text-blue-900 font-medium whitespace-nowrap block min-h-[1.2rem] min-w-[20px]">
-                                                                {String(field.value || "")}
+                                                                {(field.value === null || field.value === undefined || field.value === "null") ? "" : String(field.value)}
                                                             </span>
 
-                                                            {/* Four Corner Dots for Rotation */}
                                                             {isSelected && (
                                                                 <>
-                                                                    {/* Top-left */}
-                                                                    <div
-                                                                        className="absolute -top-2 -left-2 w-3 h-3 bg-blue-600 rounded-full cursor-grab active:cursor-grabbing shadow-sm hover:scale-125 transition-transform"
-                                                                        onMouseDown={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                                                                            const centerX = rect.left + rect.width / 2;
-                                                                            const centerY = rect.top + rect.height / 2;
-                                                                            const startRot = field.rotation || 0;
-                                                                            const handleMouseMove = (mv: MouseEvent) => {
-                                                                                const angle = Math.atan2(mv.clientY - centerY, mv.clientX - centerX) * (180 / Math.PI);
-                                                                                updateFieldProperty(globalIdx, { rotation: angle });
-                                                                            };
-                                                                            const handleMouseUp = () => {
-                                                                                window.removeEventListener('mousemove', handleMouseMove);
-                                                                                window.removeEventListener('mouseup', handleMouseUp);
-                                                                            };
-                                                                            window.addEventListener('mousemove', handleMouseMove);
-                                                                            window.addEventListener('mouseup', handleMouseUp);
-                                                                        }}
-                                                                    />
-                                                                    {/* Top-right */}
-                                                                    <div
-                                                                        className="absolute -top-2 -right-2 w-3 h-3 bg-blue-600 rounded-full cursor-grab active:cursor-grabbing shadow-sm hover:scale-125 transition-transform"
-                                                                        onMouseDown={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                                                                            const centerX = rect.left + rect.width / 2;
-                                                                            const centerY = rect.top + rect.height / 2;
-                                                                            const handleMouseMove = (mv: MouseEvent) => {
-                                                                                const angle = Math.atan2(mv.clientY - centerY, mv.clientX - centerX) * (180 / Math.PI);
-                                                                                updateFieldProperty(globalIdx, { rotation: angle });
-                                                                            };
-                                                                            const handleMouseUp = () => {
-                                                                                window.removeEventListener('mousemove', handleMouseMove);
-                                                                                window.removeEventListener('mouseup', handleMouseUp);
-                                                                            };
-                                                                            window.addEventListener('mousemove', handleMouseMove);
-                                                                            window.addEventListener('mouseup', handleMouseUp);
-                                                                        }}
-                                                                    />
-                                                                    {/* Bottom-left */}
-                                                                    <div
-                                                                        className="absolute -bottom-2 -left-2 w-3 h-3 bg-blue-600 rounded-full cursor-grab active:cursor-grabbing shadow-sm hover:scale-125 transition-transform"
-                                                                        onMouseDown={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                                                                            const centerX = rect.left + rect.width / 2;
-                                                                            const centerY = rect.top + rect.height / 2;
-                                                                            const handleMouseMove = (mv: MouseEvent) => {
-                                                                                const angle = Math.atan2(mv.clientY - centerY, mv.clientX - centerX) * (180 / Math.PI);
-                                                                                updateFieldProperty(globalIdx, { rotation: angle });
-                                                                            };
-                                                                            const handleMouseUp = () => {
-                                                                                window.removeEventListener('mousemove', handleMouseMove);
-                                                                                window.removeEventListener('mouseup', handleMouseUp);
-                                                                            };
-                                                                            window.addEventListener('mousemove', handleMouseMove);
-                                                                            window.addEventListener('mouseup', handleMouseUp);
-                                                                        }}
-                                                                    />
-                                                                    {/* Bottom-right */}
-                                                                    <div
-                                                                        className="absolute -bottom-2 -right-2 w-3 h-3 bg-blue-600 rounded-full cursor-grab active:cursor-grabbing shadow-sm hover:scale-125 transition-transform"
-                                                                        onMouseDown={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                                                                            const centerX = rect.left + rect.width / 2;
-                                                                            const centerY = rect.top + rect.height / 2;
-                                                                            const handleMouseMove = (mv: MouseEvent) => {
-                                                                                const angle = Math.atan2(mv.clientY - centerY, mv.clientX - centerX) * (180 / Math.PI);
-                                                                                updateFieldProperty(globalIdx, { rotation: angle });
-                                                                            };
-                                                                            const handleMouseUp = () => {
-                                                                                window.removeEventListener('mousemove', handleMouseMove);
-                                                                                window.removeEventListener('mouseup', handleMouseUp);
-                                                                            };
-                                                                            window.addEventListener('mousemove', handleMouseMove);
-                                                                            window.addEventListener('mouseup', handleMouseUp);
-                                                                        }}
-                                                                    />
+                                                                    {/* Rotation Control - All 4 corners behave the same for simplicity and consistency */}
+                                                                    {[
+                                                                        { top: -2, left: -2, cursor: 'nw-resize' }, // Top-left
+                                                                        { top: -2, right: -2, cursor: 'ne-resize' }, // Top-right
+                                                                        { bottom: -2, left: -2, cursor: 'sw-resize' }, // Bottom-left
+                                                                        { bottom: -2, right: -2, cursor: 'se-resize' }  // Bottom-right
+                                                                    ].map((pos, i) => (
+                                                                        <div
+                                                                            key={i}
+                                                                            className="absolute w-3 h-3 bg-blue-600 rounded-full shadow-sm hover:scale-125 transition-transform z-50"
+                                                                            style={{ ...pos, cursor: 'crosshair' }}
+                                                                            onMouseDown={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+                                                                                const centerX = rect.left + rect.width / 2;
+                                                                                const centerY = rect.top + rect.height / 2;
+
+                                                                                // Calculate initial angle of the mouse relative to center
+                                                                                const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+                                                                                const initialFieldRotation = field.rotation || 0;
+
+                                                                                const handleMouseMove = (mv: MouseEvent) => {
+                                                                                    // Calculate new angle
+                                                                                    const currentAngle = Math.atan2(mv.clientY - centerY, mv.clientX - centerX) * (180 / Math.PI);
+
+                                                                                    // Apply the difference (delta) to the initial field rotation
+                                                                                    // This ensures smooth rotation from the current state without jumping
+                                                                                    const delta = currentAngle - startAngle;
+                                                                                    updateFieldProperty(globalIdx, { rotation: initialFieldRotation + delta });
+                                                                                };
+
+                                                                                const handleMouseUp = () => {
+                                                                                    window.removeEventListener('mousemove', handleMouseMove);
+                                                                                    window.removeEventListener('mouseup', handleMouseUp);
+                                                                                };
+
+                                                                                window.addEventListener('mousemove', handleMouseMove);
+                                                                                window.addEventListener('mouseup', handleMouseUp);
+                                                                            }}
+                                                                        />
+                                                                    ))}
                                                                 </>
                                                             )}
                                                         </div>

@@ -1338,12 +1338,15 @@ Esempio di output:
       // Build prompt for filling
       let userPrompt = ``;
       if (fillingMode === 'studio') {
-        userPrompt = `You are a professional document compiler.
-${notes ? `Additional Instructions: ${notes}` : ""}
+        userPrompt = `
+Sei un assistente intelligente che compila documenti.
+Analizza il documento fornito (immagine/PDF) e le fonti di supporto (testo/altri file).
 
-Analyze the provided documents and fill the requested fields.
-IMPORTANT: You must return ONLY a JSON object mapping the field names to their values.
-Fields to fill: ${requestedFields?.join(', ')}
+Il tuo compito è compilare i seguenti campi del form:
+${requestedFields?.map(f => `- ${f}`).join('\n')}
+
+IMPORTANTE:
+${notes ? `NOTE UTENTE AGGIUNTIVE: ${notes}` : ""}
 `;
       } else {
         userPrompt = `Compila il seguente template con informazioni coerenti e professionali.
@@ -1359,149 +1362,158 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
     - Sostituisci i placeholder([...]) con i dati estratti.
 - Sfrutta il LINK WEB(se presente) per descrivere in dettaglio il progetto / argomento.
 - Sfrutta i FILE(se presenti) per i dati anagrafici precisi.
-- Se mancano dati: "Errore di compilazione"(solo se bloccante) o[DATO MANCANTE].
-${pinnedSource ? `\n\nIMPORTANTE: Dato che c'è un DOCUMENTO MASTER, DEVI generare il JSON di filling descritto sopra per una modifica binaria precisa. Se è un PDF, individua gli underscore o gli spazi vuoti e forniscimi le coordinate BOX.` : ''} `;
-      }
+   Come completare i valori:
+   1. ANALIZZA il contenuto completo del documento PDF fornito come immagine/testo. Capisci di cosa parla (es. Delega, Modulo Iscrizione, Fattura).
+   2. Usa le FONTI fornite (altri file caricati, note, web research) per trovare i dati specifici da inserire.
+   3. Per ogni campo richiesto nella lista 'fields':
+      - Cerca di capire dal nome del campo (es. 'Il sottoscritto', 'nato a') cosa va inserito in quel punto specifico del documento.
+      - Se hai il dato, scrivilo.
+      - Se il dato manca completamente, scrivi "[MANCANTE]".
+      - Se il campo è una firma o una data, prova a dedurlo dal contesto o usa la data odierna.
 
-      // Build contents with multimodal files
-      const messageParts: any[] = [{ text: userPrompt }];
+   IMPORTANTE: Non limitarti ai soli metadati. Usa la tua intelligenza per collegare semanticamente i dati delle fonti ai campi del modulo e posizionarli nel posto giusto.
+   Restituisci un JSON piatto: { "Nome Campo 1": "Valore 1", "Nome Campo 2": "Valore 2" ... }
+   `;
 
-      // Add multimodal files as inline data
-      for (const file of multimodalFiles) {
-        messageParts.push({
-          inlineData: { mimeType: file.mimeType, data: file.data }
+        // Build contents with multimodal files
+        const messageParts: any[] = [{ text: userPrompt }];
+
+        // Add multimodal files as inline data
+        for (const file of multimodalFiles) {
+          messageParts.push({
+            inlineData: { mimeType: file.mimeType, data: file.data }
+          });
+        }
+
+        // Add pinned source as image/pdf for structural guide if applicable
+        if (pinnedSource && (pinnedSource.type.startsWith('image/') || pinnedSource.type === 'application/pdf')) {
+          messageParts.push({
+            inlineData: { mimeType: pinnedSource.type, data: pinnedSource.base64 }
+          });
+        }
+
+        const result = await modelInstance.generateContent({
+          contents: [{ role: 'user', parts: messageParts }],
+          generationConfig: {
+            temperature: temperature || 0.7,
+          },
         });
-      }
 
-      // Add pinned source as image/pdf for structural guide if applicable
-      if (pinnedSource && (pinnedSource.type.startsWith('image/') || pinnedSource.type === 'application/pdf')) {
-        messageParts.push({
-          inlineData: { mimeType: pinnedSource.type, data: pinnedSource.base64 }
-        });
-      }
+        const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-      const result = await modelInstance.generateContent({
-        contents: [{ role: 'user', parts: messageParts }],
-        generationConfig: {
-          temperature: temperature || 0.7,
-        },
-      });
-
-      const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-      if (fillingMode === 'studio') {
-        try {
-          // Extract JSON from response, handling potential Markdown code blocks
-          let cleanText = text.trim();
-          if (cleanText.includes('```')) {
-            const match = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (match) cleanText = match[1];
-          }
-
-          const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-          let values = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
-
-          // Ensure all values are strings or numbers, not objects
-          for (const key in values) {
-            if (typeof values[key] === 'object' && values[key] !== null) {
-              values[key] = JSON.stringify(values[key]);
+        if (fillingMode === 'studio') {
+          try {
+            // Extract JSON from response, handling potential Markdown code blocks
+            let cleanText = text.trim();
+            if (cleanText.includes('```')) {
+              const match = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+              if (match) cleanText = match[1];
             }
-          }
 
-          return res.json({ success: true, values });
-        } catch (e) {
-          console.error('[API compile] JSON parse error in studio mode:', e, 'Text:', text);
-          return res.status(500).json({ error: 'Failed to generate structured values' });
-        }
-      }
+            const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+            let values = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
 
-      let compiledContent = text;
-
-      if (pinnedSource) {
-        console.log(`[DEBUG Compile] Pinned source detected: ${pinnedSource.name} (${pinnedSource.type})`);
-
-        // Try to parse JSON for binary filling
-        let fillingData: any = null;
-        try {
-          const jsonMatch = compiledContent.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            fillingData = JSON.parse(jsonMatch[0]);
-            console.log(`[DEBUG Compile] Extracted filling JSON, mode: ${fillingData.fillingMode} `);
-          }
-        } catch (e) {
-          console.warn('[WARN Compile] Failed to parse filling JSON, falling back to reproduction');
-        }
-
-
-        let binaryBase64 = '';
-        let finalMimeType = pinnedSource.type;
-
-        if (pinnedSource.type === 'application/pdf' && fillingData?.fillingMode === 'pdf_coordinates') {
-          // Map preciseData to preciseBox if available
-          const finalFields = (fillingData.data || []).map((f: any) => ({ ...f }));
-
-          if (fillingData.preciseData && preciseFields.length > 0) {
-            console.log(`[DEBUG Compile] Fuzzy-mapping ${fillingData.preciseData.length} inputs against ${preciseFields.length} detected fields...`);
-            for (const pd of fillingData.preciseData) {
-              const cleanedInputName = (pd.fieldName || "").trim().toLowerCase();
-              const match = preciseFields.find(pf => {
-                const cleanedDetectedName = (pf.name || "").trim().toLowerCase();
-                return cleanedDetectedName === cleanedInputName ||
-                  cleanedDetectedName.includes(cleanedInputName) ||
-                  cleanedInputName.includes(cleanedDetectedName);
-              });
-
-              if (match) {
-                console.log(`[DEBUG Compile] MAPPED: "${pd.fieldName}" -> "${match.name}"`);
-                finalFields.push({
-                  text: pd.text,
-                  preciseBox: match.boundingPoly,
-                  pageIndex: match.pageIndex
-                });
-              } else {
-                console.warn(`[DEBUG Compile] NO MATCH for "${pd.fieldName}".`);
+            // Ensure all values are strings or numbers, not objects
+            for (const key in values) {
+              if (typeof values[key] === 'object' && values[key] !== null) {
+                values[key] = JSON.stringify(values[key]);
               }
             }
-          }
 
-          binaryBase64 = await fillPdfBinary(pinnedSource.base64, finalFields);
-          console.log(`[DEBUG Compile] PDF binary modification successful. Total fields filled: ${finalFields.length}`);
-        } else if (pinnedSource.type.includes('wordprocessingml.document') && fillingData?.fillingMode === 'docx_tags') {
-          binaryBase64 = await fillDocxBinary(pinnedSource.base64, fillingData.tagData);
-          console.log('[DEBUG Compile] DOCX binary modification successful');
-        } else {
-          // Fallback to old reproduction method
-          binaryBase64 = await generateProfessionalDocxBase64(compiledContent);
-          finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-          console.log('[DEBUG Compile] Falling back to text reproduction');
+            return res.json({ success: true, values });
+          } catch (e) {
+            console.error('[API compile] JSON parse error in studio mode:', e, 'Text:', text);
+            return res.status(500).json({ error: 'Failed to generate structured values' });
+          }
         }
 
-        // Clean up compiledContent from JSON for preview
-        const previewContent = compiledContent.replace(/\{[\s\S]*\}/, '').trim() || "Documento modificato correttamente preservando il layout originale.";
+        let compiledContent = text;
 
-        return res.json({
-          success: true,
-          compiledContent: previewContent,
-          file: {
-            name: (binaryBase64 === pinnedSource.base64 ? 'Non_Modificato_' : 'Compilato_') + pinnedSource.name,
-            type: finalMimeType,
-            base64: binaryBase64
+        if (pinnedSource) {
+          console.log(`[DEBUG Compile] Pinned source detected: ${pinnedSource.name} (${pinnedSource.type})`);
+
+          // Try to parse JSON for binary filling
+          let fillingData: any = null;
+          try {
+            const jsonMatch = compiledContent.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              fillingData = JSON.parse(jsonMatch[0]);
+              console.log(`[DEBUG Compile] Extracted filling JSON, mode: ${fillingData.fillingMode} `);
+            }
+          } catch (e) {
+            console.warn('[WARN Compile] Failed to parse filling JSON, falling back to reproduction');
           }
+
+
+          let binaryBase64 = '';
+          let finalMimeType = pinnedSource.type;
+
+          if (pinnedSource.type === 'application/pdf' && fillingData?.fillingMode === 'pdf_coordinates') {
+            // Map preciseData to preciseBox if available
+            const finalFields = (fillingData.data || []).map((f: any) => ({ ...f }));
+
+            if (fillingData.preciseData && preciseFields.length > 0) {
+              console.log(`[DEBUG Compile] Fuzzy-mapping ${fillingData.preciseData.length} inputs against ${preciseFields.length} detected fields...`);
+              for (const pd of fillingData.preciseData) {
+                const cleanedInputName = (pd.fieldName || "").trim().toLowerCase();
+                const match = preciseFields.find(pf => {
+                  const cleanedDetectedName = (pf.name || "").trim().toLowerCase();
+                  return cleanedDetectedName === cleanedInputName ||
+                    cleanedDetectedName.includes(cleanedInputName) ||
+                    cleanedInputName.includes(cleanedDetectedName);
+                });
+
+                if (match) {
+                  console.log(`[DEBUG Compile] MAPPED: "${pd.fieldName}" -> "${match.name}"`);
+                  finalFields.push({
+                    text: pd.text,
+                    preciseBox: match.boundingPoly,
+                    pageIndex: match.pageIndex
+                  });
+                } else {
+                  console.warn(`[DEBUG Compile] NO MATCH for "${pd.fieldName}".`);
+                }
+              }
+            }
+
+            binaryBase64 = await fillPdfBinary(pinnedSource.base64, finalFields);
+            console.log(`[DEBUG Compile] PDF binary modification successful. Total fields filled: ${finalFields.length}`);
+          } else if (pinnedSource.type.includes('wordprocessingml.document') && fillingData?.fillingMode === 'docx_tags') {
+            binaryBase64 = await fillDocxBinary(pinnedSource.base64, fillingData.tagData);
+            console.log('[DEBUG Compile] DOCX binary modification successful');
+          } else {
+            // Fallback to old reproduction method
+            binaryBase64 = await generateProfessionalDocxBase64(compiledContent);
+            finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            console.log('[DEBUG Compile] Falling back to text reproduction');
+          }
+
+          // Clean up compiledContent from JSON for preview
+          const previewContent = compiledContent.replace(/\{[\s\S]*\}/, '').trim() || "Documento modificato correttamente preservando il layout originale.";
+
+          return res.json({
+            success: true,
+            compiledContent: previewContent,
+            file: {
+              name: (binaryBase64 === pinnedSource.base64 ? 'Non_Modificato_' : 'Compilato_') + pinnedSource.name,
+              type: finalMimeType,
+              base64: binaryBase64
+            }
+          });
+        }
+
+        res.json({
+          success: true,
+          compiledContent
+        });
+
+      } catch (error: any) {
+        console.error('Errore durante compilazione:', error);
+        res.status(500).json({
+          error: error.message || 'Errore durante compilazione documento',
         });
       }
-
-      res.json({
-        success: true,
-        compiledContent
-      });
-
-    } catch (error: any) {
-      console.error('Errore durante compilazione:', error);
-      res.status(500).json({
-        error: error.message || 'Errore durante compilazione documento',
-      });
-    }
-  });
+    });
 
   // Endpoint per trascrizione audio (STT)
   app.post('/api/transcribe', upload.single('file'), async (req: Request, res: Response) => {
