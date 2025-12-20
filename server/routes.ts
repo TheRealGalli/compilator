@@ -129,12 +129,37 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
     };
 
     const discoveredFields: any[] = [];
+
+    // Support for specialized/custom processors using entities
+    if (document && document.entities) {
+      console.log(`[DEBUG analyzePdfLayout] Detected ${document.entities.length} entities (Specialized/Custom Processor)`);
+      for (const entity of document.entities) {
+        const entityName = entity.type || entity.mentionText || "Entity";
+        // Use the normalized vertices if available for precision
+        const poly = entity.pageAnchor?.pageRefs?.[0]?.boundingPoly;
+        if (poly) {
+          discoveredFields.push({
+            name: entityName,
+            boundingPoly: poly,
+            pageIndex: (entity.pageAnchor?.pageRefs?.[0]?.page || 1) - 1,
+            source: 'entity'
+          });
+        }
+      }
+    }
+
+    // Support for Form Parser using formFields
     if (document && document.pages) {
       for (const page of document.pages) {
         if (page.formFields) {
+          console.log(`[DEBUG analyzePdfLayout] Page ${page.pageNumber}: Detected ${page.formFields.length} formFields`);
           for (const field of page.formFields) {
             const fieldName = getTextFromAnchor(field.fieldName?.textAnchor);
-            const boundingPoly = field.fieldValue?.boundingPoly;
+
+            // For an empty form, the fieldValue might not have text, but it MUST have a location (boundingPoly)
+            // Sometimes it's in fieldValue.boundingPoly, sometimes in fieldValue.layout.boundingPoly
+            const boundingPoly = field.fieldValue?.boundingPoly || field.fieldValue?.layout?.boundingPoly;
+
             if (fieldName && boundingPoly) {
               discoveredFields.push({
                 name: fieldName,
