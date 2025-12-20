@@ -1175,6 +1175,10 @@ Restituisci un blocco JSON finale nel formato:
       if (fillingMode === 'studio') {
         const isAutoMode = (!requestedFields || requestedFields.length === 0);
 
+        const fieldsToFill = (requestedFields && requestedFields.length > 0)
+          ? requestedFields
+          : preciseFields.map(f => f.name);
+
         const fieldsList = isAutoMode
           ? "TUTTI i campi pertinenti identificabili nel documento"
           : fieldsToFill.join(', ');
