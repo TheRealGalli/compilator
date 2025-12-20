@@ -134,6 +134,7 @@ export function DocumentStudio({
                             <p className="text-xs text-muted-foreground">{fileName}</p>
                         </div>
                     </div>
+                    <div className="flex gap-2">
                         {/* Download button removed as requested */}
                         {fields.length === 0 && !isLoadingFields && (
                             <Button
@@ -190,8 +191,8 @@ export function DocumentStudio({
                                                 let width = 'auto';
                                                 if (isNormalized && v.length === 4) {
                                                     const w = (v[1].x - v[0].x) * 100;
-                                                     // If width is tiny, default to auto/min-width to be usable
-                                                     if (w > 2) width = `${w}%`;
+                                                    // If width is tiny, default to auto/min-width to be usable
+                                                    if (w > 2) width = `${w}%`;
                                                 }
 
                                                 return (
