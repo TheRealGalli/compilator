@@ -179,35 +179,36 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
     if (discoveredFields.length < 5 && document && document.pages) {
       console.log(`[DEBUG analyzePdfLayout] Entering LANDMARK MODE (Discovered fields were only ${discoveredFields.length})`);
       for (const page of document.pages) {
-        // Find all underscore sequences and lines
-        const lines: any[] = [];
+        // Find all lines (underscores)
+        const underscoreLines: any[] = [];
         if (page.visualElements) {
           for (const ve of page.visualElements) {
-            if (ve.type === 'horizontal_line' || ve.type === 'form_field_underline') lines.push(ve);
+            if (ve.type === 'horizontal_line' || ve.type === 'form_field_underline') underscoreLines.push(ve);
           }
         }
 
-        // Scan tokens for labels and underscore landmarks
-        if (page.tokens) {
-          for (let i = 0; i < page.tokens.length; i++) {
-            const token = page.tokens[i];
-            const text = getTextFromAnchor(token.layout?.textAnchor);
+        // Scan paragraphs for labels and underscores
+        if (page.paragraphs) {
+          for (let i = 0; i < page.paragraphs.length; i++) {
+            const para = page.paragraphs[i];
+            const text = getTextFromAnchor(para.layout?.textAnchor);
 
-            // If token is a potential label (ends with colon) or is preceding an underscore sequence
-            if (text.endsWith(':') || (i < page.tokens.length - 1 && getTextFromAnchor(page.tokens[i + 1].layout?.textAnchor).includes('_'))) {
-              const cleanedName = text.replace(':', '').trim();
-              if (cleanedName.length > 2) {
-                // The "Field" is the area to the right or immediately after
-                const targetToken = (i < page.tokens.length - 1 && getTextFromAnchor(page.tokens[i + 1].layout?.textAnchor).includes('_'))
-                  ? page.tokens[i + 1] : token;
-
-                discoveredFields.push({
-                  name: cleanedName,
-                  boundingPoly: targetToken.layout?.boundingPoly,
-                  pageIndex: (page.pageNumber || 1) - 1,
-                  source: 'landmark'
-                });
-              }
+            // Check if paragraph contains underscore or is likely a label for the next element
+            if (text.includes('___')) {
+              discoveredFields.push({
+                name: `Rigo_${text.substring(0, 15).replace(/_/g, '').trim() || i}`,
+                boundingPoly: para.layout?.boundingPoly,
+                pageIndex: (page.pageNumber || 1) - 1,
+                source: 'landmark'
+              });
+            } else if (text.endsWith(':') || text.length < 30) {
+              // Potential label, check if next paragraph is an underscore landmark or if there is a line nearby
+              discoveredFields.push({
+                name: text.replace(':', '').trim(),
+                boundingPoly: para.layout?.boundingPoly,
+                pageIndex: (page.pageNumber || 1) - 1,
+                source: 'landmark'
+              });
             }
           }
         }
