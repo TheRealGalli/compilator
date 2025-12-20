@@ -11,13 +11,15 @@ interface AppSidebarProps {
   sources?: Source[];
   onRemoveSource?: (id: string) => void;
   onToggleSource?: (id: string) => void;
+  onTogglePin?: (id: string) => void;
 }
 
 export function AppSidebar({
   activeSection = "documents",
   onSectionChange = () => { },
   sources = [],
-  onToggleSource
+  onToggleSource,
+  onTogglePin
 }: AppSidebarProps) {
   const sections = [
     { id: "documents" as const, label: "Documenti", icon: FileText },
@@ -56,7 +58,11 @@ export function AppSidebar({
       <Separator />
 
       <div className="flex-1 overflow-hidden flex flex-col p-4">
-        <SourceSelector sources={sources} onToggle={onToggleSource} />
+        <SourceSelector
+          sources={sources}
+          onToggle={onToggleSource}
+          onTogglePin={onTogglePin}
+        />
       </div>
     </aside>
   );

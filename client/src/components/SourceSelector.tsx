@@ -1,5 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileText, Image, Music } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FileText, Image, Music, Pin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -12,14 +13,16 @@ interface Source {
   id: string;
   name: string;
   selected: boolean;
+  isPinned?: boolean;
 }
 
 interface SourceSelectorProps {
   sources: Source[];
   onToggle?: (id: string) => void;
+  onTogglePin?: (id: string) => void;
 }
 
-export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
+export function SourceSelector({ sources, onToggle, onTogglePin }: SourceSelectorProps) {
   const selectedCount = sources.filter(s => s.selected).length;
 
   const getFileIcon = (filename: string) => {
@@ -70,6 +73,15 @@ export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
                     <p>{source.name}</p>
                   </TooltipContent>
                 </Tooltip>
+
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => onTogglePin?.(source.id)}
+                  className={`h-6 w-6 flex-shrink-0 transition-all ${source.isPinned ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}
+                >
+                  <Pin className={`w-3.5 h-3.5 ${source.isPinned ? 'text-red-500 fill-red-500 rotate-45' : 'text-muted-foreground'}`} />
+                </Button>
               </div>
             );
           })}
