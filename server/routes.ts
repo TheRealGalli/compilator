@@ -1184,23 +1184,33 @@ Restituisci un blocco JSON finale nel formato:
           : fieldsToFill.join(', ');
 
         systemPrompt += `
-**MODALITÀ STUDIO ATTIVA:**
+**MODALITÀ STUDIO ATTIVA - VISIONE DIRETTA:**
 ${isAutoMode ? "Hai PIENA AUTONOMIA decisionale." : "Segui le richieste utente."}
-Devi rispondere ESCLUSIVAMENTE con un oggetto JSON che mappa i nomi dei campi ai valori estratti.
-Non includere alcun testo aggiuntivo.
+
+ISTRUZIONI CRITICHE (USA LA VISIONE!):
+1. GUARDA ATTENTAMENTE il documento PDF allegato.
+2. VERIFICA visivamente dove si trovano i campi (underscore, caselle, righe vuote).
+3. Le coordinate pre-rilevate sono SOLO suggerimenti. Se vedi che sono sbagliate, CORREGGILE.
+4. Per ogni campo, restituisci sia il VALORE che le COORDINATE VERIFICATE.
+
+FORMATO OUTPUT (JSON):
+{
+  "fields": [
+    {
+      "name": "Nome Campo",
+      "value": "Valore da inserire",
+      "box": [ymin, xmin, ymax, xmax],  // Coordinate verificate visivamente (scala 0-1000)
+      "page": 0  // Indice pagina (0-indexed)
+    }
+  ]
+}
 
 ${isAutoMode ? `
-REGOLE AUTONOMIA:
-1. Esamina il documento visivamente.
-2. Identifica tutti i campi che richiedono dati (non limitarti a quelli rilevati dall'AI se ne vedi altri).
-3. Usa nomi di campo semantici (es. "cognome_cliente", "data_firma").
-` : `I campi da compilare sono: ${fieldsList}.`}
-
-Esempio di output:
-{
-  "nome_cliente": "Mario Rossi",
-  "data_contratto": "2023-10-26"
-}`;
+AUTONOMIA TOTALE:
+- Identifica TUTTI i campi compilabili guardando il PDF.
+- Non limitarti ai campi pre-rilevati se ne vedi altri.
+- Usa nomi semantici in italiano (es. "Cognome", "Data Nascita").
+` : `I campi da compilare sono: ${fieldsList}.`}`;
       }
 
 
@@ -1211,19 +1221,28 @@ Esempio di output:
         const isAutoMode = (!requestedFields || requestedFields.length === 0);
 
         userPrompt = `
-Sei un compilatore esperto e autonomo.
-Hai PIENO CONTROLLO del documento.
-Il tuo compito è completarlo usando i dati disponibili.
+Sei un compilatore esperto con CAPACITÀ VISIVE.
+GUARDA IL PDF allegato e compila i campi.
+
+${preciseFields.length > 0 ? `
+CAMPI PRE-RILEVATI (verificali visivamente e correggi se necessario):
+${preciseFields.map(f => `- "${f.name}" (box suggerito: ${JSON.stringify(f.boundingPoly?.normalizedVertices?.[0] || 'N/A')})`).join('\n')}
+` : 'Nessun campo pre-rilevato. Identifica tu i campi guardando il PDF.'}
 
 ${isAutoMode ? `
-ISTRUZIONI AUTONOMIA:
-- Non aspettare una lista di campi.
-- Osserva il documento e riempi tutto ciò che ha senso riempire.
-- Usa i campi rilevati dall'AI come suggerimento posizionale, ma sentiti libero di aggiungere altri campi se necessario.
-` : `Compila i seguenti campi:\n${fieldsToFill.map((f: string) => `- ${f}`).join('\n')}`}
+ISTRUZIONI:
+1. OSSERVA il documento PDF allegato.
+2. TROVA tutti i punti dove inserire dati (righe vuote, underscore, caselle).
+3. Per ogni campo, determina:
+   - Il nome semantico del campo
+   - Il valore da inserire (dalle note/fonti)
+   - Le coordinate PRECISE guardando il PDF (scala 0-1000)
+4. Restituisci il JSON nel formato specificato.
+` : `Compila i seguenti campi:\n${(requestedFields || []).map((f: string) => `- ${f}`).join('\n')}`}
 
-IMPORTANTE:
-${notes ? `NOTE UTENTE AGGIUNTIVE: ${notes}` : ""}
+${notes ? `NOTE UTENTE: ${notes}` : ""}
+
+RICORDA: Le coordinate pre-rilevate potrebbero essere IMPRECISE. Usa la tua visione per correggerle!
 `;
       } else {
         userPrompt = `Compila il seguente template con informazioni coerenti e professionali.
@@ -1308,7 +1327,10 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
             }
           };
 
-          if (values.preciseData && Array.isArray(values.preciseData)) {
+          // NEW FORMAT: Handle { fields: [{name, value, box, page}] }
+          if (values.fields && Array.isArray(values.fields)) {
+            processArray(values.fields);
+          } else if (values.preciseData && Array.isArray(values.preciseData)) {
             processArray(values.preciseData);
           } else if (values.data && Array.isArray(values.data)) {
             processArray(values.data);
