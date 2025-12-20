@@ -215,15 +215,75 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
       }
     }
 
-    console.log(`[DEBUG analyzePdfLayout] Discovered ${discoveredFields.length} fields: ${discoveredFields.map(f => f.name).join(', ')}`);
-
-    // Session-safe caching: only store if we found fields
-    if (discoveredFields.length > 0) {
-      pdfLayoutCache.set(contentHash, discoveredFields);
-    }
+    console.log(`[DEBUG analyzePdfLayout] Discovered ${discoveredFields.map(f => f.name).join(', ')}`);
+    if (discoveredFields.length > 0) pdfLayoutCache.set(contentHash, discoveredFields);
     return discoveredFields;
   } catch (err) {
     console.error('[ERROR analyzePdfLayout]', err);
+    return [];
+  }
+}
+
+// NEW: Gemini-powered Layout Analysis
+async function analyzeLayoutWithGemini(base64Pdf: string): Promise<any[]> {
+  try {
+    // Ensure VertexAI is initialized
+    const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
+    const location = 'europe-west1';
+    const vertex_ai = new VertexAI({ project: projectId, location });
+
+    const model = vertex_ai.getGenerativeModel({
+      model: 'gemini-1.5-flash-002', // Using Flash for speed and vision capabilities
+      generationConfig: { responseMimeType: "application/json" }
+    });
+
+    const prompt = `
+     You are a layout analysis engine.
+     Detect all form fields in this document (underscores, boxes, empty areas for text).
+     For each field, provide:
+     1. "name": A concise semantic label (e.g. "Name", "Date", "Signature").
+     2. "box_2d": The bounding box as [ymin, xmin, ymax, xmax] on a 0-1000 scale.
+
+     Return JSON: { "data": [ { "name": "...", "box_2d": [0,0,0,0] } ] }
+     `;
+
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: 'application/pdf', data: base64Pdf } }
+          ]
+        }
+      ]
+    });
+
+    const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const json = JSON.parse(responseText.replace(/```json|```/g, '').trim());
+
+    if (!json.data || !Array.isArray(json.data)) return [];
+
+    return json.data.map((item: any) => {
+      const [ymin, xmin, ymax, xmax] = item.box_2d;
+      return {
+        name: item.name,
+        // Convert 1000-scale [ymin, xmin, ymax, xmax] to normalized vertices 0-1
+        boundingPoly: {
+          normalizedVertices: [
+            { x: xmin / 1000, y: ymin / 1000 }, // TL
+            { x: xmax / 1000, y: ymin / 1000 }, // TR
+            { x: xmax / 1000, y: ymax / 1000 }, // BR
+            { x: xmin / 1000, y: ymax / 1000 }  // BL
+          ]
+        },
+        pageIndex: 0, // Gemini assumes single page or first page context usually
+        source: 'gemini'
+      };
+    });
+
+  } catch (error) {
+    console.error('[ERROR analyzeLayoutWithGemini]', error);
     return [];
   }
 }
@@ -1006,13 +1066,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint per compilare documenti con AI
-  // NEW: Layout analysis for Document Studio
+  // NEW: Layout analysis for Document Studio (Gemini-First)
   app.post('/api/analyze-layout', async (req, res) => {
     try {
       const { base64 } = req.body;
       if (!base64) return res.status(400).json({ error: 'Missing base64 content' });
 
-      const fields = await analyzePdfLayout(base64);
+      console.log('[DEBUG analyze-layout] Starting layout analysis via Gemini Vision...');
+
+      // Try Gemini First (Smart Analysis)
+      let fields = await analyzeLayoutWithGemini(base64);
+
+      // Fallback to Document AI if Gemini finds nothing
+      if (!fields || fields.length === 0) {
+        console.warn('[WARN analyze-layout] Gemini found no fields, falling back to Document AI...');
+        fields = await analyzePdfLayout(base64);
+      }
+
+      console.log(`[DEBUG analyze-layout] Analysis complete. Found ${fields.length} fields.`);
       res.json({ fields });
     } catch (error: any) {
       console.error('[API analyze-layout] Error:', error);
