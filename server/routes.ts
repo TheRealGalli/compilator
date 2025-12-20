@@ -13,6 +13,7 @@ import { google } from 'googleapis';
 import crypto from 'crypto';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { getSecret } from './gcp-secrets';
+import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
@@ -30,6 +31,41 @@ const upload = multer({
 });
 
 const BUCKET_NAME = process.env.GCP_STORAGE_BUCKET || 'notebooklm-compiler-files';
+
+/**
+ * Helper to generate a professional DOCX from text
+ */
+async function generateProfessionalDocxBase64(content: string): Promise<string> {
+  const lines = content.split('\n');
+  const children = lines.map(line => {
+    const text = line.trim();
+    if (!text) return new Paragraph({ text: "" });
+
+    // Simple markdown-style bold detection
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    const textRuns = parts.map(part => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return new TextRun({ text: part.replace(/\*\*/g, ''), bold: true, size: 24 });
+      }
+      return new TextRun({ text: part, size: 24 });
+    });
+
+    return new Paragraph({
+      children: textRuns,
+      spacing: { after: 120 }
+    });
+  });
+
+  const doc = new DocxDocument({
+    sections: [{
+      properties: {},
+      children: children
+    }]
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return buffer.toString('base64');
+}
 
 // Cache VertexAI client to avoid re-initialization
 let vertexAICache: { client: any; project: string; location: string } | null = null;
@@ -698,8 +734,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { template, notes, temperature, formalTone, detailedAnalysis, webResearch, sources } = req.body;
 
-      if (!template) {
-        return res.status(400).json({ error: 'Template richiesto' });
+      const pinnedSource = req.body.pinnedSource; // {name, type, base64}
+
+      if (!template && !pinnedSource) {
+        return res.status(400).json({ error: 'Template o fonte master (ping rosso) richiesti' });
       }
 
       console.log(`[DEBUG Compile] Received sources:`, sources?.length || 0);
@@ -859,7 +897,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const systemPrompt = `Data e ora corrente: ${dateTimeIT}
 
-Sei un assistente AI esperto nella compilazione di documenti legali e commerciali.
+Sei un assistente AI esperto nella compilazione di documenti. 
+
+${pinnedSource ? `
+**DOCUMENTO MASTER (PUNTINA ROSSA) RILEVATO:**
+Hai il compito di compilare o agire su questo file specifico: ${pinnedSource.name}.
+Mantieni la struttura logica e i contenuti di questo file come riferimento primario basandoti sui dati estratti dalle altre fonti.` : ''}
 
 **PRINCIPIO FONDAMENTALE - NO ALLUCINAZIONI:**
 Non inventare MAI dati specifici del progetto, nomi di aziende, persone o dettagli non forniti. Se non hai le informazioni necessarie per compilare un campo (es. [CLIENTE], [PROGETTO]), **LASCIALO VUOTO** o inserisci [DATO MANCANTE].
@@ -882,7 +925,7 @@ MODALITÀ WEB RESEARCH (GROUNDING & FONTI ESTERNE):
 - **GROUNDING:** Usa la conoscenza web generale per riferimenti normativi e standard.` : 'MODALITÀ WEB RESEARCH DISATTIVATA: Usa solo la tua conoscenza base e i documenti forniti.'}
 
 ${multimodalFiles.length > 0 || compileTextContext.length > 0 ? `
-Hai accesso a ${multimodalFiles.length + (compileTextContext.length > 0 ? 1 : 0)} fonti documentali (file multimodali e/o testo estratto).
+Hai accesso a ${multimodalFiles.length + (compileTextContext.length > 0 ? 1 : 0)} fonti documentali.
  
 **IMPORTANTE - ANALISI FONTI (PRIORITÀ ALTA):**
 - **Documenti/Testo:** Analizza attentamente il testo estratto e il contenuto dei file PDF per trovare i dati richiesti.
@@ -931,45 +974,43 @@ Istruzioni:
         userParts.push({
           inlineData: { mimeType: file.mimeType, data: file.data }
         });
-        console.log(`[DEBUG Compile] Added to userParts: ${file.name} (${file.mimeType}), data length: ${file.data?.length || 0}`);
       }
 
-      console.log(`[DEBUG Compile] Total userParts: ${userParts.length} (1 text + ${multimodalFiles.length} files)`);
+      // Add pinned source as image/pdf for structural guide if applicable
+      if (pinnedSource && (pinnedSource.type.startsWith('image/') || pinnedSource.type === 'application/pdf')) {
+        userParts.push({
+          inlineData: { mimeType: pinnedSource.type, data: pinnedSource.base64 }
+        });
+      }
 
-      // Build generateContent options with optional Google Search grounding
-      const generateOptions: any = {
+      const result = await model.generateContent({
         contents: [{ role: 'user', parts: userParts }],
         generationConfig: {
           temperature: temperature || 0.7,
         }
-      };
+      });
 
-      // Enable Google Search grounding when webResearch is active
-      if (webResearch) {
-        generateOptions.tools = [{ googleSearch: {} }];
-        console.log('[DEBUG Compile] Google Search grounding ENABLED in generateContent');
+      const response = await result.response;
+      const compiledContent = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (pinnedSource) {
+        // Return directly filled file
+        return res.json({
+          success: true,
+          compiledContent,
+          file: {
+            name: `Compilato_${pinnedSource.name.split('.')[0]}.docx`,
+            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            base64: await generateProfessionalDocxBase64(compiledContent)
+          }
+        });
       }
-
-      const result = await model.generateContent(generateOptions);
-
-      const response = result.response;
-      let text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-      // Clean up output: remove prompt echo if present
-      // User reported that sometimes the output includes the prompt up to "TEMPLATE DA COMPILARE:"
-      if (text.includes("TEMPLATE DA COMPILARE:")) {
-        console.log('[DEBUG Compile] Stripping prompt header from output');
-        const parts = text.split("TEMPLATE DA COMPILARE:");
-        // Take the last part which should be the actual compiled content
-        text = parts[parts.length - 1].trim();
-      }
-
-      console.log(`[DEBUG Compile] Generated ${text.length} characters`);
 
       res.json({
         success: true,
-        compiledContent: text,
+        compiledContent
       });
+
     } catch (error: any) {
       console.error('Errore durante compilazione:', error);
       res.status(500).json({
@@ -1439,6 +1480,16 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
 3. **Integrazione e Contraddizioni:** Usa la conoscenza web per arricchire il contesto. MANTIENI la coerenza, ma SE RILEVI CONTRADDIZIONI o problematiche tra i documenti e i risultati web, SEGNALALO ESPLICITAMENTE all'utente in modo professionale (es: "Nota: ho riscontrato una discrepanza tra il documento e le fonti web riguardo a...").`;
       }
 
+      // Add pinned source instruction if present
+      const pinnedSource = req.body.pinnedSource;
+      if (pinnedSource) {
+        systemInstruction += `
+
+**DOCUMENTO MASTER (PUNTINA ROSSA) RILEVATO:**
+L'utente ha contrassegnato "${pinnedSource.name}" come documento master.
+Se l'utente ti chiede di "compilare", "salvare" o "aggiornare" questo documento con i dati trovati nelle altre fonti o nella chat corrente, USA LO STRUMENTO generate_filled_document per generare il file compilato.`;
+      }
+
       console.log(`[DEBUG] System instruction length: ${systemInstruction.length} characters, max response: ${maxChars}`);
 
       // Get current datetime in Italian format for analyzer
@@ -1624,6 +1675,38 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
         console.log('[DEBUG Chat] Google Search grounding ENABLED in generateContent');
       }
 
+      // Pinned source tool handled above (const pinnedSource = req.body.pinnedSource)
+      if (pinnedSource) {
+        const docTool = {
+          functionDeclarations: [{
+            name: "generate_filled_document",
+            description: "Genera un documento compilato partendo dal file master (puntina rossa) e dai dati estratti. Usa questa funzione se l'utente chiede esplicitamente di 'compilare il file', 'riempire il modulo' o 'salvare i dati nel documento' basandosi sul file master.",
+            parameters: {
+              type: "object",
+              properties: {
+                content: {
+                  type: "string",
+                  description: "Il testo completo del documento da generare, formattato professionalmente."
+                },
+                summary: {
+                  type: "string",
+                  description: "Un breve riepilogo di cosa è stato inserito nel documento da mostrare all'utente in chat."
+                }
+              },
+              required: ["content"]
+            }
+          }]
+        };
+
+        if (!generateOptions.tools) {
+          generateOptions.tools = [docTool];
+        } else {
+          // Add to existing tools (e.g. googleSearch)
+          generateOptions.tools.push(docTool);
+        }
+        console.log('[DEBUG Chat] Pinned source tool ENABLED');
+      }
+
       // Use standard generation for stability
       console.log('[DEBUG Chat] Starting standard generation response');
       const result = await model.generateContent(generateOptions);
@@ -1636,6 +1719,27 @@ LIMITE LUNGHEZZA: Massimo 3000 caratteri.`;
 
       if (response.candidates && response.candidates.length > 0) {
         const candidate = response.candidates[0];
+
+        // Check for function call
+        const funcCall = candidate.content?.parts?.find((p: any) => p.functionCall);
+
+        if (funcCall && funcCall.functionCall.name === "generate_filled_document") {
+          const args: any = funcCall.functionCall.args;
+          console.log('[DEBUG Chat] Function call received:', funcCall.functionCall.name);
+
+          text = args.summary || "Ho generato il documento compilato basandomi sulla tua richiesta.";
+
+          const fileBase64 = await generateProfessionalDocxBase64(args.content);
+
+          return res.json({
+            text,
+            file: {
+              name: `Compilato_${pinnedSource.name.split('.')[0]}.docx`,
+              type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              base64: fileBase64
+            }
+          });
+        }
 
         // Extract Text
         if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {

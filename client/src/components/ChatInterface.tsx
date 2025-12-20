@@ -43,7 +43,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [isLoading, setIsLoading] = useState(false);
   const [webResearch, setWebResearch] = useState(false);
   const { toast } = useToast();
-  const { selectedSources } = useSources();
+  const { selectedSources, pinnedSource } = useSources();
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -223,6 +223,11 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         sources: selectedSources,
         temperature: 0.7,
         webResearch: webResearch,
+        pinnedSource: pinnedSource ? {
+          name: pinnedSource.name,
+          type: pinnedSource.type,
+          base64: pinnedSource.base64
+        } : null
       });
 
       const data = await response.json();
@@ -240,6 +245,27 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         groundingMetadata: data.groundingMetadata,
         searchEntryPoint: data.searchEntryPoint,
       };
+
+      // Check for direct file modification response
+      if (data.file) {
+        const base64Data = data.file.base64;
+        const fileName = data.file.name;
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: data.file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+        const { saveAs } = await import("file-saver");
+        saveAs(blob, fileName);
+
+        toast({
+          title: "Documento generato",
+          description: `L'AI ha compilato il file "${fileName}" basandosi sulla tua richiesta.`,
+        });
+      }
 
       const updatedMessages = [...newMessages, assistantMessage];
       setMessages(updatedMessages);

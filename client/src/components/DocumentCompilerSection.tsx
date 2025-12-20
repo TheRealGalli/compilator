@@ -204,7 +204,7 @@ export function DocumentCompilerSection({
   const [isCompiling, setIsCompiling] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
   const { toast } = useToast();
-  const { selectedSources, toggleSource } = useSources();
+  const { selectedSources, toggleSource, pinnedSource } = useSources();
 
   // Template Generation State
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -295,10 +295,10 @@ export function DocumentCompilerSection({
   };
 
   const handleCompile = async () => {
-    if (!templateContent.trim()) {
+    if (!templateContent.trim() && !pinnedSource) {
       toast({
         title: "Errore",
-        description: "Il template non può essere vuoto.",
+        description: "Seleziona un template o marca un documento con la puntina rossa per procedere.",
         variant: "destructive",
       });
       return;
@@ -330,23 +330,49 @@ export function DocumentCompilerSection({
         modelProvider: 'gemini',
         sources: sourcesForCompiler, // Pass sources with base64 directly
         model: 'gemini-2.5-flash',
+        pinnedSource: pinnedSource ? {
+          name: pinnedSource.name,
+          type: pinnedSource.type,
+          base64: pinnedSource.base64
+        } : null
       });
 
       const data = await response.json();
 
-      if (data.success && data.compiledContent) {
-        setCompiledContent(data.compiledContent);
+      if (data.success && (data.compiledContent || data.file)) {
+        if (data.file) {
+          // If the backend returns a file (direct modification)
+          const base64Data = data.file.base64;
+          const fileName = data.file.name;
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: data.file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 
-        const settingsInfo = [];
-        if (webResearch) settingsInfo.push('Web Research');
-        if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
-        if (formalTone) settingsInfo.push('Tono Formale');
-        if (selectedSources.length > 0) settingsInfo.push(`${selectedSources.length} docs`);
+          const { saveAs } = await import("file-saver");
+          saveAs(blob, fileName);
 
-        toast({
-          title: "Documento compilato con successo",
-          description: `Temperatura: ${temperature.toFixed(1)} | Strumenti attivi: ${settingsInfo.join(', ')}`,
-        });
+          toast({
+            title: "Documento creato con successo",
+            description: `Il file "${fileName}" è stato generato basandosi sul template originale.`,
+          });
+        } else {
+          setCompiledContent(data.compiledContent);
+
+          const settingsInfo = [];
+          if (webResearch) settingsInfo.push('Web Research');
+          if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
+          if (formalTone) settingsInfo.push('Tono Formale');
+          if (selectedSources.length > 0) settingsInfo.push(`${selectedSources.length} docs`);
+
+          toast({
+            title: "Documento compilato con successo",
+            description: `Temperatura: ${temperature.toFixed(1)} | Strumenti attivi: ${settingsInfo.join(', ')}`,
+          });
+        }
       } else {
         throw new Error(data.error || 'Errore durante la compilazione');
       }
@@ -543,7 +569,7 @@ export function DocumentCompilerSection({
 
           <Button
             onClick={handleCompile}
-            disabled={!templateContent || isCompiling}
+            disabled={(!templateContent && !pinnedSource) || isCompiling}
             data-testid="button-compile"
             className="w-full sm:w-auto"
           >

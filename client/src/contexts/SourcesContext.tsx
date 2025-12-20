@@ -19,6 +19,7 @@ interface SourcesContextType {
     toggleSource: (id: string) => void;
     togglePin: (id: string) => void;
     selectedSources: Source[];
+    pinnedSource: Source | null;
     maxSources: number;
 }
 
@@ -111,6 +112,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 toggleSource,
                 togglePin,
                 selectedSources,
+                pinnedSource: sources.find(s => s.isPinned) || null,
                 maxSources: MAX_SOURCES,
             }}
         >
