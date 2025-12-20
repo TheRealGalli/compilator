@@ -117,16 +117,39 @@ async function analyzePdfLayout(base64Pdf: string): Promise<any[]> {
     const discoveredFields: any[] = [];
     if (document && document.pages) {
       for (const page of document.pages) {
+        // STRATEGY 1: Official Form Fields (Legacy fallback)
         if (page.formFields) {
           for (const field of page.formFields) {
-            const fieldName = field.fieldName?.textAnchor?.content?.replace(/\n/g, ' ').trim();
+            const fieldName = field.fieldName?.textAnchor?.[0]?.content || field.fieldName?.textAnchor?.content?.replace(/\n/g, ' ').trim();
             const boundingPoly = field.fieldValue?.boundingPoly;
             if (fieldName && boundingPoly) {
-              discoveredFields.push({
-                name: fieldName,
-                boundingPoly,
-                pageIndex: (page.pageNumber || 1) - 1
-              });
+              discoveredFields.push({ name: fieldName, boundingPoly, pageIndex: (page.pageNumber || 1) - 1, source: 'formField' });
+            }
+          }
+        }
+
+        // STRATEGY 2: Visual Elements (Underscore lines detection)
+        // Some documents use lines that are not caught as "fields" but are visualElements
+        if (page.visualElements) {
+          for (const element of page.visualElements) {
+            if (element.type === 'form_field_underline' || element.type === 'horizontal_line') {
+              // Create a synthesized name based on surrounding text context if possible
+              // For now, we use a generic identifier + coordinates to allow Gemini to match it
+              const poly = element.layout?.boundingPoly;
+              if (poly) {
+                discoveredFields.push({ name: `Area_${Math.round(poly.vertices?.[0]?.y * 1000)}_${Math.round(poly.vertices?.[0]?.x * 1000)}`, boundingPoly: poly, pageIndex: (page.pageNumber || 1) - 1, source: 'visualElement' });
+              }
+            }
+          }
+        }
+
+        // STRATEGY 3: Underscore sequences in text
+        // If the PDF is flat text with "_______", we catch these as landmarks
+        if (page.paragraphs) {
+          for (const para of page.paragraphs) {
+            const text = para.layout?.textAnchor?.content || "";
+            if (text.includes('___')) {
+              discoveredFields.push({ name: `Rigo_${text.substring(0, 15).trim()}`, boundingPoly: para.layout?.boundingPoly, pageIndex: (page.pageNumber || 1) - 1, source: 'textLandmark' });
             }
           }
         }
@@ -1122,6 +1145,8 @@ Se è presente un DOCUMENTO MASTER, devi rispondere con un oggetto JSON struttur
    2. SE USI "preciseData", NON devi aggiungere lo stesso campo a "data" con le coordinate approssimative [ymin, xmin, ymax, xmax].
    3. "data" deve essere usato solo per campi NON presenti nella lista qui sotto.
    
+   IMPORTANTE: Se non trovi il nome esatto di un campo nella lista sopra ma vedi una riga o uno spazio nel PDF, USALO comunque in "data" con le coordinate [ymin, xmin, ymax, xmax]. Priorità a "preciseData", ma NON lasciare vuoto se mancano i match.
+
    ELENCO CAMPI RILEVATI (usa questi nomi in "preciseData"):
    ${preciseFields.map(f => `- "${f.name}"`).join('\n')}` : `Identifica i punti del documento dove mancano dati (es. righe vuote o underscore). Restituisci per ogni campo individuato le coordinate bounding box [ymin, xmin, ymax, xmax] in scala 0-1000.`}
    
@@ -1240,7 +1265,7 @@ ${pinnedSource ? `\n\nIMPORTANTE: Dato che c'è un DOCUMENTO MASTER, DEVI genera
           }
 
           binaryBase64 = await fillPdfBinary(pinnedSource.base64, finalFields);
-          console.log('[DEBUG Compile] PDF binary modification successful');
+          console.log(`[DEBUG Compile] PDF binary modification successful. Total fields filled: ${finalFields.length}`);
         } else if (pinnedSource.type.includes('wordprocessingml.document') && fillingData?.fillingMode === 'docx_tags') {
           binaryBase64 = await fillDocxBinary(pinnedSource.base64, fillingData.tagData);
           console.log('[DEBUG Compile] DOCX binary modification successful');
