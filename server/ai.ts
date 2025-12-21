@@ -136,6 +136,9 @@ export class AiService {
                 `- "${f.name}" a pagina ${f.page}, box [${f.box.join(', ')}]`
             ).join('\n');
 
+            console.log('[AiService Stage 2] Starting fillAndRefinePositions with', params.fields.length, 'fields');
+            console.log('[AiService Stage 2] User notes:', params.userNotes?.substring(0, 100) || 'none');
+
             const prompt = `
 Sei un compilatore di documenti PDF con capacità visive avanzate.
 
@@ -183,7 +186,10 @@ FORMATO OUTPUT (JSON):
                 ]
             });
 
+            console.log('[AiService Stage 2] Calling Gemini...');
             const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            console.log('[AiService Stage 2] Raw response length:', responseText.length);
+            console.log('[AiService Stage 2] Raw response preview:', responseText.substring(0, 300));
             const json = JSON.parse(responseText.replace(/```json|```/g, '').trim());
 
             if (!json.fields || !Array.isArray(json.fields)) {
@@ -199,8 +205,9 @@ FORMATO OUTPUT (JSON):
                 page: item.page || 0
             }));
 
-        } catch (error) {
-            console.error('[AiService] fillAndRefinePositions error:', error);
+        } catch (error: any) {
+            console.error('[AiService] fillAndRefinePositions error:', error?.message || error);
+            console.error('[AiService] fillAndRefinePositions stack:', error?.stack);
             return [];
         }
     }
