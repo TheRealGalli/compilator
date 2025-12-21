@@ -1380,16 +1380,65 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
           info: "Generated from direct user input"
         });
       } else if (fillingMode === 'studio' && preciseFields.length > 0 && pinnedSource) {
-        // SIMPLIFIED SINGLE-STAGE: Use compileDocument directly for value filling
-        console.log('[DEBUG Compile] SINGLE-STAGE PIPELINE: Using compileDocument for Studio Mode');
-        console.log('[DEBUG Compile] Fields to fill:', preciseFields.map((f: any) => f.name).join(', '));
+        // FUNCTION CALLING MODE: AI has full control with tools
+        console.log('[DEBUG Compile] FUNCTION CALLING MODE: Using compileWithTools');
+        console.log('[DEBUG Compile] Fields available:', preciseFields.map((f: any) => f.name).join(', '));
 
-        text = await aiService.compileDocument({
-          systemPrompt,
-          userPrompt,
-          multimodalFiles,
-          pinnedSource
+        // Get page dimensions for coordinate conversion
+        const pdfDoc = await PDFDocument.load(Buffer.from(pinnedSource.base64, 'base64'));
+        const pages = pdfDoc.getPages();
+
+        // Convert preciseFields to the format expected by compileWithTools
+        const toolFields = preciseFields.map((f: any) => {
+          const page = pages[f.pageIndex || 0] || pages[0];
+          const { width: pageWidth, height: pageHeight } = page.getSize();
+
+          // Convert normalized coordinates to PDF points
+          const vertices = f.boundingPoly?.normalizedVertices || [];
+          const x = vertices[0]?.x ? vertices[0].x * pageWidth : 0;
+          const y = vertices[3]?.y ? (1 - vertices[3].y) * pageHeight : 0; // Flip Y for PDF coords
+          const width = vertices.length >= 2 ? (vertices[1].x - vertices[0].x) * pageWidth : 100;
+          const height = vertices.length >= 4 ? (vertices[0].y - vertices[3].y) * pageHeight : 20;
+
+          return {
+            name: f.name,
+            x: Math.round(x),
+            y: Math.round(y),
+            width: Math.round(width),
+            height: Math.round(height),
+            pageIndex: f.pageIndex || 0
+          };
         });
+
+        // Call AI with function calling
+        const placedTexts = await aiService.compileWithTools({
+          pdfBase64: pinnedSource.base64,
+          fields: toolFields,
+          userNotes: notes || '',
+          sources: multimodalFiles.map((f: any) => ({ name: f.name || 'source', base64: f.data, type: f.mimeType }))
+        });
+
+        // Convert placed texts to values format for frontend
+        const valuesForFrontend: Record<string, string> = {};
+        placedTexts.forEach(pt => {
+          // Find matching field by proximity
+          const matchingField = toolFields.find(f =>
+            Math.abs(f.x - pt.x) < 50 && Math.abs(f.y - pt.y) < 50 && f.pageIndex === pt.pageIndex
+          );
+          if (matchingField) {
+            valuesForFrontend[matchingField.name] = pt.text;
+          }
+        });
+
+        console.log('[DEBUG Compile] Function calling complete, placed:', Object.keys(valuesForFrontend).length, 'texts');
+
+        // Return values directly for Studio Mode
+        return res.json({
+          success: true,
+          values: valuesForFrontend,
+          placedTexts: placedTexts // Include raw placed texts for PDF generation
+        });
+
       } else {
         text = await aiService.compileDocument({
           systemPrompt,

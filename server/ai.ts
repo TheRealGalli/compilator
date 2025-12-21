@@ -241,4 +241,212 @@ FORMATO OUTPUT (JSON):
             return [];
         }
     }
+
+    /**
+     * Compile document using Gemini Function Calling
+     * Gives AI full control over document with real-time feedback
+     */
+    async compileWithTools(params: {
+        pdfBase64: string,
+        fields: Array<{ name: string, x: number, y: number, width: number, height: number, pageIndex: number }>,
+        userNotes: string,
+        sources?: Array<{ name: string, base64: string, type: string }>
+    }): Promise<Array<{ x: number, y: number, text: string, fontSize: number, pageIndex: number }>> {
+
+        console.log('[AiService] compileWithTools: Starting with', params.fields.length, 'fields');
+
+        // Define function declarations for Gemini
+        const functionDeclarations = [
+            {
+                name: "readDocumentFields",
+                description: "Legge tutti i campi disponibili nel documento con le loro posizioni esatte. Chiamare all'inizio per sapere dove piazzare il testo.",
+                parameters: {
+                    type: "object",
+                    properties: {},
+                    required: []
+                }
+            },
+            {
+                name: "placeText",
+                description: "Piazza del testo a coordinate specifiche nel documento PDF. Usa le coordinate ottenute da readDocumentFields.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        fieldName: {
+                            type: "string",
+                            description: "Nome del campo dove piazzare il testo (per logging)"
+                        },
+                        x: {
+                            type: "number",
+                            description: "Coordinata X in pixel (dal bordo sinistro)"
+                        },
+                        y: {
+                            type: "number",
+                            description: "Coordinata Y in pixel (dal bordo inferiore, sistema PDF)"
+                        },
+                        text: {
+                            type: "string",
+                            description: "Il testo da inserire"
+                        },
+                        fontSize: {
+                            type: "number",
+                            description: "Dimensione font in punti (default 11)"
+                        },
+                        pageIndex: {
+                            type: "number",
+                            description: "Indice della pagina (0-based, default 0)"
+                        }
+                    },
+                    required: ["fieldName", "x", "y", "text"]
+                }
+            },
+            {
+                name: "done",
+                description: "Segnala che la compilazione è completa. Chiamare quando tutti i campi sono stati riempiti.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        summary: {
+                            type: "string",
+                            description: "Breve riepilogo dei campi compilati"
+                        }
+                    },
+                    required: []
+                }
+            }
+        ];
+
+        const model = this.vertex_ai.getGenerativeModel({
+            model: this.modelId,
+            tools: [{ functionDeclarations }] as any
+        });
+
+        // Build source context
+        let sourceContext = '';
+        if (params.sources && params.sources.length > 0) {
+            sourceContext = params.sources.map(s => `Fonte: ${s.name}`).join('\n');
+        }
+
+        const systemPrompt = `Sei un assistente per la compilazione precisa di documenti PDF.
+
+ISTRUZIONI:
+1. PRIMA chiama readDocumentFields() per ottenere la lista dei campi con posizioni esatte
+2. Per ogni campo, usa le note dell'utente per trovare il valore corretto
+3. Chiama placeText() per ogni campo con le coordinate ESATTE ricevute
+4. Quando hai finito tutti i campi, chiama done()
+
+NOTE UTENTE:
+${params.userNotes}
+
+${sourceContext ? `FONTI DISPONIBILI:\n${sourceContext}` : ''}
+
+IMPORTANTE:
+- Usa SEMPRE le coordinate esatte ricevute da readDocumentFields
+- Non inventare coordinate
+- Se non trovi un valore per un campo, lascialo vuoto (non chiamare placeText)
+- Font size consigliato: 10-12 punti`;
+
+        // State for placed texts
+        const placedTexts: Array<{ x: number, y: number, text: string, fontSize: number, pageIndex: number }> = [];
+        let isDone = false;
+
+        // Start conversation
+        let messages: any[] = [
+            { role: 'user', parts: [{ text: systemPrompt }] }
+        ];
+
+        // Tool execution loop
+        let iterations = 0;
+        const maxIterations = 20;
+
+        while (!isDone && iterations < maxIterations) {
+            iterations++;
+            console.log(`[AiService] compileWithTools: Iteration ${iterations}`);
+
+            const response = await model.generateContent({ contents: messages });
+            const candidate = response.response.candidates?.[0];
+
+            if (!candidate?.content?.parts) {
+                console.error('[AiService] No response parts');
+                break;
+            }
+
+            // Add assistant response to conversation
+            messages.push({ role: 'model', parts: candidate.content.parts });
+
+            // Check for function calls
+            const functionCalls = candidate.content.parts.filter((p: any) => p.functionCall);
+
+            if (functionCalls.length === 0) {
+                console.log('[AiService] No function calls, checking for text response');
+                break;
+            }
+
+            // Process each function call
+            const functionResponses: any[] = [];
+
+            for (const part of functionCalls) {
+                const fc = (part as any).functionCall;
+                if (!fc) continue;
+
+                console.log(`[AiService] Function call: ${fc.name}`, fc.args);
+
+                let result: any;
+                const args = fc.args || {};
+
+                switch (fc.name) {
+                    case 'readDocumentFields':
+                        result = params.fields.map(f => ({
+                            name: f.name,
+                            x: Math.round(f.x),
+                            y: Math.round(f.y),
+                            width: Math.round(f.width),
+                            height: Math.round(f.height),
+                            pageIndex: f.pageIndex
+                        }));
+                        console.log(`[AiService] Returning ${result.length} fields`);
+                        break;
+
+                    case 'placeText':
+                        const { fieldName, x, y, text, fontSize = 11, pageIndex = 0 } = args as any;
+                        if (text && String(text).trim()) {
+                            placedTexts.push({
+                                x: Number(x),
+                                y: Number(y),
+                                text: String(text),
+                                fontSize: Number(fontSize),
+                                pageIndex: Number(pageIndex)
+                            });
+                            result = { success: true, placedAt: { x, y }, field: fieldName };
+                            console.log(`[AiService] Placed "${text}" at (${x}, ${y}) for ${fieldName}`);
+                        } else {
+                            result = { success: false, error: 'Empty text' };
+                        }
+                        break;
+
+                    case 'done':
+                        isDone = true;
+                        result = { success: true, totalPlaced: placedTexts.length };
+                        console.log(`[AiService] Done! Placed ${placedTexts.length} texts`);
+                        break;
+
+                    default:
+                        result = { error: 'Unknown function' };
+                }
+
+                functionResponses.push({
+                    functionResponse: {
+                        name: fc.name,
+                        response: result
+                    }
+                });
+            }
+
+            // Add function responses to conversation
+            messages.push({ role: 'user', parts: functionResponses });
+        }
+
+        console.log(`[AiService] compileWithTools complete: ${placedTexts.length} texts placed in ${iterations} iterations`);
+        return placedTexts;
+    }
 }
