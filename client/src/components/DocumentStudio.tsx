@@ -46,6 +46,7 @@ export interface DiscoveredField {
     offsetX?: number;
     offsetY?: number;
     rotation?: number;
+    width?: number; // Dynamic width in percentage (0-100)
 }
 
 // ... (rest of the file hooks)
@@ -88,6 +89,26 @@ export function DocumentStudio({
             analyzeLayout();
         }
     }, [pdfBase64]);
+
+    // Keyboard delete handler
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFieldIndex !== null) {
+                // Don't delete if focus is on an input
+                if (document.activeElement?.tagName === 'INPUT') return;
+                deleteField(selectedFieldIndex);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedFieldIndex]);
+
+    const deleteField = (index: number) => {
+        const newFields = fields.filter((_, i) => i !== index);
+        setFields(newFields);
+        setSelectedFieldIndex(null);
+        toast({ title: "Campo eliminato" });
+    };
 
     // Watch for external values to trigger "typing" effect
     useEffect(() => {

@@ -498,63 +498,66 @@ export function DocumentCompilerSection({
           <h2 className="text-xl font-semibold">Compilatore Documenti AI</h2>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-            <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
-              <SelectValue placeholder="Seleziona template" />
-            </SelectTrigger>
-            <SelectContent>
-              <div className="p-2 border-b space-y-1">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    document.getElementById('template-upload')?.click();
-                  }}
-                  data-testid="button-upload-template"
-                >
-                  <span className="mr-2">📄</span>
-                  Upload Template
-                </Button>
-                <input
-                  id="template-upload"
-                  type="file"
-                  accept=".txt,.md"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        setTemplateContent(event.target?.result as string);
-                        setSelectedTemplate("");
-                        toast({
-                          title: "Template caricato",
-                          description: `${file.name} è stato caricato con successo.`,
-                        });
-                      };
-                      reader.readAsText(file);
-                    }
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setIsGenerateModalOpen(true);
-                  }}
-                  data-testid="button-generate-template"
-                >
-                  <span className="mr-2">✏️</span>
-                  Genera Template
-                </Button>
-              </div>
-              <SelectItem value="privacy">Privacy Policy</SelectItem>
-              <SelectItem value="relazione">Relazione Tecnica</SelectItem>
-              <SelectItem value="contratto">Contratto di Servizio</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Hide template selector when a source is pinned */}
+          {!pinnedSource && (
+            <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
+              <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
+                <SelectValue placeholder="Seleziona template" />
+              </SelectTrigger>
+              <SelectContent>
+                <div className="p-2 border-b space-y-1">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById('template-upload')?.click();
+                    }}
+                    data-testid="button-upload-template"
+                  >
+                    <span className="mr-2">📄</span>
+                    Upload Template
+                  </Button>
+                  <input
+                    id="template-upload"
+                    type="file"
+                    accept=".txt,.md"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setTemplateContent(event.target?.result as string);
+                          setSelectedTemplate("");
+                          toast({
+                            title: "Template caricato",
+                            description: `${file.name} è stato caricato con successo.`,
+                          });
+                        };
+                        reader.readAsText(file);
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsGenerateModalOpen(true);
+                    }}
+                    data-testid="button-generate-template"
+                  >
+                    <span className="mr-2">✏️</span>
+                    Genera Template
+                  </Button>
+                </div>
+                <SelectItem value="privacy">Privacy Policy</SelectItem>
+                <SelectItem value="relazione">Relazione Tecnica</SelectItem>
+                <SelectItem value="contratto">Contratto di Servizio</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
 
           <Button
             onClick={handleCompile}
@@ -574,7 +577,7 @@ export function DocumentCompilerSection({
             >
               <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
             </svg>
-            {isCompiling ? "Compilazione..." : "Compila con AI"}
+            {isCompiling ? (pinnedSource ? "Genero etichette..." : "Compilazione...") : "Compila con AI"}
           </Button>
         </div>
       </div>
