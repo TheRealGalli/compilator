@@ -17,6 +17,18 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } f
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
+
+// Canvas polyfills for pdfjs-dist in Node.js
+// @ts-ignore
+import { createCanvas } from 'canvas';
+// @ts-ignore - Inject canvas factory for pdfjs
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  // @ts-ignore
+  globalThis.DOMMatrix = class DOMMatrix {
+    constructor() { return [1, 0, 0, 1, 0, 0]; }
+  };
+}
+
 // @ts-ignore - pdfjs-dist types
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 // [Removed legacy Document AI import]
