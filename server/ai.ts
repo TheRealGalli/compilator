@@ -197,9 +197,36 @@ export class AiService {
 
                             // If we have a value box, it's the precise area for input.
                             // If not, we take the name box but we know it might be the label.
-                            const targetBox = valueBox || nameBox;
+                            // const targetBox = valueBox || nameBox;
 
-                            if (!targetBox?.normalizedVertices) continue;
+                            let targetVertices: any[] = [];
+                            let isInferred = false;
+
+                            if (valueBox?.normalizedVertices) {
+                                targetVertices = valueBox.normalizedVertices;
+                            } else if (nameBox?.normalizedVertices) {
+                                // Infer box to the RIGHT of the name
+                                const nv = nameBox.normalizedVertices;
+                                const nameMaxX = Math.max(...nv.map((v: any) => v.x || 0));
+                                const nameMinY = Math.min(...nv.map((v: any) => v.y || 0));
+                                const nameMaxY = Math.max(...nv.map((v: any) => v.y || 0));
+
+                                // Create a generic writing zone starting after the label
+                                const gap = 0.01; // Small gap
+                                const width = 0.25; // Estimate 25% page width for values
+
+                                targetVertices = [
+                                    { x: nameMaxX + gap, y: nameMinY },
+                                    { x: nameMaxX + gap + width, y: nameMinY },
+                                    { x: nameMaxX + gap + width, y: nameMaxY },
+                                    { x: nameMaxX + gap, y: nameMaxY }
+                                ];
+                                isInferred = true;
+                            } else {
+                                continue;
+                            }
+
+                            if (targetVertices.length < 3) continue;
 
                             let fieldName = 'Campo';
                             if (textAnchorName && textAnchorName.textSegments && document.text) {
@@ -224,26 +251,23 @@ export class AiService {
                                 isCheckbox = true;
                             }
 
-                            const vertices = targetBox.normalizedVertices!;
-
                             // For text fields, if we are using the valueBox, we are already "on the line".
-                            // If we only have nameBox, we might need a small downward offset, 
-                            // but usually it's better to stick to what Document AI says is the 'value' area.
+                            // If we only have nameBox, we have inferred a generic box to the right.
 
                             fields.push({
                                 name: cleanName,
-                                value: fieldValue.trim(),
+                                value: isInferred ? "" : fieldValue.trim(), // Force empty if inferred to encourage filling
                                 fieldType: isCheckbox ? 'checkbox' : 'text',
                                 boundingPoly: {
-                                    normalizedVertices: vertices.map((v: any) => ({
+                                    normalizedVertices: targetVertices.map((v: any) => ({
                                         x: v.x || 0,
                                         y: v.y || 0
                                     }))
                                 },
                                 pageIndex: pageIndex,
                                 source: 'document_ai_form_parser',
-                                // Add a flag if this was specifically a valueBox (more precise)
-                                isPreciseValue: !!valueBox
+                                isPreciseValue: !isInferred,
+                                isInferred: isInferred
                             });
                         }
                     }

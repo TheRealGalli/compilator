@@ -13,7 +13,7 @@ export class StudioAgent {
 
     constructor() {
         this.model = vertex_ai.getGenerativeModel({
-            model: 'gemini-1.5-flash', // Reverting to stable channel
+            model: 'gemini-2.5-flash', // Unified model
             generationConfig: {
                 temperature: 0.1,
                 responseMimeType: "application/json",
