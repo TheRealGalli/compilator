@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TemplateEditor } from "./TemplateEditor";
 import { CompiledOutput } from "./CompiledOutput";
 import { ModelSettings } from "./ModelSettings";
+import { StudioChat } from "./StudioChat";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -590,21 +591,69 @@ export function DocumentCompilerSection({
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full overflow-auto">
-            {/* Removed StudioChat Mode for now */}
-            <ModelSettings
-              notes={notes}
-              temperature={temperature}
-              webResearch={webResearch}
-              detailedAnalysis={detailedAnalysis}
-              formalTone={formalTone}
-              modelProvider={modelProvider}
-              onNotesChange={setNotes}
-              onTemperatureChange={setTemperature}
-              onWebResearchChange={setWebResearch}
-              onDetailedAnalysisChange={setDetailedAnalysis}
-              onFormalToneChange={setFormalTone}
-              onModelProviderChange={setModelProvider}
-            />
+            {/* Conditional Rendering: ModelSettings vs StudioChat */}
+            {pinnedSource && discoveredFieldNames.length > 0 ? (
+              <StudioChat
+                isProcessing={isCompiling}
+                onSendMessage={async (message) => {
+                  console.log("Chat Message:", message);
+                  // Trigger Compilation with instruction
+                  setIsCompiling(true);
+                  try {
+                    const { apiRequest } = await import("@/lib/queryClient");
+                    const response = await apiRequest('POST', '/api/compile', {
+                      template: "",
+                      notes: message, // Treat chat message as notes/instructions
+                      sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
+                      pinnedSource: {
+                        name: pinnedSource.name,
+                        type: pinnedSource.type,
+                        base64: pinnedSource.base64
+                      },
+                      studioFields: currentFields.map(f => ({
+                        name: f.name,
+                        pageIndex: f.pageIndex,
+                        boundingPoly: { normalizedVertices: f.boundingPoly.normalizedVertices || [] }
+                      })),
+                      modelProvider,
+                      temperature,
+                      webResearch,
+                      detailedAnalysis,
+                      formalTone,
+                      fillingMode: 'studio'
+                    });
+
+                    const data = await response.json();
+                    if (data.values) {
+                      setStudioValues(data.values);
+                      return "Ho aggiornato i campi secondo le tue indicazioni. C'è altro?";
+                    } else {
+                      return "Analisi completata, ma non ho modificato i campi. Verifica i dati.";
+                    }
+                  } catch (e) {
+                    console.error("Chat Action Failed", e);
+                    throw e;
+                  } finally {
+                    setIsCompiling(false);
+                  }
+                }}
+              />
+            ) : (
+              <ModelSettings
+                notes={notes}
+                temperature={temperature}
+                webResearch={webResearch}
+                detailedAnalysis={detailedAnalysis}
+                formalTone={formalTone}
+                modelProvider={modelProvider}
+                onNotesChange={setNotes}
+                onTemperatureChange={setTemperature}
+                onWebResearchChange={setWebResearch}
+                onDetailedAnalysisChange={setDetailedAnalysis}
+                onFormalToneChange={setFormalTone}
+                onModelProviderChange={setModelProvider}
+              />
+            )}
           </div>
 
           <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
