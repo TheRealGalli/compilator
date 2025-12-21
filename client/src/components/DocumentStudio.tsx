@@ -157,6 +157,22 @@ export function DocumentStudio({
     const analyzeLayout = async () => {
         setIsLoadingFields(true);
         try {
+            // PRIORITY 1: Client-side PDF.js extraction (INSTANT + PRECISE)
+            console.log("[DocumentStudio] Trying client-side PDF.js extraction...");
+            const clientFields = await extractTextPositionsClientSide();
+
+            if (clientFields.length > 0) {
+                console.log(`[DocumentStudio] CLIENT EXTRACTION: Found ${clientFields.length} fields`);
+                setFields(clientFields);
+                if (onFieldsDiscovered) {
+                    onFieldsDiscovered(clientFields.map(f => f.name));
+                }
+                setIsLoadingFields(false);
+                return;
+            }
+
+            // FALLBACK: Server-side analysis (slower but handles complex cases)
+            console.log("[DocumentStudio] Falling back to server analysis...");
             const { getApiUrl } = await import("@/lib/api-config");
             const response = await fetch(getApiUrl('/api/analyze-layout'), {
                 method: 'POST',
@@ -176,6 +192,101 @@ export function DocumentStudio({
             console.error("Layout analysis failed:", error);
         } finally {
             setIsLoadingFields(false);
+        }
+    };
+
+    // Client-side PDF text extraction using pdfjs (INSTANT + PRECISE)
+    const extractTextPositionsClientSide = async (): Promise<DiscoveredField[]> => {
+        try {
+            console.log("[DocumentStudio] Starting client-side PDF extraction...");
+            const startTime = Date.now();
+
+            // Decode base64 and load PDF
+            const binaryString = atob(pdfBase64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+
+            const pdf = await pdfjs.getDocument({ data: bytes }).promise;
+            const fields: DiscoveredField[] = [];
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1.0 });
+                const textContent = await page.getTextContent();
+
+                // Group by approximate Y position (same line)
+                const lines = new Map<number, any[]>();
+
+                for (const item of textContent.items as any[]) {
+                    if (!item.str) continue;
+
+                    const [a, b, c, d, tx, ty] = item.transform;
+                    const fontSize = Math.sqrt(a * a + b * b);
+                    const yKey = Math.round((viewport.height - ty) / 10) * 10;
+
+                    if (!lines.has(yKey)) lines.set(yKey, []);
+                    lines.get(yKey)!.push({
+                        text: item.str,
+                        x: tx,
+                        y: viewport.height - ty,
+                        width: item.width || (item.str.length * fontSize * 0.6),
+                        height: fontSize * 1.2,
+                        pageWidth: viewport.width,
+                        pageHeight: viewport.height
+                    });
+                }
+
+                // Analyze lines for field patterns
+                for (const [yKey, lineItems] of Array.from(lines.entries())) {
+                    lineItems.sort((a, b) => a.x - b.x);
+
+                    for (let i = 0; i < lineItems.length; i++) {
+                        const item = lineItems[i];
+                        const text = item.text.trim();
+
+                        // Skip empty or underscore-only items
+                        const isEmptyField = /^[_\-\.]{3,}$/.test(text) || text === '';
+                        if (isEmptyField) continue;
+
+                        // Check if next item is empty field indicator
+                        const nextItem = lineItems[i + 1];
+                        const nextIsEmpty = nextItem && /^[_\-\.]{3,}$/.test(nextItem.text.trim());
+
+                        // Check if text ends with : or next is empty
+                        if (text.endsWith(':') || nextIsEmpty) {
+                            const fieldX = nextIsEmpty ? nextItem.x : item.x + item.width + 5;
+                            const fieldWidth = nextIsEmpty ? nextItem.width : 150;
+
+                            fields.push({
+                                name: text.replace(/:$/, '').trim(),
+                                boundingPoly: {
+                                    vertices: [],
+                                    normalizedVertices: [
+                                        { x: fieldX / item.pageWidth, y: item.y / item.pageHeight },
+                                        { x: (fieldX + fieldWidth) / item.pageWidth, y: item.y / item.pageHeight },
+                                        { x: (fieldX + fieldWidth) / item.pageWidth, y: (item.y + item.height) / item.pageHeight },
+                                        { x: fieldX / item.pageWidth, y: (item.y + item.height) / item.pageHeight }
+                                    ]
+                                },
+                                pageIndex: pageNum - 1,
+                                value: "",
+                                offsetX: 0,
+                                offsetY: 0,
+                                rotation: 0
+                            });
+                        }
+                    }
+                }
+            }
+
+            console.log(`[DocumentStudio] Client extraction complete: ${fields.length} fields in ${Date.now() - startTime}ms`);
+            return fields;
+
+        } catch (error) {
+            console.error("[DocumentStudio] Client-side extraction failed:", error);
+            return [];
         }
     };
 
