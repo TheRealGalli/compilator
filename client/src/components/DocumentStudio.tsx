@@ -342,8 +342,9 @@ export function DocumentStudio({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="flex items-center -space-x-3 mr-2 select-none">
-                            <Asterisk className="w-8 h-8 text-blue-600" strokeWidth={3} />
-                            <Asterisk className="w-8 h-8 text-blue-600" strokeWidth={3} />
+                            <Asterisk className="w-8 h-8 text-blue-600 animate-spin" strokeWidth={3} />
+                            <Asterisk className="w-8 h-8 text-blue-600 animate-spin delay-75" strokeWidth={3} />
+                            <Asterisk className="w-8 h-8 text-blue-600 animate-spin delay-150" strokeWidth={3} />
                         </div>
                         <div>
                             <CardTitle className="text-lg">Document Studio</CardTitle>
