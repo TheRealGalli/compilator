@@ -190,13 +190,12 @@ export function DocumentStudio({
     };
 
     // Auto-discover fields on PDF load
-    // Auto-discover fields on PDF load - DISABLED by user request
+    // Auto-discover fields on PDF load
     useEffect(() => {
-        /*
         if (pdfBase64 && fields.length === 0 && !isLoadingFields) {
+            console.log("Triggering auto-discovery...");
             discoverLayout(false);
         }
-        */
     }, [pdfBase64]);
 
     // Watch for external values to trigger "typing" effect
@@ -211,16 +210,29 @@ export function DocumentStudio({
 
             const applyTyping = async () => {
                 for (const key of keys) {
-                    const index = newFields.findIndex(f =>
-                        f.name.toLowerCase().includes(key.toLowerCase()) ||
-                        key.toLowerCase().includes(f.name.toLowerCase())
-                    );
+                    // IMPROVED MATCHING: Normalize key and field name
+                    // 1. Remove punctuation (:, _, .)
+                    // 2. Lowercase
+                    // 3. Trim
+                    const normKey = key.toLowerCase().replace(/[:_\-\.\s]+/g, '');
+
+                    const index = newFields.findIndex(f => {
+                        const normField = f.name.toLowerCase().replace(/[:_\-\.\s]+/g, '');
+                        // Check for exact match of normalized strings OR partial contains
+                        return normField === normKey ||
+                            (normField.length > 3 && normField.includes(normKey)) ||
+                            (normKey.length > 3 && normKey.includes(normField));
+                    });
+
                     if (index !== -1) {
+                        console.log(`[DocumentStudio] Matched value for "${key}" to field "${newFields[index].name}"`);
                         const val = externalValues[key];
                         const safeVal = typeof val === 'object' ? JSON.stringify(val) : String(val || "");
                         newFields[index] = { ...newFields[index], value: safeVal };
                         setFields([...newFields]);
                         await new Promise(r => setTimeout(r, 60));
+                    } else {
+                        console.warn(`[DocumentStudio] No match found for external value key: "${key}"`);
                     }
                 }
             };
