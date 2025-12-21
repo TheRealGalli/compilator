@@ -140,11 +140,23 @@ export function DocumentStudio({
                 if (onFieldsDiscovered) {
                     onFieldsDiscovered(discovered.map((f: any) => f.name));
                 }
-                toast({ title: "Layout Analizzato", description: `Trovati ${discovered.length} campi.` });
+                toast({ title: "Layout Analizzato", description: `Trovati ${discovered.length} campi (Form).` });
             } else {
-                console.warn('[DocumentStudio] No fields returned from server');
-                if (isManual) {
-                    toast({ title: "Nessun campo trovato", description: "Prova ad aggiungere i campi manualmente." });
+                console.warn('[DocumentStudio] No fields returned from server, trying Client-Side Heuristic...');
+
+                // FALLBACK: Client-side extraction
+                const clientFields = await extractTextPositionsClientSide();
+
+                if (clientFields.length > 0) {
+                    setFields(clientFields);
+                    if (onFieldsDiscovered) {
+                        onFieldsDiscovered(clientFields.map(f => f.name));
+                    }
+                    toast({ title: "Analisi Visiva", description: `Trovati ${clientFields.length} potenziali campi dal testo.` });
+                } else {
+                    if (isManual) {
+                        toast({ title: "Nessun campo trovato", description: "Prova ad aggiungere i campi manualmente." });
+                    }
                 }
             }
         } catch (e) {
