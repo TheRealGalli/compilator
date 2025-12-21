@@ -80,7 +80,7 @@ export function DocumentStudio({
 
     // Star animations state
     const [star1Rotation, setStar1Rotation] = useState(0);
-    const [star2Rotation, setStar2Rotation] = useState(0);
+    const [star2Spinning, setStar2Spinning] = useState(false);
     const [star3Spinning, setStar3Spinning] = useState(false);
 
     // Load fields from backend when PDF changes
@@ -113,6 +113,9 @@ export function DocumentStudio({
     // Watch for external values to trigger "typing" effect
     useEffect(() => {
         if (externalValues && Object.keys(externalValues).length > 0) {
+            // Stop Star 2 spinning when values arrive
+            setStar2Spinning(false);
+
             const keys = Object.keys(externalValues);
             const newFields = [...fields];
 
@@ -248,9 +251,15 @@ export function DocumentStudio({
                             {/* Star 2: Compile */}
                             <TooltipWrapper text="Compila con AI">
                                 <motion.div
-                                    animate={{ rotateY: star2Rotation }}
+                                    animate={star2Spinning ? { rotate: [0, 360, 720] } : {}}
+                                    transition={star2Spinning ? {
+                                        repeat: Infinity,
+                                        duration: 2,
+                                        ease: [0.4, 0, 0.2, 1],
+                                        times: [0, 0.5, 1]
+                                    } : {}}
                                     onClick={() => {
-                                        setStar2Rotation(prev => prev + 360);
+                                        setStar2Spinning(true);
                                         onCompile(fields);
                                     }}
                                     className="cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 hover:scale-110"
