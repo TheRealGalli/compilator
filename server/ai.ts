@@ -160,12 +160,24 @@ export class AiService {
                             const textAnchorName = formField.fieldName?.textAnchor;
                             const textAnchorValue = formField.fieldValue?.textAnchor;
 
+                            // PRECISION: Strictly require the value poly (blank space). 
+                            // If only the fieldName exists, it's likely a title or a label with no input area.
+                            const valueBox = formField.fieldValue?.boundingPoly;
+                            if (!valueBox?.normalizedVertices) continue;
+
                             let fieldName = 'Campo';
                             if (textAnchorName && textAnchorName.textSegments && document.text) {
                                 fieldName = textAnchorName.textSegments
                                     .map((seg: any) => document.text!.substring(Number(seg.startIndex || 0), Number(seg.endIndex || 0)))
                                     .join('');
                             }
+
+                            // FILTER 1: Skip obvious titles or overly long text (noise)
+                            const cleanName = fieldName.trim().replace(/[:\s]+$/, '');
+
+                            // Heuristic: Titles are often all-caps and centralized. 
+                            const isTitle = cleanName.length > 2 && cleanName === cleanName.toUpperCase() && !cleanName.includes(':');
+                            if (cleanName.length > 55 || cleanName.length < 2 || isTitle) continue;
 
                             let fieldValue = '';
                             if (textAnchorValue && textAnchorValue.textSegments && document.text) {
@@ -174,27 +186,35 @@ export class AiService {
                                     .join('');
                             }
 
-                            const boundingBox = formField.fieldName?.boundingPoly || formField.fieldValue?.boundingPoly;
-
-                            if (boundingBox?.normalizedVertices) {
-                                const vertices = boundingBox.normalizedVertices;
-                                fields.push({
-                                    name: fieldName.trim().replace(/[:\s]+$/, ''),
-                                    value: fieldValue.trim(),
-                                    boundingPoly: {
-                                        normalizedVertices: vertices.map((v: any) => ({
-                                            x: v.x || 0,
-                                            y: v.y || 0
-                                        }))
-                                    },
-                                    pageIndex: pageIndex,
-                                    source: 'document_ai_form_parser'
-                                });
+                            let isCheckbox = false;
+                            const valType = formField.valueType || '';
+                            if (valType.includes('checkbox')) {
+                                isCheckbox = true;
                             }
+
+                            const vertices = valueBox.normalizedVertices;
+
+                            // FILTER 2: Skip fields that take up too much width (likely large text blocks or headers)
+                            const polyWidth = Math.abs((vertices[1]?.x || 0) - (vertices[0]?.x || 0));
+                            if (polyWidth > 0.8) continue;
+
+                            fields.push({
+                                name: cleanName,
+                                value: fieldValue.trim(),
+                                fieldType: isCheckbox ? 'checkbox' : 'text',
+                                boundingPoly: {
+                                    normalizedVertices: vertices.map((v: any) => ({
+                                        x: v.x || 0,
+                                        y: v.y || 0
+                                    }))
+                                },
+                                pageIndex: pageIndex,
+                                source: 'document_ai_form_parser'
+                            });
                         }
                     }
 
-                    // Fallback: If no structured form fields found on this page, use text segments (lines) as potential candidates
+                    // Fallback: Pick ONLY lines that look like input fields (contain "...") or trailing spaces
                     if (fields.filter(f => f.pageIndex === pageIndex).length === 0 && page.lines) {
                         for (const line of page.lines) {
                             const textAnchor = line.layout?.textAnchor;
@@ -205,12 +225,16 @@ export class AiService {
                                     .join('');
                             }
 
-                            if (content.trim().length > 2 && content.trim().length < 60) {
+                            const hasDots = content.includes('...') || content.includes('___');
+                            const cleanContent = content.trim().replace(/[:\s_.-]+$/, '');
+
+                            if (cleanContent.length > 2 && cleanContent.length < 40 && hasDots) {
                                 const vertices = line.layout?.boundingPoly?.normalizedVertices;
                                 if (vertices && vertices.length >= 4) {
                                     fields.push({
-                                        name: content.trim().replace(/[:\s_.-]+$/, ''),
+                                        name: cleanContent,
                                         value: '',
+                                        fieldType: 'text',
                                         boundingPoly: {
                                             normalizedVertices: vertices.map((v: any) => ({
                                                 x: v.x || 0,

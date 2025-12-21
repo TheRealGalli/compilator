@@ -36,6 +36,7 @@ const TooltipWrapper = ({ children, text }: { children: React.ReactNode, text: s
 
 export interface DiscoveredField {
     name: string;
+    fieldType?: 'text' | 'checkbox';
     boundingPoly: {
         vertices: { x: number; y: number }[];
         normalizedVertices?: { x: number; y: number }[];
@@ -135,7 +136,8 @@ export function DocumentStudio({
                 // Convert to DiscoveredField
                 const discovered = data.fields.map((f: any) => ({
                     ...f,
-                    value: '',
+                    fieldType: f.fieldType || 'text',
+                    value: f.value || '',
                     offsetX: 0,
                     offsetY: 0,
                     rotation: 0
@@ -489,7 +491,8 @@ export function DocumentStudio({
                                                     if (w > 2) width = `${w}%`;
                                                 }
 
-                                                const isValueEmpty = !field.value || field.value === "null";
+                                                const isValueEmpty = !field.value || field.value === "null" || field.value === "";
+                                                const isCheckbox = field.fieldType === 'checkbox';
 
                                                 return (
                                                     <motion.div
@@ -504,6 +507,11 @@ export function DocumentStudio({
                                                         }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
+                                                            if (isCheckbox) {
+                                                                // Toggle checkbox value on click
+                                                                const newVal = (field.value === 'X' || field.value === 'true') ? '' : 'X';
+                                                                updateFieldProperty(globalIdx, { value: newVal });
+                                                            }
                                                             setSelectedFieldIndex(isSelected ? null : globalIdx);
                                                         }}
                                                         className={`absolute ${isAddingField ? '' : 'cursor-move'} group z-10`}
@@ -515,35 +523,38 @@ export function DocumentStudio({
                                                         style={{
                                                             left: `${left}%`,
                                                             top: `${top}%`,
-                                                            transform: 'translateY(-100%)', // Text anchor
-                                                            width: width === 'auto' ? 'auto' : width,
+                                                            transform: isCheckbox ? 'translate(-50%, -50%)' : 'translateY(-100%)', // Center for checkbox, baseline for text
+                                                            width: isCheckbox ? '20px' : (width === 'auto' ? 'auto' : width),
+                                                            height: isCheckbox ? '20px' : 'auto',
                                                             maxWidth: '400px'
                                                         }}
                                                     >
                                                         <div className={`
-                                                            relative px-1 rounded border transition-colors flex items-center
+                                                            relative px-1 rounded border transition-colors flex items-center justify-center
                                                             ${isSelected ? 'border-blue-500 bg-blue-50/90 shadow-lg scale-105' : 'border-blue-400/30 bg-blue-50/20 hover:border-blue-400 hover:bg-blue-50/50'}
-                                                            ${isValueEmpty ? 'border-dashed' : ''} 
+                                                            ${isCheckbox ? 'rounded-sm aspect-square' : ''}
+                                                            ${isValueEmpty && !isCheckbox ? 'border-dashed' : ''} 
                                                         `}>
-                                                            {/* Editable Input */}
-                                                            {/* If value is empty, we edit NAME (Label). If value exists, we edit VALUE. */}
-                                                            <input
-                                                                type="text"
-                                                                value={isValueEmpty ? field.name : String(field.value)}
-                                                                placeholder={isValueEmpty ? "Etichetta..." : field.name}
-                                                                className={`bg-transparent border-none outline-none w-full p-0 m-0 text-[12px] font-medium min-w-[30px]
-                                                                    ${isValueEmpty ? 'text-blue-400 italic' : 'text-blue-900'}
-                                                                `}
-                                                                onChange={(e) => {
-                                                                    if (isValueEmpty) {
-                                                                        updateFieldProperty(globalIdx, { name: e.target.value });
-                                                                    } else {
+                                                            {/* Editable Input for Text, or X for Checkbox */}
+                                                            {isCheckbox ? (
+                                                                <span className="text-blue-900 font-bold text-sm select-none">
+                                                                    {field.value === 'X' || field.value === 'true' ? 'X' : ''}
+                                                                </span>
+                                                            ) : (
+                                                                <input
+                                                                    type="text"
+                                                                    value={isValueEmpty ? "" : String(field.value)}
+                                                                    placeholder={isValueEmpty ? field.name : ""}
+                                                                    className={`bg-transparent border-none outline-none w-full p-0 m-0 text-[12px] font-medium min-w-[30px]
+                                                                        ${isValueEmpty ? 'text-blue-400/70 italic' : 'text-blue-900'}
+                                                                    `}
+                                                                    onChange={(e) => {
                                                                         updateFieldProperty(globalIdx, { value: e.target.value });
-                                                                    }
-                                                                }}
-                                                                onPointerDown={(e) => e.stopPropagation()}
-                                                                onKeyDown={(e) => e.stopPropagation()}
-                                                            />
+                                                                    }}
+                                                                    onPointerDown={(e) => e.stopPropagation()}
+                                                                    onKeyDown={(e) => e.stopPropagation()}
+                                                                />
+                                                            )}
 
                                                             {isSelected && (
                                                                 <button

@@ -153,6 +153,7 @@ async function fillPdfBinary(
   base64Original: string,
   fields: {
     text: string,
+    fieldType?: 'text' | 'checkbox',
     box?: number[],
     preciseBox?: any,
     pageIndex?: number,
@@ -175,38 +176,56 @@ async function fillPdfBinary(
         // Use Document AI precise coordinates (normalized 0-1)
         const vertices = field.preciseBox.normalizedVertices || field.preciseBox.vertices;
         if (vertices && vertices.length >= 4) {
-          // Document AI vertices are usually [top-left, top-right, bottom-right, bottom-left]
-          // We want the bottom-left vertex for pdf-lib text placement (which is the origin for text)
-          const bl = vertices[3];
+          // Document AI vertices: [top-left, top-right, bottom-right, bottom-left]
+          const tl = vertices[0];
           const tr = vertices[1];
+          const br = vertices[2];
+          const bl = vertices[3];
 
           let x = bl.x * width;
           let y = (1 - bl.y) * height;
 
-          // Apply manual adjustments (pixels relative to 800px width preview)
+          // Apply manual adjustments
           if (field.offsetX !== undefined) {
             x += (field.offsetX / 800) * width;
           }
           if (field.offsetY !== undefined) {
-            // Scale Y offset using the same ratio as X (width/800) because pixels are square
-            // Subtract because dragging down (positive pixel Y) means moving towards 0 in PDF coords (bottom-left origin)
             y -= field.offsetY * (width / 800);
           }
 
-          // Estimate optimal font size based on bounding box height
-          const boxHeight = (bl.y - tr.y) * height;
-          const fontSize = Math.max(7, Math.min(11, boxHeight * 0.75));
+          if (field.fieldType === 'checkbox') {
+            // MARK CHECKBOX: Center an 'X' in the box
+            const boxWidth = (tr.x - tl.x) * width;
+            const boxHeight = (bl.y - tl.y) * height;
+            const centerX = x + boxWidth / 2;
+            const centerY = y + boxHeight / 2;
+            const charSize = Math.max(8, boxHeight * 0.82);
 
-          console.log(`[DEBUG fillPdfBinary] MAPPING SUCCESS for field value: "${field.text}" at (x: ${x.toFixed(1)}, y: ${y.toFixed(1)}) with rot: ${field.rotation || 0}`);
+            // Only draw if value is truthy (X, selected, true, etc.)
+            const val = field.text?.toLowerCase();
+            if (val && (val === 'x' || val === 'true' || val === 'selected' || val === 'checked' || val === '1')) {
+              page.drawText('X', {
+                x: centerX - (charSize * 0.3), // Center horizontally
+                y: centerY - (charSize * 0.35), // Center vertically
+                size: charSize,
+                font: font,
+                color: rgb(0, 0, 0.55),
+              });
+            }
+          } else {
+            // NORMAL TEXT: Refined baseline alignment
+            const boxHeight = (bl.y - tr.y) * height;
+            const fontSize = Math.max(7, Math.min(11, boxHeight * 0.75));
 
-          page.drawText(field.text, {
-            x: x + 1.5, // Small horizontal margin
-            y: y + 1.5, // Refined baseline offset
-            size: fontSize,
-            font: font,
-            rotate: degrees(field.rotation || 0),
-            color: rgb(0, 0, 0.55), // Professional dark blue
-          });
+            page.drawText(field.text, {
+              x: x + 1.5,
+              y: y + 1.5,
+              size: fontSize,
+              font: font,
+              rotate: degrees(field.rotation || 0),
+              color: rgb(0, 0, 0.55),
+            });
+          }
         }
       } else if (field.box && field.box.length === 4) {
         // Fallback to Gemini 0-1000 coordinates
