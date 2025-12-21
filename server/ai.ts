@@ -571,7 +571,7 @@ IMPORTANTE:
                 functionResponses.push({
                     functionResponse: {
                         name: fc.name,
-                        response: result
+                        response: { output: JSON.stringify(result) }
                     }
                 });
             }

@@ -363,7 +363,7 @@ export function DocumentStudio({
                                     }}
                                     className={`cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 origin-center ${isAddingField ? 'scale-125' : 'hover:scale-110'}`}
                                 >
-                                    <span className="text-4xl font-bold text-blue-600 pb-2">*</span>
+                                    <span className="text-4xl font-bold text-blue-600">*</span>
                                 </motion.div>
                             </TooltipWrapper>
 
@@ -376,7 +376,7 @@ export function DocumentStudio({
                                     }}
                                     className={`cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 origin-center hover:scale-110 ${star2Spinning ? 'animate-turbo-spin' : ''}`}
                                 >
-                                    <span className="text-4xl font-bold text-blue-600 pb-2">*</span>
+                                    <span className="text-4xl font-bold text-blue-600">*</span>
                                 </div>
                             </TooltipWrapper>
 
@@ -392,7 +392,7 @@ export function DocumentStudio({
                                     }}
                                     className="cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 origin-center hover:scale-110"
                                 >
-                                    <span className="text-4xl font-bold text-blue-600 pb-2">*</span>
+                                    <span className="text-4xl font-bold text-blue-600">*</span>
                                 </motion.div>
                             </TooltipWrapper>
                         </div>
