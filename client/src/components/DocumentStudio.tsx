@@ -158,10 +158,13 @@ export function DocumentStudio({
     };
 
     // Auto-discover fields on PDF load
+    // Auto-discover fields on PDF load - DISABLED by user request
     useEffect(() => {
+        /*
         if (pdfBase64 && fields.length === 0 && !isLoadingFields) {
             discoverLayout(false);
         }
+        */
     }, [pdfBase64]);
 
     // Watch for external values to trigger "typing" effect
@@ -458,7 +461,7 @@ export function DocumentStudio({
                                                 const isCheckbox = field.fieldType === 'checkbox';
 
                                                 return (
-                                                    <div
+                                                    <motion.div
                                                         key={`overlay_${globalIdx}`}
                                                         className={`absolute z-10 pointer-events-none`}
                                                         animate={{
@@ -492,7 +495,7 @@ export function DocumentStudio({
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    </div>
+                                                    </motion.div>
                                                 );
                                             })}
                                         </div>
