@@ -157,10 +157,23 @@ export class AiService {
                     // Extract form fields
                     if (page.formFields) {
                         for (const formField of page.formFields) {
-                            const fieldName = formField.fieldName?.textAnchor?.content || 'Campo';
-                            const fieldValue = formField.fieldValue?.textAnchor?.content || '';
+                            const textAnchorName = formField.fieldName?.textAnchor;
+                            const textAnchorValue = formField.fieldValue?.textAnchor;
 
-                            // Get bounding box from field name or value
+                            let fieldName = 'Campo';
+                            if (textAnchorName && textAnchorName.textSegments && document.text) {
+                                fieldName = textAnchorName.textSegments
+                                    .map((seg: any) => document.text!.substring(Number(seg.startIndex || 0), Number(seg.endIndex || 0)))
+                                    .join('');
+                            }
+
+                            let fieldValue = '';
+                            if (textAnchorValue && textAnchorValue.textSegments && document.text) {
+                                fieldValue = textAnchorValue.textSegments
+                                    .map((seg: any) => document.text!.substring(Number(seg.startIndex || 0), Number(seg.endIndex || 0)))
+                                    .join('');
+                            }
+
                             const boundingBox = formField.fieldName?.boundingPoly || formField.fieldValue?.boundingPoly;
 
                             if (boundingBox?.normalizedVertices) {
@@ -177,6 +190,37 @@ export class AiService {
                                     pageIndex: pageIndex,
                                     source: 'document_ai_form_parser'
                                 });
+                            }
+                        }
+                    }
+
+                    // Fallback: If no structured form fields found on this page, use text segments (lines) as potential candidates
+                    if (fields.filter(f => f.pageIndex === pageIndex).length === 0 && page.lines) {
+                        for (const line of page.lines) {
+                            const textAnchor = line.layout?.textAnchor;
+                            let content = '';
+                            if (textAnchor && textAnchor.textSegments && document.text) {
+                                content = textAnchor.textSegments
+                                    .map((seg: any) => document.text!.substring(Number(seg.startIndex || 0), Number(seg.endIndex || 0)))
+                                    .join('');
+                            }
+
+                            if (content.trim().length > 2 && content.trim().length < 60) {
+                                const vertices = line.layout?.boundingPoly?.normalizedVertices;
+                                if (vertices && vertices.length >= 4) {
+                                    fields.push({
+                                        name: content.trim().replace(/[:\s_.-]+$/, ''),
+                                        value: '',
+                                        boundingPoly: {
+                                            normalizedVertices: vertices.map((v: any) => ({
+                                                x: v.x || 0,
+                                                y: v.y || 0
+                                            }))
+                                        },
+                                        pageIndex: pageIndex,
+                                        source: 'document_ai_layout_line'
+                                    });
+                                }
                             }
                         }
                     }

@@ -1461,6 +1461,14 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
       console.log('[DEBUG Compile] AI Response processed.');
 
       if (fillingMode === 'studio') {
+        // If the user only wants to find fields, return them now
+        if (req.body.onlyAnalyze) {
+          console.log(`[DEBUG Studio] onlyAnalyze mode: returning ${preciseFields.length} fields directly`);
+          return res.json({
+            success: true,
+            fields: preciseFields
+          });
+        }
         try {
           console.log('[DEBUG Studio] Raw AI response:', text);
 
@@ -1545,7 +1553,13 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
             }
           }
 
-          return res.json({ success: true, values: flatValues });
+          // If this is a COMPILE request (no direct data), we return the values for the UI.
+          // If this is a DOWNLOAD request (has data), we proceed below to generate the PDF.
+          if (!req.body.data) {
+            return res.json({ success: true, values: flatValues });
+          } else {
+            console.log('[DEBUG Studio] Data present, proceeding to PDF binary generation');
+          }
         } catch (e) {
           console.error('[API compile] JSON parse error in studio mode:', e, 'Text:', text);
           return res.status(500).json({ error: 'Failed to generate structured values' });
@@ -1597,10 +1611,16 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
 
                 if (val !== undefined && val !== null && String(val).trim() !== "") {
                   console.log(`[DEBUG Compile] FAST MATCH: "${pf.name}" = "${val}"`);
+
+                  const adj = (req.body.adjustments && req.body.adjustments[pf.name]) || {};
+
                   finalFields.push({
                     text: String(val),
                     preciseBox: pf.boundingPoly,
-                    pageIndex: pf.pageIndex
+                    pageIndex: pf.pageIndex,
+                    offsetX: adj.offsetX,
+                    offsetY: adj.offsetY,
+                    rotation: adj.rotation
                   });
                 }
               }

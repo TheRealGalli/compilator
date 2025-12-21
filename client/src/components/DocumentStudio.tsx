@@ -111,6 +111,56 @@ export function DocumentStudio({
         toast({ title: "Campo eliminato" });
     };
 
+
+    // Auto-discover fields on PDF load
+    useEffect(() => {
+        if (pdfBase64 && fields.length === 0 && !isLoadingFields) {
+            handleDiscoverFields();
+        }
+    }, [pdfBase64]);
+
+    const handleDiscoverFields = async () => {
+        if (isLoadingFields || !pdfBase64) return;
+        setIsLoadingFields(true);
+        console.log('[DocumentStudio] Starting layout discovery...');
+
+        try {
+            const { apiRequest } = await import("@/lib/queryClient");
+            const response = await apiRequest('POST', '/api/compile', {
+                pinnedSource: {
+                    name: fileName,
+                    type: 'application/pdf',
+                    base64: pdfBase64
+                },
+                fillingMode: 'studio',
+                onlyAnalyze: true
+            });
+
+            const data = await response.json();
+            if (data.fields) {
+                // Convert to DiscoveredField
+                const discovered = data.fields.map((f: any) => ({
+                    ...f,
+                    value: '',
+                    offsetX: 0,
+                    offsetY: 0,
+                    rotation: 0
+                }));
+                console.log('[DocumentStudio] Fields discovered:', discovered.length);
+                setFields(discovered);
+                if (onFieldsDiscovered) {
+                    onFieldsDiscovered(discovered.map((f: any) => f.name));
+                }
+                toast({ title: "Layout Analizzato", description: `Trovati ${discovered.length} campi.` });
+            }
+        } catch (e) {
+            console.error('Discover fields failed', e);
+            toast({ variant: "destructive", title: "Errore Analisi", description: "Riprova." });
+        } finally {
+            setIsLoadingFields(false);
+        }
+    };
+
     // Watch for external values to trigger "typing" effect
     useEffect(() => {
         if (externalValues && Object.keys(externalValues).length > 0) {
