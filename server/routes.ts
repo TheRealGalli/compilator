@@ -952,8 +952,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ fields });
       }
 
-      // FALLBACK: Use Gemini Vision (works reliably but slower ~20-30s)
-      console.log('[DEBUG analyze-layout] Using Gemini Vision analysis...');
+      // FALLBACK 1: Use Document AI for precise layout analysis (Fastest & most precise)
+      console.log('[DEBUG analyze-layout] Using Document AI for analysis...');
+      try {
+        const docAiFields = await aiService.analyzeLayoutWithDocumentAI(base64);
+        if (docAiFields.length > 0) {
+          console.log(`[DEBUG analyze-layout] Document AI found ${docAiFields.length} fields in ${Date.now() - startTime}ms`);
+          return res.json({ fields: docAiFields });
+        }
+      } catch (e) {
+        console.error('[API analyze-layout] Document AI error, falling back to Gemini Vision:', e);
+      }
+
+      // FALLBACK 2: Use Gemini Vision (works reliably but slower ~20-30s)
+      console.log('[DEBUG analyze-layout] Using Gemini Vision analysis fallback...');
       const fields = await aiService.analyzeLayout(base64);
       console.log(`[DEBUG analyze-layout] Analysis complete. Found ${fields.length} fields in ${Date.now() - startTime}ms`);
 
@@ -1228,6 +1240,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // SHORT-CIRCUIT: If the user only wants to find fields (Studio Mode initial load), return them now
+      // This avoids expensive and slow LLM compilation calls when we only need layout data.
+      if (req.body.onlyAnalyze && fillingMode === 'studio') {
+        console.log(`[DEBUG Studio] FAST PATH (onlyAnalyze): returning ${preciseFields.length} fields directly`);
+        return res.json({
+          success: true,
+          fields: preciseFields
+        });
+      }
+
       let systemPrompt = `Data e ora corrente: ${dateTimeIT}
 
 Sei un assistente AI esperto nella compilazione di documenti. 
@@ -1461,14 +1483,6 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
       console.log('[DEBUG Compile] AI Response processed.');
 
       if (fillingMode === 'studio') {
-        // If the user only wants to find fields, return them now
-        if (req.body.onlyAnalyze) {
-          console.log(`[DEBUG Studio] onlyAnalyze mode: returning ${preciseFields.length} fields directly`);
-          return res.json({
-            success: true,
-            fields: preciseFields
-          });
-        }
         try {
           console.log('[DEBUG Studio] Raw AI response:', text);
 

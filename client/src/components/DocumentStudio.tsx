@@ -112,17 +112,11 @@ export function DocumentStudio({
     };
 
 
-    // Auto-discover fields on PDF load
-    useEffect(() => {
-        if (pdfBase64 && fields.length === 0 && !isLoadingFields) {
-            handleDiscoverFields();
-        }
-    }, [pdfBase64]);
-
-    const handleDiscoverFields = async () => {
+    // Unified layout discovery (used both for auto-load and manual Star 1 click)
+    const discoverLayout = async (isManual = false) => {
         if (isLoadingFields || !pdfBase64) return;
         setIsLoadingFields(true);
-        console.log('[DocumentStudio] Starting layout discovery...');
+        console.log(`[DocumentStudio] Starting layout discovery (manual: ${isManual})...`);
 
         try {
             const { apiRequest } = await import("@/lib/queryClient");
@@ -137,7 +131,7 @@ export function DocumentStudio({
             });
 
             const data = await response.json();
-            if (data.fields) {
+            if (data.fields && data.fields.length > 0) {
                 // Convert to DiscoveredField
                 const discovered = data.fields.map((f: any) => ({
                     ...f,
@@ -146,20 +140,34 @@ export function DocumentStudio({
                     offsetY: 0,
                     rotation: 0
                 }));
-                console.log('[DocumentStudio] Fields discovered:', discovered.length);
+                console.log('[DocumentStudio] Fields discovered and set to state:', discovered.length);
                 setFields(discovered);
                 if (onFieldsDiscovered) {
                     onFieldsDiscovered(discovered.map((f: any) => f.name));
                 }
                 toast({ title: "Layout Analizzato", description: `Trovati ${discovered.length} campi.` });
+            } else {
+                console.warn('[DocumentStudio] No fields returned from server');
+                if (isManual) {
+                    toast({ title: "Nessun campo trovato", description: "Prova ad aggiungere i campi manualmente." });
+                }
             }
         } catch (e) {
-            console.error('Discover fields failed', e);
-            toast({ variant: "destructive", title: "Errore Analisi", description: "Riprova." });
+            console.error('Discover layout failed', e);
+            if (isManual) {
+                toast({ variant: "destructive", title: "Errore Analisi", description: "Riprova tra poco." });
+            }
         } finally {
             setIsLoadingFields(false);
         }
     };
+
+    // Auto-discover fields on PDF load
+    useEffect(() => {
+        if (pdfBase64 && fields.length === 0 && !isLoadingFields) {
+            discoverLayout(false);
+        }
+    }, [pdfBase64]);
 
     // Watch for external values to trigger "typing" effect
     useEffect(() => {
@@ -168,8 +176,6 @@ export function DocumentStudio({
             setStar2Spinning(false);
 
             console.log('[DocumentStudio] Received externalValues:', externalValues);
-            console.log('[DocumentStudio] Current fields:', fields.map(f => f.name));
-
             const keys = Object.keys(externalValues);
             const newFields = [...fields];
 
@@ -179,67 +185,18 @@ export function DocumentStudio({
                         f.name.toLowerCase().includes(key.toLowerCase()) ||
                         key.toLowerCase().includes(f.name.toLowerCase())
                     );
-                    console.log(`[DocumentStudio] Matching key "${key}" -> index ${index}`);
                     if (index !== -1) {
                         const val = externalValues[key];
                         const safeVal = typeof val === 'object' ? JSON.stringify(val) : String(val || "");
-                        console.log(`[DocumentStudio] Setting field "${newFields[index].name}" = "${safeVal}"`);
-                        newFields[index] = {
-                            ...newFields[index],
-                            value: safeVal
-                        };
+                        newFields[index] = { ...newFields[index], value: safeVal };
                         setFields([...newFields]);
                         await new Promise(r => setTimeout(r, 60));
-                    } else {
-                        console.warn(`[DocumentStudio] No field match for key "${key}"`);
                     }
                 }
             };
-
             applyTyping();
         }
     }, [externalValues]);
-
-    const analyzeLayout = async () => {
-        setIsLoadingFields(true);
-        try {
-            // PRIORITY 1: Client-side PDF.js extraction (INSTANT + PRECISE)
-            console.log("[DocumentStudio] Trying client-side PDF.js extraction...");
-            const clientFields = await extractTextPositionsClientSide();
-
-            if (clientFields.length > 0) {
-                console.log(`[DocumentStudio] CLIENT EXTRACTION: Found ${clientFields.length} fields`);
-                setFields(clientFields);
-                if (onFieldsDiscovered) {
-                    onFieldsDiscovered(clientFields.map(f => f.name));
-                }
-                setIsLoadingFields(false);
-                return;
-            }
-
-            // FALLBACK: Server-side analysis (slower but handles complex cases)
-            console.log("[DocumentStudio] Falling back to server analysis...");
-            const { getApiUrl } = await import("@/lib/api-config");
-            const response = await fetch(getApiUrl('/api/analyze-layout'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ base64: pdfBase64 })
-            });
-
-            const data = await response.json();
-            if (data.fields) {
-                console.log("[DEBUG DocumentStudio] Fields discovered:", data.fields.length);
-                setFields(data.fields.map((f: any) => ({ ...f, value: "", offsetX: 0, offsetY: 0, rotation: 0 })));
-                if (onFieldsDiscovered) {
-                    onFieldsDiscovered(data.fields.map((f: any) => f.name));
-                }
-            }
-        } catch (error) {
-            console.error("Layout analysis failed:", error);
-        } finally {
-            setIsLoadingFields(false);
-        }
-    };
 
     // Sync fields with external values (compilation results)
     useEffect(() => {
@@ -565,8 +522,8 @@ export function DocumentStudio({
                                                     >
                                                         <div className={`
                                                             relative px-1 rounded border transition-colors flex items-center
-                                                            ${isSelected ? 'border-blue-500 bg-blue-50/90 shadow-lg' : 'border-transparent hover:border-blue-300 hover:bg-blue-50/50'}
-                                                            ${isValueEmpty ? 'border-dashed border-blue-300/50' : ''} 
+                                                            ${isSelected ? 'border-blue-500 bg-blue-50/90 shadow-lg scale-105' : 'border-blue-400/30 bg-blue-50/20 hover:border-blue-400 hover:bg-blue-50/50'}
+                                                            ${isValueEmpty ? 'border-dashed' : ''} 
                                                         `}>
                                                             {/* Editable Input */}
                                                             {/* If value is empty, we edit NAME (Label). If value exists, we edit VALUE. */}
