@@ -1350,6 +1350,7 @@ AUTONOMIA TOTALE:
 - Identifica TUTTI i campi compilabili guardando il PDF.
 - Non limitarti ai campi pre-rilevati se ne vedi altri.
 - Usa nomi semantici in italiano (es. "Cognome", "Data Nascita").
+5. ADATTAMENTO STRUTTURALE: Se un campo nel PDF contiene gia' separatori grafici (es. sbarrette per le date _/_/____ o trattini), restituisci SOLO il dato puro (numeri o testo) SENZA aggiungere tu sbarrette o separatori, per evitare sovrapposizioni.
 ` : `I campi da compilare sono: ${fieldsList}.`}`;
       }
 

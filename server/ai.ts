@@ -160,10 +160,12 @@ export class AiService {
                             const textAnchorName = formField.fieldName?.textAnchor;
                             const textAnchorValue = formField.fieldValue?.textAnchor;
 
-                            // PRECISION: Strictly require the value poly (blank space). 
-                            // If only the fieldName exists, it's likely a title or a label with no input area.
+                            // PRECISION: Use value space if available, fallback to name space
                             const valueBox = formField.fieldValue?.boundingPoly;
-                            if (!valueBox?.normalizedVertices) continue;
+                            const nameBox = formField.fieldName?.boundingPoly;
+                            const targetBox = valueBox || nameBox;
+
+                            if (!targetBox?.normalizedVertices) continue;
 
                             let fieldName = 'Campo';
                             if (textAnchorName && textAnchorName.textSegments && document.text) {
@@ -175,9 +177,9 @@ export class AiService {
                             // FILTER 1: Skip obvious titles or overly long text (noise)
                             const cleanName = fieldName.trim().replace(/[:\s]+$/, '');
 
-                            // Heuristic: Titles are often all-caps and centralized. 
-                            const isTitle = cleanName.length > 2 && cleanName === cleanName.toUpperCase() && !cleanName.includes(':');
-                            if (cleanName.length > 55 || cleanName.length < 2 || isTitle) continue;
+                            // Heuristic: Titles are usually very long or disconnected. 
+                            // We allow all-caps labels (like COGNOME) as they are common in forms.
+                            if (cleanName.length > 60 || cleanName.length < 2) continue;
 
                             let fieldValue = '';
                             if (textAnchorValue && textAnchorValue.textSegments && document.text) {
@@ -192,11 +194,7 @@ export class AiService {
                                 isCheckbox = true;
                             }
 
-                            const vertices = valueBox.normalizedVertices;
-
-                            // FILTER 2: Skip fields that take up too much width (likely large text blocks or headers)
-                            const polyWidth = Math.abs((vertices[1]?.x || 0) - (vertices[0]?.x || 0));
-                            if (polyWidth > 0.8) continue;
+                            const vertices = targetBox.normalizedVertices!;
 
                             fields.push({
                                 name: cleanName,
