@@ -310,8 +310,8 @@ export function DocumentStudio({
                     // Reconstruct full line text to find inline patterns
                     const fullLineText = lineItems.map(i => i.text).join(' ');
                     // Regex for "Label: _____" or "_____ Label" or just "_____"
-                    // We look for sequences of 3+ underscores/dots
-                    const fieldRegex = /([_\-.]{3,})/g;
+                    // We look for sequences of 2+ underscores/dots (was 3+)
+                    const fieldRegex = /([_\-.]{2,})/g;
                     let match;
 
                     // If we find specific underscore patterns in the reconstruct line, 
@@ -322,22 +322,43 @@ export function DocumentStudio({
                         const text = item.text.trim();
 
                         // 1. IS IT A PLACEHOLDER? (____, ...., ----)
-                        if (/^[_\-.]{3,}$/.test(text)) {
+                        if (/^[_\-.]{2,}$/.test(text)) {
                             // It's a field! Try to find a label to its left
                             let label = "Campo";
                             if (i > 0) {
-                                label = lineItems[i - 1].text.replace(/[:\s]+$/, '').trim();
+                                const prev = lineItems[i - 1];
+                                let prevText = "";
+                                if (!/^[_\-.]{2,}$/.test(prev.text)) {
+                                    prevText = prev.text.replace(/[:\s]+$/, '').trim();
+                                    label = prevText;
+                                }
+
+                                if (i > 1) {
+                                    const prevPrev = lineItems[i - 2];
+                                    if (!/^[_\-.]{2,}$/.test(prevPrev.text)) {
+                                        const prevPrevText = prevPrev.text.replace(/[:\s]+$/, '').trim();
+                                        if (prevText) {
+                                            label = `${prevPrevText} ${prevText}`;
+                                        } else {
+                                            label = prevPrevText;
+                                        }
+                                    }
+                                }
                             }
+
+                            // COORDINATE FIX: item.y is effectively the baseline.
+                            // We want the box to sit ON the line, so we shift up.
+                            const boxTop = item.y - (item.height * 0.9);
 
                             fields.push({
                                 name: label,
                                 boundingPoly: {
                                     vertices: [],
                                     normalizedVertices: [
-                                        { x: item.x / item.pageWidth, y: item.y / item.pageHeight },
-                                        { x: (item.x + item.width) / item.pageWidth, y: item.y / item.pageHeight },
-                                        { x: (item.x + item.width) / item.pageWidth, y: (item.y + item.height) / item.pageHeight },
-                                        { x: item.x / item.pageWidth, y: (item.y + item.height) / item.pageHeight }
+                                        { x: item.x / item.pageWidth, y: boxTop / item.pageHeight },
+                                        { x: (item.x + item.width) / item.pageWidth, y: boxTop / item.pageHeight },
+                                        { x: (item.x + item.width) / item.pageWidth, y: (boxTop + item.height) / item.pageHeight },
+                                        { x: item.x / item.pageWidth, y: (boxTop + item.height) / item.pageHeight }
                                     ]
                                 },
                                 pageIndex: pageNum - 1,
@@ -350,10 +371,10 @@ export function DocumentStudio({
                         }
 
                         // 2. DOES IT CONTAIN A PLACEHOLDER? (Name: ______)
-                        if (text.match(/[_\-.]{3,}/)) {
+                        if (text.match(/[_\-.]{2,}/)) {
                             // This item contains both label and field. 
                             // We estimate the field starts after the label part
-                            const parts = text.split(/([_\-.]{3,})/);
+                            const parts = text.split(/([_\-.]{2,})/);
                             // If we have "Label" and "____", parts will be ["Label", "____", ""]
                             if (parts.length >= 2 && parts[0].trim().length > 0) {
                                 const label = parts[0].replace(/[:\s]+$/, '').trim();
@@ -362,15 +383,18 @@ export function DocumentStudio({
                                 const fieldX = item.x + (item.width * labelRatio);
                                 const fieldW = item.width * (1 - labelRatio);
 
+                                // Coordinate fix
+                                const boxTop = item.y - (item.height * 0.9);
+
                                 fields.push({
                                     name: label,
                                     boundingPoly: {
                                         vertices: [],
                                         normalizedVertices: [
-                                            { x: fieldX / item.pageWidth, y: item.y / item.pageHeight },
-                                            { x: (fieldX + fieldW) / item.pageWidth, y: item.y / item.pageHeight },
-                                            { x: (fieldX + fieldW) / item.pageWidth, y: (item.y + item.height) / item.pageHeight },
-                                            { x: fieldX / item.pageWidth, y: (item.y + item.height) / item.pageHeight }
+                                            { x: fieldX / item.pageWidth, y: boxTop / item.pageHeight },
+                                            { x: (fieldX + fieldW) / item.pageWidth, y: boxTop / item.pageHeight },
+                                            { x: (fieldX + fieldW) / item.pageWidth, y: (boxTop + item.height) / item.pageHeight },
+                                            { x: fieldX / item.pageWidth, y: (boxTop + item.height) / item.pageHeight }
                                         ]
                                     },
                                     pageIndex: pageNum - 1,
@@ -394,15 +418,18 @@ export function DocumentStudio({
                                 const fieldX = item.x + item.width + 5;
                                 const fieldWidth = 150; // Assume standard width
 
+                                // Coordinate fix
+                                const boxTop = item.y - (item.height * 0.9);
+
                                 fields.push({
                                     name: text.replace(/:$/, '').trim(),
                                     boundingPoly: {
                                         vertices: [],
                                         normalizedVertices: [
-                                            { x: fieldX / item.pageWidth, y: item.y / item.pageHeight },
-                                            { x: (fieldX + fieldWidth) / item.pageWidth, y: item.y / item.pageHeight },
-                                            { x: (fieldX + fieldWidth) / item.pageWidth, y: (item.y + item.height) / item.pageHeight },
-                                            { x: fieldX / item.pageWidth, y: (item.y + item.height) / item.pageHeight }
+                                            { x: fieldX / item.pageWidth, y: boxTop / item.pageHeight },
+                                            { x: (fieldX + fieldWidth) / item.pageWidth, y: boxTop / item.pageHeight },
+                                            { x: (fieldX + fieldWidth) / item.pageWidth, y: (boxTop + item.height) / item.pageHeight },
+                                            { x: fieldX / item.pageWidth, y: (boxTop + item.height) / item.pageHeight }
                                         ]
                                     },
                                     pageIndex: pageNum - 1,
