@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 
 
+import { ThreeStars } from "@/components/ui/three-stars";
+
 // Setup pdfjs worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -341,6 +343,8 @@ export function DocumentStudio({
             <CardHeader className="flex-shrink-0 px-0 pb-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
+                        <ThreeStars className="w-8 h-8 text-blue-500 mr-2" />
+                        <div>
                             <CardTitle className="text-lg">Document Studio</CardTitle>
                             <p className="text-xs text-muted-foreground">{fileName}</p>
                         </div>
@@ -378,7 +382,7 @@ export function DocumentStudio({
                                         renderAnnotationLayer={false}
                                         className="mb-4 shadow-sm"
                                         width={800} // Assuming a fixed width for now, adjust as needed
-                                        // onLoadSuccess={handlePageLoadSuccess} // If you have a page-specific load success handler
+                                    // onLoadSuccess={handlePageLoadSuccess} // If you have a page-specific load success handler
                                     />
                                 ))}
                             </Document>
