@@ -399,7 +399,7 @@ export function DocumentStudio({
 
             <div className="flex-1 grid grid-cols-1 gap-6 min-h-0">
                 {/* Full-width PDF Workspace */}
-                <div className={`bg-muted/30 rounded-xl overflow-hidden relative flex justify-center p-4 border shadow-inner ${isAddingField ? 'cursor-crosshair' : ''}`}>
+                <div id="pdf-workspace" className={`bg-muted/30 rounded-xl overflow-hidden relative flex justify-center p-4 border shadow-inner ${isAddingField ? 'cursor-crosshair' : ''}`}>
                     {/* Loading Overlay for Layout Analysis */}
                     {isLoadingFields && (
                         <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-[100] flex flex-col items-center justify-center pointer-events-none">

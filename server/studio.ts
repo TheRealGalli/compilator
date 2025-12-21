@@ -21,7 +21,7 @@ export class StudioAgent {
         });
     }
 
-    async chat(messages: any[], context: { pinnedSource?: any, currentFields?: any[] }) {
+    async chat(messages: any[], context: { pinnedSource?: any, currentFields?: any[], visualCheck?: string }) {
         const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content || "";
 
         // Construct context string
@@ -37,30 +37,50 @@ export class StudioAgent {
       L'utente ti sta parlando per completare un documento PDF o immagine: "${sourceName}".
       
       ${fieldsInfo}
-      
-      OBIETTIVO:
-      - Sii estremamente preciso (pixel-perfect).
+
+        OBIETTIVO:
+        - Sii estremamente preciso(pixel - perfect).
       - Se l'utente chiede di 'compilare', identifica i campi dai 'CAMPI RILEVATI' e riempili usando i dati che hai o inventando dati verosimili se richiesto.
-      - Se l'utente segnala errori visivi, ammetti l'errore e proponi una correzione.
+            - DOPO aver compilato, o se l'utente chiede "controlla il lavoro", CHIEDI una verifica visiva usando l'azione 'verify_visual'.
+      - Se ricevi un'immagine nel contesto (visualCheck), ANALIZZALA. Cerca testi sovrapposti, font troppo grandi, o allineamenti errati. Se trovi errori, CORREGGI usando 'fill_fields' o 'adjust_coordinates'. Se è tutto ok, dillo all'utente.
       - Usa sempre un tono professionale e rassicurante.
 
-      OUTPUT FORMAT (JSON):
-      {
-        "text": "Risposta testuale all'utente",
-        "steps": [
-          { "id": "task_id", "label": "Titolo Task", "status": "completed" | "running" | "pending" | "error", "description": "Dettaglio" }
-        ],
-        "action": { "type": "fill_fields" | "adjust_coordinates", "data": { "NomeCampo": "Valore", ... } }
-      }
-    `;
+      OUTPUT FORMAT(JSON):
+        {
+            "text": "Risposta testuale all'utente",
+                "steps": [
+                    { "id": "task_id", "label": "Titolo Task", "status": "completed" | "running" | "pending" | "error", "description": "Dettaglio" }
+                ],
+                    "action": {
+                "type": "fill_fields" | "adjust_coordinates" | "verify_visual",
+                    "data": {
+                    "focusField": "NomeCampoOpzionale", // Per verify_visual
+                        "NomeCampo": "Valore" // Per fill_fields
+                }
+            }
+        }
+        `;
 
         try {
-            const chatSession = this.model.startChat({
-                history: [
-                    { role: 'user', parts: [{ text: systemPrompt }] },
-                    { role: 'model', parts: [{ text: "Ricevuto. Ho analizzato la struttura del documento e sono pronto." }] }
-                ],
-            });
+            // Check for image in context
+            const history: any[] = [
+                { role: 'user', parts: [{ text: systemPrompt }] },
+                { role: 'model', parts: [{ text: "Ricevuto. Ho analizzato la struttura del documento e sono pronto." }] }
+            ];
+
+            // If context has visualCheck, add it as a user message with image
+            if (context.visualCheck) {
+                console.log("[StudioAgent] Received visual check image");
+                history.push({
+                    role: 'user',
+                    parts: [
+                        { text: "Ecco lo screenshot attuale del documento. Analizzalo per eventuali errori di allineamento o sovrapposizione." },
+                        { inlineData: { mimeType: 'image/jpeg', data: context.visualCheck } }
+                    ]
+                });
+            }
+
+            const chatSession = this.model.startChat({ history });
 
             const result = await chatSession.sendMessage(lastUserMessage);
             const responseText = result.response.candidates[0].content.parts[0].text;
@@ -91,7 +111,7 @@ export class StudioAgent {
         // This would use a library to render the PDF page to a canvas/image 
         // and crop the area around the field.
         // For now, return a placeholder or implement using a helper if available.
-        console.log(`[StudioAgent] Capturing field area for: ${field.name}`);
+        console.log(`[StudioAgent] Capturing field area for: ${field.name} `);
         return null;
     }
 }

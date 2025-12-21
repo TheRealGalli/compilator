@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import html2canvas from "html2canvas";
 import { Send, Bot, User, Wand2, CheckCircle2, Circle, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -119,7 +120,11 @@ export function StudioChat({ onAgentAction, isProcessing, pinnedSource, currentF
             setMessages(prev => [...prev, assistantMessage]);
 
             if (data.action && onAgentAction) {
-                onAgentAction(data.action);
+                if (data.action.type === 'verify_visual') {
+                    handleVisualVerification(data.action.data?.focusField);
+                } else {
+                    onAgentAction(data.action);
+                }
             }
 
         } catch (error) {
@@ -127,6 +132,53 @@ export function StudioChat({ onAgentAction, isProcessing, pinnedSource, currentF
             toast({ variant: "destructive", title: "Errore Agente", description: "Impossibile completare l'azione." });
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleVisualVerification = async (focusField?: string) => {
+        // Find the PDF container
+        const element = document.getElementById('pdf-workspace');
+        if (!element) {
+            console.error("PDF Workspace not found");
+            return;
+        }
+
+        try {
+            // Add a temporary "taking screenshot" toast
+            toast({ title: "Verifica Visiva", description: "Sto guardando il documento..." });
+
+            const canvas = await html2canvas(element, {
+                scale: 1, // Don't need ultra high res
+                useCORS: true,
+                logging: false
+            });
+
+            const imageBase64 = canvas.toDataURL("image/jpeg", 0.7).split(',')[1];
+
+            // Send image back to agent
+            const res = await apiRequest('POST', '/api/studio/chat', {
+                messages: [...messages, { role: 'user', content: 'Ecco lo screenshot del documento compilato. Verifica se è corretto.' }],
+                context: { pinnedSource, currentFields, visualCheck: imageBase64 }
+            });
+
+            const data = await res.json();
+
+            const assistantMessage: StudioMessage = {
+                id: (Date.now() + 2).toString(),
+                role: 'assistant',
+                content: data.text,
+                steps: data.steps || [],
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            setMessages(prev => [...prev, assistantMessage]);
+
+            if (data.action && onAgentAction && data.action.type !== 'verify_visual') {
+                onAgentAction(data.action);
+            }
+
+        } catch (e) {
+            console.error("Screenshot failed", e);
+            toast({ variant: "destructive", title: "Errore Visivo", description: "Non riesco a vedere il documento." });
         }
     };
 
