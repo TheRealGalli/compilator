@@ -500,15 +500,48 @@ export function DocumentStudio({
                                 }
                             >
                                 {Array.from(new Array(numPages), (el, pageIndex) => (
-                                    <Page
-                                        key={`page_${pageIndex + 1}`}
-                                        pageNumber={pageIndex + 1}
-                                        renderTextLayer={false}
-                                        renderAnnotationLayer={false}
-                                        className="mb-4 shadow-sm"
-                                        width={800} // Assuming a fixed width for now, adjust as needed
-                                    // onLoadSuccess={handlePageLoadSuccess} // If you have a page-specific load success handler
-                                    />
+                                    <div key={`page_wrapper_${pageIndex}`} className="relative mb-4 shadow-sm">
+                                        <Page
+                                            key={`page_${pageIndex + 1}`}
+                                            pageNumber={pageIndex + 1}
+                                            renderTextLayer={false}
+                                            renderAnnotationLayer={false}
+                                            width={800}
+                                        />
+
+                                        {/* Field Overlays for this page */}
+                                        {fields
+                                            .filter(f => f.pageIndex === pageIndex)
+                                            .map((field, i) => (
+                                                <div
+                                                    key={`field_${i}`}
+                                                    className="absolute border-2 border-blue-500/50 bg-blue-100/20 hover:bg-blue-100/40 transition-colors z-10"
+                                                    style={{
+                                                        left: `${field.boundingPoly.normalizedVertices[0].x * 100}%`,
+                                                        top: `${field.boundingPoly.normalizedVertices[0].y * 100}%`,
+                                                        width: `${(field.boundingPoly.normalizedVertices[1].x - field.boundingPoly.normalizedVertices[0].x) * 100}%`,
+                                                        height: `${(field.boundingPoly.normalizedVertices[2].y - field.boundingPoly.normalizedVertices[0].y) * 100}%`,
+                                                    }}
+                                                    title={field.name}
+                                                >
+                                                    {/* Value Display */}
+                                                    {field.value && (
+                                                        <div className="absolute inset-0 flex items-center px-1">
+                                                            <span
+                                                                className="text-blue-900 font-handwriting"
+                                                                style={{
+                                                                    fontSize: 'clamp(8px, 1.2vw, 14px)',
+                                                                    lineHeight: 1,
+                                                                    fontFamily: 'Courier New, monospace'
+                                                                }}
+                                                            >
+                                                                {field.value}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                    </div>
                                 ))}
                             </Document>
                         </div>
