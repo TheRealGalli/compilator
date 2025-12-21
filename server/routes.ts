@@ -17,9 +17,7 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } f
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
-// @ts-ignore - pdfjs-dist types
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-// [Removed legacy Document AI import]
+// [pdfjs-dist removed - using client-side extraction instead]
 import { AiService } from './ai'; // Import new AI Service
 
 // Initialize AI Service
@@ -141,142 +139,7 @@ async function extractPdfFormFields(base64Pdf: string): Promise<Array<{
   }
 }
 
-// NEW: Extract text positions from PDF using pdfjs-dist (INSTANT, PRECISE)
-async function extractPdfTextPositions(base64Pdf: string): Promise<Array<{
-  text: string,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  pageIndex: number,
-  isEmptyField: boolean // True if this looks like a fill-in field (underscore, blank line)
-}>> {
-  try {
-    console.log('[extractPdfTextPositions] Starting PDF text extraction...');
-    const startTime = Date.now();
-
-    const data = Buffer.from(base64Pdf, 'base64');
-    const pdf = await pdfjsLib.getDocument({ data }).promise;
-
-    const allTexts: Array<{
-      text: string, x: number, y: number, width: number, height: number, pageIndex: number, isEmptyField: boolean
-    }> = [];
-
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.0 });
-      const textContent = await page.getTextContent();
-
-      for (const item of textContent.items as any[]) {
-        if (!item.str) continue;
-
-        const [a, b, c, d, tx, ty] = item.transform;
-        const fontSize = Math.sqrt(a * a + b * b);
-
-        // Detect if this is a fill-in field indicator
-        const text = item.str.trim();
-        const isEmptyField =
-          text.match(/^_{3,}$/) || // Underscores like _____
-          text.match(/^\.{3,}$/) || // Dots like .....
-          text.match(/^\/{3,}$/) || // Slashes
-          text === '' ||
-          text.match(/^[\s_\-\.]{5,}$/); // Mixed whitespace/underscores
-
-        allTexts.push({
-          text: item.str,
-          x: tx,
-          y: viewport.height - ty, // Flip Y for standard coordinate system
-          width: item.width || (text.length * fontSize * 0.6),
-          height: fontSize * 1.2,
-          pageIndex: pageNum - 1,
-          isEmptyField: !!isEmptyField
-        });
-      }
-    }
-
-    const elapsed = Date.now() - startTime;
-    console.log(`[extractPdfTextPositions] Extracted ${allTexts.length} text elements in ${elapsed}ms`);
-
-    return allTexts;
-  } catch (error) {
-    console.error('[extractPdfTextPositions] Error:', error);
-    return [];
-  }
-}
-
-// NEW: Identify fillable fields from PDF text structure (INSTANT)
-async function identifyFillableFields(base64Pdf: string): Promise<Array<{
-  name: string,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  pageIndex: number,
-  labelText: string // The text that labels this field
-}>> {
-  const textPositions = await extractPdfTextPositions(base64Pdf);
-
-  // Find patterns that indicate fillable fields:
-  // 1. Text followed by underscores/empty space
-  // 2. Text ending with ":"
-  // 3. Common form labels
-
-  const fields: Array<{
-    name: string, x: number, y: number, width: number, height: number, pageIndex: number, labelText: string
-  }> = [];
-
-  // Group by approximate Y position (same line)
-  const lines = new Map<number, typeof textPositions>();
-  for (const t of textPositions) {
-    const yKey = Math.round(t.y / 10) * 10; // Group within 10px
-    if (!lines.has(yKey)) lines.set(yKey, []);
-    lines.get(yKey)!.push(t);
-  }
-
-  // Analyze each line for field patterns
-  for (const [yKey, lineItems] of Array.from(lines.entries())) {
-    // Sort by X position
-    lineItems.sort((a: any, b: any) => a.x - b.x);
-
-    for (let i = 0; i < lineItems.length; i++) {
-      const item = lineItems[i];
-      const text = item.text.trim();
-
-      // Skip if this is just underscores or empty
-      if (item.isEmptyField) continue;
-
-      // Check if next item is empty field (underscores, etc)
-      const nextItem = lineItems[i + 1];
-      if (nextItem && nextItem.isEmptyField) {
-        // This text labels the next empty field
-        fields.push({
-          name: text.replace(/:$/, '').trim(),
-          x: nextItem.x,
-          y: item.y,
-          width: nextItem.width || 100,
-          height: item.height,
-          pageIndex: item.pageIndex,
-          labelText: text
-        });
-      }
-      // Check if text ends with : and has space after
-      else if (text.endsWith(':')) {
-        fields.push({
-          name: text.replace(/:$/, '').trim(),
-          x: item.x + item.width + 5,
-          y: item.y,
-          width: 150,
-          height: item.height,
-          pageIndex: item.pageIndex,
-          labelText: text
-        });
-      }
-    }
-  }
-
-  console.log(`[identifyFillableFields] Identified ${fields.length} fillable fields in ${Date.now()}ms`);
-  return fields;
-}
+// [pdfjs-dist functions REMOVED - extraction is now client-side in DocumentStudio.tsx]
 
 // NEW: Gemini-powered Layout Analysis
 // [Removed legacy analyzeLayoutWithGemini function - replaced by AiService]

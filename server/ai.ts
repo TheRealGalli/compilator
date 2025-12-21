@@ -12,7 +12,13 @@ export class AiService {
         this.projectId = projectId;
         this.location = location;
         this.vertex_ai = new VertexAI({ project: projectId, location });
-        this.documentAiClient = new DocumentProcessorServiceClient();
+
+        // Document AI client with correct regional endpoint
+        const docAiLocation = process.env.DOCUMENT_AI_LOCATION || 'eu';
+        this.documentAiClient = new DocumentProcessorServiceClient({
+            apiEndpoint: `${docAiLocation}-documentai.googleapis.com`
+        });
+
         console.log(`[AiService] Initialized with model: ${this.modelId} in ${location}`);
     }
 
@@ -116,12 +122,19 @@ export class AiService {
                 return this.analyzeLayout(base64Pdf);
             }
 
-            const processorName = `projects/${this.projectId}/locations/${this.location}/processors/${formParserProcessorId}`;
+            // Document AI processor location - can be different from Vertex AI location
+            const docAiLocation = process.env.DOCUMENT_AI_LOCATION || 'eu';
+            const processorName = `projects/${this.projectId}/locations/${docAiLocation}/processors/${formParserProcessorId}`;
+
+            console.log(`[AiService] Using processor: ${processorName}`);
+
+            // Convert base64 to Buffer (Document AI needs binary content)
+            const contentBuffer = Buffer.from(base64Pdf, 'base64');
 
             const request = {
                 name: processorName,
                 rawDocument: {
-                    content: base64Pdf,
+                    content: contentBuffer,
                     mimeType: 'application/pdf'
                 }
             };

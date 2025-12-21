@@ -83,12 +83,8 @@ export function DocumentStudio({
     const [star2Spinning, setStar2Spinning] = useState(false);
     const [star3Spinning, setStar3Spinning] = useState(false);
 
-    // Load fields from backend when PDF changes
-    useEffect(() => {
-        if (pdfBase64) {
-            analyzeLayout();
-        }
-    }, [pdfBase64]);
+    // REMOVED: Auto-detection on PDF load - now user must click star to compile
+    // The PDF is shown without pre-detected fields
 
     // Keyboard delete handler
     useEffect(() => {
