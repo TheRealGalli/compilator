@@ -16,7 +16,7 @@ import crypto from 'crypto';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { getSecret } from './gcp-secrets';
 import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } from "docx";
-import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts, degrees, PDFTextField, PDFCheckBox, PDFDropdown } from 'pdf-lib';
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
 // [pdfjs-dist removed - using client-side extraction instead]
@@ -104,6 +104,28 @@ async function extractPdfFormFields(base64Pdf: string): Promise<Array<{
       const name = field.getName();
       const type = field.constructor.name;
 
+      // STRICT FILTER: Only consider fields that are likely user-fillable and currently empty
+      // 1. Check if it has a value
+      let hasValue = false;
+      try {
+        if (field instanceof PDFTextField) {
+          const text = field.getText();
+          if (text && text.trim().length > 0) hasValue = true;
+        } else if (field instanceof PDFCheckBox) {
+          if (field.isChecked()) hasValue = true; // Consider checked boxes as "filled" or at least not "empty/to-do" ? User might want to change them.
+          // Requirement was "spazi vuoti da compilare". If checked, it's not empty.
+        } else if (field instanceof PDFDropdown) {
+          if (field.getSelected().length > 0) hasValue = true;
+        }
+      } catch (e) {
+        // Ignore error reading value
+      }
+
+      if (hasValue) {
+        // Skip pre-filled fields
+        continue;
+      }
+
       // Get widget (visual representation) of the field
       const widgets = field.acroField.getWidgets();
       if (widgets.length > 0) {
@@ -133,7 +155,7 @@ async function extractPdfFormFields(base64Pdf: string): Promise<Array<{
       }
     }
 
-    console.log(`[extractPdfFormFields] Found ${result.length} form fields in PDF`);
+    console.log(`[extractPdfFormFields] Found ${result.length} EMPTY form fields in PDF`);
     return result;
   } catch (error) {
     console.log('[extractPdfFormFields] No form fields found or error:', error);
@@ -1016,26 +1038,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           source: 'pdf_form_instant'
         }));
         return res.json({ fields });
+      } else {
+        // FAST FAIL: If no form fields, return empty immediately. No AI fallback.
+        console.log(`[DEBUG analyze-layout] No PDF form fields found. Returning empty. Time: ${Date.now() - startTime}ms`);
+        return res.json({ fields: [] });
       }
 
-      // FALLBACK 1: Use Document AI for precise layout analysis (Fastest & most precise)
-      console.log('[DEBUG analyze-layout] Using Document AI for analysis...');
-      try {
-        const docAiFields = await aiService.analyzeLayoutWithDocumentAI(base64);
-        if (docAiFields.length > 0) {
-          console.log(`[DEBUG analyze-layout] Document AI found ${docAiFields.length} fields in ${Date.now() - startTime}ms`);
-          return res.json({ fields: docAiFields });
-        }
-      } catch (e) {
-        console.error('[API analyze-layout] Document AI error, falling back to Gemini Vision:', e);
-      }
-
-      // FALLBACK 2: Use Gemini Vision (works reliably but slower ~20-30s)
-      console.log('[DEBUG analyze-layout] Using Gemini Vision analysis fallback...');
-      const fields = await aiService.analyzeLayout(base64);
-      console.log(`[DEBUG analyze-layout] Analysis complete. Found ${fields.length} fields in ${Date.now() - startTime}ms`);
-
-      res.json({ fields });
     } catch (error: any) {
       console.error('[API analyze-layout] Error:', error);
       res.status(500).json({ error: error.message });
@@ -1296,17 +1304,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               fieldType: f.type
             };
           });
-        } else if (fillingMode === 'studio') {
-          // Step 2: Use Document AI for precise layout analysis in Studio Mode
-          const analysis = await aiService.analyzeLayoutWithDocumentAI(pinnedSource.base64);
-          preciseFields = analysis.fields;
-          documentTokens = analysis.documentTokens;
-        } else {
-          // Step 3: Fall back to Gemini Vision analysis (slower)
-          console.log('[DEBUG Compile] No form fields found, using AI vision analysis');
-          preciseFields = await aiService.analyzeLayout(pinnedSource.base64);
         }
       }
+
+      // REMOVED AI FALLBACKS (Document AI & Gemini Vision) per user request for speed/stability.
+      // If no AcroFields are found, we return empty preciseFields.
+      console.log(`[DEBUG Compile] Analysis strategy: PDF Forms only. Found: ${preciseFields.length}`);
+
 
       // SHORT-CIRCUIT: If the user only wants to find fields (Studio Mode initial load), return them now
       // This avoids expensive and slow LLM compilation calls when we only need layout data.
