@@ -511,28 +511,30 @@ export function DocumentStudio({
 
                                         {/* Field Overlays for this page */}
                                         {fields
-                                            .filter(f => f.pageIndex === pageIndex)
+                                            .filter(f => f.pageIndex === pageIndex && f.boundingPoly?.normalizedVertices?.length! >= 4)
                                             .map((field, i) => (
                                                 <div
                                                     key={`field_${i}`}
-                                                    className="absolute border-2 border-blue-500/50 bg-blue-100/20 hover:bg-blue-100/40 transition-colors z-10"
+                                                    // Removed border and background, added subtle hover for discoverability
+                                                    className="absolute z-10 hover:bg-black/5 transition-colors cursor-text group"
                                                     style={{
-                                                        left: `${field.boundingPoly.normalizedVertices[0].x * 100}%`,
-                                                        top: `${field.boundingPoly.normalizedVertices[0].y * 100}%`,
-                                                        width: `${(field.boundingPoly.normalizedVertices[1].x - field.boundingPoly.normalizedVertices[0].x) * 100}%`,
-                                                        height: `${(field.boundingPoly.normalizedVertices[2].y - field.boundingPoly.normalizedVertices[0].y) * 100}%`,
+                                                        left: `${field.boundingPoly!.normalizedVertices![0].x * 100}%`,
+                                                        top: `${field.boundingPoly!.normalizedVertices![0].y * 100}%`,
+                                                        width: `${(field.boundingPoly!.normalizedVertices![1].x - field.boundingPoly!.normalizedVertices![0].x) * 100}%`,
+                                                        height: `${(field.boundingPoly!.normalizedVertices![2].y - field.boundingPoly!.normalizedVertices![0].y) * 100}%`,
                                                     }}
                                                     title={field.name}
                                                 >
-                                                    {/* Value Display */}
+                                                    {/* Value Display - Simulated Handwriting/Typewriter */}
                                                     {field.value && (
-                                                        <div className="absolute inset-0 flex items-center px-1">
+                                                        <div className="w-full h-full flex items-center px-1">
                                                             <span
-                                                                className="text-blue-900 font-handwriting"
+                                                                className="text-blue-700 font-semibold"
                                                                 style={{
-                                                                    fontSize: 'clamp(8px, 1.2vw, 14px)',
-                                                                    lineHeight: 1,
-                                                                    fontFamily: 'Courier New, monospace'
+                                                                    fontSize: 'clamp(9px, 1.3vw, 16px)',
+                                                                    lineHeight: 1.1,
+                                                                    fontFamily: '"Courier New", Courier, monospace',
+                                                                    letterSpacing: '-0.02em'
                                                                 }}
                                                             >
                                                                 {field.value}
