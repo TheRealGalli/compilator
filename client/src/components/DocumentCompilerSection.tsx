@@ -635,7 +635,16 @@ export function DocumentCompilerSection({
                           base64: pinnedSource.base64
                         },
                         // We use requestedFields to guide the AI with the User's defined schema
-                        requestedFields: currentFields.map(f => f.name),
+                        // We send the full definitions of current fields to the backend
+                        // This allows Nano Banana to know EXACTLY where they are in real-time
+                        studioFields: currentFields.map(f => {
+                          const v = f.boundingPoly.normalizedVertices || [];
+                          return {
+                            name: f.name,
+                            pageIndex: f.pageIndex,
+                            boundingPoly: { normalizedVertices: v }
+                          };
+                        }),
                         modelProvider,
                         temperature,
                         webResearch,

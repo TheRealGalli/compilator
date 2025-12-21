@@ -385,7 +385,7 @@ FORMATO OUTPUT (JSON):
         fields: Array<{ name: string, x: number, y: number, width: number, height: number, pageIndex: number }>,
         userNotes: string,
         sources?: Array<{ name: string, base64: string, type: string }>
-    }): Promise<Array<{ x: number, y: number, text: string, fontSize: number, pageIndex: number }>> {
+    }): Promise<Array<{ x: number, y: number, text: string, fontSize: number, pageIndex: number, fieldName?: string }>> {
 
         console.log('[AiService] compileWithTools: Starting with', params.fields.length, 'fields');
 
@@ -481,7 +481,7 @@ IMPORTANTE:
 - Font size consigliato: 10-12 punti`;
 
         // State for placed texts
-        const placedTexts: Array<{ x: number, y: number, text: string, fontSize: number, pageIndex: number }> = [];
+        const placedTexts: Array<{ x: number, y: number, text: string, fontSize: number, pageIndex: number, fieldName?: string }> = [];
         let isDone = false;
 
         // Start conversation
@@ -549,7 +549,8 @@ IMPORTANTE:
                                 y: Number(y),
                                 text: String(text),
                                 fontSize: Number(fontSize),
-                                pageIndex: Number(pageIndex)
+                                pageIndex: Number(pageIndex),
+                                fieldName: String(fieldName)
                             });
                             result = { success: true, placedAt: { x, y }, field: fieldName };
                             console.log(`[AiService] Placed "${text}" at (${x}, ${y}) for ${fieldName}`);

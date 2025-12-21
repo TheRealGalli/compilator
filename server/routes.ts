@@ -1179,12 +1179,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalSources = multimodalFiles.length + (hasExternalSources ? 1 : 0);
 
 
-      // SIMPLIFIED APPROACH: Try pdf-lib form extraction first (fast + precise)
-      // Fall back to single AI analysis only if no form fields found
+      // SIMPLIFIED APPROACH: Priority 1: Fields provided by Studio Frontend
+      // Priority 2: pdf-lib form extraction (fast + precise)
+      // Priority 3: Fall back to AI analysis
       let preciseFields: any[] = [];
-      let formFieldsFromPdf: any[] = [];
+      const studioFields = req.body.studioFields;
 
-      if (pinnedSource && pinnedSource.type === 'application/pdf') {
+      if (studioFields && Array.isArray(studioFields) && studioFields.length > 0) {
+        console.log(`[DEBUG Compile] Using ${studioFields.length} fields provided by Studio Frontend`);
+        preciseFields = studioFields;
+      } else if (pinnedSource && pinnedSource.type === 'application/pdf') {
+        let formFieldsFromPdf: any[] = [];
         // Step 1: Try to extract form fields from PDF structure (instant, precise)
         formFieldsFromPdf = await extractPdfFormFields(pinnedSource.base64);
 
@@ -1422,12 +1427,17 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
         // Convert placed texts to values format for frontend
         const valuesForFrontend: Record<string, string> = {};
         placedTexts.forEach(pt => {
-          // Find matching field by proximity
-          const matchingField = toolFields.find(f =>
-            Math.abs(f.x - pt.x) < 50 && Math.abs(f.y - pt.y) < 50 && f.pageIndex === pt.pageIndex
-          );
-          if (matchingField) {
-            valuesForFrontend[matchingField.name] = pt.text;
+          if (pt.fieldName) {
+            // Priority 1: Use explicit field name from AI
+            valuesForFrontend[pt.fieldName] = pt.text;
+          } else {
+            // Priority 2: Fall back to proximity mapping
+            const matchingField = toolFields.find(f =>
+              Math.abs(f.x - pt.x) < 50 && Math.abs(f.y - pt.y) < 50 && f.pageIndex === pt.pageIndex
+            );
+            if (matchingField) {
+              valuesForFrontend[matchingField.name] = pt.text;
+            }
           }
         });
 

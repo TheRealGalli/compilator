@@ -191,6 +191,19 @@ export function DocumentStudio({
         }
     };
 
+    // Sync fields with external values (compilation results)
+    useEffect(() => {
+        if (externalValues && Object.keys(externalValues).length > 0) {
+            console.log('[DocumentStudio] Syncing with external values:', Object.keys(externalValues).length);
+            setFields(prev => prev.map(f => {
+                if (externalValues[f.name] !== undefined) {
+                    return { ...f, value: externalValues[f.name] };
+                }
+                return f;
+            }));
+        }
+    }, [externalValues]);
+
     // Sync spinning state with parent processing state
     useEffect(() => {
         if (!isProcessing) {
@@ -415,6 +428,14 @@ export function DocumentStudio({
             <div className="flex-1 grid grid-cols-1 gap-6 min-h-0">
                 {/* Full-width PDF Workspace */}
                 <div className={`bg-muted/30 rounded-xl overflow-hidden relative flex justify-center p-4 border shadow-inner ${isAddingField ? 'cursor-crosshair' : ''}`}>
+                    {/* Loading Overlay for Layout Analysis */}
+                    {isLoadingFields && (
+                        <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-[100] flex flex-col items-center justify-center pointer-events-none">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                            <p className="text-blue-900 font-medium animate-pulse">Analisi Layout in corso...</p>
+                        </div>
+                    )}
+
                     <ScrollArea className="h-full w-full">
                         <div className="flex flex-col items-center gap-4 relative py-8" ref={pdfContainerRef}>
                             <Document
@@ -516,6 +537,18 @@ export function DocumentStudio({
                                                                 onPointerDown={(e) => e.stopPropagation()}
                                                                 onKeyDown={(e) => e.stopPropagation()}
                                                             />
+
+                                                            {isSelected && (
+                                                                <button
+                                                                    className="absolute -right-3 -top-3 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-700 transition-colors z-[100]"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        deleteField(globalIdx);
+                                                                    }}
+                                                                >
+                                                                    <X className="w-4 h-4" />
+                                                                </button>
+                                                            )}
 
                                                             {isSelected && (
                                                                 <>
