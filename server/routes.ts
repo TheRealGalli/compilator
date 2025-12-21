@@ -1111,10 +1111,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ fields });
       }
 
-      // FALLBACK: Use AI Vision (SLOW, for complex documents)
-      console.log('[DEBUG analyze-layout] SLOW PATH: Falling back to AI Vision...');
-      const fields = await aiService.analyzeLayout(base64);
-      console.log(`[DEBUG analyze-layout] AI analysis complete. Found ${fields.length} fields in ${Date.now() - startTime}ms`);
+      // FALLBACK: Use Document AI Form Parser (FAST + PRECISE)
+      // Document AI internally falls back to Vision if processor not configured
+      console.log('[DEBUG analyze-layout] Using Document AI Form Parser...');
+      const fields = await aiService.analyzeLayoutWithDocumentAI(base64);
+      console.log(`[DEBUG analyze-layout] Analysis complete. Found ${fields.length} fields in ${Date.now() - startTime}ms`);
 
       res.json({ fields });
     } catch (error: any) {
