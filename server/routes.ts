@@ -1286,6 +1286,42 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
           fillingMode: 'pdf_coordinates',
           info: "Generated from direct user input"
         });
+      } else if (fillingMode === 'studio' && preciseFields.length > 0 && pinnedSource) {
+        // TWO-STAGE PIPELINE: Use Stage 2 for value filling + position refinement
+        console.log('[DEBUG Compile] TWO-STAGE PIPELINE: Calling fillAndRefinePositions (Stage 2)');
+
+        const stage2Fields = preciseFields.map((f: any) => ({
+          name: f.name,
+          box: f.boundingPoly?.normalizedVertices
+            ? [
+              Math.round(f.boundingPoly.normalizedVertices[0].y * 1000),
+              Math.round(f.boundingPoly.normalizedVertices[0].x * 1000),
+              Math.round(f.boundingPoly.normalizedVertices[2].y * 1000),
+              Math.round(f.boundingPoly.normalizedVertices[2].x * 1000)
+            ]
+            : [0, 0, 0, 0],
+          page: f.pageIndex || 0
+        }));
+
+        const refinedFields = await aiService.fillAndRefinePositions({
+          pdfBase64: pinnedSource.base64,
+          fields: stage2Fields,
+          userNotes: notes || ''
+        });
+
+        // Convert refined fields to expected format
+        const valuesObject: Record<string, any> = {};
+        refinedFields.forEach((rf) => {
+          valuesObject[rf.name] = {
+            value: rf.value,
+            box: rf.box,
+            width: rf.width,
+            page: rf.page
+          };
+        });
+
+        text = JSON.stringify({ fields: refinedFields, values: valuesObject });
+        console.log('[DEBUG Compile] Stage 2 completed with', refinedFields.length, 'refined fields');
       } else {
         text = await aiService.compileDocument({
           systemPrompt,

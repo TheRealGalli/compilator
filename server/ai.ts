@@ -114,4 +114,94 @@ export class AiService {
             throw error;
         }
     }
+
+    /**
+     * STAGE 2: Fill values and refine positions using Vision.
+     * The AI looks at the PDF, uses the detected fields + user notes,
+     * and returns filled values with optimized positions and widths.
+     */
+    async fillAndRefinePositions(params: {
+        pdfBase64: string,
+        fields: Array<{ name: string, box: number[], page: number }>,
+        userNotes: string,
+        sources?: any[]
+    }): Promise<Array<{ name: string, value: string, box: number[], width: number, page: number }>> {
+        try {
+            const model = this.vertex_ai.getGenerativeModel({
+                model: this.modelId,
+                generationConfig: { responseMimeType: "application/json" }
+            });
+
+            const fieldsDescription = params.fields.map(f =>
+                `- "${f.name}" a pagina ${f.page}, box [${f.box.join(', ')}]`
+            ).join('\n');
+
+            const prompt = `
+Sei un compilatore di documenti PDF con capacità visive avanzate.
+
+COMPITO:
+1. GUARDA il documento PDF allegato.
+2. Per ogni campo nell'elenco sottostante, inserisci il VALORE appropriato dalle note utente.
+3. VERIFICA e CORREGGI le posizioni dei campi guardando il documento reale.
+4. CALCOLA la LARGHEZZA ottimale per ogni valore (in scala 0-1000).
+
+CAMPI DA COMPILARE:
+${fieldsDescription}
+
+NOTE UTENTE:
+${params.userNotes || 'Nessuna nota aggiuntiva.'}
+
+ISTRUZIONI CRITICHE:
+- Guarda ESATTAMENTE dove sono gli spazi vuoti nel PDF.
+- Se un campo è posizionato male, CORREGGI le coordinate.
+- Calcola la larghezza necessaria per il testo inserito.
+- Usa nomi semantici in italiano.
+
+FORMATO OUTPUT (JSON):
+{
+  "fields": [
+    {
+      "name": "Nome Campo",
+      "value": "Valore inserito",
+      "box": [ymin, xmin, ymax, xmax],  // Coordinate VERIFICATE (scala 0-1000)
+      "width": 150,  // Larghezza calcolata per il testo (scala 0-1000)
+      "page": 0
+    }
+  ]
+}
+`;
+
+            const result = await model.generateContent({
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [
+                            { text: prompt },
+                            { inlineData: { mimeType: 'application/pdf', data: params.pdfBase64 } }
+                        ]
+                    }
+                ]
+            });
+
+            const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            const json = JSON.parse(responseText.replace(/```json|```/g, '').trim());
+
+            if (!json.fields || !Array.isArray(json.fields)) {
+                console.warn('[AiService] fillAndRefinePositions: No fields in response');
+                return [];
+            }
+
+            return json.fields.map((item: any) => ({
+                name: item.name || 'Campo',
+                value: item.value || '',
+                box: item.box || [0, 0, 0, 0],
+                width: item.width || 100,
+                page: item.page || 0
+            }));
+
+        } catch (error) {
+            console.error('[AiService] fillAndRefinePositions error:', error);
+            return [];
+        }
+    }
 }
