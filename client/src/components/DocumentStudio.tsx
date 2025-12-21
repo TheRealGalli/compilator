@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, Wand2, X, Check, Sparkles } from "lucide-react";
+import { Download, Wand2, X, Check, Sparkles, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, useMotionValue, useTransform } from "framer-motion";
@@ -191,6 +191,14 @@ export function DocumentStudio({
         }
     };
 
+    // Sync spinning state with parent processing state
+    useEffect(() => {
+        if (!isProcessing) {
+            setStar2Spinning(false);
+            setStar3Spinning(false);
+        }
+    }, [isProcessing]);
+
     // Client-side PDF text extraction using pdfjs (INSTANT + PRECISE)
     const extractTextPositionsClientSide = async (): Promise<DiscoveredField[]> => {
         try {
@@ -361,9 +369,9 @@ export function DocumentStudio({
                                             description: isAddingField ? "Modifiche terminate" : "Clicca sul documento per aggiungere campi"
                                         });
                                     }}
-                                    className={`cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 origin-center ${isAddingField ? 'scale-125' : 'hover:scale-110'}`}
+                                    className={`cursor-pointer p-0 m-0 flex items-center justify-center w-8 h-8 origin-center ${isAddingField ? 'scale-125' : 'hover:scale-110'}`}
                                 >
-                                    <span className="text-4xl font-bold text-blue-600">*</span>
+                                    <Star className="w-6 h-6 fill-blue-600 text-blue-600 pointer-events-none" />
                                 </motion.div>
                             </TooltipWrapper>
 
@@ -374,9 +382,9 @@ export function DocumentStudio({
                                         setStar2Spinning(true);
                                         onCompile(fields);
                                     }}
-                                    className={`cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 origin-center hover:scale-110 ${star2Spinning ? 'animate-turbo-spin' : ''}`}
+                                    className={`cursor-pointer p-0 m-0 flex items-center justify-center w-8 h-8 origin-center hover:scale-110 ${star2Spinning ? 'animate-turbo-spin' : ''}`}
                                 >
-                                    <span className="text-4xl font-bold text-blue-600">*</span>
+                                    <Star className="w-6 h-6 fill-blue-600 text-blue-600 pointer-events-none" />
                                 </div>
                             </TooltipWrapper>
 
@@ -390,9 +398,9 @@ export function DocumentStudio({
                                         onDownload(fields);
                                         setTimeout(() => setStar3Spinning(false), 3000);
                                     }}
-                                    className="cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 origin-center hover:scale-110"
+                                    className="cursor-pointer p-0 m-0 flex items-center justify-center w-8 h-8 origin-center hover:scale-110"
                                 >
-                                    <span className="text-4xl font-bold text-blue-600">*</span>
+                                    <Star className="w-6 h-6 fill-blue-600 text-blue-600 pointer-events-none" />
                                 </motion.div>
                             </TooltipWrapper>
                         </div>

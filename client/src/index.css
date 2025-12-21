@@ -4,11 +4,11 @@
 
 /* LIGHT MODE */
 :root {
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
+  --button-outline: rgba(0, 0, 0, .10);
+  --badge-outline: rgba(0, 0, 0, .05);
   --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
+  --elevate-1: rgba(0, 0, 0, .03);
+  --elevate-2: rgba(0, 0, 0, .08);
   --background: 0 0% 100%;
   --foreground: 0 0% 9%;
   --border: 0 0% 91%;
@@ -58,7 +58,7 @@
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
-/* Fallback for older browsers */
+  /* Fallback for older browsers */
   --sidebar-primary-border: hsl(var(--sidebar-primary));
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 
@@ -88,11 +88,11 @@
 }
 
 .dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
+  --button-outline: rgba(255, 255, 255, .10);
+  --badge-outline: rgba(255, 255, 255, .05);
   --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
+  --elevate-1: rgba(255, 255, 255, .04);
+  --elevate-2: rgba(255, 255, 255, .09);
   --background: 0 0% 7%;
   --foreground: 0 0% 98%;
   --border: 0 0% 16%;
@@ -136,7 +136,7 @@
   --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.00), 0px 8px 10px -1px hsl(0 0% 0% / 0.00);
   --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
 
-/* Fallback for older browsers */
+  /* Fallback for older browsers */
   --sidebar-primary-border: hsl(var(--sidebar-primary));
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 
@@ -290,16 +290,33 @@
 @layer utilities {
   .animate-turbo-spin {
     animation: turbo-spin 3s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
-    transform-origin: center center;
+    transform-origin: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
 @keyframes turbo-spin {
-  0% { transform: rotate(0deg); }
-  20% { transform: rotate(180deg); }
-  50% { transform: rotate(1800deg); }
-  80% { transform: rotate(3420deg); }
-  100% { transform: rotate(3600deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  20% {
+    transform: rotate(180deg);
+  }
+
+  50% {
+    transform: rotate(1800deg);
+  }
+
+  80% {
+    transform: rotate(3420deg);
+  }
+
+  100% {
+    transform: rotate(3600deg);
+  }
 }
 
 /* Google Search Grounding & Suggestions */
@@ -321,7 +338,7 @@
   @apply flex flex-wrap gap-2 mt-2 !important;
 }
 
-.google-search-entry-point div[role="listitem"], 
+.google-search-entry-point div[role="listitem"],
 .google-search-entry-point .suggestion-chip {
   @apply inline-flex items-center px-3 py-1.5 rounded-full border border-border bg-background text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer shadow-sm !important;
 }

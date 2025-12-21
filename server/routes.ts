@@ -1212,8 +1212,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               fieldType: f.type
             };
           });
+        } else if (fillingMode === 'studio') {
+          // Step 2: Use Document AI for precise layout analysis in Studio Mode
+          console.log('[DEBUG Compile] Studio Mode: Using Document AI for precise layout analysis');
+          preciseFields = await aiService.analyzeLayoutWithDocumentAI(pinnedSource.base64);
         } else {
-          // Step 2: Fall back to single AI analysis (slower but handles non-form PDFs)
+          // Step 3: Fall back to Gemini Vision analysis (slower)
           console.log('[DEBUG Compile] No form fields found, using AI vision analysis');
           preciseFields = await aiService.analyzeLayout(pinnedSource.base64);
         }
