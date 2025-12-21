@@ -608,7 +608,7 @@ export function DocumentCompilerSection({
             {pinnedSource ? (
               pinnedSource.type === 'application/pdf' || pinnedSource.type.startsWith('image/') ? (
                 <DocumentStudio
-                  pdfBase64={pinnedSource!.base64}
+                  pdfBase64={pinnedSource!.base64 || ""}
                   fileName={pinnedSource!.name}
                   onFieldsDiscovered={setDiscoveredFieldNames}
                   externalValues={studioValues}
