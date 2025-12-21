@@ -21,13 +21,29 @@ export class AiService {
             });
 
             const prompt = `
-      Agisci come un motore di analisi layout per documenti.
-      Rileva tutti i campi del modulo dove dovrebbero essere inseriti dati (underscore, caselle, spazi vuoti, righe di firma).
-      Per ogni campo, fornisci:
-      1. "name": Un'etichetta semantica specifica in ITALIANO (es. "Cognome", "Data di Nascita", "Firma", "Indirizzo").
-      2. "box_2d": Il bounding box come [ymin, xmin, ymax, xmax] su scala 0-1000.
+      Agisci come un motore di analisi layout per documenti con PRECISIONE PIXEL-PERFECT.
+      
+      COMPITO:
+      1. ANALIZZA attentamente il documento PDF allegato
+      2. RILEVA tutti i campi vuoti dove dovrebbero essere inseriti dati:
+         - Underscore (_____), linee vuote, caselle, spazi bianchi evidenti
+         - Righe per firma, campi numerici, date
+      3. Per ogni campo, CALCOLA la posizione esatta del PRIMO CARATTERE dove inizierebbe il testo
+      
+      OUTPUT RICHIESTO per ogni campo:
+      - "name": Etichetta semantica SPECIFICA in ITALIANO (es. "Cognome", "Data di Nascita", "Codice Fiscale")
+      - "box_2d": Bounding box PRECISO come [ymin, xmin, ymax, xmax] su scala 0-1000
+      - "charStart": Posizione X del primo carattere (scala 0-1000) - dove inizia effettivamente lo spazio scrivibile
+      - "baseline": Posizione Y della linea base del testo (scala 0-1000)
+      - "estimatedFont": Font stimato (es. "Helvetica", "Times", "Arial")
+      - "estimatedSize": Dimensione font stimata in pt (es. 10, 11, 12)
 
-      Restituisci JSON: { "data": [ { "name": "...", "box_2d": [0,0,0,0] } ] }
+      ATTENZIONE: 
+      - Le coordinate devono essere PRECISE al pixel
+      - charStart deve indicare dove INIZIA lo spazio scrivibile, non l'etichetta
+      - Usa la linea base (baseline) per allineamento verticale preciso
+
+      Restituisci JSON: { "data": [ { "name": "...", "box_2d": [0,0,0,0], "charStart": 0, "baseline": 0, "estimatedFont": "...", "estimatedSize": 11 } ] }
       `;
 
             const result = await model.generateContent({
@@ -48,7 +64,7 @@ export class AiService {
             if (!json.data || !Array.isArray(json.data)) return [];
 
             return json.data.map((item: any) => {
-                const [ymin, xmin, ymax, xmax] = item.box_2d;
+                const [ymin, xmin, ymax, xmax] = item.box_2d || [0, 0, 0, 0];
                 return {
                     name: item.name,
                     boundingPoly: {
@@ -59,8 +75,13 @@ export class AiService {
                             { x: xmin / 1000, y: ymax / 1000 }
                         ]
                     },
+                    // New precision fields
+                    charStart: item.charStart ? item.charStart / 1000 : xmin / 1000,
+                    baseline: item.baseline ? item.baseline / 1000 : ymax / 1000,
+                    estimatedFont: item.estimatedFont || 'Helvetica',
+                    estimatedSize: item.estimatedSize || 11,
                     pageIndex: 0,
-                    source: 'gemini_vision'
+                    source: 'gemini_vision_precise'
                 };
             });
 

@@ -406,23 +406,28 @@ export function DocumentStudio({
                                                                 <>
                                                                     {/* Left Edge Resize Handle */}
                                                                     <div
-                                                                        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-6 bg-blue-500 rounded cursor-ew-resize hover:bg-blue-700 z-50"
+                                                                        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-1.5 h-8 bg-blue-500 rounded-full cursor-ew-resize hover:bg-blue-600 hover:w-2 transition-all z-50 shadow-md"
+                                                                        title="Trascina per ridimensionare"
                                                                         onMouseDown={(e) => {
                                                                             e.stopPropagation();
+                                                                            e.preventDefault();
                                                                             const startX = e.clientX;
-                                                                            const startWidth = field.width || 100;
+                                                                            const parentEl = e.currentTarget.parentElement?.parentElement;
+                                                                            const startWidth = parentEl?.offsetWidth || field.width || 100;
 
                                                                             const handleMouseMove = (mv: MouseEvent) => {
                                                                                 const delta = startX - mv.clientX;
-                                                                                const newWidth = Math.max(30, startWidth + delta * 0.5);
+                                                                                const newWidth = Math.max(40, startWidth + delta);
                                                                                 updateFieldProperty(globalIdx, { width: newWidth });
                                                                             };
 
                                                                             const handleMouseUp = () => {
                                                                                 window.removeEventListener('mousemove', handleMouseMove);
                                                                                 window.removeEventListener('mouseup', handleMouseUp);
+                                                                                document.body.style.cursor = '';
                                                                             };
 
+                                                                            document.body.style.cursor = 'ew-resize';
                                                                             window.addEventListener('mousemove', handleMouseMove);
                                                                             window.addEventListener('mouseup', handleMouseUp);
                                                                         }}
@@ -430,63 +435,68 @@ export function DocumentStudio({
 
                                                                     {/* Right Edge Resize Handle */}
                                                                     <div
-                                                                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-2 h-6 bg-blue-500 rounded cursor-ew-resize hover:bg-blue-700 z-50"
+                                                                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-1.5 h-8 bg-blue-500 rounded-full cursor-ew-resize hover:bg-blue-600 hover:w-2 transition-all z-50 shadow-md"
+                                                                        title="Trascina per ridimensionare"
                                                                         onMouseDown={(e) => {
                                                                             e.stopPropagation();
+                                                                            e.preventDefault();
                                                                             const startX = e.clientX;
-                                                                            const startWidth = field.width || 100;
+                                                                            const parentEl = e.currentTarget.parentElement?.parentElement;
+                                                                            const startWidth = parentEl?.offsetWidth || field.width || 100;
 
                                                                             const handleMouseMove = (mv: MouseEvent) => {
                                                                                 const delta = mv.clientX - startX;
-                                                                                const newWidth = Math.max(30, startWidth + delta * 0.5);
+                                                                                const newWidth = Math.max(40, startWidth + delta);
                                                                                 updateFieldProperty(globalIdx, { width: newWidth });
                                                                             };
 
                                                                             const handleMouseUp = () => {
                                                                                 window.removeEventListener('mousemove', handleMouseMove);
                                                                                 window.removeEventListener('mouseup', handleMouseUp);
+                                                                                document.body.style.cursor = '';
                                                                             };
 
+                                                                            document.body.style.cursor = 'ew-resize';
                                                                             window.addEventListener('mousemove', handleMouseMove);
                                                                             window.addEventListener('mouseup', handleMouseUp);
                                                                         }}
                                                                     />
 
-                                                                    {/* Corner Rotation Controls */}
-                                                                    {[
-                                                                        { top: -3, left: -3, cursor: 'nw-resize' },
-                                                                        { top: -3, right: -3, cursor: 'ne-resize' },
-                                                                        { bottom: -3, left: -3, cursor: 'sw-resize' },
-                                                                        { bottom: -3, right: -3, cursor: 'se-resize' }
-                                                                    ].map((pos, i) => (
-                                                                        <div
-                                                                            key={i}
-                                                                            className="absolute w-2 h-2 bg-blue-600 rounded-full shadow-sm hover:scale-150 transition-transform z-50"
-                                                                            style={{ ...pos, cursor: 'crosshair' }}
-                                                                            onMouseDown={(e) => {
-                                                                                e.stopPropagation();
-                                                                                const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                                                                                const centerX = rect.left + rect.width / 2;
-                                                                                const centerY = rect.top + rect.height / 2;
-                                                                                const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-                                                                                const initialFieldRotation = field.rotation || 0;
+                                                                    {/* Rotation Handle - Above center */}
+                                                                    <div
+                                                                        className="absolute left-1/2 -top-6 -translate-x-1/2 w-5 h-5 bg-blue-600 rounded-full cursor-grab hover:bg-blue-700 hover:scale-110 transition-all z-50 shadow-md flex items-center justify-center"
+                                                                        title="Trascina per ruotare"
+                                                                        onMouseDown={(e) => {
+                                                                            e.stopPropagation();
+                                                                            e.preventDefault();
+                                                                            const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+                                                                            const centerX = rect.left + rect.width / 2;
+                                                                            const centerY = rect.top + rect.height / 2;
+                                                                            const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+                                                                            const initialFieldRotation = field.rotation || 0;
 
-                                                                                const handleMouseMove = (mv: MouseEvent) => {
-                                                                                    const currentAngle = Math.atan2(mv.clientY - centerY, mv.clientX - centerX) * (180 / Math.PI);
-                                                                                    const delta = currentAngle - startAngle;
-                                                                                    updateFieldProperty(globalIdx, { rotation: initialFieldRotation + delta });
-                                                                                };
+                                                                            const handleMouseMove = (mv: MouseEvent) => {
+                                                                                const currentAngle = Math.atan2(mv.clientY - centerY, mv.clientX - centerX) * (180 / Math.PI);
+                                                                                const delta = currentAngle - startAngle;
+                                                                                updateFieldProperty(globalIdx, { rotation: initialFieldRotation + delta });
+                                                                            };
 
-                                                                                const handleMouseUp = () => {
-                                                                                    window.removeEventListener('mousemove', handleMouseMove);
-                                                                                    window.removeEventListener('mouseup', handleMouseUp);
-                                                                                };
+                                                                            const handleMouseUp = () => {
+                                                                                window.removeEventListener('mousemove', handleMouseMove);
+                                                                                window.removeEventListener('mouseup', handleMouseUp);
+                                                                                document.body.style.cursor = '';
+                                                                            };
 
-                                                                                window.addEventListener('mousemove', handleMouseMove);
-                                                                                window.addEventListener('mouseup', handleMouseUp);
-                                                                            }}
-                                                                        />
-                                                                    ))}
+                                                                            document.body.style.cursor = 'grabbing';
+                                                                            window.addEventListener('mousemove', handleMouseMove);
+                                                                            window.addEventListener('mouseup', handleMouseUp);
+                                                                        }}
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                                                            <path d="M3 3v5h5" />
+                                                                        </svg>
+                                                                    </div>
                                                                 </>
                                                             )}
                                                         </div>
