@@ -1349,6 +1349,21 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
           // FIX: Handle complex structures (preciseData, data) from Autonomous Mode
           const flatValues: Record<string, string> = {};
 
+          console.log('[DEBUG Studio] Parsed values object keys:', Object.keys(values));
+
+          // PRIORITY 1: If values.values exists (from Stage 2), use it directly
+          if (values.values && typeof values.values === 'object') {
+            console.log('[DEBUG Studio] Found values.values from Stage 2');
+            for (const key in values.values) {
+              const v = values.values[key];
+              if (v && typeof v === 'object' && v.value !== undefined) {
+                flatValues[key] = String(v.value);
+              } else if (typeof v === 'string' || typeof v === 'number') {
+                flatValues[key] = String(v);
+              }
+            }
+          }
+
           // Helper to process arrays of { fieldName, text, ... }
           const processArray = (arr: any[]) => {
             if (!Array.isArray(arr)) return;
@@ -1363,14 +1378,15 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
             }
           };
 
-          // NEW FORMAT: Handle { fields: [{name, value, box, page}] }
-          if (values.fields && Array.isArray(values.fields)) {
+          // PRIORITY 2: Handle { fields: [{name, value, box, page}] }
+          if (Object.keys(flatValues).length === 0 && values.fields && Array.isArray(values.fields)) {
+            console.log('[DEBUG Studio] Processing values.fields array');
             processArray(values.fields);
           } else if (values.preciseData && Array.isArray(values.preciseData)) {
             processArray(values.preciseData);
           } else if (values.data && Array.isArray(values.data)) {
             processArray(values.data);
-          } else {
+          } else if (Object.keys(flatValues).length === 0) {
             // Fallback: It might be a flat object already, or mix
             for (const key in values) {
               const v = values[key];
@@ -1378,7 +1394,7 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
               // If it's an object/array (and not processed above), ignore or try to extract text
               if (typeof v === 'string' || typeof v === 'number') {
                 flatValues[key] = String(v);
-              } else if (key !== 'preciseData' && key !== 'data' && key !== 'fillingMode') {
+              } else if (key !== 'preciseData' && key !== 'data' && key !== 'fillingMode' && key !== 'fields' && key !== 'values') {
                 // Try to be safe, maybe it's { value: "..." }
                 if (v && typeof v === 'object' && (v.text || v.value)) {
                   flatValues[key] = String(v.text || v.value);
@@ -1386,6 +1402,8 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
               }
             }
           }
+
+          console.log('[DEBUG Studio] Final flatValues:', flatValues);
 
           // If we found nothing structured but there are keys in original (and not special keys), use original
           if (Object.keys(flatValues).length === 0 && Object.keys(values).length > 0) {

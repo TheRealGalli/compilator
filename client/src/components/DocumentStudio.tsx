@@ -121,6 +121,9 @@ export function DocumentStudio({
             // Stop Star 2 spinning when values arrive
             setStar2Spinning(false);
 
+            console.log('[DocumentStudio] Received externalValues:', externalValues);
+            console.log('[DocumentStudio] Current fields:', fields.map(f => f.name));
+
             const keys = Object.keys(externalValues);
             const newFields = [...fields];
 
@@ -130,15 +133,19 @@ export function DocumentStudio({
                         f.name.toLowerCase().includes(key.toLowerCase()) ||
                         key.toLowerCase().includes(f.name.toLowerCase())
                     );
+                    console.log(`[DocumentStudio] Matching key "${key}" -> index ${index}`);
                     if (index !== -1) {
                         const val = externalValues[key];
                         const safeVal = typeof val === 'object' ? JSON.stringify(val) : String(val || "");
+                        console.log(`[DocumentStudio] Setting field "${newFields[index].name}" = "${safeVal}"`);
                         newFields[index] = {
                             ...newFields[index],
                             value: safeVal
                         };
                         setFields([...newFields]);
                         await new Promise(r => setTimeout(r, 60));
+                    } else {
+                        console.warn(`[DocumentStudio] No field match for key "${key}"`);
                     }
                 }
             };
@@ -247,7 +254,7 @@ export function DocumentStudio({
                                             description: isAddingField ? "Modifiche terminate" : "Clicca sul documento per aggiungere campi"
                                         });
                                     }}
-                                    className={`cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 ${isAddingField ? 'scale-125' : 'hover:scale-110'}`}
+                                    className={`cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 origin-center ${isAddingField ? 'scale-125' : 'hover:scale-110'}`}
                                 >
                                     <span className="text-4xl font-bold text-blue-600 pb-2">*</span>
                                 </motion.div>
@@ -260,7 +267,7 @@ export function DocumentStudio({
                                         setStar2Spinning(true);
                                         onCompile(fields);
                                     }}
-                                    className={`cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 hover:scale-110 ${star2Spinning ? 'animate-turbo-spin' : ''}`}
+                                    className={`cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 origin-center hover:scale-110 ${star2Spinning ? 'animate-turbo-spin' : ''}`}
                                 >
                                     <span className="text-4xl font-bold text-blue-600 pb-2">*</span>
                                 </div>
@@ -276,7 +283,7 @@ export function DocumentStudio({
                                         onDownload(fields);
                                         setTimeout(() => setStar3Spinning(false), 3000);
                                     }}
-                                    className="cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 hover:scale-110"
+                                    className="cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 origin-center hover:scale-110"
                                 >
                                     <span className="text-4xl font-bold text-blue-600 pb-2">*</span>
                                 </motion.div>
