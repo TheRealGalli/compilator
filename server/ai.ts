@@ -174,7 +174,14 @@ FORMATO OUTPUT (JSON):
 }
 `;
 
-            const result = await model.generateContent({
+            // Add timeout to prevent infinite waiting
+            const timeout = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Stage 2 timeout after 60s')), 60000);
+            });
+
+            console.log('[AiService Stage 2] Calling Gemini with 60s timeout...');
+
+            const generatePromise = model.generateContent({
                 contents: [
                     {
                         role: 'user',
@@ -185,6 +192,8 @@ FORMATO OUTPUT (JSON):
                     }
                 ]
             });
+
+            const result = await Promise.race([generatePromise, timeout]);
 
             console.log('[AiService Stage 2] Calling Gemini...');
             const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";

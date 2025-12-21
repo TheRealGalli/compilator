@@ -94,16 +94,21 @@ export function DocumentStudio({
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFieldIndex !== null) {
-                // Don't delete if focus is on an input
-                if (document.activeElement?.tagName === 'INPUT') return;
+                // Don't delete if focus is on an input or editable element
+                const activeEl = document.activeElement;
+                if (activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || (activeEl as HTMLElement)?.isContentEditable) {
+                    return;
+                }
+                e.preventDefault();
                 deleteField(selectedFieldIndex);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedFieldIndex]);
+    }, [selectedFieldIndex, fields]);
 
     const deleteField = (index: number) => {
+        console.log('[DocumentStudio] Deleting field at index:', index);
         const newFields = fields.filter((_, i) => i !== index);
         setFields(newFields);
         setSelectedFieldIndex(null);
@@ -250,22 +255,15 @@ export function DocumentStudio({
 
                             {/* Star 2: Compile */}
                             <TooltipWrapper text="Compila con AI">
-                                <motion.div
-                                    animate={star2Spinning ? { rotate: [0, 360, 720] } : {}}
-                                    transition={star2Spinning ? {
-                                        repeat: Infinity,
-                                        duration: 2,
-                                        ease: [0.4, 0, 0.2, 1],
-                                        times: [0, 0.5, 1]
-                                    } : {}}
+                                <div
                                     onClick={() => {
                                         setStar2Spinning(true);
                                         onCompile(fields);
                                     }}
-                                    className="cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 hover:scale-110"
+                                    className={`cursor-pointer p-0 m-0 leading-none flex items-center justify-center w-6 h-8 hover:scale-110 ${star2Spinning ? 'animate-turbo-spin' : ''}`}
                                 >
                                     <span className="text-4xl font-bold text-blue-600 pb-2">*</span>
-                                </motion.div>
+                                </div>
                             </TooltipWrapper>
 
                             {/* Star 3: Download */}
@@ -332,9 +330,11 @@ export function DocumentStudio({
                                                 const left = isNormalized ? v[0].x * 100 : (v[0].x / 1000) * 100;
                                                 const top = isNormalized ? v[0].y * 100 : (v[0].y / 1000) * 100;
 
-                                                // Calculate generic width based on bounding box if available, else auto
+                                                // Calculate width: use field.width if set, otherwise from bounding box
                                                 let width = 'auto';
-                                                if (isNormalized && v.length === 4) {
+                                                if (field.width) {
+                                                    width = `${field.width}px`;
+                                                } else if (isNormalized && v.length === 4) {
                                                     const w = (v[1].x - v[0].x) * 100;
                                                     if (w > 2) width = `${w}%`;
                                                 }
@@ -397,8 +397,55 @@ export function DocumentStudio({
 
                                                             {isSelected && (
                                                                 <>
+                                                                    {/* Left Edge Resize Handle */}
+                                                                    <div
+                                                                        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-6 bg-blue-500 rounded cursor-ew-resize hover:bg-blue-700 z-50"
+                                                                        onMouseDown={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const startX = e.clientX;
+                                                                            const startWidth = field.width || 100;
 
-                                                                    {/* Rotation Control */}
+                                                                            const handleMouseMove = (mv: MouseEvent) => {
+                                                                                const delta = startX - mv.clientX;
+                                                                                const newWidth = Math.max(30, startWidth + delta * 0.5);
+                                                                                updateFieldProperty(globalIdx, { width: newWidth });
+                                                                            };
+
+                                                                            const handleMouseUp = () => {
+                                                                                window.removeEventListener('mousemove', handleMouseMove);
+                                                                                window.removeEventListener('mouseup', handleMouseUp);
+                                                                            };
+
+                                                                            window.addEventListener('mousemove', handleMouseMove);
+                                                                            window.addEventListener('mouseup', handleMouseUp);
+                                                                        }}
+                                                                    />
+
+                                                                    {/* Right Edge Resize Handle */}
+                                                                    <div
+                                                                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-2 h-6 bg-blue-500 rounded cursor-ew-resize hover:bg-blue-700 z-50"
+                                                                        onMouseDown={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const startX = e.clientX;
+                                                                            const startWidth = field.width || 100;
+
+                                                                            const handleMouseMove = (mv: MouseEvent) => {
+                                                                                const delta = mv.clientX - startX;
+                                                                                const newWidth = Math.max(30, startWidth + delta * 0.5);
+                                                                                updateFieldProperty(globalIdx, { width: newWidth });
+                                                                            };
+
+                                                                            const handleMouseUp = () => {
+                                                                                window.removeEventListener('mousemove', handleMouseMove);
+                                                                                window.removeEventListener('mouseup', handleMouseUp);
+                                                                            };
+
+                                                                            window.addEventListener('mousemove', handleMouseMove);
+                                                                            window.addEventListener('mouseup', handleMouseUp);
+                                                                        }}
+                                                                    />
+
+                                                                    {/* Corner Rotation Controls */}
                                                                     {[
                                                                         { top: -3, left: -3, cursor: 'nw-resize' },
                                                                         { top: -3, right: -3, cursor: 'ne-resize' },
