@@ -80,6 +80,65 @@ async function generateProfessionalDocxBase64(content: string): Promise<string> 
 
 // [Removed legacy analyzePdfLayout function - replaced by AiService]
 
+// NEW: Extract form fields from PDF with exact coordinates using pdf-lib
+async function extractPdfFormFields(base64Pdf: string): Promise<Array<{
+  name: string,
+  type: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  pageIndex: number
+}>> {
+  try {
+    const pdfDoc = await PDFDocument.load(Buffer.from(base64Pdf, 'base64'));
+    const form = pdfDoc.getForm();
+    const fields = form.getFields();
+    const pages = pdfDoc.getPages();
+
+    const result: Array<{ name: string, type: string, x: number, y: number, width: number, height: number, pageIndex: number }> = [];
+
+    for (const field of fields) {
+      const name = field.getName();
+      const type = field.constructor.name;
+
+      // Get widget (visual representation) of the field
+      const widgets = field.acroField.getWidgets();
+      if (widgets.length > 0) {
+        const widget = widgets[0];
+        const rect = widget.getRectangle();
+
+        // Find which page this widget is on
+        let pageIndex = 0;
+        for (let i = 0; i < pages.length; i++) {
+          const pageRef = pages[i].ref;
+          const widgetPage = widget.P();
+          if (widgetPage && pageRef.toString() === widgetPage.toString()) {
+            pageIndex = i;
+            break;
+          }
+        }
+
+        result.push({
+          name: name,
+          type: type.replace('PDF', '').replace('Field', ''),
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          pageIndex: pageIndex
+        });
+      }
+    }
+
+    console.log(`[extractPdfFormFields] Found ${result.length} form fields in PDF`);
+    return result;
+  } catch (error) {
+    console.log('[extractPdfFormFields] No form fields found or error:', error);
+    return [];
+  }
+}
+
 // NEW: Gemini-powered Layout Analysis
 // [Removed legacy analyzeLayoutWithGemini function - replaced by AiService]
 
@@ -1094,10 +1153,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalSources = multimodalFiles.length + (hasExternalSources ? 1 : 0);
 
 
-      // AI Precision Layout Analysis (Document AI) if PDF is pinned
+      // SIMPLIFIED APPROACH: Try pdf-lib form extraction first (fast + precise)
+      // Fall back to single AI analysis only if no form fields found
       let preciseFields: any[] = [];
+      let formFieldsFromPdf: any[] = [];
+
       if (pinnedSource && pinnedSource.type === 'application/pdf') {
-        preciseFields = await aiService.analyzeLayout(pinnedSource.base64);
+        // Step 1: Try to extract form fields from PDF structure (instant, precise)
+        formFieldsFromPdf = await extractPdfFormFields(pinnedSource.base64);
+
+        if (formFieldsFromPdf.length > 0) {
+          // Convert pdf-lib format to expected format
+          console.log(`[DEBUG Compile] Using ${formFieldsFromPdf.length} form fields from PDF structure (FAST PATH)`);
+          const pages = await PDFDocument.load(Buffer.from(pinnedSource.base64, 'base64')).then(doc => doc.getPages());
+
+          preciseFields = formFieldsFromPdf.map(f => {
+            const page = pages[f.pageIndex] || pages[0];
+            const { width: pageWidth, height: pageHeight } = page.getSize();
+
+            return {
+              name: f.name,
+              boundingPoly: {
+                normalizedVertices: [
+                  { x: f.x / pageWidth, y: 1 - (f.y + f.height) / pageHeight },
+                  { x: (f.x + f.width) / pageWidth, y: 1 - (f.y + f.height) / pageHeight },
+                  { x: (f.x + f.width) / pageWidth, y: 1 - f.y / pageHeight },
+                  { x: f.x / pageWidth, y: 1 - f.y / pageHeight }
+                ]
+              },
+              pageIndex: f.pageIndex,
+              source: 'pdf_form_field',
+              fieldType: f.type
+            };
+          });
+        } else {
+          // Step 2: Fall back to single AI analysis (slower but handles non-form PDFs)
+          console.log('[DEBUG Compile] No form fields found, using AI vision analysis');
+          preciseFields = await aiService.analyzeLayout(pinnedSource.base64);
+        }
       }
 
       let systemPrompt = `Data e ora corrente: ${dateTimeIT}
@@ -1287,41 +1380,16 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
           info: "Generated from direct user input"
         });
       } else if (fillingMode === 'studio' && preciseFields.length > 0 && pinnedSource) {
-        // TWO-STAGE PIPELINE: Use Stage 2 for value filling + position refinement
-        console.log('[DEBUG Compile] TWO-STAGE PIPELINE: Calling fillAndRefinePositions (Stage 2)');
+        // SIMPLIFIED SINGLE-STAGE: Use compileDocument directly for value filling
+        console.log('[DEBUG Compile] SINGLE-STAGE PIPELINE: Using compileDocument for Studio Mode');
+        console.log('[DEBUG Compile] Fields to fill:', preciseFields.map((f: any) => f.name).join(', '));
 
-        const stage2Fields = preciseFields.map((f: any) => ({
-          name: f.name,
-          box: f.boundingPoly?.normalizedVertices
-            ? [
-              Math.round(f.boundingPoly.normalizedVertices[0].y * 1000),
-              Math.round(f.boundingPoly.normalizedVertices[0].x * 1000),
-              Math.round(f.boundingPoly.normalizedVertices[2].y * 1000),
-              Math.round(f.boundingPoly.normalizedVertices[2].x * 1000)
-            ]
-            : [0, 0, 0, 0],
-          page: f.pageIndex || 0
-        }));
-
-        const refinedFields = await aiService.fillAndRefinePositions({
-          pdfBase64: pinnedSource.base64,
-          fields: stage2Fields,
-          userNotes: notes || ''
+        text = await aiService.compileDocument({
+          systemPrompt,
+          userPrompt,
+          multimodalFiles,
+          pinnedSource
         });
-
-        // Convert refined fields to expected format
-        const valuesObject: Record<string, any> = {};
-        refinedFields.forEach((rf) => {
-          valuesObject[rf.name] = {
-            value: rf.value,
-            box: rf.box,
-            width: rf.width,
-            page: rf.page
-          };
-        });
-
-        text = JSON.stringify({ fields: refinedFields, values: valuesObject });
-        console.log('[DEBUG Compile] Stage 2 completed with', refinedFields.length, 'refined fields');
       } else {
         text = await aiService.compileDocument({
           systemPrompt,
