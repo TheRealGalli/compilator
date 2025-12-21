@@ -110,8 +110,13 @@ export function DocumentStudio({
         setTimeout(() => setStar3Spinning(false), 1500);
     }, []);
 
-    // REMOVED: Auto-detection on PDF load - now user must click star to compile
-    // The PDF is shown without pre-detected fields
+    // Auto-detection on PDF load
+    useEffect(() => {
+        if (pdfBase64 && fields.length === 0 && !isLoadingFields) {
+            console.log("Triggering auto-discovery...");
+            discoverLayout(false);
+        }
+    }, [pdfBase64]);
 
     // Keyboard handlers removed
     useEffect(() => { }, []);
