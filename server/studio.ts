@@ -52,12 +52,17 @@ export class StudioAgent {
                     { "id": "task_id", "label": "Titolo Task", "status": "completed" | "running" | "pending" | "error", "description": "Dettaglio" }
                 ],
                     "action": {
-                "type": "fill_fields" | "adjust_coordinates" | "verify_visual",
+            "type": "fill_fields" | "adjust_coordinates" | "verify_visual",
                     "data": {
-                    "focusField": "NomeCampoOpzionale", // Per verify_visual
-                        "NomeCampo": "Valore" // Per fill_fields
-                }
+                        "focusField": "NomeCampoOpzionale", // Per verify_visual
+                        "NomeCampo": "Valore", // Per fill_fields
+                        "NomeCampo_Coords": { "x": "0.5", "y": "+0.01", "w": "0.2" } // Per adjust_coordinates use FieldName as key
+                    }
             }
+        
+        INSTRUCTIONS FOR ADJUST_COORDINATES:
+        Se noti che un campo si sovrappone a un'etichetta (es. "Nome: [Mario Rossi]" dove "Mario Rossi" copre "Nome:"), SPOSTA IL CAMPO usando adjust_coordinates.
+        Usa valori normalizzati (0-1). Se vuoi spostare leggermente a destra, usa x: "+0.01" o setta x assoluto.
         }
         `;
 

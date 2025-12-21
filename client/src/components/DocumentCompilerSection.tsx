@@ -613,7 +613,59 @@ export function DocumentCompilerSection({
                 currentFields={currentFields}
                 onAgentAction={(action) => {
                   if (action.type === 'fill_fields') {
-                    setStudioValues(action.data);
+                    setStudioValues(prev => ({ ...prev, ...action.data }));
+                  }
+                  if (action.type === 'adjust_coordinates') {
+                    // Update currentFields (coordinates) based on agent data
+                    // Agent sends: { "FieldName": { x: "start", w: "+10%" } } or similar
+                    // We need to parse and update.
+                    const updates = action.data;
+                    setCurrentFields(prevFields => {
+                      return prevFields.map(field => {
+                        const update = updates[field.name];
+                        if (update) {
+                          // Copy current vertices
+                          const newVertices = [...field.boundingPoly.normalizedVertices];
+
+                          // Simple logic: If update has x, y, w, h (normalized 0-1)
+                          // Or delta. For now assume agent sends absolute or simple delta.
+                          // Let's assume simplest: Agent says "move right" -> x + 0.05
+
+                          // TODO: Make this robust. For now, trust partial updates?
+                          // Check if update is absolute or relative?
+
+                          // REAL IMPLEMENTATION:
+                          // If 'x' is provided, shift horizontally.
+                          // If 'y' is provided, shift vertically.
+                          // If 'w' (width) or 'h' (height) provided, resize.
+
+                          let startX = newVertices[0].x;
+                          let startY = newVertices[0].y;
+                          // Approx width/height
+                          let width = Math.abs(newVertices[1].x - newVertices[0].x);
+                          let height = Math.abs(newVertices[3].y - newVertices[0].y);
+
+                          if (update.x !== undefined) startX = Number(update.x);
+                          if (update.y !== undefined) startY = Number(update.y);
+                          if (update.w !== undefined) width = Number(update.w);
+                          if (update.h !== undefined) height = Number(update.h);
+
+                          // Reconstruct box
+                          return {
+                            ...field,
+                            boundingPoly: {
+                              normalizedVertices: [
+                                { x: startX, y: startY },
+                                { x: startX + width, y: startY },
+                                { x: startX + width, y: startY + height },
+                                { x: startX, y: startY + height }
+                              ]
+                            }
+                          };
+                        }
+                        return field;
+                      });
+                    });
                   }
                 }}
               />
@@ -628,6 +680,7 @@ export function DocumentCompilerSection({
                   fileName={pinnedSource!.name}
                   onFieldsDiscovered={(names) => setDiscoveredFieldNames(names)}
                   onFieldsChange={setCurrentFields}
+                  controlledFields={currentFields} // Pass back the source of truth
                   externalValues={studioValues}
                   onCompile={async (currentFields) => {
                     // Trigger compile with user's current schema

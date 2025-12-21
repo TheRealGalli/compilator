@@ -63,6 +63,7 @@ interface DocumentStudioProps {
     onFieldsChange?: (fields: DiscoveredField[]) => void;
     studioMode?: 'settings' | 'chat';
     onStudioModeChange?: (mode: 'settings' | 'chat') => void;
+    controlledFields?: DiscoveredField[]; // Allow parent to control fields (e.g. for adjusting coordinates)
 }
 
 export function DocumentStudio({
@@ -75,7 +76,8 @@ export function DocumentStudio({
     onFieldsDiscovered,
     onFieldsChange,
     studioMode = 'settings',
-    onStudioModeChange
+    onStudioModeChange,
+    controlledFields
 }: DocumentStudioProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [fields, setFields] = useState<DiscoveredField[]>([]);
@@ -85,10 +87,23 @@ export function DocumentStudio({
     const { toast } = useToast();
     const pdfContainerRef = useRef<HTMLDivElement>(null);
 
-    // Sync fields with parent
+    // Sync from parent (controlled mode)
     useEffect(() => {
-        if (onFieldsChange) onFieldsChange(fields);
-    }, [fields, onFieldsChange]);
+        if (controlledFields) {
+            setFields(prev => {
+                // Only update if different to avoid loop
+                if (JSON.stringify(prev) !== JSON.stringify(controlledFields)) {
+                    return controlledFields;
+                }
+                return prev;
+            });
+        }
+    }, [controlledFields]);
+
+    // Sync to parent
+    useEffect(() => {
+        if (onFieldsChange && !controlledFields) onFieldsChange(fields);
+    }, [fields, onFieldsChange, controlledFields]);
 
     // Star animations state
     const [star1Rotation, setStar1Rotation] = useState(0);
