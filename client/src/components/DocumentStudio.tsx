@@ -373,38 +373,62 @@ export function DocumentStudio({
                         // 2. DOES IT CONTAIN A PLACEHOLDER? (Name: ______)
                         if (text.match(/[_\-.]{2,}/)) {
                             // This item contains both label and field. 
-                            // We estimate the field starts after the label part
+                            // We split by the placeholder regex, keeping the delimiters
                             const parts = text.split(/([_\-.]{2,})/);
-                            // If we have "Label" and "____", parts will be ["Label", "____", ""]
-                            if (parts.length >= 2 && parts[0].trim().length > 0) {
-                                const label = parts[0].replace(/[:\s]+$/, '').trim();
-                                // Rough estimation: label takes up some % of width
-                                const labelRatio = parts[0].length / text.length;
-                                const fieldX = item.x + (item.width * labelRatio);
-                                const fieldW = item.width * (1 - labelRatio);
 
-                                // Coordinate fix
-                                const boxTop = item.y - (item.height * 0.9);
+                            let currentX = item.x;
+                            let currentTextLen = 0;
 
-                                fields.push({
-                                    name: label,
-                                    boundingPoly: {
-                                        vertices: [],
-                                        normalizedVertices: [
-                                            { x: fieldX / item.pageWidth, y: boxTop / item.pageHeight },
-                                            { x: (fieldX + fieldW) / item.pageWidth, y: boxTop / item.pageHeight },
-                                            { x: (fieldX + fieldW) / item.pageWidth, y: (boxTop + item.height) / item.pageHeight },
-                                            { x: fieldX / item.pageWidth, y: (boxTop + item.height) / item.pageHeight }
-                                        ]
-                                    },
-                                    pageIndex: pageNum - 1,
-                                    value: "",
-                                    offsetX: 0,
-                                    offsetY: 0,
-                                    rotation: 0
-                                });
-                                continue;
+                            // Iterate through parts to find ALL fields in this line item
+                            for (let p = 0; p < parts.length; p++) {
+                                const part = parts[p];
+                                const partLenRatio = part.length / text.length;
+                                const partWidth = item.width * partLenRatio;
+
+                                // If this part is a placeholder
+                                if (/^[_\-.]{2,}$/.test(part)) {
+                                    // Find label: typically the text immediately preceding it
+                                    let label = "Campo";
+                                    if (p > 0) {
+                                        // Get the previous text part, clean trailing colons/spaces
+                                        // If previous part is empty (e.g. double field), go back further?
+                                        // Usually parts go: "Name: ", "_____", " Date: ", "_____"
+                                        const prevPart = parts[p - 1];
+                                        if (prevPart.trim().length > 0) {
+                                            label = prevPart.replace(/[:\s]+$/, '').trim();
+                                        } else if (p > 2) {
+                                            // Maybe "Name:", "", "____" ? unlikely with split.
+                                            // Try p-2 if available
+                                            label = parts[p - 2].replace(/[:\s]+$/, '').trim();
+                                        }
+                                    }
+
+                                    // Coordinate Fix: 0.85 seems safer to avoid "too high"
+                                    const boxTop = item.y - (item.height * 0.85);
+
+                                    fields.push({
+                                        name: label,
+                                        boundingPoly: {
+                                            vertices: [],
+                                            normalizedVertices: [
+                                                { x: currentX / item.pageWidth, y: boxTop / item.pageHeight },
+                                                { x: (currentX + partWidth) / item.pageWidth, y: boxTop / item.pageHeight },
+                                                { x: (currentX + partWidth) / item.pageWidth, y: (boxTop + item.height) / item.pageHeight },
+                                                { x: currentX / item.pageWidth, y: (boxTop + item.height) / item.pageHeight }
+                                            ]
+                                        },
+                                        pageIndex: pageNum - 1,
+                                        value: "",
+                                        offsetX: 0,
+                                        offsetY: 0,
+                                        rotation: 0
+                                    });
+                                }
+
+                                // Advance X cursor
+                                currentX += partWidth;
                             }
+                            continue;
                         }
 
                         // 3. IS IT A LABEL FOR A FOLLOWING EMPTY SPACE? (Name:)
