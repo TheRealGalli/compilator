@@ -91,9 +91,24 @@ export function DocumentStudio({
     }, [fields, onFieldsChange]);
 
     // Star animations state
-    const [star1Rotation, setStar1Rotation] = useState(0);
+    const [star1Rotation, setStar1Rotation] = useState(false);
     const [star2Spinning, setStar2Spinning] = useState(false);
     const [star3Spinning, setStar3Spinning] = useState(false);
+
+    // Initial sequential animation (Logo style)
+    useEffect(() => {
+        // Star 1
+        setTimeout(() => setStar1Rotation(true), 100);
+        setTimeout(() => setStar1Rotation(false), 1100);
+
+        // Star 2
+        setTimeout(() => setStar2Spinning(true), 300);
+        setTimeout(() => setStar2Spinning(false), 1300);
+
+        // Star 3
+        setTimeout(() => setStar3Spinning(true), 500);
+        setTimeout(() => setStar3Spinning(false), 1500);
+    }, []);
 
     // REMOVED: Auto-detection on PDF load - now user must click star to compile
     // The PDF is shown without pre-detected fields
@@ -354,9 +369,18 @@ export function DocumentStudio({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="flex items-center -space-x-3 mr-2 select-none">
-                            <Asterisk className="w-8 h-8 text-blue-600 animate-spin" strokeWidth={3} />
-                            <Asterisk className="w-8 h-8 text-blue-600 animate-spin delay-75" strokeWidth={3} />
-                            <Asterisk className="w-8 h-8 text-blue-600 animate-spin delay-150" strokeWidth={3} />
+                            <Asterisk
+                                className={`w-8 h-8 text-blue-600 transition-transform duration-1000 ease-in-out ${star1Rotation ? 'rotate-[360deg]' : 'rotate-0'}`}
+                                strokeWidth={3}
+                            />
+                            <Asterisk
+                                className={`w-8 h-8 text-blue-600 transition-transform duration-1000 ease-in-out ${star2Spinning ? 'rotate-[360deg]' : 'rotate-0'}`}
+                                strokeWidth={3}
+                            />
+                            <Asterisk
+                                className={`w-8 h-8 text-blue-600 transition-transform duration-1000 ease-in-out ${star3Spinning ? 'rotate-[360deg]' : 'rotate-0'}`}
+                                strokeWidth={3}
+                            />
                         </div>
                         <div>
                             <CardTitle className="text-lg">Document Studio</CardTitle>
