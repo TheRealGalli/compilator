@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSources } from "@/contexts/SourcesContext";
 import { DocumentStudio } from "./DocumentStudio";
+import { StudioChat } from "./StudioChat";
 import {
   Dialog,
   DialogContent,
@@ -205,6 +206,7 @@ export function DocumentCompilerSection({
   const [compiledContent, setCompiledContent] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
   const [discoveredFieldNames, setDiscoveredFieldNames] = useState<string[]>([]); // New: for studio mode
+  const [currentFields, setCurrentFields] = useState<any[]>([]); // New: Full field objects
   const [studioValues, setStudioValues] = useState<Record<string, string>>({}); // New: for real-time typing
   const { toast } = useToast();
   const { selectedSources, pinnedSource } = useSources();
@@ -221,6 +223,7 @@ export function DocumentCompilerSection({
   const [detailedAnalysis, setDetailedAnalysis] = useState(true);
   const [formalTone, setFormalTone] = useState(true);
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
+  const [studioMode, setStudioMode] = useState<'settings' | 'chat'>('settings');
 
   useEffect(() => {
     // fetchDocuments(); // Removed as per previous instructions, if any.
@@ -588,20 +591,33 @@ export function DocumentCompilerSection({
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full overflow-auto">
-            <ModelSettings
-              notes={notes}
-              temperature={temperature}
-              webResearch={webResearch}
-              detailedAnalysis={detailedAnalysis}
-              formalTone={formalTone}
-              modelProvider={modelProvider}
-              onNotesChange={setNotes}
-              onTemperatureChange={setTemperature}
-              onWebResearchChange={setWebResearch}
-              onDetailedAnalysisChange={setDetailedAnalysis}
-              onFormalToneChange={setFormalTone}
-              onModelProviderChange={setModelProvider}
-            />
+            {studioMode === 'settings' ? (
+              <ModelSettings
+                notes={notes}
+                temperature={temperature}
+                webResearch={webResearch}
+                detailedAnalysis={detailedAnalysis}
+                formalTone={formalTone}
+                modelProvider={modelProvider}
+                onNotesChange={setNotes}
+                onTemperatureChange={setTemperature}
+                onWebResearchChange={setWebResearch}
+                onDetailedAnalysisChange={setDetailedAnalysis}
+                onFormalToneChange={setFormalTone}
+                onModelProviderChange={setModelProvider}
+              />
+            ) : (
+              <StudioChat
+                isProcessing={isCompiling}
+                pinnedSource={pinnedSource}
+                currentFields={currentFields}
+                onAgentAction={(action) => {
+                  if (action.type === 'fill_fields') {
+                    setStudioValues(action.data);
+                  }
+                }}
+              />
+            )}
           </div>
 
           <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
@@ -610,7 +626,8 @@ export function DocumentCompilerSection({
                 <DocumentStudio
                   pdfBase64={pinnedSource!.base64 || ""}
                   fileName={pinnedSource!.name}
-                  onFieldsDiscovered={setDiscoveredFieldNames}
+                  onFieldsDiscovered={(names) => setDiscoveredFieldNames(names)}
+                  onFieldsChange={setCurrentFields}
                   externalValues={studioValues}
                   onCompile={async (currentFields) => {
                     // Trigger compile with user's current schema
@@ -704,6 +721,8 @@ export function DocumentCompilerSection({
                     }
                   }}
                   isProcessing={isCompiling}
+                  studioMode={studioMode}
+                  onStudioModeChange={setStudioMode}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center bg-muted/20 rounded-xl border-dashed border-2">

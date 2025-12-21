@@ -189,9 +189,14 @@ export class AiService {
                             const textAnchorName = formField.fieldName?.textAnchor;
                             const textAnchorValue = formField.fieldValue?.textAnchor;
 
-                            // PRECISION: Use value space if available, fallback to name space
+                            // PRECISION: We want the INPUT AREA (fieldValue), not just the label (fieldName).
+                            // Document AI Form Parser separates Name and Value. 
+                            // Using Name box puts the text OVER the label. Using Value box puts it ON the line.
                             const valueBox = formField.fieldValue?.boundingPoly;
                             const nameBox = formField.fieldName?.boundingPoly;
+
+                            // If we have a value box, it's the precise area for input.
+                            // If not, we take the name box but we know it might be the label.
                             const targetBox = valueBox || nameBox;
 
                             if (!targetBox?.normalizedVertices) continue;
@@ -203,11 +208,7 @@ export class AiService {
                                     .join('');
                             }
 
-                            // FILTER 1: Skip obvious titles or overly long text (noise)
                             const cleanName = fieldName.trim().replace(/[:\s]+$/, '');
-
-                            // Heuristic: Titles are usually very long or disconnected. 
-                            // We allow all-caps labels (like COGNOME) as they are common in forms.
                             if (cleanName.length > 60 || cleanName.length < 2) continue;
 
                             let fieldValue = '';
@@ -225,6 +226,10 @@ export class AiService {
 
                             const vertices = targetBox.normalizedVertices!;
 
+                            // For text fields, if we are using the valueBox, we are already "on the line".
+                            // If we only have nameBox, we might need a small downward offset, 
+                            // but usually it's better to stick to what Document AI says is the 'value' area.
+
                             fields.push({
                                 name: cleanName,
                                 value: fieldValue.trim(),
@@ -236,7 +241,9 @@ export class AiService {
                                     }))
                                 },
                                 pageIndex: pageIndex,
-                                source: 'document_ai_form_parser'
+                                source: 'document_ai_form_parser',
+                                // Add a flag if this was specifically a valueBox (more precise)
+                                isPreciseValue: !!valueBox
                             });
                         }
                     }

@@ -56,10 +56,13 @@ interface DocumentStudioProps {
     pdfBase64: string;
     fileName: string;
     onDownload: (filledFields: DiscoveredField[]) => void;
-    onCompile: (currentFields: DiscoveredField[]) => void; // New prop
+    onCompile: (currentFields: DiscoveredField[]) => void;
     isProcessing?: boolean;
     externalValues?: Record<string, string>;
     onFieldsDiscovered?: (fieldNames: string[]) => void;
+    onFieldsChange?: (fields: DiscoveredField[]) => void;
+    studioMode?: 'settings' | 'chat';
+    onStudioModeChange?: (mode: 'settings' | 'chat') => void;
 }
 
 export function DocumentStudio({
@@ -69,7 +72,10 @@ export function DocumentStudio({
     onCompile,
     isProcessing = false,
     externalValues,
-    onFieldsDiscovered
+    onFieldsDiscovered,
+    onFieldsChange,
+    studioMode = 'settings',
+    onStudioModeChange
 }: DocumentStudioProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [fields, setFields] = useState<DiscoveredField[]>([]);
@@ -79,6 +85,11 @@ export function DocumentStudio({
     const { toast } = useToast();
     const pdfContainerRef = useRef<HTMLDivElement>(null);
 
+    // Sync fields with parent
+    useEffect(() => {
+        if (onFieldsChange) onFieldsChange(fields);
+    }, [fields, onFieldsChange]);
+
     // Star animations state
     const [star1Rotation, setStar1Rotation] = useState(0);
     const [star2Spinning, setStar2Spinning] = useState(false);
@@ -87,29 +98,11 @@ export function DocumentStudio({
     // REMOVED: Auto-detection on PDF load - now user must click star to compile
     // The PDF is shown without pre-detected fields
 
-    // Keyboard delete handler
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFieldIndex !== null) {
-                // Don't delete if focus is on an input or editable element
-                const activeEl = document.activeElement;
-                if (activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || (activeEl as HTMLElement)?.isContentEditable) {
-                    return;
-                }
-                e.preventDefault();
-                deleteField(selectedFieldIndex);
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedFieldIndex, fields]);
+    // Keyboard handlers removed
+    useEffect(() => { }, []);
 
     const deleteField = (index: number) => {
-        console.log('[DocumentStudio] Deleting field at index:', index);
-        const newFields = fields.filter((_, i) => i !== index);
-        setFields(newFields);
-        setSelectedFieldIndex(null);
-        toast({ title: "Campo eliminato" });
+        // Disabled manually
     };
 
 
@@ -333,40 +326,7 @@ export function DocumentStudio({
     };
 
     const handlePageClick = (pageIndex: number, e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isAddingField) return;
-
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Convert to normalized coordinates (0-1) or absolute if backend prefers.
-        // Assuming 800px width as rendered.
-        // We'll use normalized for consistency with analyzeLayout.
-        const normalizedX = x / rect.width;
-        const normalizedY = y / rect.height;
-
-        const newField: DiscoveredField = {
-            name: "Nuovo Campo",
-            pageIndex: pageIndex,
-            boundingPoly: {
-                vertices: [], // Not strictly needed for UI logic if normalized exists
-                normalizedVertices: [
-                    { x: normalizedX, y: normalizedY },
-                    { x: normalizedX + 0.2, y: normalizedY }, // Default width
-                    { x: normalizedX + 0.2, y: normalizedY + 0.03 }, // Default height
-                    { x: normalizedX, y: normalizedY + 0.03 }
-                ]
-            },
-            value: "",
-            offsetX: 0,
-            offsetY: 0,
-            rotation: 0
-        };
-
-        setFields([...fields, newField]);
-        setIsAddingField(false); // Auto-exit add mode? Or keep it? keeping it allows multiple adds.
-        // Let's keep it but maybe show a toast or cursor change.
-        toast({ title: "Campo Aggiunto", description: "Modifica il nome in azzurro." });
+        // Manual tagging disabled
     };
 
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
@@ -379,34 +339,37 @@ export function DocumentStudio({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1 mr-4 select-none">
-                            {/* Star 1: Add Field Mode */}
-                            <TooltipWrapper text="Aggiungi Campi">
+                            {/* Star 1: Placeholder/Info */}
+                            <TooltipWrapper text="Rilevamento Automatico">
                                 <motion.div
                                     animate={{ rotate: star1Rotation }}
                                     onClick={() => {
                                         setStar1Rotation(prev => prev + 360);
-                                        setIsAddingField(!isAddingField);
                                         toast({
-                                            title: isAddingField ? "Modalità Visualizzazione" : "Modalità Aggiunta",
-                                            description: isAddingField ? "Modifiche terminate" : "Clicca sul documento per aggiungere campi"
+                                            title: "Rilevamento IA",
+                                            description: "I campi vengono rilevati automaticamente all'apertura del file."
                                         });
                                     }}
-                                    className={`cursor-pointer p-0 m-0 flex items-center justify-center w-8 h-8 origin-center ${isAddingField ? 'scale-125' : 'hover:scale-110'}`}
+                                    className={`cursor-pointer p-0 m-0 flex items-center justify-center w-8 h-8 origin-center hover:scale-110`}
                                 >
-                                    <Star className="w-6 h-6 fill-blue-600 text-blue-600 pointer-events-none" />
+                                    <Star className="w-6 h-6 fill-slate-300 text-slate-300 pointer-events-none" />
                                 </motion.div>
                             </TooltipWrapper>
 
-                            {/* Star 2: Compile */}
-                            <TooltipWrapper text="Compila con AI">
+                            {/* Star 2: Chat Studio Toggle */}
+                            <TooltipWrapper text={studioMode === 'chat' ? "Impostazioni Modello" : "Chat Studio"}>
                                 <div
                                     onClick={() => {
-                                        setStar2Spinning(true);
-                                        onCompile(fields);
+                                        const newMode = studioMode === 'chat' ? 'settings' : 'chat';
+                                        if (onStudioModeChange) onStudioModeChange(newMode);
+                                        toast({
+                                            title: newMode === 'chat' ? "Chat Studio Attiva" : "Impostazioni Modello",
+                                            description: newMode === 'chat' ? "L'agente è pronto ad aiutarti." : "Regola i parametri del modello."
+                                        });
                                     }}
-                                    className={`cursor-pointer p-0 m-0 flex items-center justify-center w-8 h-8 origin-center hover:scale-110 ${star2Spinning ? 'animate-turbo-spin' : ''}`}
+                                    className={`cursor-pointer p-0 m-0 flex items-center justify-center w-8 h-8 origin-center hover:scale-110 transition-all ${studioMode === 'chat' ? 'scale-125' : ''} ${star2Spinning ? 'animate-turbo-spin' : ''}`}
                                 >
-                                    <Star className="w-6 h-6 fill-blue-600 text-blue-600 pointer-events-none" />
+                                    <Star className={`w-6 h-6 ${studioMode === 'chat' ? 'fill-amber-400 text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.4)]' : 'fill-blue-600 text-blue-600'} pointer-events-none transition-all`} />
                                 </div>
                             </TooltipWrapper>
 
@@ -495,26 +458,9 @@ export function DocumentStudio({
                                                 const isCheckbox = field.fieldType === 'checkbox';
 
                                                 return (
-                                                    <motion.div
+                                                    <div
                                                         key={`overlay_${globalIdx}`}
-                                                        drag={!isAddingField} // Disable drag when adding
-                                                        dragMomentum={false}
-                                                        onDragEnd={(e, info) => {
-                                                            updateFieldProperty(globalIdx, {
-                                                                offsetX: (field.offsetX || 0) + info.offset.x,
-                                                                offsetY: (field.offsetY || 0) + info.offset.y,
-                                                            });
-                                                        }}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (isCheckbox) {
-                                                                // Toggle checkbox value on click
-                                                                const newVal = (field.value === 'X' || field.value === 'true') ? '' : 'X';
-                                                                updateFieldProperty(globalIdx, { value: newVal });
-                                                            }
-                                                            setSelectedFieldIndex(isSelected ? null : globalIdx);
-                                                        }}
-                                                        className={`absolute ${isAddingField ? '' : 'cursor-move'} group z-10`}
+                                                        className={`absolute z-10 pointer-events-none`}
                                                         animate={{
                                                             x: field.offsetX || 0,
                                                             y: field.offsetY || 0,
@@ -531,142 +477,22 @@ export function DocumentStudio({
                                                     >
                                                         <div className={`
                                                             relative px-1 rounded border transition-colors flex items-center justify-center
-                                                            ${isSelected ? 'border-blue-500 bg-blue-50/90 shadow-lg scale-105' : 'border-blue-400/30 bg-blue-50/20 hover:border-blue-400 hover:bg-blue-50/50'}
+                                                            ${isSelected ? 'border-amber-500 bg-amber-50/90 shadow-lg' : 'border-amber-400/30 bg-amber-50/20'}
                                                             ${isCheckbox ? 'rounded-sm aspect-square' : ''}
                                                             ${isValueEmpty && !isCheckbox ? 'border-dashed' : ''} 
                                                         `}>
-                                                            {/* Editable Input for Text, or X for Checkbox */}
+                                                            {/* Static View Only */}
                                                             {isCheckbox ? (
-                                                                <span className="text-blue-900 font-bold text-sm select-none">
+                                                                <span className="text-amber-900 font-bold text-sm select-none">
                                                                     {field.value === 'X' || field.value === 'true' ? 'X' : ''}
                                                                 </span>
                                                             ) : (
-                                                                <input
-                                                                    type="text"
-                                                                    value={isValueEmpty ? "" : String(field.value)}
-                                                                    placeholder={isValueEmpty ? field.name : ""}
-                                                                    className={`bg-transparent border-none outline-none w-full p-0 m-0 text-[12px] font-medium min-w-[30px]
-                                                                        ${isValueEmpty ? 'text-blue-400/70 italic' : 'text-blue-900'}
-                                                                    `}
-                                                                    onChange={(e) => {
-                                                                        updateFieldProperty(globalIdx, { value: e.target.value });
-                                                                    }}
-                                                                    onPointerDown={(e) => e.stopPropagation()}
-                                                                    onKeyDown={(e) => e.stopPropagation()}
-                                                                />
-                                                            )}
-
-                                                            {isSelected && (
-                                                                <button
-                                                                    className="absolute -right-3 -top-3 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-700 transition-colors z-[100]"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        deleteField(globalIdx);
-                                                                    }}
-                                                                >
-                                                                    <X className="w-4 h-4" />
-                                                                </button>
-                                                            )}
-
-                                                            {isSelected && (
-                                                                <>
-                                                                    {/* Left Edge Resize Handle */}
-                                                                    <div
-                                                                        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-1.5 h-8 bg-blue-500 rounded-full cursor-ew-resize hover:bg-blue-600 hover:w-2 transition-all z-50 shadow-md"
-                                                                        title="Trascina per ridimensionare"
-                                                                        onMouseDown={(e) => {
-                                                                            e.stopPropagation();
-                                                                            e.preventDefault();
-                                                                            const startX = e.clientX;
-                                                                            const parentEl = e.currentTarget.parentElement?.parentElement;
-                                                                            const startWidth = parentEl?.offsetWidth || field.width || 100;
-
-                                                                            const handleMouseMove = (mv: MouseEvent) => {
-                                                                                const delta = startX - mv.clientX;
-                                                                                const newWidth = Math.max(40, startWidth + delta);
-                                                                                updateFieldProperty(globalIdx, { width: newWidth });
-                                                                            };
-
-                                                                            const handleMouseUp = () => {
-                                                                                window.removeEventListener('mousemove', handleMouseMove);
-                                                                                window.removeEventListener('mouseup', handleMouseUp);
-                                                                                document.body.style.cursor = '';
-                                                                            };
-
-                                                                            document.body.style.cursor = 'ew-resize';
-                                                                            window.addEventListener('mousemove', handleMouseMove);
-                                                                            window.addEventListener('mouseup', handleMouseUp);
-                                                                        }}
-                                                                    />
-
-                                                                    {/* Right Edge Resize Handle */}
-                                                                    <div
-                                                                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-1.5 h-8 bg-blue-500 rounded-full cursor-ew-resize hover:bg-blue-600 hover:w-2 transition-all z-50 shadow-md"
-                                                                        title="Trascina per ridimensionare"
-                                                                        onMouseDown={(e) => {
-                                                                            e.stopPropagation();
-                                                                            e.preventDefault();
-                                                                            const startX = e.clientX;
-                                                                            const parentEl = e.currentTarget.parentElement?.parentElement;
-                                                                            const startWidth = parentEl?.offsetWidth || field.width || 100;
-
-                                                                            const handleMouseMove = (mv: MouseEvent) => {
-                                                                                const delta = mv.clientX - startX;
-                                                                                const newWidth = Math.max(40, startWidth + delta);
-                                                                                updateFieldProperty(globalIdx, { width: newWidth });
-                                                                            };
-
-                                                                            const handleMouseUp = () => {
-                                                                                window.removeEventListener('mousemove', handleMouseMove);
-                                                                                window.removeEventListener('mouseup', handleMouseUp);
-                                                                                document.body.style.cursor = '';
-                                                                            };
-
-                                                                            document.body.style.cursor = 'ew-resize';
-                                                                            window.addEventListener('mousemove', handleMouseMove);
-                                                                            window.addEventListener('mouseup', handleMouseUp);
-                                                                        }}
-                                                                    />
-
-                                                                    {/* Rotation Handle - Above center */}
-                                                                    <div
-                                                                        className="absolute left-1/2 -top-6 -translate-x-1/2 w-5 h-5 bg-blue-600 rounded-full cursor-grab hover:bg-blue-700 hover:scale-110 transition-all z-50 shadow-md flex items-center justify-center"
-                                                                        title="Trascina per ruotare"
-                                                                        onMouseDown={(e) => {
-                                                                            e.stopPropagation();
-                                                                            e.preventDefault();
-                                                                            const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                                                                            const centerX = rect.left + rect.width / 2;
-                                                                            const centerY = rect.top + rect.height / 2;
-                                                                            const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-                                                                            const initialFieldRotation = field.rotation || 0;
-
-                                                                            const handleMouseMove = (mv: MouseEvent) => {
-                                                                                const currentAngle = Math.atan2(mv.clientY - centerY, mv.clientX - centerX) * (180 / Math.PI);
-                                                                                const delta = currentAngle - startAngle;
-                                                                                updateFieldProperty(globalIdx, { rotation: initialFieldRotation + delta });
-                                                                            };
-
-                                                                            const handleMouseUp = () => {
-                                                                                window.removeEventListener('mousemove', handleMouseMove);
-                                                                                window.removeEventListener('mouseup', handleMouseUp);
-                                                                                document.body.style.cursor = '';
-                                                                            };
-
-                                                                            document.body.style.cursor = 'grabbing';
-                                                                            window.addEventListener('mousemove', handleMouseMove);
-                                                                            window.addEventListener('mouseup', handleMouseUp);
-                                                                        }}
-                                                                    >
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                                                                            <path d="M3 3v5h5" />
-                                                                        </svg>
-                                                                    </div>
-                                                                </>
+                                                                <div className={`text-[12px] font-medium min-w-[30px] ${isValueEmpty ? 'text-amber-400/70 italic' : 'text-amber-900'}`}>
+                                                                    {isValueEmpty ? field.name : String(field.value)}
+                                                                </div>
                                                             )}
                                                         </div>
-                                                    </motion.div>
+                                                    </div>
                                                 );
                                             })}
                                         </div>

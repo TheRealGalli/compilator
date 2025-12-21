@@ -2614,6 +2614,24 @@ Nel parametro 'content', restituisci un oggetto JSON strutturato:
     }
   });
 
+  // --- STUDIO AGENT ROUTES ---
+  app.post('/api/studio/chat', async (req, res) => {
+    try {
+      const { messages, context } = req.body;
+      const { studioAgent } = await import("./studio");
+      const response = await studioAgent.chat(messages, context);
+      res.json(response);
+    } catch (error: any) {
+      console.error('[StudioAgent Route] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/studio/capture', async (req, res) => {
+    // Placeholder for visual area capture
+    res.json({ success: true, image: null });
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
