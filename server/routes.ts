@@ -1089,32 +1089,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ fields });
       }
 
-      // PRIORITY 2: Try pdfjs-dist text extraction (INSTANT, for non-form PDFs)
-      console.log('[DEBUG analyze-layout] Trying pdfjs-dist text extraction...');
-      const textFields = await identifyFillableFields(base64);
-
-      if (textFields.length > 0) {
-        console.log(`[DEBUG analyze-layout] MEDIUM PATH: Found ${textFields.length} text fields in ${Date.now() - startTime}ms`);
-        const fields = textFields.map(f => ({
-          name: f.name,
-          boundingPoly: {
-            normalizedVertices: [
-              { x: f.x / 612, y: f.y / 792 },
-              { x: (f.x + f.width) / 612, y: f.y / 792 },
-              { x: (f.x + f.width) / 612, y: (f.y + f.height) / 792 },
-              { x: f.x / 612, y: (f.y + f.height) / 792 }
-            ]
-          },
-          pageIndex: f.pageIndex,
-          source: 'pdfjs_text_instant'
-        }));
-        return res.json({ fields });
-      }
-
-      // FALLBACK: Use Document AI Form Parser (FAST + PRECISE)
-      // Document AI internally falls back to Vision if processor not configured
-      console.log('[DEBUG analyze-layout] Using Document AI Form Parser...');
-      const fields = await aiService.analyzeLayoutWithDocumentAI(base64);
+      // FALLBACK: Use Gemini Vision (works reliably but slower ~20-30s)
+      console.log('[DEBUG analyze-layout] Using Gemini Vision analysis...');
+      const fields = await aiService.analyzeLayout(base64);
       console.log(`[DEBUG analyze-layout] Analysis complete. Found ${fields.length} fields in ${Date.now() - startTime}ms`);
 
       res.json({ fields });
@@ -1416,40 +1393,11 @@ Hai accesso a ${multimodalFiles.length + (compileTextContext.length > 0 ? 1 : 0)
 - **Immagini:** Usa l'OCR per leggere scansioni, tabelle e moduli nelle immagini.
 - **Audio:** Usa la trascrizione dei file audio per estrarre istruzioni o dettature.
  
-${compileTextContext.length > 0 ? `**TESTO ESTRATTO DAI DOCUMENTI:**\n${compileTextContext}` : ''}
+${compileTextContext.length > 0 ? `**TESTO ESTRATTO DAI DOCUMENTI:**\\n${compileTextContext}` : ''}
  
 **ISTRUZIONE DI SINTESI:**
-Incrocia i dati dei FILE e del TESTO ESTRATTO (fatti, persone, date) con le informazioni di contesto del LINK WEB per compilare il template.` : 'NESSUN FILE SORGENTE: Se presenti Link Web, usali per il contesto, mas non inventare i dati anagrafici mancanti.'}
-
-${pinnedSource ? `
-**FORMATO OUTPUT SPECIALE (SOLO SE PRESENTE PINNED SOURCE):**
-Se è presente un DOCUMENTO MASTER, devi rispondere con un oggetto JSON strutturato che permetta di mappare i dati sulle coordinate o sui tag del file originale.
-
-   ${preciseFields.length > 0 ? `Abbiamo rilevato i seguenti campi precisi nel PDF Master tramite l'analisi del layout. 
-   **REGOLE DI COMPILAZIONE (PRIORITÀ ASSOLUTA):**
-   1. Se un campo che desideri compilare è nella lista qui sotto, DEVI usare esattamente il suo 'fieldName' nel tuo JSON sotto la chiave "preciseData".
-   2. SE USI "preciseData", NON devi aggiungere lo stesso campo a "data" con le coordinate approssimative [ymin, xmin, ymax, xmax].
-   3. "data" deve essere usato solo per campi NON presenti nella lista qui sotto.
-   
-   IMPORTANTE: Se non trovi il nome esatto di un campo nella lista sopra ma vedi una riga o uno spazio nel PDF, USALO comunque in "data" con le coordinate [ymin, xmin, ymax, xmax]. Priorità a "preciseData", ma NON lasciare vuoto se mancano i match.
-
-   ELENCO CAMPI RILEVATI (usa questi nomi in "preciseData"):
-   ${preciseFields.map(f => `- "${f.name}"`).join('\n')}` : `Identifica i punti del documento dove mancano dati (es. righe vuote o underscore). Restituisci per ogni campo individuato le coordinate bounding box [ymin, xmin, ymax, xmax] in scala 0-1000.`}
-   
-2. **Se Master è DOCX**: Identifica le chiavi/placeholder del documento originale.
-
-Restituisci un blocco JSON finale nel formato:
-{
-  "fillingMode": "pdf_coordinates" | "docx_tags" | "fallback_text",
-  "data": [
-    {"text": "Valore", "box": [ymin, xmin, ymax, xmax]}, ... (SOLO per campi NON rilevati sopra)
-  ],
-  "preciseData": [
-    {"text": "Valore", "fieldName": "nome_campo_rilevato"}, ... (USA SEMPRE QUESTO per i campi rilevati sopra)
-  ],
-  "tagData": {"TAG_NAME": "Valore", ...} (per DOCX)
-}
-` : ''}`;
+Incrocia i dati dei FILE e del TESTO ESTRATTO (fatti, persone, date) con le informazioni di contesto del LINK WEB per compilare il template.` : 'NESSUN FILE SORGENTE: Se presenti Link Web, usali per il contesto, ma non inventare i dati anagrafici mancanti.'}
+`;
 
       if (fillingMode === 'studio') {
         const isAutoMode = (!requestedFields || requestedFields.length === 0);
