@@ -155,7 +155,10 @@ async function extractPdfFormFields(base64Pdf: string): Promise<Array<{
       }
     }
 
-    console.log(`[extractPdfFormFields] Found ${result.length} EMPTY form fields in PDF`);
+    console.log(`[extractPdfFormFields] Found ${result.length} EMPTY form fields`);
+    if (result.length > 0) {
+      console.log('[extractPdfFormFields] Details:', JSON.stringify(result.map(f => ({ name: f.name, x: f.x, y: f.y, pg: f.pageIndex })), null, 2));
+    }
     return result;
   } catch (error) {
     console.log('[extractPdfFormFields] No form fields found or error:', error);
