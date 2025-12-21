@@ -17,6 +17,8 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } f
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
+// @ts-ignore - pdfjs-dist types
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 // [Removed legacy Document AI import]
 import { AiService } from './ai'; // Import new AI Service
 
@@ -137,6 +139,143 @@ async function extractPdfFormFields(base64Pdf: string): Promise<Array<{
     console.log('[extractPdfFormFields] No form fields found or error:', error);
     return [];
   }
+}
+
+// NEW: Extract text positions from PDF using pdfjs-dist (INSTANT, PRECISE)
+async function extractPdfTextPositions(base64Pdf: string): Promise<Array<{
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  pageIndex: number,
+  isEmptyField: boolean // True if this looks like a fill-in field (underscore, blank line)
+}>> {
+  try {
+    console.log('[extractPdfTextPositions] Starting PDF text extraction...');
+    const startTime = Date.now();
+
+    const data = Buffer.from(base64Pdf, 'base64');
+    const pdf = await pdfjsLib.getDocument({ data }).promise;
+
+    const allTexts: Array<{
+      text: string, x: number, y: number, width: number, height: number, pageIndex: number, isEmptyField: boolean
+    }> = [];
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.0 });
+      const textContent = await page.getTextContent();
+
+      for (const item of textContent.items as any[]) {
+        if (!item.str) continue;
+
+        const [a, b, c, d, tx, ty] = item.transform;
+        const fontSize = Math.sqrt(a * a + b * b);
+
+        // Detect if this is a fill-in field indicator
+        const text = item.str.trim();
+        const isEmptyField =
+          text.match(/^_{3,}$/) || // Underscores like _____
+          text.match(/^\.{3,}$/) || // Dots like .....
+          text.match(/^\/{3,}$/) || // Slashes
+          text === '' ||
+          text.match(/^[\s_\-\.]{5,}$/); // Mixed whitespace/underscores
+
+        allTexts.push({
+          text: item.str,
+          x: tx,
+          y: viewport.height - ty, // Flip Y for standard coordinate system
+          width: item.width || (text.length * fontSize * 0.6),
+          height: fontSize * 1.2,
+          pageIndex: pageNum - 1,
+          isEmptyField: !!isEmptyField
+        });
+      }
+    }
+
+    const elapsed = Date.now() - startTime;
+    console.log(`[extractPdfTextPositions] Extracted ${allTexts.length} text elements in ${elapsed}ms`);
+
+    return allTexts;
+  } catch (error) {
+    console.error('[extractPdfTextPositions] Error:', error);
+    return [];
+  }
+}
+
+// NEW: Identify fillable fields from PDF text structure (INSTANT)
+async function identifyFillableFields(base64Pdf: string): Promise<Array<{
+  name: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  pageIndex: number,
+  labelText: string // The text that labels this field
+}>> {
+  const textPositions = await extractPdfTextPositions(base64Pdf);
+
+  // Find patterns that indicate fillable fields:
+  // 1. Text followed by underscores/empty space
+  // 2. Text ending with ":"
+  // 3. Common form labels
+
+  const fields: Array<{
+    name: string, x: number, y: number, width: number, height: number, pageIndex: number, labelText: string
+  }> = [];
+
+  // Group by approximate Y position (same line)
+  const lines = new Map<number, typeof textPositions>();
+  for (const t of textPositions) {
+    const yKey = Math.round(t.y / 10) * 10; // Group within 10px
+    if (!lines.has(yKey)) lines.set(yKey, []);
+    lines.get(yKey)!.push(t);
+  }
+
+  // Analyze each line for field patterns
+  for (const [yKey, lineItems] of Array.from(lines.entries())) {
+    // Sort by X position
+    lineItems.sort((a: any, b: any) => a.x - b.x);
+
+    for (let i = 0; i < lineItems.length; i++) {
+      const item = lineItems[i];
+      const text = item.text.trim();
+
+      // Skip if this is just underscores or empty
+      if (item.isEmptyField) continue;
+
+      // Check if next item is empty field (underscores, etc)
+      const nextItem = lineItems[i + 1];
+      if (nextItem && nextItem.isEmptyField) {
+        // This text labels the next empty field
+        fields.push({
+          name: text.replace(/:$/, '').trim(),
+          x: nextItem.x,
+          y: item.y,
+          width: nextItem.width || 100,
+          height: item.height,
+          pageIndex: item.pageIndex,
+          labelText: text
+        });
+      }
+      // Check if text ends with : and has space after
+      else if (text.endsWith(':')) {
+        fields.push({
+          name: text.replace(/:$/, '').trim(),
+          x: item.x + item.width + 5,
+          y: item.y,
+          width: 150,
+          height: item.height,
+          pageIndex: item.pageIndex,
+          labelText: text
+        });
+      }
+    }
+  }
+
+  console.log(`[identifyFillableFields] Identified ${fields.length} fillable fields in ${Date.now()}ms`);
+  return fields;
 }
 
 // NEW: Gemini-powered Layout Analysis
@@ -926,11 +1065,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { base64 } = req.body;
       if (!base64) return res.status(400).json({ error: 'Missing base64 content' });
 
-      console.log('[DEBUG analyze-layout] Delegating to AiService (Gemini Vision)...');
+      const startTime = Date.now();
 
+      // PRIORITY 1: Try pdf-lib form fields (INSTANT, for editable PDFs)
+      console.log('[DEBUG analyze-layout] Trying pdf-lib form field extraction...');
+      const formFields = await extractPdfFormFields(base64);
+
+      if (formFields.length > 0) {
+        console.log(`[DEBUG analyze-layout] FAST PATH: Found ${formFields.length} form fields in ${Date.now() - startTime}ms`);
+        const fields = formFields.map(f => ({
+          name: f.name,
+          boundingPoly: {
+            normalizedVertices: [
+              { x: f.x / 612, y: (792 - f.y - f.height) / 792 }, // Normalize to 0-1 (assuming 8.5x11 page)
+              { x: (f.x + f.width) / 612, y: (792 - f.y - f.height) / 792 },
+              { x: (f.x + f.width) / 612, y: (792 - f.y) / 792 },
+              { x: f.x / 612, y: (792 - f.y) / 792 }
+            ]
+          },
+          pageIndex: f.pageIndex,
+          source: 'pdf_form_instant'
+        }));
+        return res.json({ fields });
+      }
+
+      // PRIORITY 2: Try pdfjs-dist text extraction (INSTANT, for non-form PDFs)
+      console.log('[DEBUG analyze-layout] Trying pdfjs-dist text extraction...');
+      const textFields = await identifyFillableFields(base64);
+
+      if (textFields.length > 0) {
+        console.log(`[DEBUG analyze-layout] MEDIUM PATH: Found ${textFields.length} text fields in ${Date.now() - startTime}ms`);
+        const fields = textFields.map(f => ({
+          name: f.name,
+          boundingPoly: {
+            normalizedVertices: [
+              { x: f.x / 612, y: f.y / 792 },
+              { x: (f.x + f.width) / 612, y: f.y / 792 },
+              { x: (f.x + f.width) / 612, y: (f.y + f.height) / 792 },
+              { x: f.x / 612, y: (f.y + f.height) / 792 }
+            ]
+          },
+          pageIndex: f.pageIndex,
+          source: 'pdfjs_text_instant'
+        }));
+        return res.json({ fields });
+      }
+
+      // FALLBACK: Use AI Vision (SLOW, for complex documents)
+      console.log('[DEBUG analyze-layout] SLOW PATH: Falling back to AI Vision...');
       const fields = await aiService.analyzeLayout(base64);
+      console.log(`[DEBUG analyze-layout] AI analysis complete. Found ${fields.length} fields in ${Date.now() - startTime}ms`);
 
-      console.log(`[DEBUG analyze-layout] Analysis complete. Found ${fields.length} fields.`);
       res.json({ fields });
     } catch (error: any) {
       console.error('[API analyze-layout] Error:', error);
