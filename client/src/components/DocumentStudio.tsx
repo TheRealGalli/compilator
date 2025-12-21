@@ -292,36 +292,40 @@ export function DocumentStudio({
                     });
                 }
 
-                // Analyze lines for field patterns
                 for (const [yKey, lineItems] of Array.from(lines.entries())) {
                     lineItems.sort((a, b) => a.x - b.x);
+
+                    // Reconstruct full line text to find inline patterns
+                    const fullLineText = lineItems.map(i => i.text).join(' ');
+                    // Regex for "Label: _____" or "_____ Label" or just "_____"
+                    // We look for sequences of 3+ underscores/dots
+                    const fieldRegex = /([_\-.]{3,})/g;
+                    let match;
+
+                    // If we find specific underscore patterns in the reconstruct line, 
+                    // we try to map them back to items or create a field covering that area
 
                     for (let i = 0; i < lineItems.length; i++) {
                         const item = lineItems[i];
                         const text = item.text.trim();
 
-                        // Skip empty or underscore-only items
-                        const isEmptyField = /^[_\-\.]{3,}$/.test(text) || text === '';
-                        if (isEmptyField) continue;
-
-                        // Check if next item is empty field indicator
-                        const nextItem = lineItems[i + 1];
-                        const nextIsEmpty = nextItem && /^[_\-\.]{3,}$/.test(nextItem.text.trim());
-
-                        // Check if text ends with : or next is empty
-                        if (text.endsWith(':') || nextIsEmpty) {
-                            const fieldX = nextIsEmpty ? nextItem.x : item.x + item.width + 5;
-                            const fieldWidth = nextIsEmpty ? nextItem.width : 150;
+                        // 1. IS IT A PLACEHOLDER? (____, ...., ----)
+                        if (/^[_\-.]{3,}$/.test(text)) {
+                            // It's a field! Try to find a label to its left
+                            let label = "Campo";
+                            if (i > 0) {
+                                label = lineItems[i - 1].text.replace(/[:\s]+$/, '').trim();
+                            }
 
                             fields.push({
-                                name: text.replace(/:$/, '').trim(),
+                                name: label,
                                 boundingPoly: {
                                     vertices: [],
                                     normalizedVertices: [
-                                        { x: fieldX / item.pageWidth, y: item.y / item.pageHeight },
-                                        { x: (fieldX + fieldWidth) / item.pageWidth, y: item.y / item.pageHeight },
-                                        { x: (fieldX + fieldWidth) / item.pageWidth, y: (item.y + item.height) / item.pageHeight },
-                                        { x: fieldX / item.pageWidth, y: (item.y + item.height) / item.pageHeight }
+                                        { x: item.x / item.pageWidth, y: item.y / item.pageHeight },
+                                        { x: (item.x + item.width) / item.pageWidth, y: item.y / item.pageHeight },
+                                        { x: (item.x + item.width) / item.pageWidth, y: (item.y + item.height) / item.pageHeight },
+                                        { x: item.x / item.pageWidth, y: (item.y + item.height) / item.pageHeight }
                                     ]
                                 },
                                 pageIndex: pageNum - 1,
@@ -330,6 +334,72 @@ export function DocumentStudio({
                                 offsetY: 0,
                                 rotation: 0
                             });
+                            continue;
+                        }
+
+                        // 2. DOES IT CONTAIN A PLACEHOLDER? (Name: ______)
+                        if (text.match(/[_\-.]{3,}/)) {
+                            // This item contains both label and field. 
+                            // We estimate the field starts after the label part
+                            const parts = text.split(/([_\-.]{3,})/);
+                            // If we have "Label" and "____", parts will be ["Label", "____", ""]
+                            if (parts.length >= 2 && parts[0].trim().length > 0) {
+                                const label = parts[0].replace(/[:\s]+$/, '').trim();
+                                // Rough estimation: label takes up some % of width
+                                const labelRatio = parts[0].length / text.length;
+                                const fieldX = item.x + (item.width * labelRatio);
+                                const fieldW = item.width * (1 - labelRatio);
+
+                                fields.push({
+                                    name: label,
+                                    boundingPoly: {
+                                        vertices: [],
+                                        normalizedVertices: [
+                                            { x: fieldX / item.pageWidth, y: item.y / item.pageHeight },
+                                            { x: (fieldX + fieldW) / item.pageWidth, y: item.y / item.pageHeight },
+                                            { x: (fieldX + fieldW) / item.pageWidth, y: (item.y + item.height) / item.pageHeight },
+                                            { x: fieldX / item.pageWidth, y: (item.y + item.height) / item.pageHeight }
+                                        ]
+                                    },
+                                    pageIndex: pageNum - 1,
+                                    value: "",
+                                    offsetX: 0,
+                                    offsetY: 0,
+                                    rotation: 0
+                                });
+                                continue;
+                            }
+                        }
+
+                        // 3. IS IT A LABEL FOR A FOLLOWING EMPTY SPACE? (Name:)
+                        // Only if NOT followed by a text item (i.e., end of line or big gap)
+                        if (text.endsWith(':')) {
+                            const nextItem = lineItems[i + 1];
+                            const isNextClose = nextItem && (nextItem.x - (item.x + item.width) < 20); // 20px gap
+
+                            // If nothing follows closely, assume the space AFTER is the field
+                            if (!isNextClose) {
+                                const fieldX = item.x + item.width + 5;
+                                const fieldWidth = 150; // Assume standard width
+
+                                fields.push({
+                                    name: text.replace(/:$/, '').trim(),
+                                    boundingPoly: {
+                                        vertices: [],
+                                        normalizedVertices: [
+                                            { x: fieldX / item.pageWidth, y: item.y / item.pageHeight },
+                                            { x: (fieldX + fieldWidth) / item.pageWidth, y: item.y / item.pageHeight },
+                                            { x: (fieldX + fieldWidth) / item.pageWidth, y: (item.y + item.height) / item.pageHeight },
+                                            { x: fieldX / item.pageWidth, y: (item.y + item.height) / item.pageHeight }
+                                        ]
+                                    },
+                                    pageIndex: pageNum - 1,
+                                    value: "",
+                                    offsetX: 0,
+                                    offsetY: 0,
+                                    rotation: 0
+                                });
+                            }
                         }
                     }
                 }
