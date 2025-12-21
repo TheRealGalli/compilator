@@ -109,7 +109,7 @@ export class AiService {
      * Returns precise field positions extracted from PDF structure
      * MUCH FASTER than Vision-based analysis (2-5s vs 20-30s)
      */
-    async analyzeLayoutWithDocumentAI(base64Pdf: string, processorId?: string): Promise<any[]> {
+    async analyzeLayoutWithDocumentAI(base64Pdf: string, processorId?: string): Promise<{ fields: any[], documentTokens: any[] }> {
         try {
             const startTime = Date.now();
             console.log('[AiService] analyzeLayoutWithDocumentAI: Starting...');
@@ -119,7 +119,8 @@ export class AiService {
 
             if (!formParserProcessorId) {
                 console.warn('[AiService] No Document AI processor ID configured, falling back to Vision');
-                return this.analyzeLayout(base64Pdf);
+                const fields = await this.analyzeLayout(base64Pdf);
+                return { fields, documentTokens: [] };
             }
 
             // Document AI processor location - can be different from Vertex AI location
@@ -144,15 +145,43 @@ export class AiService {
 
             if (!document) {
                 console.warn('[AiService] Document AI returned no document');
-                return [];
+                return { fields: [], documentTokens: [] };
             }
 
             const fields: any[] = [];
+            const documentTokens: any[] = [];
 
             // Extract form fields from Document AI response
             if (document.pages) {
                 for (let pageIndex = 0; pageIndex < document.pages.length; pageIndex++) {
                     const page = document.pages[pageIndex];
+
+                    // HYBRID VERIFICATION: Collect all existing tokens to prevent overlap
+                    if (page.tokens) {
+                        for (const token of page.tokens) {
+                            const textAnchor = token.layout?.textAnchor;
+                            let content = '';
+                            if (textAnchor && textAnchor.textSegments && document.text) {
+                                content = textAnchor.textSegments
+                                    .map((seg: any) => document.text!.substring(Number(seg.startIndex || 0), Number(seg.endIndex || 0)))
+                                    .join('');
+                            }
+
+                            const bp = token.layout?.boundingPoly;
+                            if (bp?.normalizedVertices && content.trim()) {
+                                documentTokens.push({
+                                    text: content.trim(),
+                                    boundingPoly: {
+                                        normalizedVertices: bp.normalizedVertices.map((v: any) => ({
+                                            x: v.x || 0,
+                                            y: v.y || 0
+                                        }))
+                                    },
+                                    pageIndex: pageIndex
+                                });
+                            }
+                        }
+                    }
 
                     // Extract form fields
                     if (page.formFields) {
@@ -212,7 +241,7 @@ export class AiService {
                         }
                     }
 
-                    // Fallback: Pick ONLY lines that look like input fields (contain "...") or trailing spaces
+                    // UNIVERSAL DISCOVERY: If no structured fields found, pick lines that look like input fields
                     if (fields.filter(f => f.pageIndex === pageIndex).length === 0 && page.lines) {
                         for (const line of page.lines) {
                             const textAnchor = line.layout?.textAnchor;
@@ -223,10 +252,10 @@ export class AiService {
                                     .join('');
                             }
 
-                            const hasDots = content.includes('...') || content.includes('___');
+                            const hasInputSignifier = content.includes('...') || content.includes('___') || content.includes(':');
                             const cleanContent = content.trim().replace(/[:\s_.-]+$/, '');
 
-                            if (cleanContent.length > 2 && cleanContent.length < 40 && hasDots) {
+                            if (cleanContent.length > 2 && cleanContent.length < 50 && (hasInputSignifier || content.length < 30)) {
                                 const vertices = line.layout?.boundingPoly?.normalizedVertices;
                                 if (vertices && vertices.length >= 4) {
                                     fields.push({
@@ -240,7 +269,7 @@ export class AiService {
                                             }))
                                         },
                                         pageIndex: pageIndex,
-                                        source: 'document_ai_layout_line'
+                                        source: 'document_ai_universal_discovery'
                                     });
                                 }
                             }
@@ -254,7 +283,13 @@ export class AiService {
                                 for (const row of table.headerRows) {
                                     if (row.cells) {
                                         for (const cell of row.cells) {
-                                            const text = cell.layout?.textAnchor?.content || '';
+                                            const textAnchorCell = cell.layout?.textAnchor;
+                                            let text = '';
+                                            if (textAnchorCell && textAnchorCell.textSegments && document.text) {
+                                                text = textAnchorCell.textSegments
+                                                    .map((seg: any) => document.text!.substring(Number(seg.startIndex || 0), Number(seg.endIndex || 0)))
+                                                    .join('');
+                                            }
                                             const bp = cell.layout?.boundingPoly;
                                             if (bp?.normalizedVertices && text.trim()) {
                                                 fields.push({
@@ -279,15 +314,23 @@ export class AiService {
             }
 
             const elapsed = Date.now() - startTime;
-            console.log(`[AiService] analyzeLayoutWithDocumentAI: Found ${fields.length} fields in ${elapsed}ms`);
+            console.log(`[AiService] analyzeLayoutWithDocumentAI: Found ${fields.length} fields and ${documentTokens.length} tokens in ${elapsed}ms`);
 
-            return fields;
+            return {
+                fields,
+                documentTokens
+            };
 
         } catch (error: any) {
             console.error('[AiService] analyzeLayoutWithDocumentAI error:', error?.message || error);
             // Fallback to Vision-based analysis
             console.log('[AiService] Falling back to Vision-based analysis');
-            return this.analyzeLayout(base64Pdf);
+            try {
+                const fields = await this.analyzeLayout(base64Pdf);
+                return { fields, documentTokens: [] };
+            } catch (fallbackError) {
+                return { fields: [], documentTokens: [] };
+            }
         }
     }
 

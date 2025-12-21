@@ -1,5 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import fs from 'fs';
+import path from 'path';
 import multer from "multer";
 import compression from "compression";
 import { storage } from "./storage";
@@ -160,12 +162,28 @@ async function fillPdfBinary(
     offsetX?: number,
     offsetY?: number,
     rotation?: number
-  }[]
+  }[],
+  documentTokens?: any[]
 ): Promise<string> {
   try {
     const pdfDoc = await PDFDocument.load(Buffer.from(base64Original, 'base64'));
     const pages = pdfDoc.getPages();
-    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    // PREMIUM FINISH: Embed a professional font
+    let font;
+    try {
+      const fontPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts/LiberationSans-Regular.ttf');
+      if (fs.existsSync(fontPath)) {
+        const fontBytes = fs.readFileSync(fontPath);
+        font = await pdfDoc.embedFont(fontBytes);
+        console.log('[DEBUG fillPdfBinary] Professional font embedded successfully.');
+      } else {
+        font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      }
+    } catch (e) {
+      console.warn('[WARN fillPdfBinary] Could not embed custom font, falling back to Helvetica:', e);
+      font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    }
 
     for (const field of fields) {
       const pageIndex = (field as any).pageIndex || 0;
@@ -213,6 +231,35 @@ async function fillPdfBinary(
               });
             }
           } else {
+            // OCR SHIELD: Hybrid Verification to prevent overlapping existing text
+            const verticesField = field.preciseBox.normalizedVertices;
+            if (documentTokens && verticesField) {
+              const fieldLeft = verticesField[0].x;
+              const fieldTop = verticesField[0].y;
+              const fieldRight = verticesField[2].x;
+              const fieldBottom = verticesField[2].y;
+
+              const overlappingToken = documentTokens.find(t => {
+                if (t.pageIndex !== pageIndex) return false;
+                const tv = t.boundingPoly?.normalizedVertices;
+                if (!tv || tv.length < 4) return false;
+
+                // Simple AABB overlap check with a small buffer
+                const tLeft = tv[0].x;
+                const tTop = tv[0].y;
+                const tRight = tv[2].x;
+                const tBottom = tv[2].y;
+
+                return !(fieldRight < tLeft + 0.01 || fieldLeft > tRight - 0.01 ||
+                  fieldBottom < tTop + 0.01 || fieldTop > tBottom - 0.01);
+              });
+
+              if (overlappingToken && overlappingToken.text.length > 3) {
+                console.log(`[DEBUG Studio] OCR SHIELD: Skipping overlap with "${overlappingToken.text}" at page ${pageIndex}`);
+                continue;
+              }
+            }
+
             // NORMAL TEXT: Refined baseline alignment
             const boxHeight = (bl.y - tr.y) * height;
             const fontSize = Math.max(7, Math.min(11, boxHeight * 0.75));
@@ -1214,6 +1261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Priority 2: pdf-lib form extraction (fast + precise)
       // Priority 3: Fall back to AI analysis
       let preciseFields: any[] = [];
+      let documentTokens: any[] = [];
       const studioFields = req.body.studioFields;
 
       if (studioFields && Array.isArray(studioFields) && studioFields.length > 0) {
@@ -1250,8 +1298,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } else if (fillingMode === 'studio') {
           // Step 2: Use Document AI for precise layout analysis in Studio Mode
-          console.log('[DEBUG Compile] Studio Mode: Using Document AI for precise layout analysis');
-          preciseFields = await aiService.analyzeLayoutWithDocumentAI(pinnedSource.base64);
+          const analysis = await aiService.analyzeLayoutWithDocumentAI(pinnedSource.base64);
+          preciseFields = analysis.fields;
+          documentTokens = analysis.documentTokens;
         } else {
           // Step 3: Fall back to Gemini Vision analysis (slower)
           console.log('[DEBUG Compile] No form fields found, using AI vision analysis');
@@ -1265,7 +1314,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[DEBUG Studio] FAST PATH (onlyAnalyze): returning ${preciseFields.length} fields directly`);
         return res.json({
           success: true,
-          fields: preciseFields
+          fields: preciseFields,
+          documentTokens: documentTokens // Optional: helps frontend debugging
         });
       }
 
@@ -1690,7 +1740,7 @@ ${multimodalFiles.length > 0 || hasExternalSources ? 'IMPORTANTE: Usa i dati dai
           }
 
           if (finalFields.length > 0) {
-            binaryBase64 = await fillPdfBinary(pinnedSource.base64, finalFields);
+            binaryBase64 = await fillPdfBinary(pinnedSource.base64, finalFields, documentTokens);
             console.log(`[DEBUG Compile] PDF binary modification successful. Total fields filled: ${finalFields.length}`);
           } else {
             console.log('[DEBUG Compile] No fields to fill found (Manual or AI). returning original.');
