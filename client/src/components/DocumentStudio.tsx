@@ -4,13 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, Wand2, X, Check, Sparkles, Star } from "lucide-react";
+import { Download, Wand2, X, Check, Sparkles, Star, Asterisk } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 
-
-import { ThreeStars } from "@/components/ui/three-stars";
 
 // Setup pdfjs worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -343,7 +341,10 @@ export function DocumentStudio({
             <CardHeader className="flex-shrink-0 px-0 pb-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <ThreeStars className="w-8 h-8 text-blue-500 mr-2" />
+                        <div className="flex items-center -space-x-3 mr-2 select-none">
+                            <Asterisk className="w-8 h-8 text-blue-600" strokeWidth={3} />
+                            <Asterisk className="w-8 h-8 text-blue-600" strokeWidth={3} />
+                        </div>
                         <div>
                             <CardTitle className="text-lg">Document Studio</CardTitle>
                             <p className="text-xs text-muted-foreground">{fileName}</p>
