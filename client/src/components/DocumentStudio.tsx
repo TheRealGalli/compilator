@@ -341,58 +341,6 @@ export function DocumentStudio({
             <CardHeader className="flex-shrink-0 px-0 pb-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 mr-4 select-none">
-                            {/* Star 1: Placeholder/Info */}
-                            <TooltipWrapper text="Rilevamento Automatico">
-                                <motion.div
-                                    animate={{ rotate: star1Rotation }}
-                                    onClick={() => {
-                                        setStar1Rotation(prev => prev + 360);
-                                        toast({
-                                            title: "Rilevamento IA",
-                                            description: "I campi vengono rilevati automaticamente all'apertura del file."
-                                        });
-                                    }}
-                                    className={`cursor-pointer p-0 m-0 flex items-center justify-center w-8 h-8 origin-center hover:scale-110`}
-                                >
-                                    <Star className="w-6 h-6 fill-slate-300 text-slate-300 pointer-events-none" />
-                                </motion.div>
-                            </TooltipWrapper>
-
-                            {/* Star 2: Chat Studio Toggle */}
-                            <TooltipWrapper text={studioMode === 'chat' ? "Impostazioni Modello" : "Chat Studio"}>
-                                <div
-                                    onClick={() => {
-                                        const newMode = studioMode === 'chat' ? 'settings' : 'chat';
-                                        if (onStudioModeChange) onStudioModeChange(newMode);
-                                        toast({
-                                            title: newMode === 'chat' ? "Chat Studio Attiva" : "Impostazioni Modello",
-                                            description: newMode === 'chat' ? "L'agente è pronto ad aiutarti." : "Regola i parametri del modello."
-                                        });
-                                    }}
-                                    className={`cursor-pointer p-0 m-0 flex items-center justify-center w-8 h-8 origin-center hover:scale-110 transition-all ${studioMode === 'chat' ? 'scale-125' : ''} ${star2Spinning ? 'animate-turbo-spin' : ''}`}
-                                >
-                                    <Star className={`w-6 h-6 ${studioMode === 'chat' ? 'fill-amber-400 text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.4)]' : 'fill-blue-600 text-blue-600'} pointer-events-none transition-all`} />
-                                </div>
-                            </TooltipWrapper>
-
-                            {/* Star 3: Download */}
-                            <TooltipWrapper text="Scarica PDF">
-                                <motion.div
-                                    animate={star3Spinning ? { rotate: 360 } : {}}
-                                    transition={star3Spinning ? { repeat: Infinity, duration: 1, ease: "linear" } : {}}
-                                    onClick={() => {
-                                        setStar3Spinning(true);
-                                        onDownload(fields);
-                                        setTimeout(() => setStar3Spinning(false), 3000);
-                                    }}
-                                    className="cursor-pointer p-0 m-0 flex items-center justify-center w-8 h-8 origin-center hover:scale-110"
-                                >
-                                    <Star className="w-6 h-6 fill-blue-600 text-blue-600 pointer-events-none" />
-                                </motion.div>
-                            </TooltipWrapper>
-                        </div>
-                        <div>
                             <CardTitle className="text-lg">Document Studio</CardTitle>
                             <p className="text-xs text-muted-foreground">{fileName}</p>
                         </div>
@@ -422,84 +370,16 @@ export function DocumentStudio({
                                     </div>
                                 }
                             >
-                                {Array.from(new Array(numPages), (el, index) => (
-                                    <div
-                                        key={`page_${index + 1}`}
-                                        className="relative shadow-2xl mb-8 bg-white overflow-hidden select-none"
-                                        onClick={(e) => handlePageClick(index, e)}
-                                    >
-                                        <Page
-                                            pageNumber={index + 1}
-                                            renderTextLayer={false}
-                                            renderAnnotationLayer={false}
-                                            width={800}
-                                        />
-                                        {/* Overlay Layer */}
-                                        <div className="absolute inset-0">
-                                            {fields.filter(f => f.pageIndex === index).map((field, fIdx) => {
-                                                const v = field.boundingPoly.normalizedVertices || field.boundingPoly.vertices;
-                                                if (!v || v.length < 1) return null;
-
-                                                const globalIdx = fields.indexOf(field);
-                                                const isSelected = selectedFieldIndex === globalIdx;
-
-                                                // Determine position (assuming 0-1 scale for normalized)
-                                                const isNormalized = !!field.boundingPoly.normalizedVertices;
-                                                const left = isNormalized ? v[0].x * 100 : (v[0].x / 1000) * 100;
-                                                const top = isNormalized ? v[0].y * 100 : (v[0].y / 1000) * 100;
-
-                                                // Calculate width: use field.width if set, otherwise from bounding box
-                                                let width = 'auto';
-                                                if (field.width) {
-                                                    width = `${field.width}px`;
-                                                } else if (isNormalized && v.length === 4) {
-                                                    const w = (v[1].x - v[0].x) * 100;
-                                                    if (w > 2) width = `${w}%`;
-                                                }
-
-                                                const isValueEmpty = !field.value || field.value === "null" || field.value === "";
-                                                const isCheckbox = field.fieldType === 'checkbox';
-
-                                                return (
-                                                    <motion.div
-                                                        key={`overlay_${globalIdx}`}
-                                                        className={`absolute z-10 pointer-events-none`}
-                                                        animate={{
-                                                            x: field.offsetX || 0,
-                                                            y: field.offsetY || 0,
-                                                            rotate: field.rotation || 0
-                                                        }}
-                                                        style={{
-                                                            left: `${left}%`,
-                                                            top: `${top}%`,
-                                                            transform: isCheckbox ? 'translate(-50%, -50%)' : 'translateY(-100%)', // Center for checkbox, baseline for text
-                                                            width: isCheckbox ? '20px' : (width === 'auto' ? 'auto' : width),
-                                                            height: isCheckbox ? '20px' : 'auto',
-                                                            maxWidth: '400px'
-                                                        }}
-                                                    >
-                                                        <div className={`
-                                                            relative px-1 rounded border transition-colors flex items-center justify-center
-                                                            ${isSelected ? 'border-amber-500 bg-amber-50/90 shadow-lg' : 'border-amber-400/30 bg-amber-50/20'}
-                                                            ${isCheckbox ? 'rounded-sm aspect-square' : ''}
-                                                            ${isValueEmpty && !isCheckbox ? 'border-dashed' : ''} 
-                                                        `}>
-                                                            {/* Static View Only */}
-                                                            {isCheckbox ? (
-                                                                <span className="text-amber-900 font-bold text-sm select-none">
-                                                                    {field.value === 'X' || field.value === 'true' ? 'X' : ''}
-                                                                </span>
-                                                            ) : (
-                                                                <div className={`text-[12px] font-medium min-w-[30px] ${isValueEmpty ? 'text-amber-400/70 italic' : 'text-amber-900'}`}>
-                                                                    {isValueEmpty ? field.name : String(field.value)}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </motion.div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
+                                {Array.from(new Array(numPages), (el, pageIndex) => (
+                                    <Page
+                                        key={`page_${pageIndex + 1}`}
+                                        pageNumber={pageIndex + 1}
+                                        renderTextLayer={false}
+                                        renderAnnotationLayer={false}
+                                        className="mb-4 shadow-sm"
+                                        width={800} // Assuming a fixed width for now, adjust as needed
+                                        // onLoadSuccess={handlePageLoadSuccess} // If you have a page-specific load success handler
+                                    />
                                 ))}
                             </Document>
                         </div>
