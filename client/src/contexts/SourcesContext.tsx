@@ -9,7 +9,6 @@ export interface Source {
     size: number;
     url?: string; // Optional GCS URL (for backward compatibility or compiler)
     base64?: string; // Client-side base64 content
-    isPinned?: boolean; // Single master document for graphic structure
 }
 
 interface SourcesContextType {
@@ -17,9 +16,7 @@ interface SourcesContextType {
     addSource: (file: File) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'>;
     removeSource: (id: string) => void;
     toggleSource: (id: string) => void;
-    togglePin: (id: string) => void;
     selectedSources: Source[];
-    pinnedSource: Source | null;
     maxSources: number;
 }
 
@@ -68,7 +65,6 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 type: file.type,
                 size: file.size,
                 base64: base64, // Store base64 directly
-                isPinned: false,
             };
 
             setSources(prev => [...prev, newSource]);
@@ -89,18 +85,6 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         );
     }, []);
 
-    const togglePin = useCallback((id: string) => {
-        setSources(prev =>
-            prev.map(s => {
-                if (s.id === id) {
-                    return { ...s, isPinned: !s.isPinned };
-                }
-                // Unpin others
-                return { ...s, isPinned: false };
-            })
-        );
-    }, []);
-
     const selectedSources = sources.filter(s => s.selected);
 
     return (
@@ -110,9 +94,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 addSource,
                 removeSource,
                 toggleSource,
-                togglePin,
                 selectedSources,
-                pinnedSource: sources.find(s => s.isPinned) || null,
                 maxSources: MAX_SOURCES,
             }}
         >

@@ -5,12 +5,10 @@ import { Card } from "@/components/ui/card";
 interface FileCardProps {
   name: string;
   size?: string;
-  isPinned?: boolean;
   onRemove?: () => void;
-  onTogglePin?: () => void;
 }
 
-export function FileCard({ name, size = "1.2 MB", isPinned, onRemove, onTogglePin }: FileCardProps) {
+export function FileCard({ name, size = "1.2 MB", onRemove }: FileCardProps) {
   const getFileIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase() || '';
     if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return Image;
@@ -31,16 +29,7 @@ export function FileCard({ name, size = "1.2 MB", isPinned, onRemove, onTogglePi
           <p className="text-[10px] text-muted-foreground leading-none" data-testid="text-filesize">{size}</p>
         </div>
 
-        {onTogglePin && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className={`h-6 w-6 transition-all ${isPinned ? 'opacity-100' : 'opacity-20 hover:opacity-100'}`}
-            onClick={onTogglePin}
-          >
-            <Pin className={`w-3.5 h-3.5 ${isPinned ? 'text-red-500 fill-red-500 rotate-45' : ''}`} />
-          </Button>
-        )}
+
 
         <Button
           size="icon"

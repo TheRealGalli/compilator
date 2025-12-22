@@ -19,7 +19,7 @@ export function DocumentsSection() {
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState<string | null>(null);
   const { toast } = useToast();
-  const { sources, addSource, removeSource, maxSources, togglePin } = useSources();
+  const { sources, addSource, removeSource, maxSources } = useSources();
   const { isConnected, messages, isFetchingMessages, fetchMessages, importEmail, nextPageToken, currentCategory, setCategory, searchQuery, setSearchQuery } = useGmail();
   const {
     files, isFetchingFiles, fetchFiles, importFile,
@@ -623,9 +623,7 @@ export function DocumentsSection() {
                 key={source.id}
                 name={source.name}
                 size={formatSize(source.size)}
-                isPinned={source.isPinned}
                 onRemove={() => handleRemove(source.id)}
-                onTogglePin={() => togglePin(source.id)}
               />
             ))}
           </div>

@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TemplateEditor } from "./TemplateEditor";
 import { CompiledOutput } from "./CompiledOutput";
 import { ModelSettings } from "./ModelSettings";
-import { StudioChat } from "./StudioChat";
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSources } from "@/contexts/SourcesContext";
-import { DocumentStudio } from "./DocumentStudio";
+
 import {
   Dialog,
   DialogContent,
@@ -205,11 +205,8 @@ export function DocumentCompilerSection({
   const [templateContent, setTemplateContent] = useState("");
   const [compiledContent, setCompiledContent] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
-  const [discoveredFieldNames, setDiscoveredFieldNames] = useState<string[]>([]); // New: for studio mode
-  const [currentFields, setCurrentFields] = useState<any[]>([]); // New: Full field objects
-  const [studioValues, setStudioValues] = useState<Record<string, string>>({}); // New: for real-time typing
   const { toast } = useToast();
-  const { selectedSources, pinnedSource } = useSources();
+  const { selectedSources } = useSources();
 
   // Template Generation State
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -223,7 +220,7 @@ export function DocumentCompilerSection({
   const [detailedAnalysis, setDetailedAnalysis] = useState(true);
   const [formalTone, setFormalTone] = useState(true);
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
-  const [studioMode, setStudioMode] = useState<'settings' | 'chat'>('settings');
+
 
   useEffect(() => {
     // fetchDocuments(); // Removed as per previous instructions, if any.
@@ -303,10 +300,10 @@ export function DocumentCompilerSection({
   const handleCompile = async () => {
     if (isCompiling) return;
 
-    if (!templateContent.trim() && !pinnedSource) {
+    if (!templateContent.trim() && selectedSources.length === 0) {
       toast({
         title: "Errore",
-        description: "Seleziona un template o marca un documento con la puntina rossa per procedere.",
+        description: "Seleziona un template o aggiungi delle fonti per procedere.",
         variant: "destructive",
       });
       return;
@@ -339,22 +336,13 @@ export function DocumentCompilerSection({
           name: s.name,
           type: s.type,
           base64: s.base64
-        })),
-        pinnedSource: pinnedSource ? {
-          name: pinnedSource.name,
-          type: pinnedSource.type,
-          base64: pinnedSource.base64
-        } : null,
-        fillingMode: pinnedSource && (pinnedSource.type === 'application/pdf' || pinnedSource.type.startsWith('image/')) ? 'studio' : null,
-        fields: discoveredFieldNames
+        }))
       });
 
-      console.log('[DEBUG Frontend] Calling /api/compile with fields:', discoveredFieldNames);
+
 
       const data = await response.json();
-      if (data.values) {
-        setStudioValues(data.values);
-      } else if (data.compiledContent) {
+      if (data.compiledContent) {
         setCompiledContent(data.compiledContent);
 
         const settingsInfo = [];
@@ -502,89 +490,84 @@ export function DocumentCompilerSection({
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {/* Hide template selector when a source is pinned */}
-          {!pinnedSource && (
-            <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-              <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
-                <SelectValue placeholder="Seleziona template" />
-              </SelectTrigger>
-              <SelectContent>
-                <div className="p-2 border-b space-y-1">
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      document.getElementById('template-upload')?.click();
-                    }}
-                    data-testid="button-upload-template"
-                  >
-                    <span className="mr-2">📄</span>
-                    Upload Template
-                  </Button>
-                  <input
-                    id="template-upload"
-                    type="file"
-                    accept=".txt,.md"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          setTemplateContent(event.target?.result as string);
-                          setSelectedTemplate("");
-                          toast({
-                            title: "Template caricato",
-                            description: `${file.name} è stato caricato con successo.`,
-                          });
-                        };
-                        reader.readAsText(file);
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setIsGenerateModalOpen(true);
-                    }}
-                    data-testid="button-generate-template"
-                  >
-                    <span className="mr-2">✏️</span>
-                    Genera Template
-                  </Button>
-                </div>
-                <SelectItem value="privacy">Privacy Policy</SelectItem>
-                <SelectItem value="relazione">Relazione Tecnica</SelectItem>
-                <SelectItem value="contratto">Contratto di Servizio</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+          <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
+            <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
+              <SelectValue placeholder="Seleziona template" />
+            </SelectTrigger>
+            <SelectContent>
+              <div className="p-2 border-b space-y-1">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('template-upload')?.click();
+                  }}
+                  data-testid="button-upload-template"
+                >
+                  <span className="mr-2">📄</span>
+                  Upload Template
+                </Button>
+                <input
+                  id="template-upload"
+                  type="file"
+                  accept=".txt,.md"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        setTemplateContent(event.target?.result as string);
+                        setSelectedTemplate("");
+                        toast({
+                          title: "Template caricato",
+                          description: `${file.name} è stato caricato con successo.`,
+                        });
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsGenerateModalOpen(true);
+                  }}
+                  data-testid="button-generate-template"
+                >
+                  <span className="mr-2">✏️</span>
+                  Genera Template
+                </Button>
+              </div>
+              <SelectItem value="privacy">Privacy Policy</SelectItem>
+              <SelectItem value="relazione">Relazione Tecnica</SelectItem>
+              <SelectItem value="contratto">Contratto di Servizio</SelectItem>
+            </SelectContent>
+          </Select>
 
-          {/* Hide compile button in Studio Mode - use stars instead */}
-          {!pinnedSource && (
-            <Button
-              onClick={handleCompile}
-              disabled={!templateContent || isCompiling}
-              data-testid="button-compile"
-              className="w-full sm:w-auto"
+          <Button
+            onClick={handleCompile}
+            disabled={!templateContent || isCompiling}
+            data-testid="button-compile"
+            className="w-full sm:w-auto"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`w-10 h-10 mr-0.5 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`w-10 h-10 mr-0.5 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
-              >
-                <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
-              </svg>
-              {isCompiling ? "Compilazione..." : "Compila con AI"}
-            </Button>
-          )}
+              <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
+            </svg>
+            {isCompiling ? "Compilazione..." : "Compila con AI"}
+          </Button>
         </div>
       </div>
 
@@ -592,196 +575,34 @@ export function DocumentCompilerSection({
         <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full overflow-auto">
             {/* Conditional Rendering: ModelSettings vs StudioChat */}
-            {pinnedSource && discoveredFieldNames.length > 0 ? (
-              <StudioChat
-                isProcessing={isCompiling}
-                onSendMessage={async (message) => {
-                  console.log("Chat Message:", message);
-                  // Trigger Compilation with instruction
-                  setIsCompiling(true);
-                  try {
-                    const { apiRequest } = await import("@/lib/queryClient");
-                    const response = await apiRequest('POST', '/api/compile', {
-                      template: "",
-                      notes: message, // Treat chat message as notes/instructions
-                      sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
-                      pinnedSource: {
-                        name: pinnedSource.name,
-                        type: pinnedSource.type,
-                        base64: pinnedSource.base64
-                      },
-                      studioFields: currentFields.map(f => ({
-                        name: f.name,
-                        pageIndex: f.pageIndex,
-                        boundingPoly: { normalizedVertices: f.boundingPoly.normalizedVertices || [] }
-                      })),
-                      modelProvider,
-                      temperature,
-                      webResearch,
-                      detailedAnalysis,
-                      formalTone,
-                      fillingMode: 'studio'
-                    });
-
-                    const data = await response.json();
-                    if (data.values) {
-                      setStudioValues(data.values);
-                      return "Ho aggiornato i campi secondo le tue indicazioni. C'è altro?";
-                    } else {
-                      return "Analisi completata, ma non ho modificato i campi. Verifica i dati.";
-                    }
-                  } catch (e) {
-                    console.error("Chat Action Failed", e);
-                    throw e;
-                  } finally {
-                    setIsCompiling(false);
-                  }
-                }}
-              />
-            ) : (
-              <ModelSettings
-                notes={notes}
-                temperature={temperature}
-                webResearch={webResearch}
-                detailedAnalysis={detailedAnalysis}
-                formalTone={formalTone}
-                modelProvider={modelProvider}
-                onNotesChange={setNotes}
-                onTemperatureChange={setTemperature}
-                onWebResearchChange={setWebResearch}
-                onDetailedAnalysisChange={setDetailedAnalysis}
-                onFormalToneChange={setFormalTone}
-                onModelProviderChange={setModelProvider}
-              />
-            )}
+            <ModelSettings
+              notes={notes}
+              temperature={temperature}
+              webResearch={webResearch}
+              detailedAnalysis={detailedAnalysis}
+              formalTone={formalTone}
+              modelProvider={modelProvider}
+              onNotesChange={setNotes}
+              onTemperatureChange={setTemperature}
+              onWebResearchChange={setWebResearch}
+              onDetailedAnalysisChange={setDetailedAnalysis}
+              onFormalToneChange={setFormalTone}
+              onModelProviderChange={setModelProvider}
+            />
           </div>
 
           <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
-            {pinnedSource ? (
-              pinnedSource.type === 'application/pdf' || pinnedSource.type.startsWith('image/') ? (
-                <DocumentStudio
-                  pdfBase64={pinnedSource!.base64 || ""}
-                  fileName={pinnedSource!.name}
-                  onFieldsDiscovered={(names) => setDiscoveredFieldNames(names)}
-                  onFieldsChange={setCurrentFields}
-                  externalValues={studioValues}
-                  onCompile={async (currentFields) => {
-                    // Trigger compile with user's current schema
-                    console.log("Star 2 Clicked: Compiling with fields", currentFields);
-                    setIsCompiling(true);
-                    try {
-                      const { apiRequest } = await import("@/lib/queryClient");
-                      // We need to pass the current fields to the backend to respect user edits
-                      // Assuming backend respects `requestedFields` or `discoveredFields`.
-                      // For now we pass them as detailed names in notes or explicit param if backend supports.
-                      // Based on plan: we need backend to accept preciseFields overrides. 
-                      // But strictly for now, we'll rely on the existing prompt logic which uses mapped names.
-                      // Ideally we send `preciseFields` in body.
-
-                      const response = await apiRequest('POST', '/api/compile', {
-                        template: "",
-                        notes,
-                        sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
-                        pinnedSource: {
-                          name: pinnedSource.name,
-                          type: pinnedSource.type,
-                          base64: pinnedSource.base64
-                        },
-                        // We use requestedFields to guide the AI with the User's defined schema
-                        // We send the full definitions of current fields to the backend
-                        // This allows Nano Banana to know EXACTLY where they are in real-time
-                        studioFields: currentFields.map(f => {
-                          const v = f.boundingPoly.normalizedVertices || [];
-                          return {
-                            name: f.name,
-                            pageIndex: f.pageIndex,
-                            boundingPoly: { normalizedVertices: v }
-                          };
-                        }),
-                        modelProvider,
-                        temperature,
-                        webResearch,
-                        detailedAnalysis,
-                        formalTone,
-                        fillingMode: 'studio'
-                      });
-
-                      const data = await response.json();
-                      if (data.values) {
-                        setStudioValues(data.values);
-                      }
-                    } catch (error) {
-                      console.error('Compilation failed', error);
-                      toast({ variant: "destructive", title: "Errore compilazione", description: "Riprova." });
-                    } finally {
-                      setIsCompiling(false);
-                    }
-                  }}
-                  onDownload={async (filledFields) => {
-                    // Final PDF generation logic
-                    setIsCompiling(true);
-                    try {
-                      const { apiRequest } = await import("@/lib/queryClient");
-                      const response = await apiRequest('POST', '/api/compile', {
-                        template: "",
-                        notes,
-                        sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
-                        pinnedSource: {
-                          name: pinnedSource.name,
-                          type: pinnedSource.type,
-                          base64: pinnedSource.base64
-                        },
-                        data: filledFields.reduce((acc, f) => ({ ...acc, [f.name]: f.value }), {}),
-                        adjustments: filledFields.reduce((acc, f) => ({
-                          ...acc,
-                          [f.name]: {
-                            offsetX: f.offsetX,
-                            offsetY: f.offsetY,
-                            rotation: f.rotation
-                          }
-                        }), {})
-                      });
-                      const data = await response.json();
-                      if (data.file) {
-                        const { saveAs } = await import("file-saver");
-                        const byteCharacters = atob(data.file.base64);
-                        const byteNumbers = new Array(byteCharacters.length);
-                        for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
-                        const blob = new Blob([new Uint8Array(byteNumbers)], { type: data.file.type });
-                        saveAs(blob, data.file.name);
-                      }
-                    } catch (e) {
-                      console.error("Final download failed:", e);
-                    } finally {
-                      setIsCompiling(false);
-                    }
-                  }}
-                  isProcessing={isCompiling}
-                  studioMode={studioMode}
-                  onStudioModeChange={setStudioMode}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center bg-muted/20 rounded-xl border-dashed border-2">
-                  <div className="text-center space-y-2">
-                    <FileText className="w-12 h-12 text-muted-foreground mx-auto opacity-20" />
-                    <p className="font-medium">Visual Studio - Coming Soon</p>
-                    <p className="text-xs text-muted-foreground">La visualizzazione real-time per questo tipo di file è in fase di sviluppo.</p>
-                  </div>
-                </div>
-              )
-            ) : (
-              <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <TemplateEditor
-                  value={templateContent}
-                  onChange={setTemplateContent}
-                />
-                <CompiledOutput
-                  content={compiledContent}
-                  onCopy={handleCopy}
-                  onDownload={handleDownload}
-                />
-              </div>
-            )}
+            <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <TemplateEditor
+                value={templateContent}
+                onChange={setTemplateContent}
+              />
+              <CompiledOutput
+                content={compiledContent}
+                onCopy={handleCopy}
+                onDownload={handleDownload}
+              />
+            </div>
           </div>
         </div>
       </div>
