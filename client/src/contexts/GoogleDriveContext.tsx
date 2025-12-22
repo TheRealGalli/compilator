@@ -186,9 +186,19 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
         const tokens = sessionStorage.getItem('gmail_tokens');
         if (tokens) {
             fetchFiles(undefined, true);
+        }
+    }, [currentCategory, currentFolderId, searchQuery, fetchFiles]);
+
+    // Check memory file on load/connection
+    const hasCheckedMemory = React.useRef(false);
+
+    React.useEffect(() => {
+        const tokens = sessionStorage.getItem('gmail_tokens');
+        if (tokens && !hasCheckedMemory.current) {
+            hasCheckedMemory.current = true;
             checkMemoryFile();
         }
-    }, [currentCategory, currentFolderId, searchQuery, fetchFiles, checkMemoryFile]);
+    }, [checkMemoryFile]);
 
     const navigateToFolder = useCallback((folderId: string, folderName: string) => {
         setCurrentFolderId(folderId);
