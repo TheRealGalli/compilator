@@ -65,11 +65,15 @@ export function ChatMessage({
   return (
     <div className={`flex w-full gap-3 ${isUser ? "justify-end" : "justify-start"} group mb-1`}>
       {!isUser && (
-        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 select-none">
-          <div className="flex items-center -space-x-2.5 hover:animate-spin transition-all duration-1000 cursor-help" title="Gromit AI">
-            <Asterisk className="w-5 h-5 text-blue-600" strokeWidth={3.5} />
-            <Asterisk className="w-5 h-5 text-blue-400" strokeWidth={3.5} />
-          </div>
+        <div
+          className="w-8 h-8 flex items-center justify-center flex-shrink-0 cursor-pointer"
+          onClick={handleIconClick}
+          title="Gromit AI"
+        >
+          <Asterisk
+            className={`w-6 h-6 text-blue-600 transition-transform duration-1000 ${isSpinning ? 'rotate-[360deg]' : ''}`}
+            strokeWidth={3}
+          />
         </div>
       )}
 
