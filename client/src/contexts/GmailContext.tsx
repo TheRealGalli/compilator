@@ -9,6 +9,7 @@ interface GmailMessage {
     from: string;
     snippet: string;
     date: string;
+    attachmentCount?: number;
 }
 
 export type GmailCategory = 'primary' | 'social' | 'promotions' | 'updates';

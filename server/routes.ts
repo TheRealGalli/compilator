@@ -466,13 +466,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const from = headers.find((h: any) => h.name === 'From')?.value || 'Sconosciuto';
         const date = headers.find((h: any) => h.name === 'Date')?.value || '';
 
+        // Count attachments
+        const parts = detail.data.payload?.parts || [];
+        const attachmentCount = parts.filter((part: any) =>
+          part.filename && part.filename.length > 0
+        ).length;
+
         return {
           id: msg.id,
           threadId: msg.threadId,
           snippet: detail.data.snippet,
           subject,
           from,
-          date
+          date,
+          attachmentCount
         };
       }));
 
