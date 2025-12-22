@@ -29,8 +29,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <GmailProvider>
-        <GoogleDriveProvider>
-          <SourcesProvider>
+        <SourcesProvider>
+          <GoogleDriveProvider>
             <TooltipProvider>
               <ThemeProvider>
                 <Toaster />
@@ -38,8 +38,8 @@ function App() {
                 <Router />
               </ThemeProvider>
             </TooltipProvider>
-          </SourcesProvider>
-        </GoogleDriveProvider>
+          </GoogleDriveProvider>
+        </SourcesProvider>
       </GmailProvider>
     </QueryClientProvider>
   );
