@@ -114,7 +114,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
     try {
       const formData = new FormData();
-      formData.append('file', audioBlob, 'recording.webm');
+      formData.append('audio', audioBlob, 'recording.webm');
 
       // Use fetch directly for FormData to ensure correct headers
       // Note: apiRequest helper might assume JSON content-type default
