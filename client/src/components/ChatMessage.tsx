@@ -5,6 +5,7 @@ import { FormattedMessage } from "./FormattedMessage";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 interface ChatMessageProps {
   role: "user" | "assistant" | "system";
@@ -30,6 +31,12 @@ export function ChatMessage({
   const { toast } = useToast();
   const { addSource } = useSources();
   const isUser = role === "user";
+  const [isSpinning, setIsSpinning] = useState(false);
+
+  const handleIconClick = () => {
+    setIsSpinning(true);
+    setTimeout(() => setIsSpinning(false), 1000);
+  };
 
   const handleAddAsSource = async () => {
     try {
