@@ -324,7 +324,7 @@ export function DocumentsSection() {
                     <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed opacity-90">{msg.snippet}</p>
                   </div>
                   <div className="flex gap-1 items-center">
-                    {msg.attachmentCount && msg.attachmentCount > 0 && (
+                    {(msg.attachmentCount ?? 0) > 0 && (
                       <div className="h-8 px-2 flex items-center justify-center bg-muted/50 text-muted-foreground rounded text-xs font-medium border border-border/40">
                         {msg.attachmentCount}
                       </div>
