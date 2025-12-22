@@ -1,7 +1,12 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Brain, Trash2 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import React, { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
@@ -20,6 +25,7 @@ export function DocumentsSection() {
   const [isImporting, setIsImporting] = useState<string | null>(null);
   const { toast } = useToast();
   const { sources, addSource, removeSource, maxSources } = useSources();
+  const memoryFile = sources.find(s => s.isMemory);
   const { isConnected, messages, isFetchingMessages, fetchMessages, importEmail, nextPageToken, currentCategory, setCategory, searchQuery, setSearchQuery } = useGmail();
   const {
     files, isFetchingFiles, fetchFiles, importFile,
@@ -565,12 +571,55 @@ export function DocumentsSection() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button className="gap-2 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-              <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
-            </svg>
-            Genera Sommario
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={`gap-2 shrink-0 ${memoryFile ? 'border-amber-500/50 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10' : ''}`}>
+                <Brain className="w-4 h-4" />
+                Gromit Memory
+                {memoryFile && <span className="flex h-2 w-2 rounded-full bg-amber-500" />}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-4" align="end">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 border-b pb-3">
+                  <Brain className="w-5 h-5 text-amber-500" />
+                  <h4 className="font-semibold">Gromit Memory</h4>
+                </div>
+
+                {memoryFile ? (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-amber-500/20 p-2 rounded shrink-0">
+                        <Brain className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{memoryFile.name}</p>
+                        <p className="text-xs text-muted-foreground">Memoria di sistema attiva</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-3 text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8"
+                      onClick={() => handleRemove(memoryFile.id)}
+                    >
+                      <Trash2 className="w-3 h-3 mr-2" />
+                      Disattiva Memoria
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center py-4 space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Nessuna memoria di sistema attiva.
+                    </p>
+                    <p className="text-xs text-muted-foreground/70">
+                      Collega Google Drive per caricare automaticamente "Gromit-Memory.pdf".
+                    </p>
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -618,11 +667,12 @@ export function DocumentsSection() {
             Fonti Caricate ({sources.length}/{maxSources})
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sources.map((source) => (
+            {sources.filter(s => !s.isMemory).map((source) => (
               <FileCard
                 key={source.id}
                 name={source.name}
                 size={formatSize(source.size)}
+                isMemory={source.isMemory}
                 onRemove={() => handleRemove(source.id)}
               />
             ))}
@@ -630,7 +680,7 @@ export function DocumentsSection() {
         </div>
       )}
 
-      {sources.length === 0 && (
+      {sources.filter(s => !s.isMemory).length === 0 && (
         <div className="flex-1 flex items-center justify-center text-center px-4">
           <div className="max-w-md">
             <p className="text-muted-foreground">

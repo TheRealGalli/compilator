@@ -9,11 +9,12 @@ export interface Source {
     size: number;
     url?: string; // Optional GCS URL (for backward compatibility or compiler)
     base64?: string; // Client-side base64 content
+    isMemory?: boolean; // System memory file
 }
 
 interface SourcesContextType {
     sources: Source[];
-    addSource: (file: File) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'>;
+    addSource: (file: File, options?: { isMemory?: boolean }) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'>;
     removeSource: (id: string) => void;
     toggleSource: (id: string) => void;
     selectedSources: Source[];
@@ -28,9 +29,14 @@ const MAX_FILE_SIZE_MB = 30; // Technical limit for Cloud Run JSON payload (32MB
 export function SourcesProvider({ children }: { children: ReactNode }) {
     const [sources, setSources] = useState<Source[]>([]);
 
-    const addSource = useCallback(async (file: File): Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'> => {
-        if (sources.length >= MAX_SOURCES) {
-            return 'limit_reached';
+    const addSource = useCallback(async (file: File, options?: { isMemory?: boolean }): Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'> => {
+        // Enforce max sources limit only for non-memory files
+        // Memory files don't count towards the limit (user can have 10 sources + memory)
+        if (!options?.isMemory) {
+            const userSources = sources.filter(s => !s.isMemory);
+            if (userSources.length >= MAX_SOURCES) {
+                return 'limit_reached';
+            }
         }
 
         // Check if file with same name already exists
@@ -65,6 +71,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 type: file.type,
                 size: file.size,
                 base64: base64, // Store base64 directly
+                isMemory: options?.isMemory
             };
 
             setSources(prev => [...prev, newSource]);

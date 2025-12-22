@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSources } from "./SourcesContext";
 
 interface DriveFile {
     id: string;
@@ -130,13 +131,64 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
         setSearchQueryState(query);
     }, []);
 
+
+
+    // NEW: Check for Gromit Memory File
+    const { addSource, sources } = useSources();
+
+    const checkMemoryFile = useCallback(async () => {
+        // Avoid duplicate checking if already present
+        if (sources.some(s => s.isMemory)) return;
+
+        try {
+            // Backend treats 'q' as "name contains 'q'", so we just send the filename
+            const searchName = "Gromit-Memory.pdf";
+            const res = await apiRequest('GET', `/api/drive/files?q=${encodeURIComponent(searchName)}`, undefined, getGoogleHeaders());
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data.files && data.files.length > 0) {
+                    // Find exact match (backend uses "contains")
+                    const memoryFile = data.files.find((f: any) => f.name === searchName && !f.trashed);
+
+                    if (memoryFile) {
+                        console.log("[Drive] Found Memory File:", memoryFile.name);
+
+                        // Import content
+                        const imported = await importFile(memoryFile.id, memoryFile.name);
+                        if (imported && imported.base64) {
+                            // Convert base64 to File object to reuse addSource logic
+                            const byteCharacters = atob(imported.base64);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                            }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], { type: imported.mimeType });
+                            const file = new File([blob], imported.name, { type: imported.mimeType });
+
+                            await addSource(file, { isMemory: true });
+                            toast({
+                                title: "Memoria Connessa",
+                                description: "Gromit-Memory.pdf caricato come memoria di sistema.",
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("[Drive] Error checking memory file:", error);
+        }
+    }, [getGoogleHeaders, importFile, addSource, sources, toast]);
+
     // Auto-fetch on dependencies change
     React.useEffect(() => {
         const tokens = sessionStorage.getItem('gmail_tokens');
         if (tokens) {
             fetchFiles(undefined, true);
+            checkMemoryFile();
         }
-    }, [currentCategory, currentFolderId, searchQuery, fetchFiles]);
+    }, [currentCategory, currentFolderId, searchQuery, fetchFiles, checkMemoryFile]);
 
     const navigateToFolder = useCallback((folderId: string, folderName: string) => {
         setCurrentFolderId(folderId);
