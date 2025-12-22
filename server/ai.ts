@@ -34,6 +34,10 @@ export class AiService {
             const messageParts: any[] = [{ text: params.userPrompt }];
 
             for (const file of params.multimodalFiles) {
+                if (!file.mimeType || !file.data) {
+                    console.warn('[AiService] Skipping file with missing mimeType or data:', file);
+                    continue;
+                }
                 messageParts.push({
                     inlineData: { mimeType: file.mimeType, data: file.data }
                 });
