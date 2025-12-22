@@ -14,6 +14,7 @@ interface Source {
   name: string;
   selected: boolean;
   isPinned?: boolean;
+  isMemory?: boolean;
 }
 
 interface SourceSelectorProps {
@@ -23,7 +24,9 @@ interface SourceSelectorProps {
 }
 
 export function SourceSelector({ sources, onToggle, onTogglePin }: SourceSelectorProps) {
-  const selectedCount = sources.filter(s => s.selected).length;
+  // Filter out memory files from the UI list
+  const visibleSources = sources.filter(s => !s.isMemory);
+  const selectedCount = visibleSources.filter(s => s.selected).length;
 
   const getFileIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase() || '';
@@ -48,7 +51,7 @@ export function SourceSelector({ sources, onToggle, onTogglePin }: SourceSelecto
       </div>
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-2">
-          {sources.map((source) => {
+          {visibleSources.map((source) => {
             const Icon = getFileIcon(source.name);
             return (
               <div

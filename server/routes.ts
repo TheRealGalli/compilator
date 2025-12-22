@@ -1150,7 +1150,16 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
       const { temperature, webResearch } = req.body;
-      let { messages, sources } = req.body; // sources: array of {name, type, size, url: GCS URL}
+      let { messages, sources } = req.body; // sources: array of {name, type, size, url: GCS URL, isMemory?: boolean}
+
+      // Prioritize Memory files (Hierarchical Context: System > Memory > Sources > User)
+      if (sources && Array.isArray(sources)) {
+        sources.sort((a: any, b: any) => {
+          if (a.isMemory && !b.isMemory) return -1;
+          if (!a.isMemory && b.isMemory) return 1;
+          return 0;
+        });
+      }
 
       // Parse messages if string (multipart/form-data)
       if (typeof messages === 'string') {
