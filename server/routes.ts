@@ -1107,9 +1107,21 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 
       // Process Sources Context
       if (sources && Array.isArray(sources) && sources.length > 0) {
-        userPrompt += `\n\n[IMPORTANTE] Ho allegato dei documenti di riferimento(PDF, Immagini o Testo).USALI come contesto primario per capire di cosa si sta parlando(es.se è un contratto SaaS o Immobiliare, il tono, i dati ricorrenti).Basati sui documenti allegati per inferire la struttura corretta.`;
+        const hasMemory = sources.some((s: any) => s.isMemory);
+
+        userPrompt += `\n\n[IMPORTANTE - FONTI ALLEGATE] Ho allegato dei documenti.`;
+
+        if (hasMemory) {
+          userPrompt += `\nNOTA SPECIALE MEMORIA: È incluso un file di "Memoria/Profilo" (Gromit-Memory).
+             - Usa la Memoria per: Stile, Formattazione preferita, Dati anagrafici chi compilatore.
+             - Usa gli ALTRI file per: Il contenuto vero e proprio del documento (Dati del verbale, progetto, ecc).
+             - Se devi citare info dalla memoria (es. "Chi scrive"), fallo in modo naturale ("Come da tue preferenze...").`;
+        }
+
+        userPrompt += `\nUSALI come contesto primario per capire di cosa si sta parlando. Basati sui documenti allegati per inferire la struttura corretta.`;
 
         console.log(`[DEBUG Template Gen] Processing ${sources.length} sources for context...`);
+        // ... rest of loop
 
         for (const source of sources) {
           if (source.base64 && source.type) {
@@ -1259,7 +1271,26 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       const maxChars = (multimodalFiles.length > 0 || filesContext.length > 5000) ? 12000 : 5000;
 
       let systemInstruction = `Sei un assistente AI di ricerca esperto e professionale.
+// ... existing base prompt ...
+`;
 
+      // Check for memory file
+      const hasMemory = sources?.some((s: any) => s.isMemory);
+
+      if (hasMemory) {
+        systemInstruction += `
+**GESTIONE MEMORIA DI SISTEMA (File "Memory"):**
+Hai accesso a un file speciale di memoria ("Gromit-Memory.pdf" o simile). QUESTO NON È UN DOCUMENTO DA ANALIZZARE, MA LA TUA CONOSCENZA.
+1. **Identità e Preferenze**: Usa questo file per sapere CHI è l'utente e COME vuole che lavori (tono, stile, formati).
+2. **Fraseggio Obbligatorio**: Quando rispondi a domande su dati presenti in memoria (es. "Chi sono?"), NON dire "Secondo il documento...", ma dì **"Basandomi sulla mia memoria..."** o **"Sapendo chi sei..."**.
+3. **Priorità**:
+   - Per lo STILE/CONTESTO -> Usa la MEMORIA.
+   - Per i DATI/TASK -> Usa le ALTRE FONTI.
+`;
+      }
+
+      // ... rest of prompt ...
+      systemInstruction += `
 **DOCUMENTI E CONTESTO DISPONIBILI:**
 ${filesContext}
 
@@ -1268,7 +1299,7 @@ ${filesContext}
 **ISTRUZIONI BASE:**
 1. Analizza attentamente i documenti forniti.
 2. Fornisci risposte concise, precise e ben strutturate.
-3. Cita sempre la fonte se possibile.
+3. Cita sempre la fonte se possibile (escluse info memoria).
 4. Se la risposta non è nei documenti, dichiaralo.
 `;
 
