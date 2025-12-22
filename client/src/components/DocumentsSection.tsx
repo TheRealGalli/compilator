@@ -444,10 +444,10 @@ export function DocumentsSection() {
         <div className="flex px-6 border-b border-border/40 gap-8 overflow-x-auto">
           {[
             { id: 'all', label: 'Tutti i file', icon: FileText, color: 'text-slate-600', border: 'border-slate-600' },
-            { id: 'folders', label: 'Cartelle', icon: Inbox, color: 'text-amber-500', border: 'border-amber-500' },
+            { id: 'pdfs', label: 'PDF', icon: Info, color: 'text-red-600', border: 'border-red-600' },
             { id: 'docs', label: 'Documenti', icon: FileText, color: 'text-blue-600', border: 'border-blue-600' },
             { id: 'sheets', label: 'Fogli di calcolo', icon: Tag, color: 'text-green-600', border: 'border-green-600' },
-            { id: 'pdfs', label: 'PDF', icon: Info, color: 'text-red-600', border: 'border-red-600' },
+            { id: 'folders', label: 'Cartelle', icon: Inbox, color: 'text-amber-500', border: 'border-amber-500' },
           ].map((tab) => (
             <button
               key={tab.id}
