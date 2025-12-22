@@ -810,16 +810,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasExternalSources = fetchedCompilerContext.length > 0;
       let compileTextContext = fetchedCompilerContext;
 
+      // Check for memory file
+      const hasMemory = multimodalFiles?.some((s: any) => s.isMemory);
+
       // Build System Prompt
-      const systemPrompt = `Data e ora corrente: ${dateTimeIT}
+      let systemPrompt = `Data e ora corrente: ${dateTimeIT}
 
 Sei un assistente AI esperto nella compilazione di documenti.
 
 **OBIETTIVO:**
 Devi compilare il template sottostante utilizzando le informazioni fornite nei documenti allegati (PDF, Immagini, Testo) e nelle note dell'utente.
 
-**ISTRUZIONI FONDAMENTALI:**
-- **NO ALLUCINAZIONI:** Non inventare MAI dati. Se un dato manca, scrivi "[MANCANTE]" o lascialo vuoto.
+**ISTRUZIONI GESTIONE MEMORIA & DATI:**
+${hasMemory ? `
+1. **MEMORIA DI SISTEMA (Priorità Alta):** Hai accesso a un file "Gromit-Memory".
+   - Usa questo file per recuperare l'IDENTITÀ di chi scrive (Nome, Cognome, Indirizzo, Ruolo).
+   - NON usare questi dati se il template richiede i dati di una controparte (es. destinatario).
+` : ''}
+2. **NO ALLUCINAZIONI (Tassativo):**
+   - Se un dato (es. Data di nascita, Codice Fiscale) non è presente né nella Memoria né nei Documenti: SCRIVI "[DATO MANCANTE]".
+   - **VIETATO** inventare dati anagrafici (es. "Mario Rossi", date a caso).
+   - È meglio un campo vuoto che un dato falso.
+
+**ISTRUZIONI GENERALI:**
 - **COERENZA:** Mantieni un tono professionale e coerente con il documento.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
 
@@ -830,8 +843,9 @@ MODALITÀ ANALISI DETTAGLIATA ATTIVA:
 
 ${webResearch ? `
 MODALITÀ WEB RESEARCH ATTIVA:
-- Usa i link forniti nelle note per il contesto e l'argomento.
-- I dati anagrafici specifici devono provenire dai FILE caricati.` : ''}
+- Usa i link forniti nelle note per il contesto e l'argomento (adatta il contenuto al link).
+- **PRIORITÀ DATI:** Se un dato è presente sia nel LINK che nelle FONTI CARICATE (PDF/Doc), usa SEMPRE il dato delle FONTI CARICATE.
+- I link servono per arricchire, non per sovrascrivere i documenti ufficiali.` : ''}
 
 ${multimodalFiles.length > 0 || hasExternalSources ? `
 Hai accesso a ${multimodalFiles.length + (hasExternalSources ? 1 : 0)} fonti.
@@ -1383,6 +1397,52 @@ ${filesContext}
     }
   });
 
+
+  // --- MASTER ENDPOINT (Red Pin) ---
+  app.post('/api/master', async (req: Request, res: Response) => {
+    try {
+      console.log('[API Master] Endpoint triggered (Red Pin Active)');
+      const { messages, sources, temperature, webResearch } = req.body;
+
+      // Placeholder for future Master Logic
+      // Currently acts as a pass-through to Gemini 2.5 Flash with specific system context
+
+      const project = process.env.GCP_PROJECT_ID;
+      const location = 'europe-west1';
+      const { VertexAI } = await import("@google-cloud/vertexai");
+
+      let vertex_ai;
+      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+        vertex_ai = vertexAICache.client;
+      } else {
+        vertex_ai = new VertexAI({ project, location });
+        vertexAICache = { client: vertex_ai, project: project!, location };
+      }
+
+      const model = vertex_ai.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        systemInstruction: {
+          role: 'system',
+          parts: [{ text: "Sei il MASTER AI. Hai priorità assoluta sulla fonte pinnata. [LOGICA DA SVILUPPARE]" }]
+        }
+      });
+
+      // Basic generation
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: messages?.[messages.length - 1]?.content || 'Hello' }] }],
+        generationConfig: { temperature: 0.7 }
+      });
+
+      const response = await result.response;
+      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || 'Master Endpoint: No response.';
+
+      res.json({ text, groundingMetadata: null, searchEntryPoint: null });
+
+    } catch (error: any) {
+      console.error('Error in Master endpoint:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   const httpServer = createServer(app);
 

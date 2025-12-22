@@ -30,7 +30,6 @@ export function AppSidebar({
 
   return (
     <aside className="w-[280px] border-r bg-sidebar flex flex-col h-full">
-
       <div className="p-4">
         <h3 className="text-sm font-medium mb-3 text-muted-foreground">Sezioni</h3>
         <div className="flex flex-col gap-1">
@@ -46,6 +45,9 @@ export function AppSidebar({
                   onClick={() => onSectionChange(section.id as any)}
                   data-testid={`button-section-${section.id}`}
                 >
+                  onClick={() => onSectionChange(section.id as any)}
+                  data-testid={`button-section-${section.id}`}
+                                >
                   <Icon className="w-4 h-4 mr-2" />
                   {section.label}
                 </Button>
@@ -60,10 +62,11 @@ export function AppSidebar({
       <div className="flex-1 overflow-hidden flex flex-col p-4">
         <SourceSelector
           sources={sources}
-          onToggle={onToggleSource}
-          onTogglePin={onTogglePin}
+          onToggle={toggleSource}
+          onTogglePin={togglePin}
         />
       </div>
-    </aside>
-  );
+    </SidebarContent>
+                  </Sidebar >
+                  );
 }

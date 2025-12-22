@@ -10,6 +10,7 @@ export interface Source {
     url?: string; // Optional GCS URL (for backward compatibility or compiler)
     base64?: string; // Client-side base64 content
     isMemory?: boolean; // System memory file
+    isPinned?: boolean; // Master source (Red Pin)
 }
 
 interface SourcesContextType {
@@ -17,7 +18,9 @@ interface SourcesContextType {
     addSource: (file: File, options?: { isMemory?: boolean }) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'>;
     removeSource: (id: string) => void;
     toggleSource: (id: string) => void;
+    togglePin: (id: string) => void;
     selectedSources: Source[];
+    pinnedSource: Source | undefined;
     maxSources: number;
 }
 
@@ -92,7 +95,17 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         );
     }, []);
 
+    const togglePin = useCallback((id: string) => {
+        setSources(prev => prev.map(s => {
+            if (s.id === id) {
+                return { ...s, isPinned: !s.isPinned };
+            }
+            return { ...s, isPinned: false }; // Ensure only one pinned source at a time
+        }));
+    }, []);
+
     const selectedSources = sources.filter(s => s.selected);
+    const pinnedSource = sources.find(s => s.isPinned);
 
     return (
         <SourcesContext.Provider
@@ -101,8 +114,10 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 addSource,
                 removeSource,
                 toggleSource,
+                togglePin,
                 selectedSources,
-                maxSources: MAX_SOURCES,
+                pinnedSource,
+                maxSources: MAX_SOURCES
             }}
         >
             {children}
