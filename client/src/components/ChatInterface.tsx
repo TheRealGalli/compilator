@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { getApiUrl } from "@/lib/api-config";
 import { useSources } from "@/contexts/SourcesContext";
+import { useGoogleDrive } from "@/contexts/GoogleDriveContext";
 
 interface Message {
   id: string;
@@ -299,12 +300,14 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     }
   };
 
+  const { userIdentity } = useGoogleDrive();
+
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1 p-6">
         <div className="space-y-6 max-w-3xl mx-auto">
           {messages.map((message) => (
-            <ChatMessage key={message.id} {...message} />
+            <ChatMessage key={message.id} {...message} userInitial={userIdentity?.initial} />
           ))}
           {isLoading && (
             <div className="flex gap-3 justify-start">

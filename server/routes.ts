@@ -1398,6 +1398,78 @@ ${filesContext}
   });
 
 
+  // --- EXTRACT IDENTITY ENDPOINT ---
+  app.post('/api/extract-identity', async (req: Request, res: Response) => {
+    try {
+      console.log('[API Identity] Extracting identity from memory file...');
+      const { fileData, mimeType } = req.body;
+
+      if (!fileData || !mimeType) {
+        return res.status(400).json({ error: 'File data required' });
+      }
+
+      const project = process.env.GCP_PROJECT_ID;
+      const location = 'europe-west1';
+      const { VertexAI } = await import("@google-cloud/vertexai");
+
+      let vertex_ai;
+      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+        vertex_ai = vertexAICache.client;
+      } else {
+        vertex_ai = new VertexAI({ project, location });
+        vertexAICache = { client: vertex_ai, project: project!, location };
+      }
+
+      const model = vertex_ai.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        systemInstruction: {
+          role: 'system',
+          parts: [{ text: "Sei un estrattore di entità. Il tuo UNICO scopo è leggere il documento e trovare il NOME e COGNOME della persona a cui appartiene o che ha scritto il documento. Restituisci SOLO un JSON valido." }]
+        }
+      });
+
+      const prompt = `Analizza questo file di memoria personale.
+      Estrai il NOME COMPLETO della persona.
+      Restituisci un JSON in questo formato esatto:
+      {
+        "name": "Nome Cognome",
+        "initial": "N"
+      }
+      Se non trovi nulla, restituisci null.`;
+
+      const result = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data: fileData } }
+          ]
+        }],
+        generationConfig: { responseMimeType: "application/json" }
+      });
+
+      const response = await result.response;
+      const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      console.log('[API Identity] Extraction result:', text);
+
+      let identity = null;
+      if (text) {
+        try {
+          identity = JSON.parse(text);
+        } catch (e) {
+          console.error('Failed to parse identity JSON', e);
+        }
+      }
+
+      res.json({ identity });
+
+    } catch (error: any) {
+      console.error('Error in Identity endpoint:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // --- MASTER ENDPOINT (Red Pin) ---
   app.post('/api/master', async (req: Request, res: Response) => {
     try {

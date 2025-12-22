@@ -35,6 +35,7 @@ interface GoogleDriveContextType {
     navigateToFolder: (folderId: string, folderName: string) => void;
     goToParentFolder: () => void;
     resetNavigation: () => void;
+    userIdentity: { name: string, initial: string } | null;
 }
 
 const GoogleDriveContext = createContext<GoogleDriveContextType | undefined>(undefined);
@@ -136,6 +137,10 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
     // NEW: Check for Gromit Memory File
     const { addSource, sources } = useSources();
 
+    const [userIdentity, setUserIdentity] = useState<{ name: string, initial: string } | null>(null);
+
+    // ... imports ...
+
     const checkMemoryFile = useCallback(async () => {
         // Avoid duplicate checking if already present
         if (sources.some(s => s.isMemory)) return;
@@ -157,7 +162,8 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
                         // Import content
                         const imported = await importFile(memoryFile.id, memoryFile.name);
                         if (imported && imported.base64) {
-                            // Convert base64 to File object to reuse addSource logic
+
+                            // 1. Add to Sources
                             const byteCharacters = atob(imported.base64);
                             const byteNumbers = new Array(byteCharacters.length);
                             for (let i = 0; i < byteCharacters.length; i++) {
@@ -168,6 +174,28 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
                             const file = new File([blob], imported.name, { type: imported.mimeType });
 
                             await addSource(file, { isMemory: true });
+
+                            // 2. Extract Identity
+                            console.log("[Drive] Extracting Identity...");
+                            try {
+                                const idRes = await apiRequest('POST', '/api/extract-identity', {
+                                    fileData: imported.base64,
+                                    mimeType: imported.mimeType
+                                });
+                                if (idRes.ok) {
+                                    const idData = await idRes.json();
+                                    if (idData.identity) {
+                                        setUserIdentity(idData.identity);
+                                        toast({
+                                            title: `Benvenuto, ${idData.identity.name}`,
+                                            description: "Identità estratta dalla memoria.",
+                                        });
+                                    }
+                                }
+                            } catch (err) {
+                                console.error("Identity extraction failed", err);
+                            }
+
                             toast({
                                 title: "Memoria Connessa",
                                 description: "Gromit-Memory.pdf caricato come memoria di sistema.",
@@ -238,7 +266,8 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
             importFile,
             navigateToFolder,
             goToParentFolder,
-            resetNavigation
+            resetNavigation,
+            userIdentity
         }}>
             {children}
         </GoogleDriveContext.Provider>

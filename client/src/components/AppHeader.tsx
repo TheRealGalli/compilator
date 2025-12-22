@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useTheme } from "./ThemeProvider";
 
+import { useGoogleDrive } from "@/contexts/GoogleDriveContext";
+
 interface AppHeaderProps {
   notebookTitle?: string;
   onHomeClick?: () => void;
@@ -11,6 +13,7 @@ interface AppHeaderProps {
 
 export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick }: AppHeaderProps) {
   const { theme, toggleTheme } = useTheme();
+  const { userIdentity } = useGoogleDrive();
   const [isSpinning, setIsSpinning] = useState(false);
 
   const handleLogoClick = () => {
@@ -24,10 +27,12 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick
       <div className="flex items-center gap-3">
         <div className="flex items-center -space-x-3 mr-2 cursor-pointer group" onClick={handleLogoClick}>
           <Asterisk
-            className={`w-8 h-8 text-blue-600 transition-transform duration-1000 ${isSpinning ? 'rotate-[360deg]' : ''}`}
+            className={`text-blue-600 transition-transform duration-1000 ${isSpinning ? 'rotate-[360deg]' : ''}`}
+            width={32}
+            height={32}
             strokeWidth={3}
           />
-          <Asterisk className="w-8 h-8 text-blue-600" strokeWidth={3} />
+          <Asterisk className="text-blue-600" width={32} height={32} strokeWidth={3} />
         </div>
         <h1 className="text-lg font-semibold" data-testid="text-notebook-title">{notebookTitle}</h1>
       </div>
@@ -43,8 +48,8 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick
         </Button>
 
         <Avatar className="w-8 h-8" data-testid="avatar-user">
-          <AvatarFallback>
-            <User className="w-4 h-4" />
+          <AvatarFallback className={userIdentity ? "bg-blue-100 text-blue-700 font-bold" : ""}>
+            {userIdentity ? userIdentity.initial : <User className="w-4 h-4" />}
           </AvatarFallback>
         </Avatar>
       </div>

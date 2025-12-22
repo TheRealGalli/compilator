@@ -1,9 +1,10 @@
-import { Bot, User, Copy, FilePlus } from "lucide-react";
+import { Bot, User, Copy, FilePlus, Asterisk } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FormattedMessage } from "./FormattedMessage";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
+import { cn } from "@/lib/utils";
 
 interface ChatMessageProps {
   role: "user" | "assistant" | "system";
@@ -13,6 +14,7 @@ interface ChatMessageProps {
   audioUrl?: string;
   groundingMetadata?: any;
   searchEntryPoint?: string;
+  userInitial?: string;
 }
 
 export function ChatMessage({
@@ -22,7 +24,8 @@ export function ChatMessage({
   sources = [],
   audioUrl,
   groundingMetadata,
-  searchEntryPoint
+  searchEntryPoint,
+  userInitial
 }: ChatMessageProps) {
   const { toast } = useToast();
   const { addSource } = useSources();
@@ -55,8 +58,11 @@ export function ChatMessage({
   return (
     <div className={`flex w-full gap-3 ${isUser ? "justify-end" : "justify-start"} group mb-1`}>
       {!isUser && (
-        <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
-          <Bot className="w-4 h-4 text-primary-foreground" />
+        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 select-none">
+          <div className="flex items-center -space-x-2.5 hover:animate-spin transition-all duration-1000 cursor-help" title="Gromit AI">
+            <Asterisk className="w-5 h-5 text-blue-600" strokeWidth={3.5} />
+            <Asterisk className="w-5 h-5 text-blue-400" strokeWidth={3.5} />
+          </div>
         </div>
       )}
 
@@ -145,8 +151,8 @@ export function ChatMessage({
       </div>
 
       {isUser && (
-        <div className="w-8 h-8 bg-secondary rounded-md flex items-center justify-center flex-shrink-0">
-          <User className="w-4 h-4" />
+        <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${userInitial ? "bg-blue-100 text-blue-700 font-bold" : "bg-secondary"}`}>
+          {userInitial ? userInitial : <User className="w-4 h-4" />}
         </div>
       )}
     </div>

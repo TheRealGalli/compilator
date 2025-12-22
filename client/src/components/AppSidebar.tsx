@@ -45,9 +45,6 @@ export function AppSidebar({
                   onClick={() => onSectionChange(section.id as any)}
                   data-testid={`button-section-${section.id}`}
                 >
-                  onClick={() => onSectionChange(section.id as any)}
-                  data-testid={`button-section-${section.id}`}
-                                >
                   <Icon className="w-4 h-4 mr-2" />
                   {section.label}
                 </Button>
@@ -62,11 +59,10 @@ export function AppSidebar({
       <div className="flex-1 overflow-hidden flex flex-col p-4">
         <SourceSelector
           sources={sources}
-          onToggle={toggleSource}
-          onTogglePin={togglePin}
+          onToggle={onToggleSource}
+          onTogglePin={onTogglePin}
         />
       </div>
-    </SidebarContent>
-                  </Sidebar >
-                  );
+    </aside>
+  );
 }
