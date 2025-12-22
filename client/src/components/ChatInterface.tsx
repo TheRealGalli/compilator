@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, Bot, Globe, Mic, Square } from "lucide-react";
+import { Send, Bot, Globe, Mic, Square, Asterisk } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -311,8 +311,11 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           ))}
           {isLoading && (
             <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
-                <Bot className="w-4 h-4 text-primary-foreground" />
+              <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                <Asterisk
+                  className="w-6 h-6 text-blue-600 animate-spin"
+                  strokeWidth={3}
+                />
               </div>
               <div className="bg-muted rounded-lg">
                 <TypingIndicator />
