@@ -1,7 +1,7 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Brain, Trash2 } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -11,13 +11,13 @@ import React, { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
 import { useGmail } from "@/contexts/GmailContext";
-import { GmailLogo } from "./ConnectorsSection";
+import { GmailLogo, DriveLogo } from "./ConnectorsSection";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useGoogleDrive, DriveCategory } from "@/contexts/GoogleDriveContext";
-import { DriveLogo } from "./ConnectorsSection";
+
 
 export function DocumentsSection() {
   const [view, setView] = useState<'main' | 'gmail' | 'drive'>('main');
@@ -578,24 +578,24 @@ export function DocumentsSection() {
         <div className="flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className={`gap-2 shrink-0 ${memoryFile ? 'border-amber-500/50 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10' : ''}`}>
-                <Brain className="w-4 h-4" />
+              <Button variant="outline" className={`gap-2 shrink-0 ${memoryFile ? 'border-blue-500/50 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10' : ''}`}>
+                <DriveLogo className="w-4 h-4" />
                 Gromit Memory
-                {memoryFile && <span className="flex h-2 w-2 rounded-full bg-amber-500" />}
+                {memoryFile && <span className="flex h-2 w-2 rounded-full bg-green-500" />}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-4" align="end">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border-b pb-3">
-                  <Brain className="w-5 h-5 text-amber-500" />
+                  <DriveLogo className="w-5 h-5 text-blue-600" />
                   <h4 className="font-semibold">Gromit Memory</h4>
                 </div>
 
                 {memoryFile ? (
-                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
                     <div className="flex items-start gap-3">
-                      <div className="bg-amber-500/20 p-2 rounded shrink-0">
-                        <Brain className="w-4 h-4 text-amber-500" />
+                      <div className="bg-blue-500/20 p-2 rounded shrink-0">
+                        <DriveLogo className="w-4 h-4 text-blue-600" />
                       </div>
                       <div className="space-y-1 min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{memoryFile.name}</p>
