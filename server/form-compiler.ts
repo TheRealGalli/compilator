@@ -23,18 +23,18 @@ interface FieldMapping {
  * Extract form fields from a PDF using Document AI Form Parser
  */
 export async function extractFormFields(pdfBuffer: Buffer, projectId: string): Promise<FormField[]> {
-    // TODO: Configure Document AI Form Parser processor ID
-    // Temporary workaround: return empty array until processor is configured
-    console.warn('[extractFormFields] Document AI Form Parser not configured - returning empty fields');
-    console.warn('[extractFormFields] To enable: Replace FORM_PARSER_ID with real processor ID');
-    return [];
-
-    /* DISABLED UNTIL PROCESSOR IS CONFIGURED
     try {
         const client = new DocumentProcessorServiceClient();
 
-        // Form Parser processor ID needs to be configured
-        const processorName = `projects/${projectId}/locations/us-central1/processors/FORM_PARSER_ID`;
+        // Get processor ID from environment variable
+        const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
+        if (!processorId) {
+            console.warn('[extractFormFields] DOCUMENT_AI_PROCESSOR_ID not set - returning empty fields');
+            return [];
+        }
+
+        const processorName = `projects/${projectId}/locations/us-central1/processors/${processorId}`;
+        console.log(`[extractFormFields] Using processor: ${processorName}`);
 
         const request = {
             name: processorName,
@@ -52,7 +52,7 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
             return [];
         }
 
-        const fields: FormField[] = []; 
+        const fields: FormField[] = [];
 
         // Extract form fields from Document AI response
         for (let pageIndex = 0; pageIndex < document.pages.length; pageIndex++) {
@@ -64,11 +64,19 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
                     const fieldValue = field.fieldValue?.textAnchor?.content || '';
 
                     if (field.fieldName?.boundingPoly) {
+                        const rawVertices = field.fieldName.boundingPoly.normalizedVertices || [];
+                        // Filter and type-guard to ensure we have valid vertices
+                        const vertices = rawVertices
+                            .filter((v): v is { x: number; y: number } =>
+                                v !== null && v !== undefined &&
+                                typeof v.x === 'number' && typeof v.y === 'number'
+                            );
+
                         fields.push({
                             fieldName: fieldName.trim(),
                             fieldType: field.valueType || 'text',
                             boundingBox: {
-                                normalizedVertices: field.fieldName.boundingPoly.normalizedVertices || []
+                                normalizedVertices: vertices
                             },
                             confidence: field.fieldName.confidence || 0,
                             pageNumber: pageIndex
@@ -85,7 +93,6 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
         console.error('[extractFormFields] Error:', error);
         throw new Error(`Failed to extract form fields: ${error}`);
     }
-    */
 }
 
 /**
