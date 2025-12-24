@@ -403,26 +403,69 @@ export function DocumentCompilerSection({
       }
 
       const data = await response.json();
-      const { compiledDocument, fieldsDetected, fieldsFilled } = data;
 
-      // Update pinnedSource with compiled version
-      // Note: This updates the preview automatically
+      // NEW: Handle pdfDocument + svgOverlay response
+      const { pdfDocument, svgOverlay, fieldsDetected, fieldsFilled } = data;
+
       toast({
-        title: "✨ Form compilato con successo!",
-        description: `${fieldsFilled}/${fieldsDetected} campi compilati. Scarica il documento.`,
+        title: "✅ Studio Mode completato",
+        description: `Compilati ${fieldsFilled}/${fieldsDetected} campi rilevati`,
       });
 
-      // Download compiled PDF
-      const byteCharacters = atob(compiledDocument.base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: compiledDocument.mimeType });
+      // Create HTML container with PDF + SVG overlay
+      const htmlContainer = `<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${pdfDocument.name} - Studio Mode</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      background: #1a1a1a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      position: relative;
+      max-width: 100%;
+      background: white;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    embed {
+      display: block;
+      width: 100%;
+      height: 100vh;
+    }
+    svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <embed src="data:application/pdf;base64,${pdfDocument.base64}" type="application/pdf" />
+    ${svgOverlay}
+  </div>
+</body>
+</html>`;
 
-      const { saveAs } = await import('file-saver');
-      saveAs(blob, compiledDocument.name);
+      // Download HTML file
+      const blob = new Blob([htmlContainer], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${pdfDocument.name.replace('.pdf', '')}_STUDIO.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
     } catch (error: any) {
       console.error('Error in Run Studio:', error);
