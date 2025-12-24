@@ -33,7 +33,8 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
             return [];
         }
 
-        const processorName = `projects/${projectId}/locations/us-central1/processors/${processorId}`;
+        // IMPORTANT: Document AI uses 'us' or 'eu' as location, not 'us-central1'
+        const processorName = `projects/${projectId}/locations/us/processors/${processorId}`;
         console.log(`[extractFormFields] Using processor: ${processorName}`);
         console.log(`[extractFormFields] PDF buffer size: ${pdfBuffer.length} bytes`);
 
