@@ -875,7 +875,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[API extract-fields-for-context] Extracting fields from: ${pinnedSource.name}`);
 
       const { extractFormFields } = await import('./form-compiler');
-      const pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
+      const { flattenPDF } = await import('./pdf-utils');
+
+      let pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
+
+      // Flatten PDF to remove interactive fields (makes them visible to Document AI)
+      if (isPDF) {
+        console.log('[API extract-fields-for-context] Flattening PDF...');
+        pdfBuffer = await flattenPDF(pdfBuffer);
+      }
+
       const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
 
       // Extract fields using Document AI
@@ -919,10 +928,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[API compile-scanned-form] Compiling form: ${pinnedSource.name}`);
 
-      const { extractFormFields, decideFieldContents, fillFormFieldsOnPDF } = await import('./form-compiler');
+      const { extractFormFields, decideFieldContents, generateSVGWithFields, getPDFDimensions } = await import('./form-compiler');
+      const { flattenPDF } = await import('./pdf-utils');
 
       // Convert base64 to buffer
-      const pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
+      let pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
+
+      // Flatten PDF to remove interactive fields (enables Document AI detection)
+      console.log('[API compile-scanned-form] Flattening PDF...');
+      pdfBuffer = await flattenPDF(pdfBuffer);
+
       const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
 
       // Step 1: Extract form fields using Document AI Form Parser
@@ -959,22 +974,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[API compile-scanned-form] Generated ${Object.keys(fieldValues).length} field values`);
 
-      // Step 3: Fill form fields on PDF with blue ink
-      console.log('[API compile-scanned-form] Step 3: Filling form fields...');
-      const compiledPdfBuffer = await fillFormFieldsOnPDF(pdfBuffer, fields, fieldValues);
+      // Step 3: Generate SVG overlay (NEW APPROACH - no PDF modification)
+      console.log('[API compile-scanned-form] Step 3: Generating SVG overlay...');
 
-      // Generate output filename
-      const originalName = pinnedSource.name.replace('.pdf', '');
-      const compiledName = `${originalName}_COMPILATO.pdf`;
+      const pdfDimensions = await getPDFDimensions(pdfBuffer);
+      const svgOverlay = generateSVGWithFields(fields, fieldValues, pdfDimensions.width, pdfDimensions.height);
 
-      console.log(`[API compile-scanned-form] Form compiled successfully`);
+      console.log('[API compile-scanned-form] Form compilation successful - returning PDF + SVG');
 
       res.json({
-        compiledDocument: {
-          base64: compiledPdfBuffer.toString('base64'),
-          name: compiledName,
+        pdfDocument: {
+          base64: pdfBuffer.toString('base64'),
+          name: pinnedSource.name,
           mimeType: 'application/pdf'
         },
+        svgOverlay: svgOverlay,
         fieldsDetected: fields.length,
         fieldsFilled: Object.keys(fieldValues).filter(k => fieldValues[k] && fieldValues[k] !== 'N/A').length
       });
