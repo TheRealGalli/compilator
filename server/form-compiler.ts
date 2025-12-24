@@ -24,8 +24,6 @@ interface FieldMapping {
  */
 export async function extractFormFields(pdfBuffer: Buffer, projectId: string): Promise<FormField[]> {
     try {
-        const client = new DocumentProcessorServiceClient();
-
         // Get processor ID from environment variable
         const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
         if (!processorId) {
@@ -33,9 +31,20 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
             return [];
         }
 
-        // IMPORTANT: Document AI uses 'us' or 'eu' as location, not 'us-central1'
-        const processorName = `projects/${projectId}/locations/us/processors/${processorId}`;
+        // IMPORTANT: Must set API endpoint to match processor location
+        // Default client uses 'us-documentai.googleapis.com'
+        // If processor is in different region, must specify endpoint
+        const location = 'us'; // or 'eu', 'us-central1', etc.
+        const apiEndpoint = `${location}-documentai.googleapis.com`;
+
+        const client = new DocumentProcessorServiceClient({
+            apiEndpoint: apiEndpoint
+        });
+
+        // Processor name format: projects/{project}/locations/{location}/processors/{id}
+        const processorName = `projects/${projectId}/locations/${location}/processors/${processorId}`;
         console.log(`[extractFormFields] Using processor: ${processorName}`);
+        console.log(`[extractFormFields] Using API endpoint: ${apiEndpoint}`);
         console.log(`[extractFormFields] PDF buffer size: ${pdfBuffer.length} bytes`);
 
         // Document AI expects base64 encoded string, not Buffer
