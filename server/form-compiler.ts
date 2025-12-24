@@ -37,10 +37,14 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
         console.log(`[extractFormFields] Using processor: ${processorName}`);
         console.log(`[extractFormFields] PDF buffer size: ${pdfBuffer.length} bytes`);
 
+        // Document AI expects base64 encoded string, not Buffer
+        const base64Content = pdfBuffer.toString('base64');
+        console.log(`[extractFormFields] Base64 content length: ${base64Content.length} chars`);
+
         const request = {
             name: processorName,
             rawDocument: {
-                content: pdfBuffer,
+                content: base64Content,
                 mimeType: 'application/pdf',
             },
         };
