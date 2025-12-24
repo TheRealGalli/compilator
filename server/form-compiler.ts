@@ -34,7 +34,7 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
         // IMPORTANT: Must set API endpoint to match processor location
         // Default client uses 'us-documentai.googleapis.com'
         // If processor is in different region, must specify endpoint
-        const location = 'us'; // or 'eu', 'us-central1', etc.
+        const location = 'eu'; // Processor is in Europe
         const apiEndpoint = `${location}-documentai.googleapis.com`;
 
         const client = new DocumentProcessorServiceClient({
