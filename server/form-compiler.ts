@@ -62,6 +62,33 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
         const [result] = await client.processDocument(request);
         const { document } = result;
 
+        // DETAILED LOGGING for debugging
+        console.log('[extractFormFields] === DOCUMENT AI RESPONSE DEBUG ===');
+        console.log('[extractFormFields] Document exists:', !!document);
+        console.log('[extractFormFields] Pages count:', document?.pages?.length || 0);
+
+        if (document) {
+            console.log('[extractFormFields] Available properties:', Object.keys(document));
+
+            if (document.pages && document.pages.length > 0) {
+                const firstPage = document.pages[0];
+                console.log('[extractFormFields] First page properties:', Object.keys(firstPage));
+                console.log('[extractFormFields] Has formFields:', !!firstPage.formFields);
+                console.log('[extractFormFields] formFields length:', firstPage.formFields?.length || 0);
+                console.log('[extractFormFields] Has tables:', !!firstPage.tables);
+                console.log('[extractFormFields] Has paragraphs:', !!firstPage.paragraphs);
+                console.log('[extractFormFields] Has lines:', !!firstPage.lines);
+                console.log('[extractFormFields] Has tokens:', !!firstPage.tokens);
+
+                // Log full structure of formFields if present
+                if (firstPage.formFields && firstPage.formFields.length > 0) {
+                    console.log('[extractFormFields] First formField structure:',
+                        JSON.stringify(firstPage.formFields[0], null, 2));
+                }
+            }
+        }
+        console.log('[extractFormFields] === END DEBUG ===');
+
         if (!document?.pages) {
             console.warn('[extractFormFields] No pages found in document');
             return [];
@@ -73,7 +100,11 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
         for (let pageIndex = 0; pageIndex < document.pages.length; pageIndex++) {
             const page = document.pages[pageIndex];
 
+            console.log(`[extractFormFields] Processing page ${pageIndex}...`);
+
             if (page.formFields) {
+                console.log(`[extractFormFields] Found ${page.formFields.length} form fields on page ${pageIndex}`);
+
                 for (const field of page.formFields) {
                     const fieldName = field.fieldName?.textAnchor?.content || `field_${fields.length}`;
                     const fieldValue = field.fieldValue?.textAnchor?.content || '';
@@ -98,6 +129,8 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
                         });
                     }
                 }
+            } else {
+                console.log(`[extractFormFields] No formFields property on page ${pageIndex}`);
             }
         }
 
