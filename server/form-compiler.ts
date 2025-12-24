@@ -23,10 +23,17 @@ interface FieldMapping {
  * Extract form fields from a PDF using Document AI Form Parser
  */
 export async function extractFormFields(pdfBuffer: Buffer, projectId: string): Promise<FormField[]> {
+    // TODO: Configure Document AI Form Parser processor ID
+    // Temporary workaround: return empty array until processor is configured
+    console.warn('[extractFormFields] Document AI Form Parser not configured - returning empty fields');
+    console.warn('[extractFormFields] To enable: Replace FORM_PARSER_ID with real processor ID');
+    return [];
+
+    /* DISABLED UNTIL PROCESSOR IS CONFIGURED
     try {
         const client = new DocumentProcessorServiceClient();
 
-        // Form Parser processor already exists (from terminal context)
+        // Form Parser processor ID needs to be configured
         const processorName = `projects/${projectId}/locations/us-central1/processors/FORM_PARSER_ID`;
 
         const request = {
@@ -45,7 +52,7 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
             return [];
         }
 
-        const fields: FormField[] = [];
+        const fields: FormField[] = []; 
 
         // Extract form fields from Document AI response
         for (let pageIndex = 0; pageIndex < document.pages.length; pageIndex++) {
@@ -78,6 +85,7 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
         console.error('[extractFormFields] Error:', error);
         throw new Error(`Failed to extract form fields: ${error}`);
     }
+    */
 }
 
 /**
