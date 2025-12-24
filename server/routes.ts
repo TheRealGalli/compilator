@@ -770,8 +770,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per generare preview intelligente di documento pinnato
+  app.post('/api/preview-pinned', async (req: Request, res: Response) => {
+    try {
+      const { source } = req.body;
+
+      if (!source || !source.name || !source.base64) {
+        return res.status(400).json({ error: 'Sorgente pinnata mancante o non valida' });
+      }
+
+      console.log(`[API preview-pinned] Generating preview for: ${source.name}`);
+
+      // Get Gemini API key
+      const apiKey = await getModelApiKey('gemini');
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+
+      // Initialize Vertex AI
+      const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
+      const location = 'us-central1';
+      const vertexAI = new VertexAI({ project: projectId, location });
+      const model = vertexAI.getGenerativeModel({
+        model: 'gemini-2.0-flash-exp',
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
+        ]
+      });
+
+      // Convert base64 to proper format for Gemini
+      const buffer = Buffer.from(source.base64, 'base64');
+
+      // Prepare multimodal content
+      const filePart = {
+        inlineData: {
+          data: buffer.toString('base64'),
+          mimeType: source.type
+        }
+      };
+
+      const systemPrompt = `Sei un assistente di analisi documentale specializzato. Il tuo compito è fornire una preview intelligente e strutturata del documento.
+
+**ISTRUZIONI PREVIEW:**
+1. Analizza attentamente il documento
+2. Fornisci una sintesi chiara e concisa
+3. Identifica i punti chiave e le informazioni principali
+4. Evidenzia argomenti trattati e struttura
+5. Usa un formato leggibile con sezioni chiare
+
+**FORMATO OUTPUT:**
+- Usa intestazioni in grassetto (**Titolo**)
+- Elenca punti chiave
+- Massimo 500 parole
+- Linguaggio professionale ma accessibile`;
+
+      const userPrompt = `Analizza questo documento e fornisci una preview intelligente seguendo le istruzioni del sistema.`;
+
+      const request = {
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: systemPrompt },
+            filePart,
+            { text: userPrompt }
+          ]
+        }]
+      };
+
+      // Generate preview
+      const response = await model.generateContent(request);
+      const previewText = response.response.candidates?.[0]?.content?.parts?.[0]?.text || 'Impossibile generare preview';
+
+      console.log(`[API preview-pinned] Preview generated successfully (${previewText.length} chars)`);
+
+      res.json({ preview: previewText });
+
+    } catch (error: any) {
+      console.error('[API preview-pinned] Error:', error);
+      res.status(500).json({
+        error: error.message || 'Errore durante generazione preview'
+      });
+    }
+  });
+
   // Endpoint per compilare documenti con AI
   // NEW: Layout analysis for Document Studio (Gemini-Native via AiService)
+
 
 
   app.post('/api/compile', async (req: Request, res: Response) => {
