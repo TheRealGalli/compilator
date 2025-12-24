@@ -854,6 +854,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per estrarre solo i campi del documento pinnato (per contesto chat)
+  app.post('/api/extract-fields-for-context', async (req: Request, res: Response) => {
+    try {
+      const { pinnedSource } = req.body;
+
+      if (!pinnedSource || !pinnedSource.name || !pinnedSource.base64) {
+        return res.status(400).json({ error: 'Documento pinnato mancante o non valido' });
+      }
+
+      // Only support PDF/DOCX for form field extraction
+      const isPDF = pinnedSource.type.includes('pdf');
+      const isDOCX = pinnedSource.type.includes('wordprocessingml') || pinnedSource.type.includes('msword');
+
+      if (!isPDF && !isDOCX) {
+        // For non-PDF/DOCX files, return empty fields (no extraction needed)
+        return res.json({ fields: [], fileType: pinnedSource.type });
+      }
+
+      console.log(`[API extract-fields-for-context] Extracting fields from: ${pinnedSource.name}`);
+
+      const { extractFormFields } = await import('./form-compiler');
+      const pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
+      const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
+
+      // Extract fields using Document AI
+      const fields = await extractFormFields(pdfBuffer, projectId);
+
+      // Return simplified field list (just names and types, no coordinates)
+      const simplifiedFields = fields.map(f => ({
+        name: f.fieldName,
+        type: f.fieldType
+      }));
+
+      console.log(`[API extract-fields-for-context] Extracted ${simplifiedFields.length} fields`);
+
+      res.json({
+        fields: simplifiedFields,
+        fileType: pinnedSource.type
+      });
+
+    } catch (error: any) {
+      console.error('[API extract-fields-for-context] Error:', error);
+      // Don't fail the chat - just return empty fields
+      res.json({ fields: [], error: error.message });
+    }
+  });
+
   // Endpoint per compilare form scansionati con Document AI Form Parser
   app.post('/api/compile-scanned-form', async (req: Request, res: Response) => {
     try {

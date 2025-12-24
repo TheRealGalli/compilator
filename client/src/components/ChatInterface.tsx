@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { getApiUrl } from "@/lib/api-config";
@@ -43,6 +43,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [webResearch, setWebResearch] = useState(false);
+  const [extractedFields, setExtractedFields] = useState<Array<{ name: string; type: string }>>([]);
   const { toast } = useToast();
   const { selectedSources, pinnedSource } = useSources();
 
@@ -156,10 +157,47 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([
     "Riassumi i punti chiave",
-    "Quali sono i risultati?", // Shortened to fit roughly 20 chars
+    "Quali sono i risultati?",
     "Note di studio",
     "Crea una FAQ",
   ]);
+
+  // Extract fields from pinned source for context
+  useEffect(() => {
+    if (!pinnedSource) {
+      setExtractedFields([]);
+      return;
+    }
+
+    const extractFields = async () => {
+      try {
+        const response = await fetch(getApiUrl('/api/extract-fields-for-context'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pinnedSource: {
+              name: pinnedSource.name,
+              type: pinnedSource.type,
+              base64: pinnedSource.base64
+            }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setExtractedFields(data.fields || []);
+          if (data.fields && data.fields.length > 0) {
+            console.log(`[ChatInterface] Extracted ${data.fields.length} fields from pinned document`);
+          }
+        }
+      } catch (error) {
+        console.error('Error extracting fields for context:', error);
+        // Silently fail - not critical for chat
+      }
+    };
+
+    extractFields();
+  }, [pinnedSource?.id]);
 
   const fetchSuggestedQuestions = async (currentMessages: Message[]) => {
     try {
@@ -228,7 +266,8 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           name: pinnedSource.name,
           type: pinnedSource.type,
           base64: pinnedSource.base64
-        } : null
+        } : null,
+        extractedFields: extractedFields.length > 0 ? extractedFields : undefined
       });
 
       const data = await response.json();

@@ -5,6 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TemplateEditor } from "./TemplateEditor";
 import { CompiledOutput } from "./CompiledOutput";
 import { ModelSettings } from "./ModelSettings";
+import { PDFViewer } from "./PDFViewer";
+import { Card } from "@/components/ui/card";
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -206,7 +208,7 @@ export function DocumentCompilerSection({
   const [compiledContent, setCompiledContent] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
   const { toast } = useToast();
-  const { selectedSources } = useSources();
+  const { selectedSources, pinnedSource } = useSources();
 
   // Template Generation State
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -592,17 +594,49 @@ export function DocumentCompilerSection({
           </div>
 
           <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
-            <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <TemplateEditor
-                value={templateContent}
-                onChange={setTemplateContent}
-              />
-              <CompiledOutput
-                content={compiledContent}
-                onCopy={handleCopy}
-                onDownload={handleDownload}
-              />
-            </div>
+            {pinnedSource ? (
+              // STUDIO MODE - Show PDF Viewer or Coming Soon
+              (() => {
+                const isPDF = pinnedSource.type.includes('pdf');
+                const isDOCX = pinnedSource.type.includes('wordprocessingml') || pinnedSource.type.includes('msword');
+
+                if (!isPDF && !isDOCX) {
+                  // Coming Soon for non-PDF/DOCX files
+                  return (
+                    <Card className="h-full flex items-center justify-center p-12">
+                      <div className="text-center max-w-md">
+                        <div className="text-6xl mb-4">🚧</div>
+                        <h3 className="text-xl font-semibold mb-2">Coming Soon</h3>
+                        <p className="text-muted-foreground">
+                          Questo tipo di file sarà possibile elaborarlo in modalità Studio prossimamente.
+                        </p>
+                      </div>
+                    </Card>
+                  );
+                }
+
+                // PDF/DOCX Preview
+                return (
+                  <PDFViewer
+                    base64={pinnedSource.base64 || ''}
+                    fileName={pinnedSource.name}
+                  />
+                );
+              })()
+            ) : (
+              // NORMAL MODE - Show Template + Output
+              <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <TemplateEditor
+                  value={templateContent}
+                  onChange={setTemplateContent}
+                />
+                <CompiledOutput
+                  content={compiledContent}
+                  onCopy={handleCopy}
+                  onDownload={handleDownload}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
