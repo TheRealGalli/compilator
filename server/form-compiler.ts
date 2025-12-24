@@ -35,11 +35,12 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
 
         const processorName = `projects/${projectId}/locations/us-central1/processors/${processorId}`;
         console.log(`[extractFormFields] Using processor: ${processorName}`);
+        console.log(`[extractFormFields] PDF buffer size: ${pdfBuffer.length} bytes`);
 
         const request = {
             name: processorName,
             rawDocument: {
-                content: pdfBuffer.toString('base64'),
+                content: pdfBuffer,
                 mimeType: 'application/pdf',
             },
         };
