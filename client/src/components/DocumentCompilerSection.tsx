@@ -370,6 +370,72 @@ export function DocumentCompilerSection({
     }
   };
 
+  const handleRunStudio = async () => {
+    if (!pinnedSource || isCompiling) return;
+
+    setIsCompiling(true);
+    try {
+      const { getApiUrl } = await import('@/lib/api-config');
+
+      toast({
+        title: "Studio Mode attivato",
+        description: "Analisi documento e compilazione campi in corso...",
+      });
+
+      const response = await fetch(getApiUrl('/api/compile-scanned-form'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pinnedSource: {
+            name: pinnedSource.name,
+            type: pinnedSource.type,
+            base64: pinnedSource.base64,
+          },
+          instructions: notes || undefined
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Errore durante compilazione form');
+      }
+
+      const data = await response.json();
+      const { compiledDocument, fieldsDetected, fieldsFilled } = data;
+
+      // Update pinnedSource with compiled version
+      // Note: This updates the preview automatically
+      toast({
+        title: "✨ Form compilato con successo!",
+        description: `${fieldsFilled}/${fieldsDetected} campi compilati. Scarica il documento.`,
+      });
+
+      // Download compiled PDF
+      const byteCharacters = atob(compiledDocument.base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: compiledDocument.mimeType });
+
+      const { saveAs } = await import('file-saver');
+      saveAs(blob, compiledDocument.name);
+
+    } catch (error: any) {
+      console.error('Error in Run Studio:', error);
+      toast({
+        title: "Errore Studio Mode",
+        description: error.message || "Impossibile compilare il documento.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCompiling(false);
+    }
+  };
+
   const handleCopy = () => {
     if (!compiledContent) return;
 
@@ -551,8 +617,8 @@ export function DocumentCompilerSection({
           </Select>
 
           <Button
-            onClick={handleCompile}
-            disabled={!templateContent || isCompiling}
+            onClick={pinnedSource ? handleRunStudio : handleCompile}
+            disabled={pinnedSource ? isCompiling : (!templateContent || isCompiling)}
             data-testid="button-compile"
             className="w-full sm:w-auto"
           >
@@ -568,7 +634,10 @@ export function DocumentCompilerSection({
             >
               <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
             </svg>
-            {isCompiling ? "Compilazione..." : "Compila con AI"}
+            {isCompiling
+              ? (pinnedSource ? "Running Studio..." : "Compilazione...")
+              : (pinnedSource ? "Run Studio" : "Compila con AI")
+            }
           </Button>
         </div>
       </div>
