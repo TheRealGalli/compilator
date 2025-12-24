@@ -70,6 +70,18 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
         if (document) {
             console.log('[extractFormFields] Available properties:', Object.keys(document));
 
+            // CHECK FOR ENTITIES (alternative extraction method)
+            if (document.entities) {
+                console.log('[extractFormFields] !!! FOUND ENTITIES !!!');
+                console.log('[extractFormFields] Entities count:', document.entities.length);
+                if (document.entities.length > 0) {
+                    console.log('[extractFormFields] First entity structure:',
+                        JSON.stringify(document.entities[0], null, 2));
+                }
+            } else {
+                console.log('[extractFormFields] No entities array found');
+            }
+
             if (document.pages && document.pages.length > 0) {
                 const firstPage = document.pages[0];
                 console.log('[extractFormFields] First page properties:', Object.keys(firstPage));
