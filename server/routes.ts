@@ -854,6 +854,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per compilare form scansionati con Document AI Form Parser
+  app.post('/api/compile-scanned-form', async (req: Request, res: Response) => {
+    try {
+      const { pinnedSource, instructions } = req.body;
+
+      if (!pinnedSource || !pinnedSource.name || !pinnedSource.base64) {
+        return res.status(400).json({ error: 'Documento pinnato mancante o non valido' });
+      }
+
+      // Only support PDF for now
+      if (!pinnedSource.type.includes('pdf')) {
+        return res.status(400).json({
+          error: 'Solo documenti PDF scansionati sono supportati per la compilazione form'
+        });
+      }
+
+      console.log(`[API compile-scanned-form] Compiling form: ${pinnedSource.name}`);
+
+      const { extractFormFields, decideFieldContents, fillFormFieldsOnPDF } = await import('./form-compiler');
+
+      // Convert base64 to buffer
+      const pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
+      const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
+
+      // Step 1: Extract form fields using Document AI Form Parser
+      console.log('[API compile-scanned-form] Step 1: Extracting form fields...');
+      const fields = await extractFormFields(pdfBuffer, projectId);
+
+      if (fields.length === 0) {
+        return res.status(400).json({
+          error: 'Nessun campo rilevato nel documento. Assicurati che sia un modulo scansionato.'
+        });
+      }
+
+      console.log(`[API compile-scanned-form] Extracted ${fields.length} fields`);
+
+      // Step 2: Use Gemini to decide field contents
+      console.log('[API compile-scanned-form] Step 2: Generating field contents with Gemini...');
+      const apiKey = await getModelApiKey('gemini');
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+
+      const location = 'us-central1';
+      const vertexAI = new VertexAI({ project: projectId, location });
+      const model = vertexAI.getGenerativeModel({
+        model: 'gemini-2.0-flash-exp',
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
+        ]
+      });
+
+      const documentContext = instructions || 'Modulo generico da compilare';
+      const fieldValues = await decideFieldContents(fields, documentContext, model);
+
+      console.log(`[API compile-scanned-form] Generated ${Object.keys(fieldValues).length} field values`);
+
+      // Step 3: Fill form fields on PDF with blue ink
+      console.log('[API compile-scanned-form] Step 3: Filling form fields...');
+      const compiledPdfBuffer = await fillFormFieldsOnPDF(pdfBuffer, fields, fieldValues);
+
+      // Generate output filename
+      const originalName = pinnedSource.name.replace('.pdf', '');
+      const compiledName = `${originalName}_COMPILATO.pdf`;
+
+      console.log(`[API compile-scanned-form] Form compiled successfully`);
+
+      res.json({
+        compiledDocument: {
+          base64: compiledPdfBuffer.toString('base64'),
+          name: compiledName,
+          mimeType: 'application/pdf'
+        },
+        fieldsDetected: fields.length,
+        fieldsFilled: Object.keys(fieldValues).filter(k => fieldValues[k] && fieldValues[k] !== 'N/A').length
+      });
+
+    } catch (error: any) {
+      console.error('[API compile-scanned-form] Error:', error);
+      res.status(500).json({
+        error: error.message || 'Errore durante compilazione form scansionato'
+      });
+    }
+  });
+
   // Endpoint per compilare documenti con AI
   // NEW: Layout analysis for Document Studio (Gemini-Native via AiService)
 
