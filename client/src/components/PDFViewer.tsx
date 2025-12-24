@@ -38,8 +38,22 @@ export function PDFViewer({ base64, fileName }: PDFViewerProps) {
         setScale((prev) => Math.max(prev - 0.2, 0.5));
     };
 
-    // Convert base64 to data URL
-    const pdfDataUrl = `data:application/pdf;base64,${base64}`;
+    // Convert base64 to Uint8Array for better compatibility with react-pdf
+    const getPDFData = () => {
+        try {
+            const binaryString = atob(base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes;
+        } catch (error) {
+            console.error('Error converting base64 to PDF:', error);
+            return null;
+        }
+    };
+
+    const pdfData = getPDFData();
 
     return (
         <Card className="flex flex-col h-full">
@@ -51,28 +65,35 @@ export function PDFViewer({ base64, fileName }: PDFViewerProps) {
 
             {/* PDF Display */}
             <div className="flex-1 overflow-auto bg-muted/10 flex items-center justify-center p-4">
-                <Document
-                    file={pdfDataUrl}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    loading={
-                        <div className="flex items-center justify-center p-8">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                        </div>
-                    }
-                    error={
-                        <div className="text-center p-8">
-                            <p className="text-sm text-destructive">Errore nel caricamento del PDF</p>
-                        </div>
-                    }
-                >
-                    <Page
-                        pageNumber={pageNumber}
-                        scale={scale}
-                        renderTextLayer={true}
-                        renderAnnotationLayer={true}
-                        className="shadow-lg"
-                    />
-                </Document>
+                {pdfData ? (
+                    <Document
+                        file={{ data: pdfData }}
+                        onLoadSuccess={onDocumentLoadSuccess}
+                        loading={
+                            <div className="flex items-center justify-center p-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                            </div>
+                        }
+                        error={
+                            <div className="text-center p-8">
+                                <p className="text-sm text-destructive">Errore nel caricamento del PDF</p>
+                                <p className="text-xs text-muted-foreground mt-2">Verifica che il file sia un PDF valido</p>
+                            </div>
+                        }
+                    >
+                        <Page
+                            pageNumber={pageNumber}
+                            scale={scale}
+                            renderTextLayer={true}
+                            renderAnnotationLayer={true}
+                            className="shadow-lg"
+                        />
+                    </Document>
+                ) : (
+                    <div className="text-center p-8">
+                        <p className="text-sm text-destructive">Impossibile convertire il PDF</p>
+                    </div>
+                )}
             </div>
 
             {/* Controls */}
