@@ -254,6 +254,8 @@ export async function fillFormFieldsOnPDF(
         // Blue ink color
         const blueInk = rgb(0.117, 0.251, 0.686); // #1E40AF
 
+        let fieldsFilledCount = 0;
+
         fields.forEach((field, idx) => {
             const value = fieldValues[idx.toString()];
             if (!value || value === 'N/A') return;
@@ -283,10 +285,13 @@ export async function fillFormFieldsOnPDF(
                     font: font,
                     color: blueInk,
                 });
+                fieldsFilledCount++;
             } catch (err) {
                 console.warn(`[fillFormFieldsOnPDF] Failed to draw field ${idx}:`, err);
             }
         });
+
+        console.log(`[fillFormFieldsOnPDF] Filled ${fieldsFilledCount}/${fields.length} fields`);
 
         const pdfBytes = await pdfDoc.save();
         return Buffer.from(pdfBytes);
@@ -294,6 +299,82 @@ export async function fillFormFieldsOnPDF(
     } catch (error) {
         console.error('[fillFormFieldsOnPDF] Error:', error);
         throw new Error(`Failed to fill form fields: ${error}`);
+    }
+}
+
+/**
+ * Generate SVG overlay with filled form fields
+ * NEW APPROACH: Instead of modifying PDF, create SVG layer
+ */
+export function generateSVGWithFields(
+    fields: FormField[],
+    fieldValues: FieldMapping,
+    pdfWidth: number,
+    pdfHeight: number
+): string {
+    try {
+        // Start SVG document
+        let svg = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+        svg += `<svg xmlns="http://www.w3.org/2000/svg" width="${pdfWidth}" height="${pdfHeight}" viewBox="0 0 ${pdfWidth} ${pdfHeight}">\n`;
+        svg += `  <!-- Studio Mode Compiled Form - Blue Ink Layer -->\n`;
+        svg += `  <style>\n`;
+        svg += `    .field-text {\n`;
+        svg += `      font-family: 'Times New Roman', Times, serif;\n`;
+        svg += `      font-size: 12px;\n`;
+        svg += `      fill: #1E40AF;\n`;  // Blue ink
+        svg += `      dominant-baseline: text-before-edge;\n`;
+        svg += `    }\n`;
+        svg += `  </style>\n\n`;
+
+        let fieldsCount = 0;
+
+        fields.forEach((field, idx) => {
+            const value = fieldValues[idx.toString()];
+            if (!value || value === 'N/A') return;
+
+            const vertices = field.boundingBox.normalizedVertices;
+            if (!vertices || vertices.length < 2) return;
+
+            // Convert normalized coords to actual coords
+            const x = vertices[0].x * pdfWidth;
+            const y = vertices[0].y * pdfHeight;
+
+            // Escape XML entities
+            const escapedValue = value
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+
+            svg += `  <text x="${x.toFixed(2)}" y="${y.toFixed(2)}" class="field-text" data-field="${field.fieldName}">${escapedValue}</text>\n`;
+            fieldsCount++;
+        });
+
+        svg += `</svg>`;
+
+        console.log(`[generateSVGWithFields] Generated SVG with ${fieldsCount}/${fields.length} fields`);
+        return svg;
+
+    } catch (error) {
+        console.error('[generateSVGWithFields] Error:', error);
+        throw new Error(`Failed to generate SVG: ${error}`);
+    }
+}
+
+/**
+ * Get PDF dimensions from buffer
+ */
+export async function getPDFDimensions(pdfBuffer: Buffer): Promise<{ width: number; height: number }> {
+    try {
+        const pdfDoc = await PDFDocument.load(pdfBuffer);
+        const firstPage = pdfDoc.getPages()[0];
+        const { width, height } = firstPage.getSize();
+        return { width, height };
+    } catch (error) {
+        console.error('[getPDFDimensions] Error:', error);
+        // Default to A4 if we can't read PDF
+        return { width: 595, height: 842 }; // A4 in points
     }
 }
 
