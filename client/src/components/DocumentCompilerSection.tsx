@@ -1,4 +1,4 @@
-import { Asterisk, FileText, ChevronUp, Wand2 } from "lucide-react";
+import { Asterisk, FileText, ChevronUp, Wand2, Menu, Type, ChevronDown } from "lucide-react";
 import { ThreeStars } from "@/components/ui/three-stars";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +16,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSources } from "@/contexts/SourcesContext";
+import { Slider } from "@/components/ui/slider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import {
   Dialog,
@@ -26,6 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+
 
 const templates = {
   privacy: {
@@ -224,6 +234,7 @@ export function DocumentCompilerSection({
   const [formalTone, setFormalTone] = useState(true);
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
   const [extractedFields, setExtractedFields] = useState<Array<{ fieldName: string; fieldType: string }>>([]);
+  const [studioFontSize, setStudioFontSize] = useState<number>(14);
 
 
 
@@ -669,17 +680,57 @@ export function DocumentCompilerSection({
                   };
 
                   return (
-                    <Card className="h-full flex flex-col overflow-hidden bg-white border-indigo-100 shadow-sm">
-                      <div className="border-b px-4 py-3 bg-indigo-50/30 flex items-center justify-between flex-shrink-0">
-                        <h3 className="text-sm font-semibold text-indigo-900">Studio Preview (Testo)</h3>
-                        <p className="text-xs text-muted-foreground truncate max-w-xs">{pinnedSource.name}</p>
+                    <Card className="h-full flex flex-col overflow-hidden bg-card border-border shadow-sm">
+                      <div className="h-12 bg-slate-900 border-b border-slate-800 flex items-center px-4 gap-4 flex-shrink-0">
+                        <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
+                          <Menu className="w-4 h-4" />
+                        </Button>
+
+                        <div className="h-4 w-px bg-slate-800 mx-1" />
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-800 gap-2 h-8 px-2 font-normal">
+                              <Type className="w-4 h-4" />
+                              <span className="text-xs">Impostazioni Caratteri</span>
+                              <ChevronDown className="w-3 h-3 opacity-50" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-56 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800">
+                            <DropdownMenuLabel>Personalizza Anteprima</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <div className="p-4 space-y-4">
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-medium">Dimensione Caratteri</span>
+                                  <span className="text-xs text-muted-foreground">{studioFontSize}px</span>
+                                </div>
+                                <Slider
+                                  value={[studioFontSize]}
+                                  onValueChange={(v) => setStudioFontSize(v[0])}
+                                  min={8}
+                                  max={32}
+                                  step={1}
+                                />
+                              </div>
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <div className="flex-1 overflow-hidden">
+                          <p className="text-xs text-slate-400 truncate text-center font-medium">{pinnedSource.name}</p>
+                        </div>
                       </div>
-                      <div className="flex-1 overflow-auto p-8 font-mono text-sm whitespace-pre-wrap selection:bg-indigo-100 selection:text-indigo-900 text-slate-700 bg-slate-50/30">
+                      <div
+                        className="flex-1 overflow-auto p-12 font-mono whitespace-pre-wrap selection:bg-indigo-500/30 selection:text-current text-foreground/90 bg-background/50 transition-all duration-200"
+                        style={{ fontSize: `${studioFontSize}px` }}
+                      >
                         {safeDecodeBase64(pinnedSource.base64 || '')}
                       </div>
                     </Card>
                   );
                 }
+
 
 
                 if (isWord) {
