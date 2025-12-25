@@ -864,14 +864,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Documento pinnato mancante o non valido' });
       }
 
-      // Only support PDF/DOCX for form field extraction
+      // Support PDF, DOCX, TXT, CSV for form field extraction
       const isPDF = pinnedSource.type.includes('pdf');
       const isDOCX = pinnedSource.type.includes('wordprocessingml') || pinnedSource.type.includes('msword');
+      const isTXT = pinnedSource.type.includes('text/plain') || pinnedSource.name.endsWith('.txt');
+      const isCSV = pinnedSource.type.includes('text/csv') || pinnedSource.name.endsWith('.csv');
 
-      if (!isPDF && !isDOCX) {
-        // For non-PDF/DOCX files, return empty fields (no extraction needed)
+      if (!isPDF && !isDOCX && !isTXT && !isCSV) {
+        // For unsupported files, return empty fields
         return res.json({ fields: [], fileType: pinnedSource.type });
       }
+
 
       console.log(`[API extract-fields-for-context] Extracting fields from: ${pinnedSource.name}`);
 
@@ -905,7 +908,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Extract fields using Gemini Vision
-      const fields = await discoverFieldsWithGemini(pdfBuffer.toString('base64'), model);
+      const fields = await discoverFieldsWithGemini(pdfBuffer.toString('base64'), model, pinnedSource.type);
+
 
       // Return simplified field list (just names and types, no coordinates)
       const simplifiedFields = fields.map((f: FormField) => ({

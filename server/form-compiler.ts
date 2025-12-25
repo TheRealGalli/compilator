@@ -18,37 +18,39 @@ export interface FormField {
  * Gemini 2.0 scans the image and identifies "fillable" areas.
  */
 export async function discoverFieldsWithGemini(
-    pdfBase64: string,
-    geminiModel: any
+    fileBase64: string,
+    geminiModel: any,
+    mimeType: string = 'application/pdf'
 ): Promise<FormField[]> {
     try {
-        console.log('[discoverFieldsWithGemini] Starting pure-Gemini field discovery...');
+        console.log(`[discoverFieldsWithGemini] Starting pure-Gemini field discovery for ${mimeType}...`);
 
-        const prompt = `Sei un esperto di analisi di moduli cartacei (Document Intelligence).
-Analizza l'immagine del PDF e identifica TUTTI i campi che dovrebbero essere compilati.
+        const prompt = `Sei un esperto di analisi di documenti e intelligence (Document Intelligence).
+Analizza il file fornito (PDF, Testo o Immagine) e identifica TUTTI i "campi" o le "entità" che potrebbero essere compilati o che rappresentano dati chiave da estrarre.
 
 Per ogni campo, fornisci un JSON con questa struttura:
 {
   "fields": [
     {
-      "fieldName": "Nome del campo (es: Cognome)",
+      "fieldName": "Nome del campo (es: Cognome, Data, Indirizzo)",
       "box": [ymin, xmin, ymax, xmax],
-      "type": "text | date | checkbox | signature"
+      "type": "text | date | checkbox | signature | entity"
     }
   ]
 }
 
-Sii estremamente preciso con le coordinate normalizzate (0-1).`;
+Sii estremamente preciso. Per i file PDF/Immagini usa coordinate normalizzate (0-1). Per i file di puro testo, prova a stimarne la posizione nel documento.`;
 
         const parts: any[] = [
             { text: prompt },
             {
                 inlineData: {
-                    data: pdfBase64,
-                    mimeType: 'application/pdf'
+                    data: fileBase64,
+                    mimeType: mimeType
                 }
             }
         ];
+
 
         const result = await geminiModel.generateContent({
             contents: [{ role: 'user', parts: parts }]

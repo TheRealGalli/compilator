@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Download } from 'lucide-react';
@@ -46,11 +46,22 @@ export function PDFViewer({ base64, fileName }: PDFViewerProps) {
         return new Blob([byteArray], { type: mimeType });
     };
 
-    // Create data URL for iframe
-    const pdfDataUrl = `data:application/pdf;base64,${base64}`;
+    // Use blob URL for cleaner resource handling and hide toolbar
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        const blob = base64ToBlob(base64, 'application/pdf');
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url + '#toolbar=0&navpanes=0&scrollbar=0');
+        return () => {
+            URL.revokeObjectURL(url);
+            setPdfUrl(null);
+        };
+    }, [base64]);
+
 
     return (
-        <Card className="flex flex-col h-full">
+        <Card className="flex flex-col h-full overflow-hidden">
             {/* Header */}
             <div className="border-b px-4 py-3 bg-muted/30 flex items-center justify-between flex-shrink-0">
                 <h3 className="text-sm font-semibold">Studio Preview</h3>
@@ -58,14 +69,19 @@ export function PDFViewer({ base64, fileName }: PDFViewerProps) {
             </div>
 
             {/* PDF Display with iframe */}
-            <div className="flex-1 overflow-hidden bg-muted/10" style={{ transform: `scale(${scale / 100})`, transformOrigin: 'top center' }}>
-                <iframe
-                    src={pdfDataUrl}
-                    className="w-full h-full border-0"
-                    title={fileName}
-                    style={{ minHeight: '100%' }}
-                />
+            <div className="flex-1 overflow-hidden bg-muted/10 relative">
+                <div style={{ transform: `scale(${scale / 100})`, transformOrigin: 'top center', height: '100%', width: '100%' }}>
+                    {pdfUrl && (
+                        <iframe
+                            src={pdfUrl}
+                            className="w-full h-full border-0"
+                            title={fileName}
+                            style={{ minHeight: '100%' }}
+                        />
+                    )}
+                </div>
             </div>
+
 
             {/* Controls */}
             <div className="border-t px-4 py-3 bg-muted/20 flex items-center justify-between flex-shrink-0">

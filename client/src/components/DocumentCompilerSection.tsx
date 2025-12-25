@@ -638,33 +638,79 @@ export function DocumentCompilerSection({
           <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
             {pinnedSource ? (
               // STUDIO MODE - Show PDF Viewer or Coming Soon
+              // STUDIO MODE - Show File Preview
               (() => {
                 const isPDF = pinnedSource.type.includes('pdf');
-                const isDOCX = pinnedSource.type.includes('wordprocessingml') || pinnedSource.type.includes('msword');
+                const isWord = pinnedSource.type.includes('wordprocessingml') || pinnedSource.type.includes('msword') || pinnedSource.name.endsWith('.docx');
+                const isText = pinnedSource.type.includes('text/plain') || pinnedSource.name.endsWith('.txt');
+                const isCSV = pinnedSource.type.includes('text/csv') || pinnedSource.name.endsWith('.csv');
 
-                if (!isPDF && !isDOCX) {
-                  // Coming Soon for non-PDF/DOCX files
+                if (isPDF) {
+                  return (
+                    <PDFViewer
+                      base64={pinnedSource.base64 || ''}
+                      fileName={pinnedSource.name}
+                    />
+                  );
+                }
+
+                if (isText || isCSV) {
+                  const safeDecodeBase64 = (b64: string) => {
+                    try {
+                      const binString = atob(b64);
+                      const bytes = new Uint8Array(binString.length);
+                      for (let i = 0; i < binString.length; i++) {
+                        bytes[i] = binString.charCodeAt(i);
+                      }
+                      return new TextDecoder().decode(bytes);
+                    } catch (e) {
+                      return "Errore decodifica testo.";
+                    }
+                  };
+
+                  return (
+                    <Card className="h-full flex flex-col overflow-hidden bg-white border-indigo-100 shadow-sm">
+                      <div className="border-b px-4 py-3 bg-indigo-50/30 flex items-center justify-between flex-shrink-0">
+                        <h3 className="text-sm font-semibold text-indigo-900">Studio Preview (Testo)</h3>
+                        <p className="text-xs text-muted-foreground truncate max-w-xs">{pinnedSource.name}</p>
+                      </div>
+                      <div className="flex-1 overflow-auto p-8 font-mono text-sm whitespace-pre-wrap selection:bg-indigo-100 selection:text-indigo-900 text-slate-700 bg-slate-50/30">
+                        {safeDecodeBase64(pinnedSource.base64 || '')}
+                      </div>
+                    </Card>
+                  );
+                }
+
+
+                if (isWord) {
                   return (
                     <Card className="h-full flex items-center justify-center p-12">
                       <div className="text-center max-w-md">
-                        <div className="text-6xl mb-4">🚧</div>
-                        <h3 className="text-xl font-semibold mb-2">Coming Soon</h3>
+                        <div className="text-6xl mb-4">📝</div>
+                        <h3 className="text-xl font-semibold mb-2">Word Preview</h3>
                         <p className="text-muted-foreground">
-                          Questo tipo di file sarà possibile elaborarlo in modalità Studio prossimamente.
+                          Il file <strong>{pinnedSource.name}</strong> è caricato ed è pronto per essere usato come fonte.
+                          Al momento i file Word possono essere analizzati dall'IA ma non visualizzati direttamente in anteprima.
                         </p>
                       </div>
                     </Card>
                   );
                 }
 
-                // PDF/DOCX Preview
+                // Default Coming Soon
                 return (
-                  <PDFViewer
-                    base64={pinnedSource.base64 || ''}
-                    fileName={pinnedSource.name}
-                  />
+                  <Card className="h-full flex items-center justify-center p-12">
+                    <div className="text-center max-w-md">
+                      <div className="text-6xl mb-4">🚧</div>
+                      <h3 className="text-xl font-semibold mb-2">Coming Soon</h3>
+                      <p className="text-muted-foreground">
+                        L'anteprima per questo tipo di file sarà disponibile prossimamente.
+                      </p>
+                    </div>
+                  </Card>
                 );
               })()
+
             ) : (
               // NORMAL MODE - Show Template + Output
               <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
