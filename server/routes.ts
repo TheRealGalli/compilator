@@ -940,7 +940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/compile', async (req: Request, res: Response) => {
     try {
-      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, pinnedSource, extractedFields } = req.body;
+      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, pinnedSource, extractedFields, manualAnnotations } = req.body;
 
       console.log('[API compile] Request received:', {
         modelProvider,
@@ -1008,6 +1008,12 @@ ${extractedFields && extractedFields.length > 0 ? `
    Il documento che stiamo compilando (o che fa da base) contiene i seguenti campi rilevati visivamente:
    ${extractedFields.map((f: any) => `- ${f.fieldName} (${f.fieldType})`).join('\n')}
    ASSICURATI che il contenuto generato includa o faccia riferimento a questi campi se pertinenti.
+` : ''}
+${manualAnnotations && manualAnnotations.length > 0 ? `
+4. **ANNOTAZIONI MANUALI STUDIO (Priorità Massima):**
+   L'utente ha aggiunto manualmente i seguenti testi sull'anteprima del documento:
+   ${manualAnnotations.map((a: any) => `- "${a.text}"`).join('\n')}
+   QUESTI DATI HANNO LA PRIORITÀ su qualsiasi altra fonte. Usali per sovrascrivere o completare i campi corrispondenti nel template.
 ` : ''}
 
 **ISTRUZIONI GENERALI:**

@@ -1,4 +1,4 @@
-import { Asterisk, FileText, ChevronUp, Wand2, Menu, Type, ChevronDown } from "lucide-react";
+import { Asterisk, FileText, ChevronUp, Wand2, Menu, Type, ChevronDown, Printer, Download } from "lucide-react";
 import { ThreeStars } from "@/components/ui/three-stars";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -210,6 +210,13 @@ interface Document {
   gcsPath: string;
 }
 
+interface Annotation {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+}
+
 export function DocumentCompilerSection({
   modelProvider: initialModelProvider = 'gemini',
   onModelProviderChange
@@ -235,6 +242,7 @@ export function DocumentCompilerSection({
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
   const [extractedFields, setExtractedFields] = useState<Array<{ fieldName: string; fieldType: string }>>([]);
   const [studioFontSize, setStudioFontSize] = useState<number>(14);
+  const [manualAnnotations, setManualAnnotations] = useState<Annotation[]>([]);
 
 
 
@@ -388,7 +396,8 @@ export function DocumentCompilerSection({
           type: pinnedSource.type,
           base64: pinnedSource.base64
         } : null,
-        extractedFields: extractedFields.length > 0 ? extractedFields : undefined
+        extractedFields: extractedFields.length > 0 ? extractedFields : undefined,
+        manualAnnotations: manualAnnotations.length > 0 ? manualAnnotations : undefined
       });
 
 
@@ -661,6 +670,7 @@ export function DocumentCompilerSection({
                     <PDFViewer
                       base64={pinnedSource.base64 || ''}
                       fileName={pinnedSource.name}
+                      onAnnotationsChange={setManualAnnotations}
                     />
                   );
                 }
@@ -676,6 +686,29 @@ export function DocumentCompilerSection({
                       return new TextDecoder().decode(bytes);
                     } catch (e) {
                       return "Errore decodifica testo.";
+                    }
+                  };
+
+                  const handleDownloadText = () => {
+                    const content = safeDecodeBase64(pinnedSource.base64 || '');
+                    const blob = new Blob([content], { type: pinnedSource.type });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = pinnedSource.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  };
+
+                  const handlePrintText = () => {
+                    const content = safeDecodeBase64(pinnedSource.base64 || '');
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                      printWindow.document.write(`<pre style="white-space: pre-wrap; font-family: monospace; padding: 20px;">${content}</pre>`);
+                      printWindow.document.close();
+                      printWindow.print();
                     }
                   };
 
@@ -702,7 +735,7 @@ export function DocumentCompilerSection({
                             <div className="p-4 space-y-4">
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-medium">Dimensione Caratteri</span>
+                                  <span className="text-xs font-medium text-foreground">Dimensione Caratteri</span>
                                   <span className="text-xs text-muted-foreground">{studioFontSize}px</span>
                                 </div>
                                 <Slider
@@ -720,6 +753,16 @@ export function DocumentCompilerSection({
                         <div className="flex-1 overflow-hidden">
                           <p className="text-xs text-slate-400 truncate text-center font-medium">{pinnedSource.name}</p>
                         </div>
+
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={handlePrintText} title="Stampa" className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
+                            <Printer className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={handleDownloadText} title="Scarica" className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+
                       </div>
                       <div
                         className="flex-1 overflow-auto p-12 font-mono whitespace-pre-wrap selection:bg-indigo-500/30 selection:text-current text-foreground/90 bg-background/50 transition-all duration-200"
@@ -730,6 +773,7 @@ export function DocumentCompilerSection({
                     </Card>
                   );
                 }
+
 
 
 
