@@ -418,17 +418,17 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                             left: `${anno.x}px`,
                             top: `${anno.y}px`,
                             zIndex: isDragging ? 100 : 30,
-                            transform: 'translate(0, -20px)',
+                            transform: 'translate(-50%, -85%)', // Centered horizontally, slightly above point
                             cursor: !isWritingMode ? 'default' : (isDragging ? 'grabbing' : 'grab')
                         }}
                         className={`group transition-transform active:scale-105 ${isDragging ? 'opacity-70' : ''}`}
                         onMouseDown={(e) => handleAnnotationMouseDown(e, anno.id)}
                         onClick={(e) => handleAnnotationClick(e, anno.id)}
                     >
-                        <div className="relative flex items-center">
+                        <div className="relative flex flex-col items-center">
                             {/* Hidden span to measure text width and drive the container size */}
                             <span
-                                className="invisible whitespace-pre px-0 min-h-[1.75rem] min-w-[4px]"
+                                className="invisible whitespace-pre px-0 min-h-[1.2rem] min-w-[4px]"
                                 style={{
                                     fontFamily: anno.fontFamily,
                                     fontSize: `${anno.fontSize}px`,
@@ -448,16 +448,17 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                         (e.target as HTMLElement).blur();
                                     }
                                 }}
-                                className={`absolute inset-0 w-full bg-transparent border-b-2 ${isLocked && anno.text.length > 0 ? 'border-blue-600' : 'border-transparent'} outline-none px-0 transition-all pointer-events-none select-none`}
+                                className={`absolute bottom-0 w-full bg-transparent border-b-2 ${isLocked && anno.text.length > 0 ? 'border-blue-600' : 'border-transparent'} outline-none px-0 text-center transition-all pointer-events-none select-none`}
                                 style={{
                                     pointerEvents: isLocked ? 'auto' : 'none',
                                     userSelect: isLocked ? 'auto' : 'none',
                                     fontFamily: anno.fontFamily,
                                     fontSize: `${anno.fontSize}px`,
                                     color: anno.color,
-                                    fontWeight: anno.isBold ? 'bold' : 'normal'
+                                    fontWeight: anno.isBold ? 'bold' : 'normal',
+                                    lineHeight: '1' // Closer to the underline
                                 }}
-                                placeholder={isLocked ? "Scrivi..." : ""}
+                                placeholder=""
                                 readOnly={!isLocked}
                             />
 
