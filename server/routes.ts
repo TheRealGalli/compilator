@@ -883,7 +883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Flatten PDF to remove interactive fields (makes them visible to Gemini)
       if (isPDF) {
         console.log('[API extract-fields-for-context] Flattening PDF...');
-        pdfBuffer = await flattenPDF(pdfBuffer);
+        pdfBuffer = (await flattenPDF(pdfBuffer)) as any;
       }
 
       const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
@@ -953,7 +953,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Flatten PDF to remove interactive fields (enables Gemini detection)
       console.log('[API compile-scanned-form] Flattening PDF...');
-      pdfBuffer = await flattenPDF(pdfBuffer);
+      pdfBuffer = (await flattenPDF(pdfBuffer)) as any;
 
       const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
 
