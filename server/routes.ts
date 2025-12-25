@@ -1050,7 +1050,10 @@ ${masterSource ? `
 
 **ISTRUZIONI GENERALI:**
 - **COERENZA:** Mantieni un tono professionale e coerente con il documento.
-- **STRUTTURA:** Se un dato è ripetitivo (es. elenco di persone, beni, importi), DEVI usare le **Tabelle Markdown** (| Intestazione | ...). È obbligatorio per la leggibilità.
+- **FORMATTAZIONE AGENTICA (Singolo Passaggio):** 
+  - Se un dato è ripetitivo o strutturato (es. elenco di persone, beni, importi, dati catastali), **DEVI** usare le **Tabelle Markdown** (| Intestazione | ...).
+  - Usa Markdown standard per la gerarchia (# Titolo, ## Sottotitolo).
+  - Usa il **grassetto** per termini chiave, nomi propri, date o importi importanti.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
 
 ${detailedAnalysis ? `
@@ -1101,8 +1104,8 @@ ISTRUZIONI OUTPUT:
       const preProcessedSourceParts = multimodalFiles?.length > 0 ? await aiService.processMultimodalParts(multimodalFiles) : [];
       const preProcessedMasterParts = masterSource ? await aiService.processMultimodalParts([masterSource]) : [];
 
-      console.log('[DEBUG Compile] Calling AiService.compileDocument (Pass 1: Content Draft)...');
-      const { content: draftContent } = await aiService.compileDocument({
+      console.log('[DEBUG Compile] Calling AiService.compileDocument (Unified Pass: Content + Layout)...');
+      const { content: finalContent } = await aiService.compileDocument({
         systemPrompt,
         userPrompt,
         multimodalFiles: multimodalFiles || [],
@@ -1110,17 +1113,7 @@ ISTRUZIONI OUTPUT:
         preProcessedParts: preProcessedSourceParts
       });
 
-      console.log('[DEBUG Compile] Draft content generated. Calling Layout Agent (Pass 2: Formatting)...');
-
-      const finalContent = await aiService.refineFormatting({
-        draftContent,
-        masterSource: masterSource || null,
-        formalTone,
-        preProcessedMasterParts: preProcessedMasterParts
-      });
-
-
-      console.log('[DEBUG Compile] AI Refinement complete.');
+      console.log('[DEBUG Compile] AI Compilation complete.');
 
       res.json({
         success: true,
