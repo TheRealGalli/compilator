@@ -405,7 +405,7 @@ export function DocumentCompilerSection({
     if (!compiledContent) return;
 
     try {
-      const { Document: DocxDocument, Packer, Paragraph, TextRun, Footer, SimpleField, AlignmentType } = await import("docx");
+      const { Document: DocxDocument, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, Footer, SimpleField, AlignmentType } = await import("docx");
       const { saveAs } = await import("file-saver");
 
       // Helper to strip emojis (Standard ranges without u flag for compatibility)
@@ -413,38 +413,117 @@ export function DocumentCompilerSection({
         return text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDDFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
       };
 
+      // Helper to parse inline formatting (like **bold**)
+      const parseInline = (text: string, options: { size?: number, color?: string, bold?: boolean } = {}) => {
+        const parts = text.split(/(\*\*.*?\*\*)/g);
+        return parts.map(part => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return new TextRun({
+              text: part.slice(2, -2),
+              bold: true,
+              font: "Arial",
+              size: options.size || 22,
+              color: options.color || "37352F"
+            });
+          }
+          return new TextRun({
+            text: part,
+            bold: options.bold || false,
+            font: "Arial",
+            size: options.size || 22,
+            color: options.color || "37352F"
+          });
+        });
+      };
+
       const lines = compiledContent.split('\n');
-      const docChildren = lines.map(line => {
-        const rawText = cleanText(line).replace(/\*\*/g, '').trim();
+      const docChildren: any[] = [];
+      let currentTableRows: any[] = [];
 
-        if (!rawText) return new Paragraph({ text: "" });
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
 
+        // Table Detection (| col | col |)
+        if (line.startsWith('|') && line.endsWith('|')) {
+          // Check if it's a separator line (| --- | --- |)
+          if (line.match(/^[|\s-]+$/)) continue;
+
+          const cells = line.split('|').filter(c => c.trim() !== '' || line.indexOf('|' + c + '|') !== -1).map(c => c.trim());
+          // Safety filter for empty splits at edges
+          const actualCells = cells.filter((_, idx) => idx > 0 || line.startsWith(cells[0]));
+          // Re-parsing logic for better accuracy
+          const cleanCells = line.split('|').slice(1, -1).map(c => c.trim());
+
+          currentTableRows.push(new TableRow({
+            children: cleanCells.map(cellText => new TableCell({
+              children: [new Paragraph({
+                children: parseInline(cleanText(cellText), { size: 20 }),
+              })],
+              width: { size: 100 / cleanCells.length, type: WidthType.PERCENTAGE },
+              shading: i === 0 || lines[i - 1]?.trim() === '' ? { fill: "F7F7F7" } : undefined
+            }))
+          }));
+          continue;
+        } else if (currentTableRows.length > 0) {
+          // Close table
+          docChildren.push(new Table({
+            rows: currentTableRows,
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+              left: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+              right: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+              insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+            }
+          }));
+          docChildren.push(new Paragraph({ text: "" }));
+          currentTableRows = [];
+        }
+
+        const rawText = cleanText(line);
+        if (!rawText) {
+          docChildren.push(new Paragraph({ text: "" }));
+          continue;
+        }
+
+        // Detect Headers (# Header)
+        if (rawText.startsWith('# ')) {
+          docChildren.push(new Paragraph({
+            children: parseInline(rawText.substring(2), { size: 32, bold: true }),
+            spacing: { before: 400, after: 200 }
+          }));
+        } else if (rawText.startsWith('## ')) {
+          docChildren.push(new Paragraph({
+            children: parseInline(rawText.substring(3), { size: 28, bold: true }),
+            spacing: { before: 300, after: 150 }
+          }));
+        } else if (rawText.startsWith('### ')) {
+          docChildren.push(new Paragraph({
+            children: parseInline(rawText.substring(4), { size: 24, bold: true }),
+            spacing: { before: 200, after: 100 }
+          }));
+        }
         // Detect Bullets
-        if (rawText.startsWith('- ') || rawText.startsWith('* ') || rawText.match(/^\d+\. /)) {
+        else if (rawText.startsWith('- ') || rawText.startsWith('* ') || rawText.match(/^\d+\. /)) {
           const isNumbered = rawText.match(/^\d+\. /);
           const textContent = isNumbered ? rawText.replace(/^\d+\. /, '') : rawText.substring(2);
 
-          return new Paragraph({
-            children: [new TextRun({ text: textContent, font: "Arial", size: 22, color: "37352F" })],
-            bullet: { level: 0 }, // docx handles numbering if we use numbering objects, but simple bullet is safer for loose text
+          docChildren.push(new Paragraph({
+            children: parseInline(textContent),
+            bullet: { level: 0 },
             spacing: { after: 120, line: 360 }
-          });
+          }));
         }
-
-        // Detect Headers (All CAPS, short) -> "Notion H2/H3" style
-        if (rawText.length > 3 && rawText.length < 60 && rawText === rawText.toUpperCase() && !rawText.includes('.')) {
-          return new Paragraph({
-            children: [new TextRun({ text: rawText, font: "Arial", bold: true, size: 28, color: "37352F" })],
-            spacing: { before: 240, after: 120, line: 360 }
-          });
-        }
-
         // Standard Paragraph
-        return new Paragraph({
-          children: [new TextRun({ text: rawText, font: "Arial", size: 22, color: "37352F" })],
-          spacing: { after: 120, line: 360 }
-        });
-      });
+        else {
+          docChildren.push(new Paragraph({
+            children: parseInline(rawText),
+            spacing: { after: 120, line: 360 }
+          }));
+        }
+      }
 
       const doc = new DocxDocument({
         styles: {

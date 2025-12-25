@@ -1070,21 +1070,29 @@ ISTRUZIONI OUTPUT:
 - Non dire "Ecco il documento", restituisci SOLO il testo del documento.
 `;
 
-      console.log('[DEBUG Compile] Calling AiService.compileDocument...');
+      console.log('[DEBUG Compile] Calling AiService.compileDocument (Pass 1: Content Draft)...');
 
-      const compiledContent = await aiService.compileDocument({
+      const draftContent = await aiService.compileDocument({
         systemPrompt,
         userPrompt,
         multimodalFiles: multimodalFiles || [],
         masterSource: masterSource || null
       });
 
+      console.log('[DEBUG Compile] Draft content generated. Calling Layout Agent (Pass 2: Formatting)...');
 
-      console.log('[DEBUG Compile] AI Response received.');
+      const finalContent = await aiService.refineFormatting({
+        draftContent,
+        masterSource: masterSource || null,
+        formalTone
+      });
+
+
+      console.log('[DEBUG Compile] AI Refinement complete.');
 
       res.json({
         success: true,
-        compiledContent
+        compiledContent: finalContent
       });
 
     } catch (error: any) {
