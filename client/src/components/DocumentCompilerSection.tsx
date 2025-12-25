@@ -714,55 +714,52 @@ export function DocumentCompilerSection({
 
                   return (
                     <Card className="h-full flex flex-col overflow-hidden bg-card border-border shadow-sm">
-                      <div className="h-12 bg-slate-900 border-b border-slate-800 flex items-center px-4 gap-4 flex-shrink-0">
-                        <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
-                          <Menu className="w-4 h-4" />
-                        </Button>
+                      <div className="h-10 bg-[#1e1e1e] flex items-center justify-between px-4 z-20">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-medium text-white/90">Studio Preview</span>
+                          <div className="h-4 w-px bg-white/10 mx-1" />
 
-                        <div className="h-4 w-px bg-slate-800 mx-1" />
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-800 gap-2 h-8 px-2 font-normal">
-                              <Type className="w-4 h-4" />
-                              <span className="text-xs">Impostazioni Caratteri</span>
-                              <ChevronDown className="w-3 h-3 opacity-50" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-56 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800">
-                            <DropdownMenuLabel>Personalizza Anteprima</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <div className="p-4 space-y-4">
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-medium text-foreground">Dimensione Caratteri</span>
-                                  <span className="text-xs text-muted-foreground">{studioFontSize}px</span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="text-white/40 hover:text-white hover:bg-white/10 gap-1 h-7 px-2 font-normal">
+                                <Type className="w-3.5 h-3.5" />
+                                <span className="text-[10px]">IMPOSTAZIONI</span>
+                                <ChevronDown className="w-3 h-3 opacity-50" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-56 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800">
+                              <DropdownMenuLabel>Personalizza Anteprima</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <div className="p-4 space-y-4">
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-foreground">Dimensione Caratteri</span>
+                                    <span className="text-xs text-muted-foreground">{studioFontSize}px</span>
+                                  </div>
+                                  <Slider
+                                    value={[studioFontSize]}
+                                    onValueChange={(v) => setStudioFontSize(v[0])}
+                                    min={8}
+                                    max={32}
+                                    step={1}
+                                  />
                                 </div>
-                                <Slider
-                                  value={[studioFontSize]}
-                                  onValueChange={(v) => setStudioFontSize(v[0])}
-                                  min={8}
-                                  max={32}
-                                  step={1}
-                                />
                               </div>
-                            </div>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        <div className="flex-1 overflow-hidden">
-                          <p className="text-xs text-slate-400 truncate text-center font-medium">{pinnedSource.name}</p>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
 
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={handlePrintText} title="Stampa" className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
-                            <Printer className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={handleDownloadText} title="Scarica" className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
-                            <Download className="w-4 h-4" />
-                          </Button>
+                        <div className="flex items-center gap-4">
+                          <p className="text-[11px] text-white/40 truncate max-w-[300px]">{pinnedSource.name}</p>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={handlePrintText} title="Stampa" className="text-white/40 hover:text-white hover:bg-white/10 h-7 w-7">
+                              <Printer className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={handleDownloadText} title="Scarica" className="text-white/40 hover:text-white hover:bg-white/10 h-7 w-7">
+                              <Download className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         </div>
-
                       </div>
                       <div
                         className="flex-1 overflow-auto p-12 font-mono whitespace-pre-wrap selection:bg-indigo-500/30 selection:text-current text-foreground/90 bg-background/50 transition-all duration-200"

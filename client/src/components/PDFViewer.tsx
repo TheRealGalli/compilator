@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, Download, Menu, Type, ChevronDown, Printer, RotateCw, X, Plus } from 'lucide-react';
+import { Type, X, Plus, ChevronDown } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,11 +27,9 @@ interface PDFViewerProps {
 }
 
 export function PDFViewer({ base64, fileName, onAnnotationsChange }: PDFViewerProps) {
-    const [scale, setScale] = useState<number>(100);
-    const [fontSize, setFontSize] = useState<number>(14);
-    const [rotation, setRotation] = useState<number>(0);
     const [isWritingMode, setIsWritingMode] = useState(false);
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
+    const [fontSize, setFontSize] = useState<number>(14);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -40,18 +38,6 @@ export function PDFViewer({ base64, fileName, onAnnotationsChange }: PDFViewerPr
         onAnnotationsChange?.(annotations);
     }, [annotations, onAnnotationsChange]);
 
-    const zoomIn = () => {
-        setScale((prev) => Math.min(prev + 10, 200));
-    };
-
-    const zoomOut = () => {
-        setScale((prev) => Math.max(prev - 10, 50));
-    };
-
-    const handleRotate = () => {
-        setRotation((prev) => (prev + 90) % 360);
-    };
-
     const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!isWritingMode) return;
 
@@ -59,8 +45,10 @@ export function PDFViewer({ base64, fileName, onAnnotationsChange }: PDFViewerPr
         if ((e.target as HTMLElement).closest('input')) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) / (scale / 100));
-        const y = ((e.clientY - rect.top) / (scale / 100));
+        // Since we are using native toolbar, we don't have scale state easily.
+        // We'll assume 1:1 for now or use a fixed width container.
+        const x = (e.clientX - rect.left);
+        const y = (e.clientY - rect.top);
 
         const newAnnotation: Annotation = {
             id: Math.random().toString(36).substr(2, 9),
@@ -80,47 +68,19 @@ export function PDFViewer({ base64, fileName, onAnnotationsChange }: PDFViewerPr
         setAnnotations(prev => prev.filter(a => a.id !== id));
     };
 
-    const handlePrint = () => {
-        try {
-            if (iframeRef.current) {
-                iframeRef.current.contentWindow?.focus();
-                iframeRef.current.contentWindow?.print();
-            }
-        } catch (error) {
-            console.error('Print failed:', error);
-            if (pdfUrl) {
-                const printWindow = window.open(pdfUrl);
-                printWindow?.addEventListener('load', () => {
-                    printWindow.print();
-                });
-            }
-        }
-    };
-
-    const handleDownload = () => {
-        try {
-            const blob = base64ToBlob(base64, 'application/pdf');
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('Download failed:', error);
-        }
-    };
-
     const base64ToBlob = (base64: string, mimeType: string) => {
-        const byteCharacters = atob(base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        try {
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType });
+        } catch (e) {
+            console.error("Base64 decode failed", e);
+            return new Blob([], { type: mimeType });
         }
-        const byteArray = new Uint8Array(byteNumbers);
-        return new Blob([byteArray], { type: mimeType });
     };
 
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -128,7 +88,8 @@ export function PDFViewer({ base64, fileName, onAnnotationsChange }: PDFViewerPr
     useEffect(() => {
         const blob = base64ToBlob(base64, 'application/pdf');
         const url = URL.createObjectURL(blob);
-        setPdfUrl(url + '#toolbar=0&navpanes=0&scrollbar=0');
+        // USE NATIVE TOOLBAR AS REQUESTED (#toolbar=1)
+        setPdfUrl(url + '#toolbar=1&navpanes=0&scrollbar=1');
         return () => {
             URL.revokeObjectURL(url);
             setPdfUrl(null);
@@ -137,108 +98,72 @@ export function PDFViewer({ base64, fileName, onAnnotationsChange }: PDFViewerPr
 
     return (
         <Card className="flex flex-col h-full overflow-hidden bg-background border-border shadow-2xl relative">
-            {/* Custom Pro Toolbar */}
-            <div className="h-12 bg-slate-900 border-b border-slate-800 flex items-center px-4 gap-4 flex-shrink-0 z-20">
-                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
-                    <Menu className="w-4 h-4" />
-                </Button>
+            {/* Native-Style Header Bar (Matches Photo 1) */}
+            <div className="h-10 bg-[#1e1e1e] flex items-center justify-between px-4 z-20">
+                <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-white/90">Studio Preview</span>
 
-                <div className="h-4 w-px bg-slate-800 mx-1" />
-
-                {/* Annotation Toggle (Writing Mode) */}
-                <Button
-                    variant={isWritingMode ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setIsWritingMode(!isWritingMode)}
-                    className={`gap-2 h-8 px-3 transition-all ${isWritingMode ? 'bg-indigo-600 text-white hover:bg-indigo-500 border-indigo-500' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}
-                >
-                    <Type className="w-4 h-4" />
-                    <span className="text-xs">{isWritingMode ? 'Smetti di scrivere' : 'Scrivi sul PDF'}</span>
-                </Button>
-
-                <div className="h-4 w-px bg-slate-800 mx-1" />
-
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-800 gap-2 h-8 px-2 font-normal">
-                            <span className="text-xs">Impostazioni</span>
-                            <ChevronDown className="w-3 h-3 opacity-50" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-56 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800">
-                        <DropdownMenuLabel>Personalizza Anteprima</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <div className="p-4 space-y-4">
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-foreground">Dimensione (Solo Testo)</span>
-                                    <span className="text-xs text-muted-foreground">{fontSize}px</span>
-                                </div>
-                                <Slider
-                                    value={[fontSize]}
-                                    onValueChange={(v) => setFontSize(v[0])}
-                                    min={8}
-                                    max={32}
-                                    step={1}
-                                />
-                                <p className="text-[10px] text-muted-foreground italic">Nota: Le impostazioni font si applicano alle fonti .txt e .csv</p>
-                            </div>
-                        </div>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-
-                <div className="flex-1 overflow-hidden">
-                    <p className="text-xs text-slate-400 truncate text-center font-medium">{fileName}</p>
+                    {/* Minimalist Annotation Toggle */}
+                    <div className="h-4 w-px bg-white/10 mx-1" />
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsWritingMode(!isWritingMode)}
+                        className={`h-7 px-2 gap-2 text-[10px] hover:bg-white/10 ${isWritingMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'text-white/60'}`}
+                    >
+                        <Type className="w-3.5 h-3.5" />
+                        {isWritingMode ? 'MODALITÀ SCRITTURA' : 'SCRIVI SU PDF'}
+                    </Button>
                 </div>
 
-                <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={handleRotate} title="Ruota Documento" className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
-                        <RotateCw className="w-4 h-4" />
-                    </Button>
-                    <div className="h-4 w-px bg-slate-800 mx-1" />
+                <div className="flex items-center gap-4">
+                    <p className="text-[11px] text-white/40 truncate max-w-[300px]">{fileName}</p>
 
-                    <Button variant="ghost" size="icon" onClick={zoomOut} disabled={scale <= 50} className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
-                        <ZoomOut className="w-4 h-4" />
-                    </Button>
-                    <span className="text-[10px] text-slate-500 font-mono w-10 text-center">{scale}%</span>
-                    <Button variant="ghost" size="icon" onClick={zoomIn} disabled={scale >= 200} className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
-                        <ZoomIn className="w-4 h-4" />
-                    </Button>
-
-                    <div className="h-4 w-px bg-slate-800 mx-1" />
-
-                    <Button variant="ghost" size="icon" onClick={handlePrint} title="Stampa" className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
-                        <Printer className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={handleDownload} title="Scarica" className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8">
-                        <Download className="w-4 h-4" />
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-white/40 hover:text-white hover:bg-white/10 gap-1 h-7 px-2 px-1">
+                                <ChevronDown className="w-3 h-3" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800">
+                            <DropdownMenuLabel>Impostazioni</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <div className="p-4 space-y-4">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-medium text-foreground">Font Size (TXT/CSV)</span>
+                                        <span className="text-xs text-muted-foreground">{fontSize}px</span>
+                                    </div>
+                                    <Slider
+                                        value={[fontSize]}
+                                        onValueChange={(v) => setFontSize(v[0])}
+                                        min={8}
+                                        max={32}
+                                        step={1}
+                                    />
+                                </div>
+                            </div>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
 
             {/* Writing Mode Overlay Notification */}
             {isWritingMode && (
-                <div className="absolute top-14 left-1/2 -translate-x-1/2 z-30 bg-indigo-600 text-white px-3 py-1 rounded-full text-[10px] font-bold shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                <div className="absolute top-12 left-1/2 -translate-x-1/2 z-30 bg-indigo-600 text-white px-3 py-1 rounded-full text-[10px] font-bold shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
                     <Plus className="w-3 h-3" />
                     MODALITÀ SCRITTURA ATTIVA: Clicca sul PDF per aggiungere testo
                 </div>
             )}
 
-            {/* PDF Canvas area */}
-            <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-800 relative scrollbar-thin">
+            {/* PDF Content Area */}
+            <div className="flex-1 bg-[#525659] relative overflow-hidden">
                 <div
                     ref={containerRef}
                     onClick={handleCanvasClick}
-                    className={`relative mx-auto my-4 shadow-xl transition-all duration-300 transform-gpu ${isWritingMode ? 'cursor-text' : 'cursor-default'}`}
-                    style={{
-                        transform: `scale(${scale / 100}) rotate(${rotation}deg)`,
-                        transformOrigin: 'top center',
-                        width: '800px', // Standard PDF width approximation
-                        minHeight: '1100px',
-                        backgroundColor: 'white'
-                    }}
+                    className={`h-full w-full relative ${isWritingMode ? 'cursor-text' : 'cursor-default'}`}
                 >
-                    {/* Interaction layer for clicks */}
+                    {/* Transparent interaction layer for clicks (only when writing) */}
                     {isWritingMode && (
                         <div className="absolute inset-0 z-10 bg-indigo-500/5" />
                     )}
@@ -280,9 +205,8 @@ export function PDFViewer({ base64, fileName, onAnnotationsChange }: PDFViewerPr
                         <iframe
                             ref={iframeRef}
                             src={pdfUrl}
-                            className={`w-full h-full border-0 absolute inset-0 ${isWritingMode ? 'pointer-events-none' : 'pointer-events-auto'}`}
+                            className={`w-full h-full border-0 ${isWritingMode ? 'pointer-events-none' : 'pointer-events-auto'}`}
                             title={fileName}
-                            style={{ minHeight: '100%' }}
                         />
                     )}
                 </div>
