@@ -35,8 +35,6 @@ export function PDFViewer({ base64, fileName }: PDFViewerProps) {
         }
     };
 
-
-
     // Convert base64 to blob
     const base64ToBlob = (base64: string, mimeType: string) => {
         const byteCharacters = atob(base64);

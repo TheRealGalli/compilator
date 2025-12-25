@@ -223,11 +223,43 @@ export function DocumentCompilerSection({
   const [detailedAnalysis, setDetailedAnalysis] = useState(true);
   const [formalTone, setFormalTone] = useState(true);
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
+  const [extractedFields, setExtractedFields] = useState<Array<{ fieldName: string; fieldType: string }>>([]);
+
 
 
   useEffect(() => {
-    // fetchDocuments(); // Removed as per previous instructions, if any.
-  }, []);
+    if (!pinnedSource) {
+      setExtractedFields([]);
+      return;
+    }
+
+    const extractFields = async () => {
+      try {
+        const { getApiUrl } = await import("@/lib/api-config");
+        const response = await fetch(getApiUrl('/api/extract-fields-for-context'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pinnedSource: {
+              name: pinnedSource.name,
+              type: pinnedSource.type,
+              base64: pinnedSource.base64
+            }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setExtractedFields(data.fields || []);
+          console.log(`[DocumentCompiler] Extracted ${data.fields?.length} fields for context`);
+        }
+      } catch (error) {
+        console.error('Error extracting fields for context:', error);
+      }
+    };
+
+    extractFields();
+  }, [pinnedSource?.id]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
   //   try {
@@ -339,7 +371,13 @@ export function DocumentCompilerSection({
           name: s.name,
           type: s.type,
           base64: s.base64
-        }))
+        })),
+        pinnedSource: pinnedSource ? {
+          name: pinnedSource.name,
+          type: pinnedSource.type,
+          base64: pinnedSource.base64
+        } : null,
+        extractedFields: extractedFields.length > 0 ? extractedFields : undefined
       });
 
 
@@ -371,67 +409,6 @@ export function DocumentCompilerSection({
     }
   };
 
-  const handleRunStudio = async () => {
-    if (!pinnedSource || isCompiling) return;
-
-    setIsCompiling(true);
-    try {
-      const { getApiUrl } = await import('@/lib/api-config');
-
-      toast({
-        title: "Studio Mode attivato",
-        description: "Analisi documento e compilazione campi in corso...",
-      });
-
-      const response = await fetch(getApiUrl('/api/compile-scanned-form'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          pinnedSource: {
-            name: pinnedSource.name,
-            type: pinnedSource.type,
-            base64: pinnedSource.base64,
-          },
-          instructions: notes || undefined
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Errore durante compilazione form');
-      }
-
-      const data = await response.json();
-
-      // NEW: Handle pdfDocument + svgOverlay response
-      const { pdfDocument, svgOverlay, fieldsDetected, fieldsFilled } = data;
-
-      toast({
-        title: "✅ Studio Mode completato",
-        description: `Compilati ${fieldsFilled}/${fieldsDetected} campi rilevati`,
-      });
-
-      // Generate and download PNG screenshot instead of HTML
-      const filename = `${pdfDocument.name.replace('.pdf', '')}_STUDIO.png`;
-      await generatePDFScreenshot(pdfDocument.base64, svgOverlay, filename, {
-        scale: 2,          // High quality (AI-adjustable)
-        quality: 0.95,     // PNG quality (AI-adjustable)
-        backgroundColor: '#ffffff'
-      });
-
-    } catch (error: any) {
-      console.error('Error in Run Studio:', error);
-      toast({
-        title: "Errore Studio Mode",
-        description: error.message || "Impossibile compilare il documento.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCompiling(false);
-    }
-  };
 
   const handleCopy = () => {
     if (!compiledContent) return;
@@ -616,8 +593,8 @@ export function DocumentCompilerSection({
           )}
 
           <Button
-            onClick={pinnedSource ? handleRunStudio : handleCompile}
-            disabled={pinnedSource ? isCompiling : (!templateContent || isCompiling)}
+            onClick={handleCompile}
+            disabled={!templateContent || isCompiling}
             data-testid="button-compile"
             className="w-full sm:w-auto"
           >
@@ -633,10 +610,7 @@ export function DocumentCompilerSection({
             >
               <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
             </svg>
-            {isCompiling
-              ? (pinnedSource ? "Running Studio..." : "Compilazione...")
-              : (pinnedSource ? "Run Studio" : "Compila con AI")
-            }
+            {isCompiling ? "Compilazione..." : "Compila con AI"}
           </Button>
         </div>
       </div>

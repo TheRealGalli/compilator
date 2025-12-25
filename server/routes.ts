@@ -20,7 +20,7 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } f
 
 // [pdfjs-dist removed - using client-side extraction instead]
 import { AiService } from './ai'; // Import new AI Service
-import type { FormField, FieldMapping } from './form-compiler';
+import type { FormField } from './form-compiler';
 
 // Initialize AI Service
 const aiService = new AiService(process.env.GCP_PROJECT_ID || 'compilator-479214');
@@ -875,7 +875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[API extract-fields-for-context] Extracting fields from: ${pinnedSource.name}`);
 
-      const { discoverFieldsWithGemini, decideFieldContents, auditFieldPlacements, generateSVGWithFields, getPDFDimensions } = await import('./form-compiler');
+      const { discoverFieldsWithGemini, getPDFDimensions } = await import('./form-compiler');
       const { flattenPDF } = await import('./pdf-utils');
 
       let pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
@@ -927,113 +927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per compilare form scansionati con Document AI Form Parser
-  app.post('/api/compile-scanned-form', async (req: Request, res: Response) => {
-    try {
-      const { pinnedSource, instructions } = req.body;
 
-      if (!pinnedSource || !pinnedSource.name || !pinnedSource.base64) {
-        return res.status(400).json({ error: 'Documento pinnato mancante o non valido' });
-      }
-
-      // Only support PDF for now
-      if (!pinnedSource.type.includes('pdf')) {
-        return res.status(400).json({
-          error: 'Solo documenti PDF scansionati sono supportati per la compilazione form'
-        });
-      }
-
-      console.log(`[API compile-scanned-form] Compiling form: ${pinnedSource.name}`);
-
-      const { discoverFieldsWithGemini, decideFieldContents, auditFieldPlacements, generateSVGWithFields, getPDFDimensions } = await import('./form-compiler');
-      const { flattenPDF } = await import('./pdf-utils');
-
-      // Convert base64 to buffer
-      let pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
-
-      // Flatten PDF to remove interactive fields (enables Gemini detection)
-      console.log('[API compile-scanned-form] Flattening PDF...');
-      pdfBuffer = (await flattenPDF(pdfBuffer)) as any;
-
-      const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
-
-      // Initialize Gemini Model first (needed for discovery)
-      const apiKey = await getModelApiKey('gemini');
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
-
-      const location = 'us-central1';
-      const vertexAI = new VertexAI({ project: projectId, location });
-      const model = vertexAI.getGenerativeModel({
-        model: 'gemini-2.0-flash-exp',
-        safetySettings: [
-          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
-        ]
-      });
-
-      // Step 1: Extract form fields using Gemini Vision Discovery
-      console.log('[API compile-scanned-form] Step 1: Discovering form fields with Gemini...');
-      const fields = await discoverFieldsWithGemini(pdfBuffer.toString('base64'), model);
-
-      if (fields.length === 0) {
-        return res.status(400).json({
-          error: 'Nessun campo rilevato nel documento. Assicurati che sia un modulo scansionato.'
-        });
-      }
-
-      console.log(`[API compile-scanned-form] Discovered ${fields.length} fields`);
-
-      const documentContext = instructions || 'Modulo generico da compilare';
-
-      // Step 2: Use Gemini to decide field contents
-      console.log('[API compile-scanned-form] Step 2: Generating field contents with Gemini...');
-      const initialFieldValues = await decideFieldContents(fields, documentContext, model, pdfBuffer.toString('base64'));
-
-      console.log(`[API compile-scanned-form] Initial generation: ${Object.keys(initialFieldValues).length} values. Starting visual audit...`);
-
-      // Step 2.5: Visual Grounding Audit (The "Red Pin" logic)
-      const fieldValues = await auditFieldPlacements(
-        pdfBuffer.toString('base64'),
-        initialFieldValues,
-        fields,
-        model
-      );
-
-      console.log(`[API compile-scanned-form] Audit complete. Using ${Object.keys(fieldValues).length} refined values.`);
-
-      // Step 3: Generate SVG overlay (NEW APPROACH - no PDF modification)
-      console.log('[API compile-scanned-form] Step 3: Generating SVG overlay...');
-
-      const pdfDimensions = await getPDFDimensions(pdfBuffer);
-      const svgOverlay = generateSVGWithFields(fields, fieldValues, pdfDimensions.width, pdfDimensions.height);
-
-      console.log('[API compile-scanned-form] Form compilation successful - returning PDF + SVG');
-
-      res.json({
-        pdfDocument: {
-          base64: pdfBuffer.toString('base64'),
-          name: pinnedSource.name,
-          mimeType: 'application/pdf'
-        },
-        svgOverlay: svgOverlay,
-        fieldsDetected: fields.length,
-        fieldsFilled: Object.keys(fieldValues).filter(k => {
-          const val = fieldValues[k];
-          if (!val) return false;
-          const text = typeof val === 'string' ? val : val.value;
-          return text && text !== 'N/A' && text !== '';
-        }).length
-      });
-
-    } catch (error: any) {
-      console.error('[API compile-scanned-form] Error:', error);
-      res.status(500).json({
-        error: error.message || 'Errore durante compilazione form scansionato'
-      });
-    }
-  });
 
   // Endpoint per compilare documenti con AI
   // NEW: Layout analysis for Document Studio (Gemini-Native via AiService)
@@ -1042,7 +936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/compile', async (req: Request, res: Response) => {
     try {
-      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone } = req.body;
+      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, pinnedSource, extractedFields } = req.body;
 
       console.log('[API compile] Request received:', {
         modelProvider,
@@ -1105,6 +999,13 @@ ${hasMemory ? `
    - **VIETATO** inventare dati anagrafici (es. "Mario Rossi", date a caso).
    - È meglio un campo vuoto che un dato falso.
 
+${extractedFields && extractedFields.length > 0 ? `
+3. **STRUTTURA DOCUMENTO TARGET (Intelligence Gemini Vision):**
+   Il documento che stiamo compilando (o che fa da base) contiene i seguenti campi rilevati visivamente:
+   ${extractedFields.map((f: any) => `- ${f.fieldName} (${f.fieldType})`).join('\n')}
+   ASSICURATI che il contenuto generato includa o faccia riferimento a questi campi se pertinenti.
+` : ''}
+
 **ISTRUZIONI GENERALI:**
 - **COERENZA:** Mantieni un tono professionale e coerente con il documento.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
@@ -1120,8 +1021,8 @@ MODALITÀ WEB RESEARCH ATTIVA:
 - **PRIORITÀ DATI:** Se un dato è presente sia nel LINK che nelle FONTI CARICATE (PDF/Doc), usa SEMPRE il dato delle FONTI CARICATE.
 - I link servono per arricchire, non per sovrascrivere i documenti ufficiali.` : ''}
 
-${multimodalFiles.length > 0 || hasExternalSources ? `
-Hai accesso a ${multimodalFiles.length + (hasExternalSources ? 1 : 0)} fonti.
+${(multimodalFiles.length > 0 || pinnedSource || hasExternalSources) ? `
+Hai accesso a ${multimodalFiles.length + (pinnedSource ? 1 : 0) + (hasExternalSources ? 1 : 0)} fonti.
 ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo basandoti sulle Note o rifiuta la compilazione.'}
 `;
 
@@ -1148,8 +1049,9 @@ ISTRUZIONI OUTPUT:
         systemPrompt,
         userPrompt,
         multimodalFiles: multimodalFiles || [],
-
+        pinnedSource: pinnedSource || null
       });
+
 
       console.log('[DEBUG Compile] AI Response received.');
 

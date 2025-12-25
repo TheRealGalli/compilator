@@ -20,7 +20,8 @@ export class AiService {
     async compileDocument(params: {
         systemPrompt: string,
         userPrompt: string,
-        multimodalFiles: any[]
+        multimodalFiles: any[],
+        pinnedSource?: any
     }): Promise<string> {
         try {
             const model = this.vertex_ai.getGenerativeModel({
@@ -34,12 +35,22 @@ export class AiService {
             const messageParts: any[] = [{ text: params.userPrompt }];
 
             for (const file of params.multimodalFiles) {
-                if (!file.mimeType || !file.data) {
-                    console.warn('[AiService] Skipping file with missing mimeType or data:', file);
-                    continue;
+                if ((file.mimeType || file.type) && (file.data || file.base64)) {
+                    messageParts.push({
+                        inlineData: {
+                            mimeType: file.mimeType || file.type,
+                            data: file.data || file.base64
+                        }
+                    });
                 }
+            }
+
+            if (params.pinnedSource && params.pinnedSource.base64) {
                 messageParts.push({
-                    inlineData: { mimeType: file.mimeType, data: file.data }
+                    inlineData: {
+                        mimeType: params.pinnedSource.type || 'application/pdf',
+                        data: params.pinnedSource.base64
+                    }
                 });
             }
 
