@@ -549,7 +549,7 @@ export function DocumentCompilerSection({
     <div className="h-full flex flex-col p-6 gap-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-semibold">Compilatore Documenti AI</h2>
+          <h2 className="text-xl font-semibold">{pinnedSource ? 'Studio Editor' : 'Compilatore Documenti AI'}</h2>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {/* Hide template selector in Studio Mode */}
@@ -615,7 +615,7 @@ export function DocumentCompilerSection({
 
           <Button
             onClick={handleCompile}
-            disabled={!templateContent || isCompiling}
+            disabled={(!templateContent && !pinnedSource) || isCompiling}
             data-testid="button-compile"
             className="w-full sm:w-auto"
           >
@@ -627,11 +627,11 @@ export function DocumentCompilerSection({
               strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className={`w-10 h-10 mr-0.5 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
+              className={`w-6 h-6 mr-2 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
             >
               <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
             </svg>
-            {isCompiling ? "Compilazione..." : "Compila con AI"}
+            {isCompiling ? "Processando..." : (pinnedSource ? "Applica Intelligenza" : "Compila con AI")}
           </Button>
         </div>
       </div>

@@ -36,6 +36,10 @@ interface Annotation {
     x: number;
     y: number;
     text: string;
+    fontFamily: string;
+    fontSize: number;
+    color: string;
+    isBold: boolean;
 }
 
 interface PDFViewerProps {
@@ -49,10 +53,14 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
     const [numPages, setNumPages] = useState<number>(0);
     const [pageNumber, setPageNumber] = useState<number>(1);
     const [scale, setScale] = useState<number>(1.0);
-    const [rotation, setRotation] = useState<number>(0);
     const [isWritingMode, setIsWritingMode] = useState(false);
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
-    const [fontSize, setFontSize] = useState<number>(14);
+
+    // Editor Settings
+    const [currentFont, setCurrentFont] = useState("Inter");
+    const [currentSize, setCurrentSize] = useState(14);
+    const [currentColor, setCurrentColor] = useState("#1e3a8a"); // Default blue-900
+    const [isBold, setIsBold] = useState(true);
 
     // Paperclip UX & Drag States
     const [mousePos, setMousePos] = useState<{ x: number, y: number, pageNum: number } | null>(null);
@@ -183,7 +191,11 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
             pageNumber: pageNum,
             x,
             y,
-            text: ""
+            text: "",
+            fontFamily: currentFont,
+            fontSize: currentSize,
+            color: currentColor,
+            isBold: isBold
         };
 
         setAnnotations([...annotations, newAnnotation]);
@@ -245,57 +257,90 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
             {/* Top Minimal Studio Header */}
             <div className="h-10 bg-[#1e1e1e] flex items-center justify-between px-4 shrink-0">
                 <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-bold text-white/50 tracking-widest uppercase">Studio Preview</span>
+                    <span className="text-[11px] font-bold text-white/50 tracking-widest uppercase">Studio Editor</span>
                 </div>
                 <div className="flex items-center gap-4">
                     <p className="text-[11px] text-white/40 truncate max-w-[300px] font-medium">{fileName}</p>
                 </div>
             </div>
 
-            {/* Chromium Replica Toolbar */}
-            <div className="h-12 bg-[#323639] flex items-center px-4 shrink-0 text-white shadow-xl z-30 border-b border-black/20">
-                <div className="flex items-center gap-4 min-w-[240px]">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-white/90 hover:bg-white/10 rounded-full">
-                        <Menu className="w-5 h-5" />
+            {/* Professional Editor Toolbar */}
+            <div className="h-14 bg-[#323639] flex items-center px-4 shrink-0 text-white shadow-xl z-30 border-b border-black/20 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-3 shrink-0 mr-4 border-r border-white/10 pr-4">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                            setIsWritingMode(!isWritingMode);
+                            if (isWritingMode) {
+                                setLockedAnnotationId(null);
+                                setMousePos(null);
+                            }
+                        }}
+                        className={`h-9 w-9 rounded-md transition-all ${isWritingMode ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/70 hover:bg-white/10'}`}
+                        title="Strumento Testo"
+                    >
+                        <Type className="w-5 h-5" />
                     </Button>
-                    <span className="text-sm font-normal truncate opacity-90 max-w-[180px]">{fileName}</span>
                 </div>
 
-                <div className="flex-1 flex items-center justify-center">
-                    <div className="flex items-center gap-1">
-                        <div className="flex items-center gap-1.5 px-3">
-                            <input type="text" value={pageNumber} readOnly className="bg-[#1e1e1e] text-white text-xs w-8 h-7 text-center outline-none border-none rounded shadow-inner" />
-                            <span className="text-xs text-white/60 font-medium">/ {numPages || 1}</span>
+                {isWritingMode && (
+                    <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-2 duration-300">
+                        {/* Font Family */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-white/40 font-bold uppercase tracking-tight">Fonte</span>
+                            <select
+                                value={currentFont}
+                                onChange={(e) => setCurrentFont(e.target.value)}
+                                className="bg-[#1e1e1e] text-white text-[11px] h-8 px-2 outline-none border-none rounded shadow-inner min-w-[100px]"
+                            >
+                                <option value="Inter">Inter</option>
+                                <option value="Roboto">Roboto</option>
+                                <option value="Courier">Courier</option>
+                            </select>
                         </div>
-                        <div className="w-px h-6 bg-white/10 mx-3" />
-                        <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => setScale(s => Math.max(0.1, s - 0.1))} className="h-8 w-8 text-white/90 hover:bg-white/10 rounded-full"><Minus className="w-4 h-4" /></Button>
-                            <div className="bg-[#1e1e1e] rounded h-7 w-16 flex items-center justify-center shadow-inner"><span className="text-[11px] font-bold text-white/90">{Math.round(scale * 100)}%</span></div>
-                            <Button variant="ghost" size="icon" onClick={() => setScale(s => Math.min(5, s + 0.1))} className="h-8 w-8 text-white/90 hover:bg-white/10 rounded-full"><Plus className="w-4 h-4" /></Button>
+
+                        {/* Font Size */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-white/40 font-bold uppercase tracking-tight">Dim.</span>
+                            <input
+                                type="number"
+                                value={currentSize}
+                                onChange={(e) => setCurrentSize(Number(e.target.value))}
+                                className="bg-[#1e1e1e] text-white text-[11px] h-8 w-12 text-center outline-none border-none rounded shadow-inner"
+                            />
                         </div>
-                        <div className="w-px h-6 bg-white/10 mx-3" />
-                        <Button variant="ghost" size="icon" onClick={fitToWidth} className="h-8 w-8 text-white/90 hover:bg-white/10 rounded-full"><Maximize2 className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => setRotation(r => (r + 90) % 360)} className="h-8 w-8 text-white/90 hover:bg-white/10 rounded-full"><RotateCw className="w-4 h-4" /></Button>
-                        <div className="w-px h-6 bg-white/10 mx-3" />
+
+                        {/* Color Pickers */}
+                        <div className="flex items-center gap-2 px-2 border-l border-white/10">
+                            {['#1e3a8a', '#dc2626', '#16a34a', '#000000'].map(color => (
+                                <button
+                                    key={color}
+                                    onClick={() => setCurrentColor(color)}
+                                    className={`w-5 h-5 rounded-full border-2 transition-all ${currentColor === color ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                                    style={{ backgroundColor: color }}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Bold Toggle */}
                         <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => {
-                                setIsWritingMode(!isWritingMode);
-                                if (isWritingMode) {
-                                    setLockedAnnotationId(null);
-                                    setMousePos(null);
-                                }
-                            }}
-                            className={`h-8 w-8 rounded-full transition-all duration-300 ${isWritingMode ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/90 hover:bg-white/10'}`}
-                            title="Scrivi sulla preview"
+                            onClick={() => setIsBold(!isBold)}
+                            className={`h-8 w-8 rounded transition-all ${isBold ? 'bg-white/20 text-white' : 'text-white/50 hover:bg-white/10'}`}
                         >
-                            <Type className="w-4 h-4" />
+                            <span className="font-bold">B</span>
                         </Button>
                     </div>
-                </div>
+                )}
 
-                <div className="flex items-center gap-1 min-w-[240px] justify-end">
+                <div className="flex-1" />
+
+                <div className="flex items-center gap-1 shrink-0 border-l border-white/10 pl-4">
+                    <div className="flex items-center gap-1.5 px-3 mr-2">
+                        <span className="text-[11px] text-white/40 font-medium">Pagina {pageNumber} / {numPages || 1}</span>
+                    </div>
                     <Button variant="ghost" size="icon" onClick={handleDownload} className="h-8 w-8 text-white/90 hover:bg-white/10 rounded-full"><Download className="w-5 h-5" /></Button>
                     <Button variant="ghost" size="icon" onClick={handlePrint} className="h-8 w-8 text-white/90 hover:bg-white/10 rounded-full"><Printer className="w-5 h-5" /></Button>
                 </div>
@@ -320,8 +365,7 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                 className="relative shadow-[0_20px_50px_rgba(0,0,0,0.5)] bg-white transform-gpu"
                                 style={{
                                     scale: scale,
-                                    transformOrigin: 'top center',
-                                    transform: `rotate(${rotation}deg)`
+                                    transformOrigin: 'top center'
                                 }}
                                 onMouseMove={(e) => handleMouseMove(e, index + 1)}
                                 onClick={(e) => handleCanvasClick(e, index + 1)}
@@ -344,9 +388,7 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                     padding: '60px',
                                     scale: scale,
                                     transformOrigin: 'top center',
-                                    transform: `rotate(${rotation}deg)`,
                                     fontFamily: 'monospace',
-                                    fontSize: `${fontSize}px`,
                                 }}
                                 onMouseMove={(e) => handleMouseMove(e, index + 1)}
                                 onClick={(e) => handleCanvasClick(e, index + 1)}
@@ -385,7 +427,14 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                     >
                         <div className="relative flex items-center">
                             {/* Hidden span to measure text width and drive the container size */}
-                            <span className="invisible whitespace-pre px-0 font-bold text-sm min-h-[1.75rem] min-w-[4px]">
+                            <span
+                                className="invisible whitespace-pre px-0 min-h-[1.75rem] min-w-[4px]"
+                                style={{
+                                    fontFamily: anno.fontFamily,
+                                    fontSize: `${anno.fontSize}px`,
+                                    fontWeight: anno.isBold ? 'bold' : 'normal'
+                                }}
+                            >
                                 {anno.text}
                             </span>
 
@@ -399,18 +448,18 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                         (e.target as HTMLElement).blur();
                                     }
                                 }}
-                                className={`absolute inset-0 w-full bg-transparent border-b-2 ${isLocked && anno.text.length > 0 ? 'border-blue-600' : 'border-transparent'} text-blue-900 font-bold text-sm outline-none px-0 transition-all pointer-events-none select-none`}
+                                className={`absolute inset-0 w-full bg-transparent border-b-2 ${isLocked && anno.text.length > 0 ? 'border-blue-600' : 'border-transparent'} outline-none px-0 transition-all pointer-events-none select-none`}
                                 style={{
                                     pointerEvents: isLocked ? 'auto' : 'none',
-                                    userSelect: isLocked ? 'auto' : 'none'
+                                    userSelect: isLocked ? 'auto' : 'none',
+                                    fontFamily: anno.fontFamily,
+                                    fontSize: `${anno.fontSize}px`,
+                                    color: anno.color,
+                                    fontWeight: anno.isBold ? 'bold' : 'normal'
                                 }}
-                                placeholder={isLocked ? "Scrivi qui..." : ""}
+                                placeholder={isLocked ? "Scrivi..." : ""}
                                 readOnly={!isLocked}
                             />
-
-                            {isLocked && (
-                                <div className="absolute -top-4 left-0 text-[8px] font-black text-blue-600 bg-white/40 px-1 rounded whitespace-nowrap pointer-events-none">MANUAL OVERRIDE</div>
-                            )}
 
                             {/* Delete button always visible and follows text progression */}
                             <Button
