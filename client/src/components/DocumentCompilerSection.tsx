@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { generatePDFScreenshot } from '@/utils/screenshot';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -412,63 +413,13 @@ export function DocumentCompilerSection({
         description: `Compilati ${fieldsFilled}/${fieldsDetected} campi rilevati`,
       });
 
-      // Create HTML container with PDF + SVG overlay
-      const htmlContainer = `<!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${pdfDocument.name} - Studio Mode</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      background: #1a1a1a;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .container {
-      position: relative;
-      max-width: 100%;
-      background: white;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    }
-    embed {
-      display: block;
-      width: 100%;
-      height: 100vh;
-    }
-    svg {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      background: transparent !important;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <embed src="data:application/pdf;base64,${pdfDocument.base64}" type="application/pdf" />
-    ${svgOverlay}
-  </div>
-</body>
-</html>`;
-
-      // Download HTML file
-      const blob = new Blob([htmlContainer], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${pdfDocument.name.replace('.pdf', '')}_STUDIO.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Generate and download PNG screenshot instead of HTML
+      const filename = `${pdfDocument.name.replace('.pdf', '')}_STUDIO.png`;
+      await generatePDFScreenshot(pdfDocument.base64, svgOverlay, filename, {
+        scale: 2,          // High quality (AI-adjustable)
+        quality: 0.95,     // PNG quality (AI-adjustable)
+        backgroundColor: '#ffffff'
+      });
 
     } catch (error: any) {
       console.error('Error in Run Studio:', error);
