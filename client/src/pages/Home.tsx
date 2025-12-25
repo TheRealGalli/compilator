@@ -13,7 +13,7 @@ type Section = "documents" | "chat" | "compiler" | "generated" | "connectors";
 export default function Home() {
   const [activeSection, setActiveSection] = useState<Section>("documents");
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>('gemini');
-  const { sources, removeSource, toggleSource } = useSources();
+  const { sources, removeSource, toggleSource, toggleMaster } = useSources();
 
   const renderSection = () => {
     switch (activeSection) {
@@ -42,6 +42,7 @@ export default function Home() {
           sources={sources}
           onRemoveSource={removeSource}
           onToggleSource={toggleSource}
+          onToggleMaster={toggleMaster}
         />
         <main className="flex-1 overflow-auto">
           {renderSection()}

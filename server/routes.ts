@@ -855,33 +855,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per estrarre solo i campi del documento pinnato (per contesto chat)
+  // Endpoint per estrarre solo i campi del documento master (per contesto chat)
   app.post('/api/extract-fields-for-context', async (req: Request, res: Response) => {
     try {
-      const { pinnedSource } = req.body;
+      const { masterSource } = req.body;
 
-      if (!pinnedSource || !pinnedSource.name || !pinnedSource.base64) {
-        return res.status(400).json({ error: 'Documento pinnato mancante o non valido' });
+      if (!masterSource || !masterSource.name || !masterSource.base64) {
+        return res.status(400).json({ error: 'Documento master mancante o non valido' });
       }
 
       // Support PDF, DOCX, TXT, CSV for form field extraction
-      const isPDF = pinnedSource.type.includes('pdf');
-      const isDOCX = pinnedSource.type.includes('wordprocessingml') || pinnedSource.type.includes('msword');
-      const isTXT = pinnedSource.type.includes('text/plain') || pinnedSource.name.endsWith('.txt');
-      const isCSV = pinnedSource.type.includes('text/csv') || pinnedSource.name.endsWith('.csv');
+      const isPDF = masterSource.type.includes('pdf');
+      const isDOCX = masterSource.type.includes('wordprocessingml') || masterSource.type.includes('msword');
+      const isTXT = masterSource.type.includes('text/plain') || masterSource.name.endsWith('.txt');
+      const isCSV = masterSource.type.includes('text/csv') || masterSource.name.endsWith('.csv');
 
       if (!isPDF && !isDOCX && !isTXT && !isCSV) {
         // For unsupported files, return empty fields
-        return res.json({ fields: [], fileType: pinnedSource.type });
+        return res.json({ fields: [], fileType: masterSource.type });
       }
 
 
-      console.log(`[API extract-fields-for-context] Extracting fields from: ${pinnedSource.name}`);
+      console.log(`[API extract-fields-for-context] Extracting fields from: ${masterSource.name}`);
 
       const { discoverFieldsWithGemini, getPDFDimensions } = await import('./form-compiler');
       const { flattenPDF } = await import('./pdf-utils');
 
-      let pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
+      let pdfBuffer = Buffer.from(masterSource.base64, 'base64');
 
       // Flatten PDF to remove interactive fields (makes them visible to Gemini)
       if (isPDF) {
@@ -908,7 +908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Extract fields using Gemini Vision
-      const fields = await discoverFieldsWithGemini(pdfBuffer.toString('base64'), model, pinnedSource.type);
+      const fields = await discoverFieldsWithGemini(pdfBuffer.toString('base64'), model, masterSource.type);
 
 
       // Return simplified field list (just names and types, no coordinates)
@@ -921,7 +921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         fields: simplifiedFields,
-        fileType: pinnedSource.type
+        fileType: masterSource.type
       });
 
     } catch (error: any) {
@@ -940,7 +940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/compile', async (req: Request, res: Response) => {
     try {
-      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, pinnedSource, extractedFields, manualAnnotations } = req.body;
+      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations } = req.body;
 
       console.log('[API compile] Request received:', {
         modelProvider,
@@ -1015,6 +1015,12 @@ ${manualAnnotations && manualAnnotations.length > 0 ? `
    ${manualAnnotations.map((a: any) => `- Pagina ${a.pageNumber}: "${a.text}"`).join('\n')}
    QUESTI DATI HANNO LA PRIORITÀ su qualsiasi altra fonte. Usali per sovrascrivere o completare i campi corrispondenti nel template.
 ` : ''}
+${masterSource ? `
+4. **MASTER SOURCE (Spunta Blu) - Riferimento Formattazione:**
+   Il documento "${masterSource.name}" è contrassegnato come MASTER.
+   - Usa questo documento come riferimento principale per lo STILE, il LAYOUT e la STRUTTURA del documento finale.
+   - Se il template è mancante o generico, imita la formattazione del Master Source.
+` : ''}
 
 **ISTRUZIONI GENERALI:**
 - **COERENZA:** Mantieni un tono professionale e coerente con il documento.
@@ -1031,8 +1037,8 @@ MODALITÀ WEB RESEARCH ATTIVA:
 - **PRIORITÀ DATI:** Se un dato è presente sia nel LINK che nelle FONTI CARICATE (PDF/Doc), usa SEMPRE il dato delle FONTI CARICATE.
 - I link servono per arricchire, non per sovrascrivere i documenti ufficiali.` : ''}
 
-${(multimodalFiles.length > 0 || pinnedSource || hasExternalSources) ? `
-Hai accesso a ${multimodalFiles.length + (pinnedSource ? 1 : 0) + (hasExternalSources ? 1 : 0)} fonti.
+${(multimodalFiles.length > 0 || masterSource || hasExternalSources) ? `
+Hai accesso a ${multimodalFiles.length + (masterSource ? 1 : 0) + (hasExternalSources ? 1 : 0)} fonti.
 ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo basandoti sulle Note o rifiuta la compilazione.'}
 `;
 
@@ -1059,7 +1065,7 @@ ISTRUZIONI OUTPUT:
         systemPrompt,
         userPrompt,
         multimodalFiles: multimodalFiles || [],
-        pinnedSource: pinnedSource || null
+        masterSource: masterSource || null
       });
 
 

@@ -44,7 +44,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [isLoading, setIsLoading] = useState(false);
   const [webResearch, setWebResearch] = useState(false);
   const { toast } = useToast();
-  const { selectedSources } = useSources();
+  const { selectedSources, masterSource } = useSources();
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -151,6 +151,41 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     "Crea una FAQ",
   ]);
 
+  // Extract fields from master source for context (optional but consistent)
+  const [extractedFields, setExtractedFields] = useState<Array<{ name: string; type: string }>>([]);
+
+  useEffect(() => {
+    if (!masterSource) {
+      setExtractedFields([]);
+      return;
+    }
+
+    const extractFields = async () => {
+      try {
+        const response = await fetch(getApiUrl('/api/extract-fields-for-context'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            masterSource: {
+              name: masterSource.name,
+              type: masterSource.type,
+              base64: masterSource.base64
+            }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setExtractedFields(data.fields || []);
+        }
+      } catch (error) {
+        console.error('Error extracting fields for context:', error);
+      }
+    };
+
+    extractFields();
+  }, [masterSource?.id]);
+
   const fetchSuggestedQuestions = async (currentMessages: Message[]) => {
     try {
       const apiMessages = currentMessages
@@ -212,7 +247,13 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         modelProvider: 'gemini',
         sources: selectedSources,
         temperature: 0.7,
-        webResearch: webResearch
+        webResearch: webResearch,
+        masterSource: masterSource ? {
+          name: masterSource.name,
+          type: masterSource.type,
+          base64: masterSource.base64
+        } : null,
+        extractedFields: extractedFields.length > 0 ? extractedFields : undefined
       });
 
       const data = await response.json();

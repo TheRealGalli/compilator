@@ -11,13 +11,15 @@ interface AppSidebarProps {
   sources?: Source[];
   onRemoveSource?: (id: string) => void;
   onToggleSource?: (id: string) => void;
+  onToggleMaster?: (id: string) => void;
 }
 
 export function AppSidebar({
   activeSection = "documents",
   onSectionChange = () => { },
   sources = [],
-  onToggleSource
+  onToggleSource,
+  onToggleMaster
 }: AppSidebarProps) {
   const sections = [
     { id: "documents" as const, label: "Documenti", icon: FileText },
@@ -58,6 +60,7 @@ export function AppSidebar({
         <SourceSelector
           sources={sources}
           onToggle={onToggleSource}
+          onToggleMaster={onToggleMaster}
         />
       </div>
     </aside>

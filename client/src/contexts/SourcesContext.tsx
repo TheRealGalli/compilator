@@ -9,6 +9,7 @@ export interface Source {
     url?: string;
     base64?: string;
     isMemory?: boolean;
+    isMaster?: boolean; // Master source for formatting (Blue Check)
 }
 
 interface SourcesContextType {
@@ -16,7 +17,9 @@ interface SourcesContextType {
     addSource: (file: File, options?: { isMemory?: boolean }) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'>;
     removeSource: (id: string) => void;
     toggleSource: (id: string) => void;
+    toggleMaster: (id: string) => void; // New: Master Source Toggle
     selectedSources: Source[];
+    masterSource: Source | undefined; // New: Master Source Reference
     maxSources: number;
 }
 
@@ -85,7 +88,17 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         );
     }, []);
 
+    const toggleMaster = useCallback((id: string) => {
+        setSources(prev => prev.map(s => {
+            if (s.id === id) {
+                return { ...s, isMaster: !s.isMaster };
+            }
+            return { ...s, isMaster: false }; // Ensure only one master source at a time
+        }));
+    }, []);
+
     const selectedSources = sources.filter(s => s.selected);
+    const masterSource = sources.find(s => s.isMaster);
 
     return (
         <SourcesContext.Provider
@@ -94,7 +107,9 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 addSource,
                 removeSource,
                 toggleSource,
+                toggleMaster,
                 selectedSources,
+                masterSource,
                 maxSources: MAX_SOURCES
             }}
         >

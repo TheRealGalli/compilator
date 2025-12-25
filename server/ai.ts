@@ -21,7 +21,7 @@ export class AiService {
         systemPrompt: string,
         userPrompt: string,
         multimodalFiles: any[],
-        pinnedSource?: any
+        masterSource?: any // Renamed from pinnedSource
     }): Promise<string> {
         try {
             const model = this.vertex_ai.getGenerativeModel({
@@ -45,11 +45,11 @@ export class AiService {
                 }
             }
 
-            if (params.pinnedSource && params.pinnedSource.base64) {
+            if (params.masterSource && params.masterSource.base64) {
                 messageParts.push({
                     inlineData: {
-                        mimeType: params.pinnedSource.type || 'application/pdf',
-                        data: params.pinnedSource.base64
+                        mimeType: params.masterSource.type || 'application/pdf',
+                        data: params.masterSource.base64
                     }
                 });
             }

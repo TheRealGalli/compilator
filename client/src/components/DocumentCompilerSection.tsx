@@ -218,7 +218,7 @@ export function DocumentCompilerSection({
   const [compiledContent, setCompiledContent] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
   const { toast } = useToast();
-  const { selectedSources } = useSources();
+  const { selectedSources, masterSource } = useSources();
 
   // Template Generation State
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -240,7 +240,7 @@ export function DocumentCompilerSection({
   useEffect(() => {
     // We are temporarily disabling field extraction based on pinned source
     setExtractedFields([]);
-  }, []);
+  }, [masterSource?.id]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
   //   try {
@@ -353,6 +353,11 @@ export function DocumentCompilerSection({
           type: s.type,
           base64: s.base64
         })),
+        masterSource: masterSource ? {
+          name: masterSource.name,
+          type: masterSource.type,
+          base64: masterSource.base64
+        } : null,
         extractedFields: extractedFields.length > 0 ? extractedFields : undefined
       });
 
