@@ -16,7 +16,11 @@ interface FormField {
 }
 
 interface FieldMapping {
-    [fieldName: string]: string;
+    [fieldName: string]: string | {
+        value: string;
+        x?: number;
+        y?: number;
+    };
 }
 
 /**
@@ -273,52 +277,64 @@ async function extractFieldsFromOCR(pdfBuffer: Buffer, projectId: string, ocrPro
 export async function decideFieldContents(
     fields: FormField[],
     documentContext: string,
-    geminiModel: any
+    geminiModel: any,
+    pdfBase64?: string
 ): Promise<FieldMapping> {
     try {
         const fieldsDescription = fields.map((f, idx) =>
-            `${idx}. "${f.fieldName}" (tipo: ${f.fieldType})`
+            `${idx}. "${f.fieldName}" (posizione approssimativa: x=${f.boundingBox.normalizedVertices[0].x.toFixed(3)}, y=${f.boundingBox.normalizedVertices[0].y.toFixed(3)})`
         ).join('\n');
 
-        const prompt = `Analizza questo modulo scansionato e decidi il contenuto appropriato per ogni campo.
+        let prompt = `Analizza questo modulo scansionato e decidi il contenuto per ogni campo.
+DEVI anche raffinare la posizione verticale (y) per assicurarti che il testo "poggi" esattamente sulla linea orizzontale del campo.
 
-**CAMPI RILEVATI:**
+**CAMPI RILEVATI (Document AI):**
 ${fieldsDescription}
 
 **CONTESTO DOCUMENTO:**
 ${documentContext}
 
-**ISTRUZIONI:**
-1. Determina il tipo di modulo (modulo fiscale, contratto, domanda, etc.)
-2. Identifica il valore appropriato per ogni campo
-3. Usa dati realistici, professionali e coerenti
-4. Rispetta formati standard (date: GG/MM/AAAA, numeri con separatori corretti, etc.)
-5. Se un campo non è chiaro, usa "N/A" o lascia vuoto
+**ISTRUZIONI DI GROUNDING VISIVO:**
+1. Osserva l'immagine del PDF allegato.
+2. Per ogni campo, decidi il valore da scrivere.
+3. Se vedi una linea orizzontale (__________), fornisci le coordinate (x, y) esatte dove il testo dovrebbe iniziare per sembrare scritto a mano sopra la linea.
+4. Il valore y dovrebbe essere leggermente sopra la linea fisica.
+5. Usa coordinate normalizzate (0-1).
 
-**OUTPUT RICHIESTO (solo JSON, niente altro testo):**
+**OUTPUT RICHIESTO (solo JSON):**
 {
-  "0": "valore campo 0",
-  "1": "valore campo 1",
-  ...
+  "0": { "value": "Testo", "x": 0.452, "y": 0.512 },
+  "1": { "value": "Altro testo", "x": 0.120, "y": 0.580 }
 }`;
 
+        const parts: any[] = [{ text: prompt }];
+
+        if (pdfBase64) {
+            parts.push({
+                inlineData: {
+                    data: pdfBase64,
+                    mimeType: 'application/pdf'
+                }
+            });
+        }
+
         const result = await geminiModel.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+            contents: [{ role: 'user', parts: parts }]
         });
+        const response = await result.response;
+        const text = response.text();
 
-        const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        // Find JSON block
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            console.error('[decideFieldContents] No JSON found in response:', text);
+            return {};
+        }
 
-        // Extract JSON from response (handle markdown code blocks)
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        const jsonString = jsonMatch ? jsonMatch[0] : '{}';
+        return JSON.parse(jsonMatch[0]);
 
-        const fieldMapping: FieldMapping = JSON.parse(jsonString);
-
-        console.log(`[decideFieldContents] Generated values for ${Object.keys(fieldMapping).length} fields`);
-        return fieldMapping;
-
-    } catch (error) {
-        console.error('[decideFieldContents] Error:', error);
+    } catch (error: any) {
+        console.error('[decideFieldContents] Error:', error.message);
         return {};
     }
 }
@@ -335,7 +351,10 @@ export function generateSVGOverlay(
     const svgElements: string[] = [];
 
     fields.forEach((field, idx) => {
-        const value = fieldValues[idx.toString()];
+        const mapping = fieldValues[idx.toString()];
+        if (!mapping || mapping === 'N/A') return;
+
+        const value = typeof mapping === 'string' ? mapping : mapping.value;
         if (!value || value === 'N/A') return;
 
         const vertices = field.boundingBox.normalizedVertices;
@@ -343,13 +362,23 @@ export function generateSVGOverlay(
 
         // Calculate position and size from bounding box
         // Document AI returns normalized coordinates (0-1)
-        const x = vertices[0].x * pdfWidth;
-        const y = vertices[0].y * pdfHeight;
-        const width = (vertices[2].x - vertices[0].x) * pdfWidth;
-        const height = (vertices[2].y - vertices[0].y) * pdfHeight;
+        let x, y;
+        if (typeof mapping !== 'string' && typeof mapping.x === 'number' && typeof mapping.y === 'number') {
+            x = mapping.x * pdfWidth;
+            y = mapping.y * pdfHeight;
+        } else {
+            // Document AI default (usually top-left of label)
+            x = vertices[0].x * pdfWidth;
+            y = vertices[0].y * pdfHeight;
+        }
+
+        // Calculate dynamic height if not explicit
+        const h = vertices.length >= 4
+            ? (vertices[2].y - vertices[1].y) * pdfHeight
+            : 20;
 
         // Calculate font size based on field height (roughly 70% of height)
-        const fontSize = Math.max(8, Math.min(height * 0.7, 14));
+        const fontSize = Math.max(8, Math.min(h * 0.7, 14));
 
         // Blue ink color
         const blueInk = '#1E40AF';
@@ -358,7 +387,7 @@ export function generateSVGOverlay(
         svgElements.push(`
       <text 
         x="${x + 2}" 
-        y="${y + height * 0.75}" 
+        y="${y + (h * 0.75)}" 
         font-family="Helvetica, Arial, sans-serif" 
         font-size="${fontSize}px" 
         fill="${blueInk}"
@@ -423,7 +452,10 @@ export async function fillFormFieldsOnPDF(
         let fieldsFilledCount = 0;
 
         fields.forEach((field, idx) => {
-            const value = fieldValues[idx.toString()];
+            const mapping = fieldValues[idx.toString()];
+            if (!mapping || mapping === 'N/A') return;
+
+            const value = typeof mapping === 'string' ? mapping : mapping.value;
             if (!value || value === 'N/A') return;
 
             const page = pages[field.pageNumber] || pages[0];
@@ -432,10 +464,17 @@ export async function fillFormFieldsOnPDF(
             const vertices = field.boundingBox.normalizedVertices;
             if (!vertices || vertices.length < 2) return;
 
-            // Convert normalized coordinates to actual page coordinates
-            const x = vertices[0].x * pageWidth;
-            // PDF coordinates start from bottom, Document AI from top
-            const y = pageHeight - (vertices[0].y * pageHeight);
+            // Use refined coordinates if available
+            let x, y;
+            if (typeof mapping !== 'string' && typeof mapping.x === 'number' && typeof mapping.y === 'number') {
+                x = mapping.x * pageWidth;
+                // PDF coordinates start from bottom, Gemini (vision normalized) from top
+                y = pageHeight - (mapping.y * pageHeight);
+            } else {
+                x = vertices[0].x * pageWidth;
+                y = pageHeight - (vertices[0].y * pageHeight);
+            }
+
             const fieldWidth = (vertices[2].x - vertices[0].x) * pageWidth;
             const fieldHeight = (vertices[2].y - vertices[0].y) * pageHeight;
 
@@ -495,15 +534,25 @@ export function generateSVGWithFields(
         let fieldsCount = 0;
 
         fields.forEach((field, idx) => {
-            const value = fieldValues[idx.toString()];
+            const mapping = fieldValues[idx.toString()];
+            if (!mapping || mapping === 'N/A') return;
+
+            const value = typeof mapping === 'string' ? mapping : mapping.value;
             if (!value || value === 'N/A') return;
 
             const vertices = field.boundingBox.normalizedVertices;
             if (!vertices || vertices.length < 2) return;
 
-            // Convert normalized coords to actual coords
-            const x = vertices[0].x * pdfWidth;
-            const y = vertices[0].y * pdfHeight;
+            // Use refined coordinates if provided by Gemini, otherwise fallback to Document AI
+            let x, y;
+            if (typeof mapping !== 'string' && typeof mapping.x === 'number' && typeof mapping.y === 'number') {
+                x = mapping.x * pdfWidth;
+                y = mapping.y * pdfHeight;
+                console.log(`[generateSVGWithFields] Using REFINED coordinates for field ${idx}: ${x}, ${y}`);
+            } else {
+                x = vertices[0].x * pdfWidth;
+                y = vertices[0].y * pdfHeight;
+            }
 
             // Escape XML entities
             const escapedValue = value

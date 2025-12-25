@@ -970,7 +970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const documentContext = instructions || 'Modulo generico da compilare';
-      const fieldValues = await decideFieldContents(fields, documentContext, model);
+      const fieldValues = await decideFieldContents(fields, documentContext, model, pdfBuffer.toString('base64'));
 
       console.log(`[API compile-scanned-form] Generated ${Object.keys(fieldValues).length} field values`);
 
