@@ -331,12 +331,17 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                             left: `${anno.x}px`,
                             top: `${anno.y}px`,
                             zIndex: 30,
-                            transform: 'translate(0, -100%)' // Aligns text baseline with click point
+                            transform: 'translate(0, -20px)' // Adjusted to be less "high" than -100%
                         }}
                         className="group"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="relative">
+                        <div className="relative flex items-center">
+                            {/* Hidden span to measure text width and drive the container size */}
+                            <span className="invisible whitespace-pre px-0 font-bold text-sm min-h-[1.75rem] min-w-[2px]">
+                                {anno.text || (isLocked ? "Scrivi qui..." : "")}
+                            </span>
+
                             <input
                                 autoFocus={isLocked}
                                 value={anno.text}
@@ -347,12 +352,13 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                         (e.target as HTMLElement).blur();
                                     }
                                 }}
-                                className={`h-7 min-w-[120px] bg-transparent border-b-2 ${isLocked ? 'border-blue-600' : 'border-transparent'} text-blue-900 font-bold text-sm outline-none px-0 transition-all`}
+                                className={`absolute inset-0 w-full bg-transparent border-b-2 ${isLocked ? 'border-blue-600' : 'border-transparent'} text-blue-900 font-bold text-sm outline-none px-0 transition-all`}
                                 placeholder={isLocked ? "Scrivi qui..." : ""}
                                 readOnly={!isLocked}
                             />
+
                             {isLocked && (
-                                <div className="absolute -top-4 left-0 text-[8px] font-black text-blue-600 bg-white/40 px-1 rounded">MANUAL OVERRIDE</div>
+                                <div className="absolute -top-4 left-0 text-[8px] font-black text-blue-600 bg-white/40 px-1 rounded whitespace-nowrap">MANUAL OVERRIDE</div>
                             )}
 
                             {!isLocked && (
