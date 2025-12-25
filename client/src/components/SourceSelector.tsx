@@ -13,17 +13,15 @@ interface Source {
   id: string;
   name: string;
   selected: boolean;
-  isPinned?: boolean;
   isMemory?: boolean;
 }
 
 interface SourceSelectorProps {
   sources: Source[];
   onToggle?: (id: string) => void;
-  onTogglePin?: (id: string) => void;
 }
 
-export function SourceSelector({ sources, onToggle, onTogglePin }: SourceSelectorProps) {
+export function SourceSelector({ sources, onToggle }: SourceSelectorProps) {
   // Filter out memory files from the UI list
   const visibleSources = sources.filter(s => !s.isMemory);
   const selectedCount = visibleSources.filter(s => s.selected).length;
@@ -76,15 +74,6 @@ export function SourceSelector({ sources, onToggle, onTogglePin }: SourceSelecto
                     <p>{source.name}</p>
                   </TooltipContent>
                 </Tooltip>
-
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => onTogglePin?.(source.id)}
-                  className={`h-6 w-6 flex-shrink-0 transition-all ${source.isPinned ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}
-                >
-                  <Pin className={`w-3.5 h-3.5 ${source.isPinned ? 'text-red-500 fill-red-500 rotate-45' : 'text-muted-foreground'}`} />
-                </Button>
               </div>
             );
           })}

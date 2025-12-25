@@ -5,7 +5,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TemplateEditor } from "./TemplateEditor";
 import { CompiledOutput } from "./CompiledOutput";
 import { ModelSettings } from "./ModelSettings";
-import { PDFViewer } from "./PDFViewer";
 import { Card } from "@/components/ui/card";
 
 import { useState, useEffect } from "react";
@@ -210,14 +209,6 @@ interface Document {
   gcsPath: string;
 }
 
-interface Annotation {
-  id: string;
-  pageNumber: number;
-  x: number;
-  y: number;
-  text: string;
-}
-
 export function DocumentCompilerSection({
   modelProvider: initialModelProvider = 'gemini',
   onModelProviderChange
@@ -227,7 +218,7 @@ export function DocumentCompilerSection({
   const [compiledContent, setCompiledContent] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
   const { toast } = useToast();
-  const { selectedSources, pinnedSource } = useSources();
+  const { selectedSources } = useSources();
 
   // Template Generation State
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -243,43 +234,13 @@ export function DocumentCompilerSection({
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
   const [extractedFields, setExtractedFields] = useState<Array<{ fieldName: string; fieldType: string }>>([]);
   const [studioFontSize, setStudioFontSize] = useState<number>(14);
-  const [manualAnnotations, setManualAnnotations] = useState<Annotation[]>([]);
 
 
 
   useEffect(() => {
-    if (!pinnedSource) {
-      setExtractedFields([]);
-      return;
-    }
-
-    const extractFields = async () => {
-      try {
-        const { getApiUrl } = await import("@/lib/api-config");
-        const response = await fetch(getApiUrl('/api/extract-fields-for-context'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pinnedSource: {
-              name: pinnedSource.name,
-              type: pinnedSource.type,
-              base64: pinnedSource.base64
-            }
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setExtractedFields(data.fields || []);
-          console.log(`[DocumentCompiler] Extracted ${data.fields?.length} fields for context`);
-        }
-      } catch (error) {
-        console.error('Error extracting fields for context:', error);
-      }
-    };
-
-    extractFields();
-  }, [pinnedSource?.id]);
+    // We are temporarily disabling field extraction based on pinned source
+    setExtractedFields([]);
+  }, []);
 
   // const fetchDocuments = async () => { // This function is no longer used.
   //   try {
@@ -392,13 +353,7 @@ export function DocumentCompilerSection({
           type: s.type,
           base64: s.base64
         })),
-        pinnedSource: pinnedSource ? {
-          name: pinnedSource.name,
-          type: pinnedSource.type,
-          base64: pinnedSource.base64
-        } : null,
-        extractedFields: extractedFields.length > 0 ? extractedFields : undefined,
-        manualAnnotations: manualAnnotations.length > 0 ? manualAnnotations : undefined
+        extractedFields: extractedFields.length > 0 ? extractedFields : undefined
       });
 
 
@@ -549,73 +504,71 @@ export function DocumentCompilerSection({
     <div className="h-full flex flex-col p-6 gap-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-semibold">{pinnedSource ? 'Studio Editor' : 'Compilatore Documenti AI'}</h2>
+          <h2 className="text-xl font-semibold">Compilatore Documenti AI</h2>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {/* Hide template selector in Studio Mode */}
-          {!pinnedSource && (
-            <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-              <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
-                <SelectValue placeholder="Seleziona template" />
-              </SelectTrigger>
-              <SelectContent>
-                <div className="p-2 border-b space-y-1">
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      document.getElementById('template-upload')?.click();
-                    }}
-                    data-testid="button-upload-template"
-                  >
-                    <span className="mr-2">📄</span>
-                    Upload Template
-                  </Button>
-                  <input
-                    id="template-upload"
-                    type="file"
-                    accept=".txt,.md"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          setTemplateContent(event.target?.result as string);
-                          setSelectedTemplate("");
-                          toast({
-                            title: "Template caricato",
-                            description: `${file.name} è stato caricato con successo.`,
-                          });
-                        };
-                        reader.readAsText(file);
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setIsGenerateModalOpen(true);
-                    }}
-                    data-testid="button-generate-template"
-                  >
-                    <span className="mr-2">✏️</span>
-                    Genera Template
-                  </Button>
-                </div>
-                <SelectItem value="privacy">Privacy Policy</SelectItem>
-                <SelectItem value="relazione">Relazione Tecnica</SelectItem>
-                <SelectItem value="contratto">Contratto di Servizio</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+          {/* Always show template selector */}
+          <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
+            <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
+              <SelectValue placeholder="Seleziona template" />
+            </SelectTrigger>
+            <SelectContent>
+              <div className="p-2 border-b space-y-1">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('template-upload')?.click();
+                  }}
+                  data-testid="button-upload-template"
+                >
+                  <span className="mr-2">📄</span>
+                  Upload Template
+                </Button>
+                <input
+                  id="template-upload"
+                  type="file"
+                  accept=".txt,.md"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        setTemplateContent(event.target?.result as string);
+                        setSelectedTemplate("");
+                        toast({
+                          title: "Template caricato",
+                          description: `${file.name} è stato caricato con successo.`,
+                        });
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsGenerateModalOpen(true);
+                  }}
+                  data-testid="button-generate-template"
+                >
+                  <span className="mr-2">✏️</span>
+                  Genera Template
+                </Button>
+              </div>
+              <SelectItem value="privacy">Privacy Policy</SelectItem>
+              <SelectItem value="relazione">Relazione Tecnica</SelectItem>
+              <SelectItem value="contratto">Contratto di Servizio</SelectItem>
+            </SelectContent>
+          </Select>
 
           <Button
             onClick={handleCompile}
-            disabled={(!templateContent && !pinnedSource) || isCompiling}
+            disabled={!templateContent || isCompiling}
             data-testid="button-compile"
             className="w-full sm:w-auto"
           >
@@ -631,7 +584,7 @@ export function DocumentCompilerSection({
             >
               <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
             </svg>
-            {isCompiling ? "Processando..." : (pinnedSource ? "Applica Intelligenza" : "Compila con AI")}
+            {isCompiling ? "Processando..." : "Compila con AI"}
           </Button>
         </div>
       </div>
@@ -657,72 +610,18 @@ export function DocumentCompilerSection({
           </div>
 
           <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
-            {pinnedSource ? (
-              // STUDIO MODE - Show PDF Viewer or Coming Soon
-              // STUDIO MODE - Show File Preview
-              (() => {
-                const isPDF = pinnedSource.type.includes('pdf');
-                const isWord = pinnedSource.type.includes('wordprocessingml') || pinnedSource.type.includes('msword') || pinnedSource.name.endsWith('.docx');
-                const isText = pinnedSource.type.includes('text/plain') || pinnedSource.name.endsWith('.txt');
-                const isCSV = pinnedSource.type.includes('text/csv') || pinnedSource.name.endsWith('.csv');
-
-                if (isPDF || isText || isCSV) {
-                  return (
-                    <PDFViewer
-                      base64={pinnedSource.base64 || ''}
-                      fileName={pinnedSource.name}
-                      fileType={isPDF ? 'pdf' : 'text'}
-                      onAnnotationsChange={setManualAnnotations}
-                    />
-                  );
-                }
-
-
-
-
-                if (isWord) {
-                  return (
-                    <Card className="h-full flex items-center justify-center p-12">
-                      <div className="text-center max-w-md">
-                        <div className="text-6xl mb-4">📝</div>
-                        <h3 className="text-xl font-semibold mb-2">Word Preview</h3>
-                        <p className="text-muted-foreground">
-                          Il file <strong>{pinnedSource.name}</strong> è caricato ed è pronto per essere usato come fonte.
-                          Al momento i file Word possono essere analizzati dall'IA ma non visualizzati direttamente in anteprima.
-                        </p>
-                      </div>
-                    </Card>
-                  );
-                }
-
-                // Default Coming Soon
-                return (
-                  <Card className="h-full flex items-center justify-center p-12">
-                    <div className="text-center max-w-md">
-                      <div className="text-6xl mb-4">🚧</div>
-                      <h3 className="text-xl font-semibold mb-2">Coming Soon</h3>
-                      <p className="text-muted-foreground">
-                        L'anteprima per questo tipo di file sarà disponibile prossimamente.
-                      </p>
-                    </div>
-                  </Card>
-                );
-              })()
-
-            ) : (
-              // NORMAL MODE - Show Template + Output
-              <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <TemplateEditor
-                  value={templateContent}
-                  onChange={setTemplateContent}
-                />
-                <CompiledOutput
-                  content={compiledContent}
-                  onCopy={handleCopy}
-                  onDownload={handleDownload}
-                />
-              </div>
-            )}
+            {/* NORMAL MODE - Show Template + Output */}
+            <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <TemplateEditor
+                value={templateContent}
+                onChange={setTemplateContent}
+              />
+              <CompiledOutput
+                content={compiledContent}
+                onCopy={handleCopy}
+                onDownload={handleDownload}
+              />
+            </div>
           </div>
         </div>
       </div>

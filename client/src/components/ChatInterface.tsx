@@ -22,7 +22,7 @@ interface Message {
   content: string;
   timestamp: string;
   sources?: string[];
-  audioUrl?: string; // URL blob locale per riproduzione
+  audioUrl?: string;
   groundingMetadata?: any;
   searchEntryPoint?: string;
 }
@@ -43,9 +43,8 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [webResearch, setWebResearch] = useState(false);
-  const [extractedFields, setExtractedFields] = useState<Array<{ name: string; type: string }>>([]);
   const { toast } = useToast();
-  const { selectedSources, pinnedSource } = useSources();
+  const { selectedSources } = useSources();
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -77,8 +76,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       recorder.onstop = () => {
         const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
         handleSendAudio(audioBlob);
-
-        // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -103,11 +100,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
   const handleSendAudio = async (audioBlob: Blob) => {
     if (isLoading || isTranscribing) return;
-
-    // Show loading state for transcription
     setIsTranscribing(true);
-
-    // Let's use a toast for specific feedback.
     toast({
       title: "Trascrizione in corso...",
       description: "Sto convertendo il tuo audio in testo.",
@@ -117,8 +110,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.webm');
 
-      // Use fetch directly for FormData to ensure correct headers
-      // Note: apiRequest helper might assume JSON content-type default
       const res = await fetch(getApiUrl('/api/transcribe'), {
         method: 'POST',
         body: formData,
@@ -131,7 +122,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
       const data = await res.json();
 
-      // Populate input with transcribed text
       if (data.text) {
         setInput((prev) => prev + (prev ? " " : "") + data.text);
       } else {
@@ -151,7 +141,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       });
     } finally {
       setIsTranscribing(false);
-      // Clean up local tracks if any active (already done in onstop, but good practice)
     }
   };
 
@@ -161,43 +150,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     "Note di studio",
     "Crea una FAQ",
   ]);
-
-  // Extract fields from pinned source for context
-  useEffect(() => {
-    if (!pinnedSource) {
-      setExtractedFields([]);
-      return;
-    }
-
-    const extractFields = async () => {
-      try {
-        const response = await fetch(getApiUrl('/api/extract-fields-for-context'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pinnedSource: {
-              name: pinnedSource.name,
-              type: pinnedSource.type,
-              base64: pinnedSource.base64
-            }
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setExtractedFields(data.fields || []);
-          if (data.fields && data.fields.length > 0) {
-            console.log(`[ChatInterface] Extracted ${data.fields.length} fields from pinned document`);
-          }
-        }
-      } catch (error) {
-        console.error('Error extracting fields for context:', error);
-        // Silently fail - not critical for chat
-      }
-    };
-
-    extractFields();
-  }, [pinnedSource?.id]);
 
   const fetchSuggestedQuestions = async (currentMessages: Message[]) => {
     try {
@@ -239,7 +191,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
-    setSuggestedPrompts([]); // Clear old suggestions
+    setSuggestedPrompts([]);
     setIsLoading(true);
 
     try {
@@ -250,9 +202,8 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           content: msg.content,
         }));
 
-      // Check total size of selected sources (Cloud Run/JSON limit)
       const totalSize = selectedSources.reduce((acc, s) => acc + (s.size || 0), 0);
-      if (totalSize > 30 * 1024 * 1024) { // 30MB limit to stay under 32MB Cloud Run cap with base64 overhead
+      if (totalSize > 30 * 1024 * 1024) {
         throw new Error("Il totale dei documenti selezionati è troppo grande (max 30MB). Deseleziona alcuni file.");
       }
 
@@ -261,13 +212,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         modelProvider: 'gemini',
         sources: selectedSources,
         temperature: 0.7,
-        webResearch: webResearch,
-        pinnedSource: pinnedSource ? {
-          name: pinnedSource.name,
-          type: pinnedSource.type,
-          base64: pinnedSource.base64
-        } : null,
-        extractedFields: extractedFields.length > 0 ? extractedFields : undefined
+        webResearch: webResearch
       });
 
       const data = await response.json();
@@ -276,7 +221,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         throw new Error(data.error);
       }
 
-      // Add assistant response
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -286,7 +230,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         searchEntryPoint: data.searchEntryPoint,
       };
 
-      // Check for direct file modification response
       if (data.file) {
         const base64Data = data.file.base64;
         const fileName = data.file.name;
@@ -309,8 +252,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
       const updatedMessages = [...newMessages, assistantMessage];
       setMessages(updatedMessages);
-
-      // Fetch new suggested questions based on the updated conversation
       fetchSuggestedQuestions(updatedMessages);
 
     } catch (error: any) {
@@ -369,7 +310,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           <AnimatePresence mode="wait">
             {suggestedPrompts.length > 0 && (
               <motion.div
-                className="flex flex-wrap gap-2 mb-4 min-h-[40px]" // min-h prevents layout jump when Empty
+                className="flex flex-wrap gap-2 mb-4 min-h-[40px]"
                 layout
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -377,7 +318,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
               >
                 {suggestedPrompts.map((prompt, i) => (
                   <motion.div
-                    key={`${prompt}-${i}`} // Key change triggers animation
+                    key={`${prompt}-${i}`}
                     layout
                     initial={{ opacity: 0, scale: 0.8, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -386,7 +327,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                       type: "spring",
                       stiffness: 400,
                       damping: 25,
-                      delay: i * 0.05 // Subtle stagger
+                      delay: i * 0.05
                     }}
                   >
                     <Badge
@@ -404,8 +345,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           </AnimatePresence>
 
           <div className="flex flex-col gap-2">
-
-            {/* Web Research Toggle */}
             <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -428,7 +367,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                 onCheckedChange={setWebResearch}
               />
 
-              <div className="w-px h-4 bg-border mx-2" /> {/* Divider */}
+              <div className="w-px h-4 bg-border mx-2" />
 
               <Tooltip>
                 <TooltipTrigger asChild>
