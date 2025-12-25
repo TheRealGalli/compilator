@@ -521,9 +521,8 @@ export function generateSVGWithFields(
     pdfHeight: number
 ): string {
     try {
-        // Start SVG document
-        let svg = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-        svg += `<svg xmlns="http://www.w3.org/2000/svg" width="${pdfWidth}" height="${pdfHeight}" viewBox="0 0 ${pdfWidth} ${pdfHeight}">\n`;
+        // Start SVG document (No XML declaration as it's used as an overlay in HTML)
+        let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${pdfWidth}" height="${pdfHeight}" viewBox="0 0 ${pdfWidth} ${pdfHeight}" style="background:transparent;">\n`;
         svg += `  <!-- Studio Mode Compiled Form - Blue Ink Layer -->\n`;
         svg += `  <style>\n`;
         svg += `    .field-text {\n`;

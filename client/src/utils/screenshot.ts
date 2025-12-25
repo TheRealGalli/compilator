@@ -2,7 +2,6 @@ import html2canvas from 'html2canvas';
 import * as pdfjs from 'pdfjs-dist';
 
 // Configure pdf.js worker
-// Use a local worker or CDN. For now, we'll try to load it from the package
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
 /**
@@ -19,12 +18,6 @@ export interface ScreenshotConfig {
 
 /**
  * Generate PNG screenshot from PDF base64 + SVG overlay
- * Configurable parameters allow AI to adjust screenshot settings in future
- * 
- * @param pdfBase64 - Base64 encoded PDF
- * @param svgOverlay - SVG string to overlay on PDF
- * @param filename - Output filename
- * @param config - Screenshot configuration (AI-adjustable)
  */
 export async function generatePDFScreenshot(
     pdfBase64: string,
@@ -47,7 +40,7 @@ export async function generatePDFScreenshot(
     position: fixed;
     top: -10000px;
     left: -10000px;
-    width: ${width || 800}px;
+    z-index: -1000;
     background: ${backgroundColor};
     padding: 0;
   `;
@@ -55,15 +48,20 @@ export async function generatePDFScreenshot(
     const contentDiv = document.createElement('div');
     contentDiv.style.cssText = `
     position: relative;
-    width: 100%;
     background: white;
+    display: block;
+    overflow: hidden;
   `;
 
     // Render PDF using pdf.js
     const pdfCanvas = document.createElement('canvas');
     const pdfContext = pdfCanvas.getContext('2d');
 
+    let pdfWidth = width || 800;
+    let pdfHeight = height || 1100;
+
     try {
+        console.log('[screenshot] Starting PDF rendering...');
         // base64 to Uint8Array
         const pdfData = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
         const loadingTask = pdfjs.getDocument({ data: pdfData });
@@ -74,27 +72,35 @@ export async function generatePDFScreenshot(
         pdfCanvas.width = viewport.width;
         pdfCanvas.height = viewport.height;
 
+        pdfWidth = viewport.width / 2; // Real width in px (at 1x)
+        pdfHeight = viewport.height / 2;
+
         await page.render({
             canvasContext: pdfContext!,
             viewport: viewport
         }).promise;
+        console.log('[screenshot] PDF rendered successfully');
 
     } catch (err) {
-        console.error('Error rendering PDF with pdf.js:', err);
-        // Fallback: draw white background if PDF fails
-        pdfCanvas.width = width || 800;
-        pdfCanvas.height = height || 1100;
+        console.error('[screenshot] Error rendering PDF with pdf.js:', err);
+        pdfCanvas.width = pdfWidth * 2;
+        pdfCanvas.height = pdfHeight * 2;
         if (pdfContext) {
             pdfContext.fillStyle = backgroundColor;
             pdfContext.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
         }
     }
 
-    pdfCanvas.style.cssText = 'width: 100%; display: block;';
+    // Force explicit dimensions
+    contentDiv.style.width = `${pdfWidth}px`;
+    contentDiv.style.height = `${pdfHeight}px`;
+    pdfCanvas.style.cssText = `width: ${pdfWidth}px; height: ${pdfHeight}px; display: block;`;
 
     // Add SVG overlay
     const svgDiv = document.createElement('div');
-    svgDiv.innerHTML = svgOverlay;
+    // REMOVE XML declaration as it breaks innerHTML for SVG
+    const cleanSvg = svgOverlay.replace(/<\?xml.*?\?>/g, '').trim();
+    svgDiv.innerHTML = cleanSvg;
     svgDiv.style.cssText = `
     position: absolute;
     top: 0;
@@ -102,40 +108,59 @@ export async function generatePDFScreenshot(
     width: 100%;
     height: 100%;
     pointer-events: none;
+    background: transparent !important;
   `;
+
+    // Ensure the SVG element itself inside the div is responsive
+    const svgElement = svgDiv.querySelector('svg');
+    if (svgElement) {
+        svgElement.style.width = '100%';
+        svgElement.style.height = '100%';
+        svgElement.style.display = 'block';
+    }
 
     contentDiv.appendChild(pdfCanvas);
     contentDiv.appendChild(svgDiv);
     tempContainer.appendChild(contentDiv);
     document.body.appendChild(tempContainer);
 
-    // Give browser a moment to paint
-    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    // Give browser more time to paint the SVG
+    await new Promise<void>((resolve) => setTimeout(resolve, 1000));
 
-    // Capture screenshot
-    const canvas = await html2canvas(contentDiv, {
-        backgroundColor,
-        scale,
-        useCORS: true,
-        logging: false,
-        width: width || contentDiv.scrollWidth,
-        height: height || contentDiv.scrollHeight
-    });
+    try {
+        console.log('[screenshot] Capturing canvas with html2canvas...');
+        const canvas = await html2canvas(contentDiv, {
+            backgroundColor,
+            scale,
+            useCORS: true,
+            allowTaint: true,
+            logging: true,
+            width: pdfWidth,
+            height: pdfHeight
+        });
 
-    // Convert and download
-    canvas.toBlob((blob) => {
-        if (blob) {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+        console.log('[screenshot] Conversion to blob...');
+        canvas.toBlob((blob) => {
+            if (blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('[screenshot] PNG Download triggered');
+            } else {
+                console.error('[screenshot] Blob creation failed');
+            }
+            document.body.removeChild(tempContainer);
+        }, `image/${format}`, quality);
+
+    } catch (err) {
+        console.error('[screenshot] Capture failed:', err);
+        if (tempContainer.parentNode) {
+            document.body.removeChild(tempContainer);
         }
-
-        // Cleanup rendering container
-        document.body.removeChild(tempContainer);
-    }, `image/${format}`, quality);
+    }
 }
