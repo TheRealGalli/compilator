@@ -459,7 +459,7 @@ export function DocumentCompilerSection({
               children: [new Paragraph({
                 children: parseInline(cleanText(cellText), { size: 20 }),
               })],
-              width: { size: 100 / cleanCells.length, type: WidthType.PERCENTAGE },
+              width: { size: (100 / cleanCells.length) * 50, type: WidthType.PERCENTAGE },
               shading: i === 0 || lines[i - 1]?.trim() === '' ? { fill: "F7F7F7" } : undefined
             }))
           }));

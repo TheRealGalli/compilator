@@ -16,9 +16,9 @@ export class AiService {
     }
 
     /**
-     * Internal helper to process multimodal files and handle DOCX via text extraction.
+     * Public helper to process multimodal files once and reuse across passes.
      */
-    private async processMultimodalParts(files: any[]): Promise<any[]> {
+    async processMultimodalParts(files: any[]): Promise<any[]> {
         const parts: any[] = [];
         for (const file of files) {
             const mimeType = file.mimeType || file.type || '';
@@ -36,7 +36,6 @@ export class AiService {
                     parts.push({ text: `[CONTENUTO DOCUMENTO WORD]:\n${text}` });
                 } catch (err) {
                     console.error('[AiService] Error extracting DOCX text:', err);
-                    // Fallback to sending nothing for this file to avoid 400
                 }
             } else {
                 parts.push({
@@ -57,8 +56,9 @@ export class AiService {
         systemPrompt: string,
         userPrompt: string,
         multimodalFiles: any[],
-        masterSource?: any
-    }): Promise<string> {
+        masterSource?: any,
+        preProcessedParts?: any[]
+    }): Promise<{ content: string, parts?: any[] }> {
         try {
             const model = this.vertex_ai.getGenerativeModel({
                 model: this.modelId,
@@ -68,7 +68,8 @@ export class AiService {
                 }
             });
 
-            const multimodalParts = await this.processMultimodalParts(params.multimodalFiles);
+            // Use pre-processed parts if provided to save latency
+            const multimodalParts = params.preProcessedParts || await this.processMultimodalParts(params.multimodalFiles);
             const messageParts: any[] = [{ text: params.userPrompt }, ...multimodalParts];
 
             if (params.masterSource && params.masterSource.base64) {
@@ -81,7 +82,8 @@ export class AiService {
                 generationConfig: { temperature: 0.2 }
             });
 
-            return result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const content = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            return { content, parts: multimodalParts };
 
         } catch (error) {
             console.error('[AiService] compileDocument error:', error);
@@ -95,7 +97,8 @@ export class AiService {
     async refineFormatting(params: {
         draftContent: string,
         masterSource?: any,
-        formalTone?: boolean
+        formalTone?: boolean,
+        preProcessedMasterParts?: any[]
     }): Promise<string> {
         try {
             const systemPrompt = `Sei un esperto di Desktop Publishing e Layout Design.
@@ -127,7 +130,7 @@ ${params.draftContent}`;
                 }
             });
 
-            const masterParts = params.masterSource ? await this.processMultimodalParts([params.masterSource]) : [];
+            const masterParts = params.preProcessedMasterParts || (params.masterSource ? await this.processMultimodalParts([params.masterSource]) : []);
             const messageParts: any[] = [{ text: userPrompt }, ...masterParts];
 
             const result = await model.generateContent({

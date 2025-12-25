@@ -1096,13 +1096,17 @@ ISTRUZIONI OUTPUT:
 - Non dire "Ecco il documento", restituisci SOLO il testo del documento.
 `;
 
-      console.log('[DEBUG Compile] Calling AiService.compileDocument (Pass 1: Content Draft)...');
+      console.log('[DEBUG Compile] Pre-processing multimodal parts...');
+      const preProcessedSourceParts = multimodalFiles?.length > 0 ? await aiService.processMultimodalParts(multimodalFiles) : [];
+      const preProcessedMasterParts = masterSource ? await aiService.processMultimodalParts([masterSource]) : [];
 
-      const draftContent = await aiService.compileDocument({
+      console.log('[DEBUG Compile] Calling AiService.compileDocument (Pass 1: Content Draft)...');
+      const { content: draftContent } = await aiService.compileDocument({
         systemPrompt,
         userPrompt,
         multimodalFiles: multimodalFiles || [],
-        masterSource: masterSource || null
+        masterSource: masterSource || null,
+        preProcessedParts: preProcessedSourceParts
       });
 
       console.log('[DEBUG Compile] Draft content generated. Calling Layout Agent (Pass 2: Formatting)...');
@@ -1110,7 +1114,8 @@ ISTRUZIONI OUTPUT:
       const finalContent = await aiService.refineFormatting({
         draftContent,
         masterSource: masterSource || null,
-        formalTone
+        formalTone,
+        preProcessedMasterParts: preProcessedMasterParts
       });
 
 
