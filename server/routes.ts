@@ -1043,7 +1043,7 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
 `;
 
       // Build User Prompt
-      const userPrompt = `Compila il seguente template:
+      const userPrompt = template ? `Compila il seguente template:
 
 TEMPLATE:
 ${template}
@@ -1057,6 +1057,17 @@ ISTRUZIONI OUTPUT:
 - Sostituisci i placeholder nel testo.
 - Non restituire JSON.
 - Non dire "Ecco il documento compilato", restituisci SOLO il testo del documento.
+` : `Genera un documento completo basandoti sulle note dell'utente e seguendo ESATTAMENTE la struttura e lo stile del documento MASTER fornito.
+
+${notes ? `NOTE UTENTE:\n${notes}` : ''}
+
+${formalTone ? 'Usa un tono formale.' : ''}
+
+ISTRUZIONI OUTPUT:
+- Restituisci il DOCUMENTO FINALE COMPLETATO.
+- Includi tutte le sezioni necessarie basandoti sul MASTER SOURCE.
+- Non restituire JSON.
+- Non dire "Ecco il documento", restituisci SOLO il testo del documento.
 `;
 
       console.log('[DEBUG Compile] Calling AiService.compileDocument...');

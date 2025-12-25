@@ -573,7 +573,7 @@ export function DocumentCompilerSection({
 
           <Button
             onClick={handleCompile}
-            disabled={!templateContent || isCompiling}
+            disabled={(!templateContent && !masterSource) || isCompiling}
             data-testid="button-compile"
             className="w-full sm:w-auto"
           >
