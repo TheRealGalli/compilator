@@ -299,7 +299,8 @@ ${documentContext}
 2. Per ogni campo, decidi il valore da scrivere.
 3. Se vedi una linea orizzontale (__________), fornisci le coordinate (x, y) esatte dove il testo dovrebbe iniziare per sembrare scritto a mano sopra la linea.
 4. Il valore y dovrebbe essere leggermente sopra la linea fisica.
-5. Usa coordinate normalizzate (0-1).
+5. Se il modulo ha già dei simboli pre-stampati (es. "/" nelle date come __/__/____), EVITA di includere quel simbolo nel valore se il campo punta a uno spazio specifico tra i simboli. In generale, non duplicare simboli grafici già presenti nel layout.
+6. Usa coordinate normalizzate (0-1).
 
 **OUTPUT RICHIESTO (solo JSON):**
 {
