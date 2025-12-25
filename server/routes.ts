@@ -990,7 +990,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         svgOverlay: svgOverlay,
         fieldsDetected: fields.length,
-        fieldsFilled: Object.keys(fieldValues).filter(k => fieldValues[k] && fieldValues[k] !== 'N/A').length
+        fieldsFilled: Object.keys(fieldValues).filter(k => {
+          const val = fieldValues[k];
+          if (!val) return false;
+          const text = typeof val === 'string' ? val : val.value;
+          return text && text !== 'N/A' && text !== '';
+        }).length
       });
 
     } catch (error: any) {
