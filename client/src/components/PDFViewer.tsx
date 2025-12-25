@@ -15,8 +15,7 @@ import {
     X,
     Undo2,
     Redo2,
-    Maximize2,
-    Paperclip
+    Maximize2
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -63,7 +62,6 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
     const [isBold, setIsBold] = useState(true);
 
     // Paperclip UX & Drag States
-    const [mousePos, setMousePos] = useState<{ x: number, y: number, pageNum: number } | null>(null);
     const [lockedAnnotationId, setLockedAnnotationId] = useState<string | null>(null);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [hasDragged, setHasDragged] = useState(false);
@@ -158,11 +156,6 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                 a.id === draggingId ? { ...a, x, y, pageNumber: pageNum } : a
             ));
             return;
-        }
-
-        // Handle Paperclip Tracking (only if not locked)
-        if (!lockedAnnotationId) {
-            setMousePos({ x, y, pageNum });
         }
     };
 
@@ -274,7 +267,6 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                             setIsWritingMode(!isWritingMode);
                             if (isWritingMode) {
                                 setLockedAnnotationId(null);
-                                setMousePos(null);
                             }
                         }}
                         className={`h-9 w-9 rounded-md transition-all ${isWritingMode ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/70 hover:bg-white/10'}`}
@@ -365,7 +357,8 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                 className="relative shadow-[0_20px_50px_rgba(0,0,0,0.5)] bg-white transform-gpu"
                                 style={{
                                     scale: scale,
-                                    transformOrigin: 'top center'
+                                    transformOrigin: 'top center',
+                                    cursor: isWritingMode ? 'text' : 'default'
                                 }}
                                 onMouseMove={(e) => handleMouseMove(e, index + 1)}
                                 onClick={(e) => handleCanvasClick(e, index + 1)}
@@ -389,6 +382,7 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                     scale: scale,
                                     transformOrigin: 'top center',
                                     fontFamily: 'monospace',
+                                    cursor: isWritingMode ? 'text' : 'default'
                                 }}
                                 onMouseMove={(e) => handleMouseMove(e, index + 1)}
                                 onClick={(e) => handleCanvasClick(e, index + 1)}
@@ -417,27 +411,74 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                             position: 'absolute',
                             left: `${anno.x}px`,
                             top: `${anno.y}px`,
-                            zIndex: isDragging ? 100 : 30,
-                            transform: 'translate(-50%, -85%)', // Centered horizontally, slightly above point
+                            zIndex: isDragging ? 100 : (isLocked ? 50 : 30),
+                            transform: 'translate(-50%, -50%)', // Precision centering on point
                             cursor: !isWritingMode ? 'default' : (isDragging ? 'grabbing' : 'grab')
                         }}
-                        className={`group transition-transform active:scale-105 ${isDragging ? 'opacity-70' : ''}`}
+                        className={`group transition-all ${isDragging ? 'opacity-70 scale-105' : ''}`}
                         onMouseDown={(e) => handleAnnotationMouseDown(e, anno.id)}
                         onClick={(e) => handleAnnotationClick(e, anno.id)}
                     >
                         <div className="relative flex flex-col items-center">
-                            {/* Hidden span to measure text width and drive the container size */}
+                            {/* Pro Floating Toolbar - Visible when focused/locked */}
+                            {isLocked && (
+                                <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center bg-[#1e1e1e] border border-white/10 shadow-2xl rounded-md p-1 gap-1 z-[100] animate-in fade-in zoom-in duration-200">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setAnnotations(prev => prev.map(a => a.id === anno.id ? { ...a, fontSize: Math.max(8, a.fontSize - 2) } : a));
+                                        }}
+                                        className="h-7 w-7 text-white/70 hover:bg-white/10 hover:text-white"
+                                    >
+                                        <Minus className="w-3 h-3" />
+                                    </Button>
+                                    <div className="w-[1px] h-4 bg-white/10 mx-0.5" />
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setAnnotations(prev => prev.map(a => a.id === anno.id ? { ...a, fontSize: Math.min(72, a.fontSize + 2) } : a));
+                                        }}
+                                        className="h-7 w-7 text-white/70 hover:bg-white/10 hover:text-white"
+                                    >
+                                        <Plus className="w-3 h-3" />
+                                    </Button>
+                                    <div className="w-[1px] h-4 bg-white/10 mx-0.5" />
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            removeAnnotation(anno.id);
+                                        }}
+                                        className="h-7 w-7 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Selection Border - Subtle indicator */}
+                            <div
+                                className={`absolute inset-x-[-10px] inset-y-[-4px] rounded border transition-all pointer-events-none ${isLocked ? 'border-indigo-500 bg-indigo-500/5' : 'border-transparent group-hover:border-white/20'}`}
+                            />
+
+                            {/* Measurement Span */}
                             <span
-                                className="invisible whitespace-pre px-0 min-h-[1.2rem] min-w-[4px]"
+                                className="invisible whitespace-pre px-2 min-h-[1em]"
                                 style={{
                                     fontFamily: anno.fontFamily,
                                     fontSize: `${anno.fontSize}px`,
                                     fontWeight: anno.isBold ? 'bold' : 'normal'
                                 }}
                             >
-                                {anno.text}
+                                {anno.text || " "}
                             </span>
 
+                            {/* The Real Input */}
                             <input
                                 autoFocus={isLocked}
                                 value={anno.text}
@@ -448,7 +489,7 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                         (e.target as HTMLElement).blur();
                                     }
                                 }}
-                                className={`absolute bottom-0 w-full bg-transparent border-b-2 ${isLocked && anno.text.length > 0 ? 'border-blue-600' : 'border-transparent'} outline-none px-0 text-center transition-all pointer-events-none select-none`}
+                                className="absolute inset-x-0 bottom-0 w-full bg-transparent outline-none px-2 text-center transition-all pointer-events-none select-none"
                                 style={{
                                     pointerEvents: isLocked ? 'auto' : 'none',
                                     userSelect: isLocked ? 'auto' : 'none',
@@ -456,25 +497,11 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                     fontSize: `${anno.fontSize}px`,
                                     color: anno.color,
                                     fontWeight: anno.isBold ? 'bold' : 'normal',
-                                    lineHeight: '1' // Closer to the underline
+                                    lineHeight: '1.2'
                                 }}
                                 placeholder=""
                                 readOnly={!isLocked}
                             />
-
-                            {/* Delete button always visible and follows text progression */}
-                            <Button
-                                variant="destructive"
-                                size="icon"
-                                className="h-4 w-4 rounded-full absolute -right-6 top-1/2 -translate-y-1/2 transition-all bg-red-500 hover:bg-black border-none shadow-md pointer-events-auto opacity-100"
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeAnnotation(anno.id);
-                                }}
-                            >
-                                <X className="w-2.5 h-2.5 text-white" />
-                            </Button>
                         </div>
                     </div>
                 );
