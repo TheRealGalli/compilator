@@ -1,11 +1,13 @@
-import { DocumentProcessorServiceClient } from '@google-cloud/documentai';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 /**
  * Helper functions for scanned form compilation using Document AI Form Parser
  */
 
-interface FormField {
+/**
+ * Core interfaces for form discovery and mapping
+ */
+export interface FormField {
     fieldName: string;
     fieldType: string;
     boundingBox: {
@@ -15,7 +17,7 @@ interface FormField {
     pageNumber: number;
 }
 
-interface FieldMapping {
+export interface FieldMapping {
     [fieldName: string]: string | {
         value: string;
         x?: number;
@@ -24,248 +26,89 @@ interface FieldMapping {
 }
 
 /**
- * Extract form fields from a PDF using Document AI Form Parser
+ * NEW: Pure-Gemini Discovery Loop
+ * Instead of Document AI, Gemini 2.0 Master scans the image and identifies "fillable" areas.
  */
-export async function extractFormFields(pdfBuffer: Buffer, projectId: string): Promise<FormField[]> {
+export async function discoverFieldsWithGemini(
+    pdfBase64: string,
+    geminiModel: any
+): Promise<FormField[]> {
     try {
-        // Get processor ID from environment variable
-        const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
-        if (!processorId) {
-            console.warn('[extractFormFields] DOCUMENT_AI_PROCESSOR_ID not set - returning empty fields');
-            return [];
-        }
+        console.log('[discoverFieldsWithGemini] Starting pure-Gemini field discovery...');
 
-        // IMPORTANT: Must set API endpoint to match processor location
-        // Default client uses 'us-documentai.googleapis.com'
-        // If processor is in different region, must specify endpoint
-        const location = 'eu'; // Processor is in Europe
-        const apiEndpoint = `${location}-documentai.googleapis.com`;
+        const prompt = `Sei un esperto di analisi di moduli cartacei (Document Intelligence).
+Analizza l'immagine del PDF e identifica TUTTI i campi che dovrebbero essere compilati.
 
-        const client = new DocumentProcessorServiceClient({
-            apiEndpoint: apiEndpoint
-        });
+Per ogni campo, fornisci:
+1. "fieldName": Un nome descrittivo semantico (es: "Cognome", "Codice Fiscale", "Data di Nascita").
+2. "box": Coordinate normalizzate [ymin, xmin, ymax, xmax] (0-1) che circondano lo spazio dove andrebbe scritto il testo (la riga o il box).
+3. "type": Il tipo di campo (text, date, signature, checkbox).
 
-        // Processor name format: projects/{project}/locations/{location}/processors/{id}
-        const processorName = `projects/${projectId}/locations/${location}/processors/${processorId}`;
-        console.log(`[extractFormFields] Using processor: ${processorName}`);
-        console.log(`[extractFormFields] Using API endpoint: ${apiEndpoint}`);
-        console.log(`[extractFormFields] PDF buffer size: ${pdfBuffer.length} bytes`);
+Sii estremamente preciso con le coordinate X e Y. Se vedi una riga orizzontale, il box deve stare esattamente sopra di essa.
 
-        // Document AI expects base64 encoded string, not Buffer
-        const base64Content = pdfBuffer.toString('base64');
-        console.log(`[extractFormFields] Base64 content length: ${base64Content.length} chars`);
+**OUTPUT RICHIESTO (solo JSON):**
+{
+  "fields": [
+    { "fieldName": "Nome", "box": [0.12, 0.45, 0.15, 0.65], "type": "text" },
+    ...
+  ]
+}`;
 
-        const request = {
-            name: processorName,
-            rawDocument: {
-                content: base64Content,
-                mimeType: 'application/pdf',
-            },
-        };
-
-        const [result] = await client.processDocument(request);
-        const { document } = result;
-
-        // DETAILED LOGGING for debugging
-        console.log('[extractFormFields] === DOCUMENT AI RESPONSE DEBUG ===');
-        console.log('[extractFormFields] Document exists:', !!document);
-        console.log('[extractFormFields] Pages count:', document?.pages?.length || 0);
-
-        if (document) {
-            console.log('[extractFormFields] Available properties:', Object.keys(document));
-
-            // CHECK FOR ENTITIES (alternative extraction method)
-            if (document.entities) {
-                console.log('[extractFormFields] !!! FOUND ENTITIES !!!');
-                console.log('[extractFormFields] Entities count:', document.entities.length);
-                if (document.entities.length > 0) {
-                    console.log('[extractFormFields] First entity structure:',
-                        JSON.stringify(document.entities[0], null, 2));
-                }
-            } else {
-                console.log('[extractFormFields] No entities array found');
-            }
-
-            if (document.pages && document.pages.length > 0) {
-                const firstPage = document.pages[0];
-                console.log('[extractFormFields] First page properties:', Object.keys(firstPage));
-                console.log('[extractFormFields] Has formFields:', !!firstPage.formFields);
-                console.log('[extractFormFields] formFields length:', firstPage.formFields?.length || 0);
-                console.log('[extractFormFields] Has tables:', !!firstPage.tables);
-                console.log('[extractFormFields] Has paragraphs:', !!firstPage.paragraphs);
-                console.log('[extractFormFields] Has lines:', !!firstPage.lines);
-                console.log('[extractFormFields] Has tokens:', !!firstPage.tokens);
-
-                // Log full structure of formFields if present
-                if (firstPage.formFields && firstPage.formFields.length > 0) {
-                    console.log('[extractFormFields] First formField structure:',
-                        JSON.stringify(firstPage.formFields[0], null, 2));
+        const parts: any[] = [
+            { text: prompt },
+            {
+                inlineData: {
+                    data: pdfBase64,
+                    mimeType: 'application/pdf'
                 }
             }
-        }
-        console.log('[extractFormFields] === END DEBUG ===');
-
-        if (!document?.pages) {
-            console.warn('[extractFormFields] No pages found in document');
-            return [];
-        }
-
-        const fields: FormField[] = [];
-
-        // Extract form fields from Document AI response
-        for (let pageIndex = 0; pageIndex < document.pages.length; pageIndex++) {
-            const page = document.pages[pageIndex];
-
-            console.log(`[extractFormFields] Processing page ${pageIndex}...`);
-
-            if (page.formFields) {
-                console.log(`[extractFormFields] Found ${page.formFields.length} form fields on page ${pageIndex}`);
-
-                for (const field of page.formFields) {
-                    const fieldName = field.fieldName?.textAnchor?.content || `field_${fields.length}`;
-                    const fieldValue = field.fieldValue?.textAnchor?.content || '';
-
-                    if (field.fieldName?.boundingPoly) {
-                        const rawVertices = field.fieldName.boundingPoly.normalizedVertices || [];
-                        // Filter and type-guard to ensure we have valid vertices
-                        const vertices = rawVertices
-                            .filter((v): v is { x: number; y: number } =>
-                                v !== null && v !== undefined &&
-                                typeof v.x === 'number' && typeof v.y === 'number'
-                            );
-
-                        fields.push({
-                            fieldName: fieldName.trim(),
-                            fieldType: field.valueType || 'text',
-                            boundingBox: {
-                                normalizedVertices: vertices
-                            },
-                            confidence: field.fieldName.confidence || 0,
-                            pageNumber: pageIndex
-                        });
-                    }
-                }
-            } else {
-                console.log(`[extractFormFields] No formFields property on page ${pageIndex}`);
-            }
-        }
-
-
-
-
-        console.log(`[extractFormFields] Found ${fields.length} form fields`);
-
-        // FALLBACK: If Form Parser found 0 fields, try OCR Processor
-        if (fields.length === 0) {
-            const ocrProcessorId = process.env.DOCUMENT_AI_PROCESSOR_ID_2;
-
-            if (ocrProcessorId) {
-                console.log('[extractFormFields] ⚠️ Form Parser found 0 fields - trying OCR fallback...');
-                const ocrFields = await extractFieldsFromOCR(pdfBuffer, projectId, ocrProcessorId);
-                console.log(`[extractFormFields] ✅ OCR Processor found ${ocrFields.length} fields`);
-                return ocrFields;
-            } else {
-                console.warn('[extractFormFields] DOCUMENT_AI_PROCESSOR_ID_2 not set - no OCR fallback available');
-            }
-        }
-
-        return fields;
-
-    } catch (error) {
-        console.error('[extractFormFields] Error:', error);
-        throw new Error(`Failed to extract form fields: ${error}`);
-    }
-}
-
-/**
- * Fallback: Extract form fields using OCR Processor
- * Uses pattern matching on OCR text to identify form fields
- */
-async function extractFieldsFromOCR(pdfBuffer: Buffer, projectId: string, ocrProcessorId: string): Promise<FormField[]> {
-    try {
-        const location = 'eu';
-        const apiEndpoint = `${location}-documentai.googleapis.com`;
-        const client = new DocumentProcessorServiceClient({ apiEndpoint });
-
-        const processorName = `projects/${projectId}/locations/${location}/processors/${ocrProcessorId}`;
-        console.log(`[extractFieldsFromOCR] Using OCR processor: ${processorName}`);
-
-        const base64Content = pdfBuffer.toString('base64');
-
-        const request = {
-            name: processorName,
-            rawDocument: {
-                content: base64Content,
-                mimeType: 'application/pdf',
-            },
-        };
-
-        const [result] = await client.processDocument(request);
-        const { document } = result;
-
-        if (!document?.pages) {
-            console.warn('[extractFieldsFromOCR] No pages found');
-            return [];
-        }
-
-        const fields: FormField[] = [];
-
-        // Patterns for Italian form fields
-        const formPatterns = [
-            { pattern: /(.+?):\s*_{3,}/gi, type: 'text' },
-            { pattern: /(.+?)\s+_{5,}/gi, type: 'text' },
-            { pattern: /Il\/La\s+sottoscritto\/a/i, type: 'text', name: 'Il/La sottoscritto/a' },
-            { pattern: /nato\s+il/i, type: 'date', name: 'nato il' },
-            { pattern: /Data\s*[_\.]{2,}/i, type: 'date', name: 'Data' },
-            { pattern: /Firma.*titolare/i, type: 'signature', name: 'Firma del titolare' },
-            { pattern: /codice\s+fiscale/i, type: 'text', name: 'Codice Fiscale' },
         ];
 
-        for (const page of document.pages) {
-            if (!page.paragraphs) continue;
+        const result = await geminiModel.generateContent({
+            contents: [{ role: 'user', parts: parts }]
+        });
 
-            for (const paragraph of page.paragraphs) {
-                const textAnchor = paragraph.layout?.textAnchor;
-                if (!textAnchor) continue;
-
-                const startIndex = textAnchor.textSegments?.[0]?.startIndex || 0;
-                const endIndex = textAnchor.textSegments?.[0]?.endIndex || 0;
-                const text = document.text?.substring(Number(startIndex), Number(endIndex)) || '';
-
-                const boundingPoly = paragraph.layout?.boundingPoly;
-                if (!boundingPoly?.normalizedVertices) continue;
-
-                for (const { pattern, type, name } of formPatterns) {
-                    const match = text.match(pattern);
-                    if (match) {
-                        const fieldName = name || (match[1]?.trim()) || text.substring(0, 50);
-
-                        const vertices = boundingPoly.normalizedVertices.filter(
-                            (v): v is { x: number; y: number } =>
-                                v !== null && v !== undefined &&
-                                typeof v.x === 'number' && typeof v.y === 'number'
-                        );
-
-                        if (vertices.length > 0) {
-                            fields.push({
-                                fieldName: fieldName.trim(),
-                                fieldType: type,
-                                boundingBox: { normalizedVertices: vertices },
-                                confidence: paragraph.layout?.confidence || 0.8,
-                                pageNumber: 0
-                            });
-                        }
-                        break;
-                    }
-                }
-            }
+        let text = '';
+        const response = await result.response;
+        if (typeof response.text === 'function') {
+            text = response.text();
+        } else {
+            text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
         }
 
-        console.log(`[extractFieldsFromOCR] Found ${fields.length} fields via OCR pattern matching`);
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            console.warn('[discoverFieldsWithGemini] No JSON found in response, returning empty fields');
+            return [];
+        }
+
+        const data = JSON.parse(jsonMatch[0]);
+        const geminiFields = data.fields || [];
+
+        // Map Gemini output to our FormField interface
+        const fields: FormField[] = geminiFields.map((f: any, idx: number) => {
+            const [ymin, xmin, ymax, xmax] = f.box || [0, 0, 0, 0];
+            return {
+                fieldName: f.fieldName || `campo_${idx}`,
+                fieldType: f.type || 'text',
+                boundingBox: {
+                    normalizedVertices: [
+                        { x: xmin, y: ymin },
+                        { x: xmax, y: ymin },
+                        { x: xmax, y: ymax },
+                        { x: xmin, y: ymax }
+                    ]
+                },
+                confidence: 1.0,
+                pageNumber: 0
+            };
+        });
+
+        console.log(`[discoverFieldsWithGemini] Successfully discovered ${fields.length} fields`);
         return fields;
 
     } catch (error: any) {
-        console.error('[extractFieldsFromOCR] Error:', error.message);
+        console.error('[discoverFieldsWithGemini] Error during discovery:', error.message);
         return [];
     }
 }

@@ -20,6 +20,7 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } f
 
 // [pdfjs-dist removed - using client-side extraction instead]
 import { AiService } from './ai'; // Import new AI Service
+import type { FormField, FieldMapping } from './form-compiler';
 
 // Initialize AI Service
 const aiService = new AiService(process.env.GCP_PROJECT_ID || 'compilator-479214');
@@ -874,12 +875,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[API extract-fields-for-context] Extracting fields from: ${pinnedSource.name}`);
 
-      const { extractFormFields } = await import('./form-compiler');
+      const { discoverFieldsWithGemini, decideFieldContents, auditFieldPlacements, generateSVGWithFields, getPDFDimensions } = await import('./form-compiler');
       const { flattenPDF } = await import('./pdf-utils');
 
       let pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
 
-      // Flatten PDF to remove interactive fields (makes them visible to Document AI)
+      // Flatten PDF to remove interactive fields (makes them visible to Gemini)
       if (isPDF) {
         console.log('[API extract-fields-for-context] Flattening PDF...');
         pdfBuffer = await flattenPDF(pdfBuffer);
@@ -887,11 +888,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
 
-      // Extract fields using Document AI
-      const fields = await extractFormFields(pdfBuffer, projectId);
+      // Initialize Gemini Model for Discovery
+      const apiKey = await getModelApiKey('gemini');
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+
+      const location = 'us-central1';
+      const vertexAIInstance = new VertexAI({ project: projectId, location });
+      const model = vertexAIInstance.getGenerativeModel({
+        model: 'gemini-2.0-flash-exp',
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
+        ]
+      });
+
+      // Extract fields using Gemini Vision
+      const fields = await discoverFieldsWithGemini(pdfBuffer.toString('base64'), model);
 
       // Return simplified field list (just names and types, no coordinates)
-      const simplifiedFields = fields.map(f => ({
+      const simplifiedFields = fields.map((f: FormField) => ({
         name: f.fieldName,
         type: f.fieldType
       }));
@@ -928,32 +945,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[API compile-scanned-form] Compiling form: ${pinnedSource.name}`);
 
-      const { extractFormFields, decideFieldContents, auditFieldPlacements, generateSVGWithFields, getPDFDimensions } = await import('./form-compiler');
+      const { discoverFieldsWithGemini, decideFieldContents, auditFieldPlacements, generateSVGWithFields, getPDFDimensions } = await import('./form-compiler');
       const { flattenPDF } = await import('./pdf-utils');
 
       // Convert base64 to buffer
       let pdfBuffer = Buffer.from(pinnedSource.base64, 'base64');
 
-      // Flatten PDF to remove interactive fields (enables Document AI detection)
+      // Flatten PDF to remove interactive fields (enables Gemini detection)
       console.log('[API compile-scanned-form] Flattening PDF...');
       pdfBuffer = await flattenPDF(pdfBuffer);
 
       const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
 
-      // Step 1: Extract form fields using Document AI Form Parser
-      console.log('[API compile-scanned-form] Step 1: Extracting form fields...');
-      const fields = await extractFormFields(pdfBuffer, projectId);
-
-      if (fields.length === 0) {
-        return res.status(400).json({
-          error: 'Nessun campo rilevato nel documento. Assicurati che sia un modulo scansionato.'
-        });
-      }
-
-      console.log(`[API compile-scanned-form] Extracted ${fields.length} fields`);
-
-      // Step 2: Use Gemini to decide field contents
-      console.log('[API compile-scanned-form] Step 2: Generating field contents with Gemini...');
+      // Initialize Gemini Model first (needed for discovery)
       const apiKey = await getModelApiKey('gemini');
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
@@ -969,7 +973,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ]
       });
 
+      // Step 1: Extract form fields using Gemini Vision Discovery
+      console.log('[API compile-scanned-form] Step 1: Discovering form fields with Gemini...');
+      const fields = await discoverFieldsWithGemini(pdfBuffer.toString('base64'), model);
+
+      if (fields.length === 0) {
+        return res.status(400).json({
+          error: 'Nessun campo rilevato nel documento. Assicurati che sia un modulo scansionato.'
+        });
+      }
+
+      console.log(`[API compile-scanned-form] Discovered ${fields.length} fields`);
+
       const documentContext = instructions || 'Modulo generico da compilare';
+
+      // Step 2: Use Gemini to decide field contents
+      console.log('[API compile-scanned-form] Step 2: Generating field contents with Gemini...');
       const initialFieldValues = await decideFieldContents(fields, documentContext, model, pdfBuffer.toString('base64'));
 
       console.log(`[API compile-scanned-form] Initial generation: ${Object.keys(initialFieldValues).length} values. Starting visual audit...`);
