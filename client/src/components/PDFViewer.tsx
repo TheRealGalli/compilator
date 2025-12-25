@@ -261,7 +261,7 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
             {/* Content Area */}
             <div
                 ref={containerRef}
-                className={`flex-1 overflow-auto p-12 flex flex-col items-center bg-[#525659] scroll-smooth ${isWritingMode && !lockedAnnotationId ? 'cursor-none' : 'cursor-default'}`}
+                className={`flex-1 overflow-auto p-12 flex flex-col items-center bg-[#525659] scroll-smooth ${isWritingMode ? 'cursor-text' : 'cursor-default'}`}
                 style={{ scrollbarColor: '#323639 #525659', scrollbarWidth: 'thin' }}
             >
                 {fileType === 'pdf' ? (
@@ -284,7 +284,6 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                 onClick={(e) => handleCanvasClick(e, index + 1)}
                             >
                                 <Page pageNumber={index + 1} renderTextLayer={false} renderAnnotationLayer={false} className="bg-white" />
-                                {renderFloatingPaperclip(index + 1)}
                                 {renderAnnotations(index + 1)}
                             </div>
                         ))}
@@ -310,7 +309,6 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                 onClick={(e) => handleCanvasClick(e, index + 1)}
                             >
                                 <pre className="whitespace-pre-wrap text-slate-800 leading-relaxed">{pageContent.join('\n')}</pre>
-                                {renderFloatingPaperclip(index + 1)}
                                 {renderAnnotations(index + 1)}
                             </div>
                         ))}
@@ -319,24 +317,6 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
             </div>
         </Card>
     );
-
-    function renderFloatingPaperclip(pageNum: number) {
-        if (!isWritingMode || lockedAnnotationId || mousePos?.pageNum !== pageNum) return null;
-        return (
-            <div
-                style={{
-                    position: 'absolute',
-                    left: `${mousePos.x}px`,
-                    top: `${mousePos.y}px`,
-                    transform: 'translate(-50%, -50%)',
-                    zIndex: 100,
-                    pointerEvents: 'none'
-                }}
-            >
-                <Paperclip className="w-5 h-5 text-indigo-600 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] animate-bounce" />
-            </div>
-        );
-    }
 
     function renderAnnotations(pageNum: number) {
         return annotations
@@ -351,14 +331,11 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                             left: `${anno.x}px`,
                             top: `${anno.y}px`,
                             zIndex: 30,
-                            transform: 'translate(-5px, -15px)'
+                            transform: 'translate(0, -100%)' // Aligns text baseline with click point
                         }}
-                        className="group flex items-center gap-2"
+                        className="group"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* The Fixed Paperclip at the position */}
-                        <Paperclip className={`w-4 h-4 ${isLocked ? 'text-indigo-600 scale-125' : 'text-slate-400 opacity-50'} transition-all`} />
-
                         <div className="relative">
                             <input
                                 autoFocus={isLocked}
@@ -370,22 +347,25 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                         (e.target as HTMLElement).blur();
                                     }
                                 }}
-                                className={`h-7 min-w-[120px] bg-white/95 backdrop-blur-sm border-b-2 ${isLocked ? 'border-indigo-600' : 'border-transparent'} text-slate-900 font-bold text-[11px] outline-none px-2 transition-all`}
-                                placeholder={isLocked ? "SCRIVI QUI..." : ""}
+                                className={`h-7 min-w-[120px] bg-transparent border-b-2 ${isLocked ? 'border-blue-600' : 'border-transparent'} text-blue-900 font-bold text-sm outline-none px-0 transition-all`}
+                                placeholder={isLocked ? "Scrivi qui..." : ""}
                                 readOnly={!isLocked}
                             />
-                        </div>
+                            {isLocked && (
+                                <div className="absolute -top-4 left-0 text-[8px] font-black text-blue-600 bg-white/40 px-1 rounded">MANUAL OVERRIDE</div>
+                            )}
 
-                        {!isLocked && (
-                            <Button
-                                variant="destructive"
-                                size="icon"
-                                className="h-4 w-4 rounded-full opacity-0 group-hover:opacity-100 transition-all bg-red-500 hover:bg-black border-none shadow-md"
-                                onClick={() => removeAnnotation(anno.id)}
-                            >
-                                <X className="w-2.5 h-2.5 text-white" />
-                            </Button>
-                        )}
+                            {!isLocked && (
+                                <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    className="h-4 w-4 rounded-full absolute -right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all bg-red-500 hover:bg-black border-none shadow-md"
+                                    onClick={() => removeAnnotation(anno.id)}
+                                >
+                                    <X className="w-2.5 h-2.5 text-white" />
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 );
             });
