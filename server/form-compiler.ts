@@ -299,8 +299,10 @@ ${documentContext}
 2. Per ogni campo, decidi il valore da scrivere.
 3. Se vedi una linea orizzontale (__________), fornisci le coordinate (x, y) esatte dove il testo dovrebbe iniziare per sembrare scritto a mano sopra la linea.
 4. Il valore y dovrebbe essere leggermente sopra la linea fisica.
-5. Se il modulo ha già dei simboli pre-stampati (es. "/" nelle date come __/__/____), EVITA di includere quel simbolo nel valore se il campo punta a uno spazio specifico tra i simboli. In generale, non duplicare simboli grafici già presenti nel layout.
-6. Usa coordinate normalizzate (0-1).
+5. **Simboli pre-stampati**: Se il modulo ha già dei simboli (es. '/' nelle date come '__/__/____' o ':' negli orari), NON includere questi simboli nel valore se il testo deve essere inserito negli spazi tra di essi.
+6. **Griglie di caratteri**: Se noti una griglia di quadratini singoli (es. per il Codice Fiscale o P.IVA), e Document AI ha identificato ogni quadratino come un campo separato, inserisci UN SOLO carattere per ogni campo corrispondente.
+7. **Allineamento**: Assicurati che il testo sia centrato orizzontalmente rispetto allo spazio disponibile se si tratta di quadratini, o allineato a sinistra se si tratta di righe lunghe.
+8. Usa coordinate normalizzate (0-1).
 
 **OUTPUT RICHIESTO (solo JSON):**
 {
