@@ -385,8 +385,8 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                     >
                         <div className="relative flex items-center">
                             {/* Hidden span to measure text width and drive the container size */}
-                            <span className="invisible whitespace-pre px-0 font-bold text-sm min-h-[1.75rem] min-w-[2px]">
-                                {anno.text || (isLocked ? "Scrivi qui..." : "")}
+                            <span className="invisible whitespace-pre px-0 font-bold text-sm min-h-[1.75rem] min-w-[4px]">
+                                {anno.text}
                             </span>
 
                             <input
@@ -399,7 +399,7 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                         (e.target as HTMLElement).blur();
                                     }
                                 }}
-                                className={`absolute inset-0 w-full bg-transparent border-b-2 ${isLocked ? 'border-blue-600' : 'border-transparent'} text-blue-900 font-bold text-sm outline-none px-0 transition-all pointer-events-none select-none`}
+                                className={`absolute inset-0 w-full bg-transparent border-b-2 ${isLocked && anno.text.length > 0 ? 'border-blue-600' : 'border-transparent'} text-blue-900 font-bold text-sm outline-none px-0 transition-all pointer-events-none select-none`}
                                 style={{
                                     pointerEvents: isLocked ? 'auto' : 'none',
                                     userSelect: isLocked ? 'auto' : 'none'
@@ -412,20 +412,19 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                 <div className="absolute -top-4 left-0 text-[8px] font-black text-blue-600 bg-white/40 px-1 rounded whitespace-nowrap pointer-events-none">MANUAL OVERRIDE</div>
                             )}
 
-                            {!isLocked && (
-                                <Button
-                                    variant="destructive"
-                                    size="icon"
-                                    className="h-4 w-4 rounded-full absolute -right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all bg-red-500 hover:bg-black border-none shadow-md pointer-events-auto"
-                                    onMouseDown={(e) => e.stopPropagation()} // Prevent drag start when clicking delete
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        removeAnnotation(anno.id);
-                                    }}
-                                >
-                                    <X className="w-2.5 h-2.5 text-white" />
-                                </Button>
-                            )}
+                            {/* Delete button always visible and follows text progression */}
+                            <Button
+                                variant="destructive"
+                                size="icon"
+                                className="h-4 w-4 rounded-full absolute -right-6 top-1/2 -translate-y-1/2 transition-all bg-red-500 hover:bg-black border-none shadow-md pointer-events-auto opacity-100"
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeAnnotation(anno.id);
+                                }}
+                            >
+                                <X className="w-2.5 h-2.5 text-white" />
+                            </Button>
                         </div>
                     </div>
                 );
