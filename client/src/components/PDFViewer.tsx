@@ -412,17 +412,17 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                             left: `${anno.x}px`,
                             top: `${anno.y}px`,
                             zIndex: isDragging ? 100 : (isLocked ? 50 : 30),
-                            transform: 'translate(-50%, -50%)', // Precision centering on point
+                            transform: 'translate(0, -50%)', // Align left edge to click point
                             cursor: !isWritingMode ? 'default' : (isDragging ? 'grabbing' : 'grab')
                         }}
                         className={`group transition-all ${isDragging ? 'opacity-70 scale-105' : ''}`}
                         onMouseDown={(e) => handleAnnotationMouseDown(e, anno.id)}
                         onClick={(e) => handleAnnotationClick(e, anno.id)}
                     >
-                        <div className="relative flex flex-col items-center">
+                        <div className="relative flex flex-col items-start">
                             {/* Pro Floating Toolbar - Visible when focused/locked */}
                             {isLocked && (
-                                <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center bg-[#1e1e1e] border border-white/10 shadow-2xl rounded-md p-1 gap-1 z-[100] animate-in fade-in zoom-in duration-200">
+                                <div className="absolute -top-12 left-0 flex items-center bg-[#1e1e1e] border border-white/10 shadow-2xl rounded-md p-1 gap-1 z-[100] animate-in fade-in zoom-in duration-200">
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -468,7 +468,7 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
 
                             {/* Measurement Span */}
                             <span
-                                className="invisible whitespace-pre px-2 min-h-[1em]"
+                                className="invisible whitespace-pre px-0 min-h-[1em]"
                                 style={{
                                     fontFamily: anno.fontFamily,
                                     fontSize: `${anno.fontSize}px`,
@@ -489,7 +489,7 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                         (e.target as HTMLElement).blur();
                                     }
                                 }}
-                                className="absolute inset-x-0 bottom-0 w-full bg-transparent outline-none px-2 text-center transition-all pointer-events-none select-none"
+                                className="absolute inset-x-0 bottom-0 w-full bg-transparent outline-none px-0 text-left transition-all pointer-events-none select-none"
                                 style={{
                                     pointerEvents: isLocked ? 'auto' : 'none',
                                     userSelect: isLocked ? 'auto' : 'none',
