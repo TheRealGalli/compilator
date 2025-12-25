@@ -5,7 +5,7 @@ export class AiService {
     private vertex_ai: VertexAI;
     private projectId: string;
     private location: string;
-    private modelId = 'gemini-1.5-flash'; // Fixed to a stable version that supports Document handling
+    private modelId = 'gemini-2.5-flash';
 
     constructor(projectId: string, location: string = 'europe-west1') {
         this.projectId = projectId;
