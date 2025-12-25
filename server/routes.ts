@@ -771,6 +771,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to convert file data to a Gemini part
+  const fileToPart = async (base64Data: string, mimeType: string) => {
+    // Strip data URI prefix if present
+    const cleanBase64 = base64Data.split(',')[1] || base64Data;
+
+    if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
+      return {
+        inlineData: {
+          mimeType: mimeType,
+          data: cleanBase64
+        }
+      };
+    } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || mimeType === 'application/msword') {
+      // Handle DOCX by extracting text
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      const textContent = await extractText(buffer, mimeType);
+      return { text: `Contenuto del documento Word (DOCX):\n${textContent}` };
+    } else if (mimeType.startsWith('text/')) {
+      // For other text-based files, just decode
+      const textContent = Buffer.from(cleanBase64, 'base64').toString('utf-8');
+      return { text: `Contenuto del file (${mimeType}):\n${textContent}` };
+    }
+    // Fallback for unsupported types, or if you want to send them as generic data
+    return {
+      inlineData: {
+        mimeType: mimeType,
+        data: cleanBase64
+      }
+    };
+  };
+
   // Endpoint per generare preview intelligente di documento pinnato
   app.post('/api/preview-pinned', async (req: Request, res: Response) => {
     try {
@@ -804,12 +835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const buffer = Buffer.from(source.base64, 'base64');
 
       // Prepare multimodal content
-      const filePart = {
-        inlineData: {
-          data: buffer.toString('base64'),
-          mimeType: source.type
-        }
-      };
+      const filePart = await fileToPart(source.base64, source.type);
 
       const systemPrompt = `Sei un assistente di analisi documentale specializzato. Il tuo compito è fornire una preview intelligente e strutturata del documento.
 
@@ -833,7 +859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: 'user',
           parts: [
             { text: systemPrompt },
-            filePart,
+            await fileToPart(source.base64, source.type),
             { text: userPrompt }
           ]
         }]
@@ -1349,14 +1375,9 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 
         for (const source of sources) {
           if (source.base64 && source.type) {
-            // Strip data URI prefix if present
-            const base64Data = source.base64.split(',')[1] || source.base64;
-            parts.push({
-              inlineData: {
-                mimeType: source.type,
-                data: base64Data
-              }
-            });
+            // Use the new fileToPart helper
+            const filePart = await fileToPart(source.base64, source.type);
+            parts.push(filePart);
           }
         }
       }
@@ -1469,14 +1490,17 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
             const isMultimodal =
               source.type.startsWith('image/') ||
               source.type === 'application/pdf' ||
-              source.type.startsWith('audio/');
+              source.type.startsWith('audio/') ||
+              source.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX
+              source.type === 'application/msword'; // Old DOC
 
             if (isMultimodal) {
-              const type = source.type.startsWith('image/') ? 'image' : 'file';
+              // For multimodal files, we'll process them with fileToPart later
               multimodalFiles.push({
-                type,
-                [type === 'image' ? 'image' : 'data']: base64,
+                name: source.name,
                 mimeType: source.type,
+                base64: base64,
+                isMemory: source.isMemory
               });
               filesContext += `- ${source.name} (${source.type})\n`;
             } else {
@@ -1495,7 +1519,6 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       const maxChars = (multimodalFiles.length > 0 || filesContext.length > 5000) ? 12000 : 5000;
 
       let systemInstruction = `Sei un assistente AI di ricerca esperto e professionale.
-// ... existing base prompt ...
 `;
 
       // Check for memory file
@@ -1564,9 +1587,11 @@ ${filesContext}
       if (multimodalFiles.length > 0 && coreMessages.length > 0) {
         const lastMsg = coreMessages[coreMessages.length - 1];
         if (lastMsg.role === 'user') {
-          multimodalFiles.forEach((f: any) => {
-            (lastMsg.parts as any[]).push({ inlineData: { mimeType: f.mimeType, data: f.image || f.data } });
-          });
+          for (const f of multimodalFiles) {
+            const mimeType = f.mimeType;
+            const filePart = await fileToPart(f.base64, mimeType);
+            (lastMsg.parts as any[]).push(filePart);
+          }
         }
       }
 

@@ -1,10 +1,11 @@
 import { VertexAI } from '@google-cloud/vertexai';
+import mammoth from 'mammoth';
 
 export class AiService {
     private vertex_ai: VertexAI;
     private projectId: string;
     private location: string;
-    private modelId = 'gemini-2.5-flash';
+    private modelId = 'gemini-1.5-flash'; // Fixed to a stable version that supports Document handling
 
     constructor(projectId: string, location: string = 'europe-west1') {
         this.projectId = projectId;
@@ -15,13 +16,48 @@ export class AiService {
     }
 
     /**
+     * Internal helper to process multimodal files and handle DOCX via text extraction.
+     */
+    private async processMultimodalParts(files: any[]): Promise<any[]> {
+        const parts: any[] = [];
+        for (const file of files) {
+            const mimeType = file.mimeType || file.type || '';
+            const base64Data = file.data || file.base64 || '';
+
+            if (!mimeType || !base64Data) continue;
+
+            const isDOCX = mimeType.includes('wordprocessingml') || mimeType.includes('msword');
+
+            if (isDOCX) {
+                try {
+                    console.log(`[AiService] Extracting text from DOCX file for Gemini pass...`);
+                    const buffer = Buffer.from(base64Data, 'base64');
+                    const { value: text } = await mammoth.extractRawText({ buffer });
+                    parts.push({ text: `[CONTENUTO DOCUMENTO WORD]:\n${text}` });
+                } catch (err) {
+                    console.error('[AiService] Error extracting DOCX text:', err);
+                    // Fallback to sending nothing for this file to avoid 400
+                }
+            } else {
+                parts.push({
+                    inlineData: {
+                        mimeType: mimeType,
+                        data: base64Data
+                    }
+                });
+            }
+        }
+        return parts;
+    }
+
+    /**
      * Compiles the document using strict context from sources.
      */
     async compileDocument(params: {
         systemPrompt: string,
         userPrompt: string,
         multimodalFiles: any[],
-        masterSource?: any // Renamed from pinnedSource
+        masterSource?: any
     }): Promise<string> {
         try {
             const model = this.vertex_ai.getGenerativeModel({
@@ -32,31 +68,17 @@ export class AiService {
                 }
             });
 
-            const messageParts: any[] = [{ text: params.userPrompt }];
-
-            for (const file of params.multimodalFiles) {
-                if ((file.mimeType || file.type) && (file.data || file.base64)) {
-                    messageParts.push({
-                        inlineData: {
-                            mimeType: file.mimeType || file.type,
-                            data: file.data || file.base64
-                        }
-                    });
-                }
-            }
+            const multimodalParts = await this.processMultimodalParts(params.multimodalFiles);
+            const messageParts: any[] = [{ text: params.userPrompt }, ...multimodalParts];
 
             if (params.masterSource && params.masterSource.base64) {
-                messageParts.push({
-                    inlineData: {
-                        mimeType: params.masterSource.type || 'application/pdf',
-                        data: params.masterSource.base64
-                    }
-                });
+                const masterParts = await this.processMultimodalParts([params.masterSource]);
+                messageParts.push(...masterParts);
             }
 
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
-                generationConfig: { temperature: 0.2 } // Low temp for factual compilation
+                generationConfig: { temperature: 0.2 }
             });
 
             return result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -105,27 +127,19 @@ ${params.draftContent}`;
                 }
             });
 
-            const messageParts: any[] = [{ text: userPrompt }];
-
-            if (params.masterSource && params.masterSource.base64) {
-                messageParts.push({
-                    inlineData: {
-                        mimeType: params.masterSource.type || 'application/pdf',
-                        data: params.masterSource.base64
-                    }
-                });
-            }
+            const masterParts = params.masterSource ? await this.processMultimodalParts([params.masterSource]) : [];
+            const messageParts: any[] = [{ text: userPrompt }, ...masterParts];
 
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
-                generationConfig: { temperature: 0.1 } // Very low temperature for consistency
+                generationConfig: { temperature: 0.1 }
             });
 
             return result.response.candidates?.[0]?.content?.parts?.[0]?.text || params.draftContent;
 
         } catch (error) {
             console.error('[AiService] refineFormatting error:', error);
-            return params.draftContent; // Fallback to draft on error
+            return params.draftContent;
         }
     }
 }

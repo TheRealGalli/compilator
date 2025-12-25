@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
+import mammoth from 'mammoth';
 
 /**
  * Core interfaces for form discovery
@@ -41,15 +42,22 @@ Per ogni campo, fornisci un JSON con questa struttura:
 
 Sii estremamente preciso. Per i file PDF/Immagini usa coordinate normalizzate (0-1). Per i file di puro testo, prova a stimarne la posizione nel documento.`;
 
-        const parts: any[] = [
-            { text: prompt },
-            {
+        const isDOCX = mimeType.includes('wordprocessingml') || mimeType.includes('msword');
+        const parts: any[] = [{ text: prompt }];
+
+        if (isDOCX) {
+            console.log(`[discoverFieldsWithGemini] DOCX detected, extracting text...`);
+            const buffer = Buffer.from(fileBase64, 'base64');
+            const { value: text } = await mammoth.extractRawText({ buffer });
+            parts.push({ text: `[CONTENUTO DOCUMENTO WORD]:\n${text}` });
+        } else {
+            parts.push({
                 inlineData: {
                     data: fileBase64,
                     mimeType: mimeType
                 }
-            }
-        ];
+            });
+        }
 
 
         const result = await geminiModel.generateContent({
