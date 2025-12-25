@@ -54,9 +54,11 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
     const [fontSize, setFontSize] = useState<number>(14);
 
-    // Paperclip UX States
+    // Paperclip UX & Drag States
     const [mousePos, setMousePos] = useState<{ x: number, y: number, pageNum: number } | null>(null);
     const [lockedAnnotationId, setLockedAnnotationId] = useState<string | null>(null);
+    const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [hasDragged, setHasDragged] = useState(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -97,6 +99,15 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
         onAnnotationsChange?.(annotations);
     }, [annotations, onAnnotationsChange]);
 
+    // Global Mouse Up to handle drag stop
+    useEffect(() => {
+        const handleGlobalMouseUp = () => {
+            setDraggingId(null);
+        };
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }, []);
+
     // Scroll Observer
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -126,19 +137,37 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
     };
 
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>, pageNum: number) => {
-        if (!isWritingMode || lockedAnnotationId) return;
+        if (!isWritingMode) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
         const x = (e.clientX - rect.left) / scale;
         const y = (e.clientY - rect.top) / scale;
 
-        setMousePos({ x, y, pageNum });
+        // Handle Dragging
+        if (draggingId) {
+            setHasDragged(true);
+            setAnnotations(prev => prev.map(a =>
+                a.id === draggingId ? { ...a, x, y, pageNumber: pageNum } : a
+            ));
+            return;
+        }
+
+        // Handle Paperclip Tracking (only if not locked)
+        if (!lockedAnnotationId) {
+            setMousePos({ x, y, pageNum });
+        }
     };
 
     const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>, pageNum: number) => {
         if (!isWritingMode) return;
 
-        // If something is already locked, unlock it and reset paperclip tracking
+        // If we just finished a drag, don't create a new annotation
+        if (hasDragged) {
+            setHasDragged(false);
+            return;
+        }
+
+        // If something is already locked, unlock it
         if (lockedAnnotationId) {
             setLockedAnnotationId(null);
             return;
@@ -161,6 +190,19 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
         setLockedAnnotationId(newId);
     };
 
+    const handleAnnotationMouseDown = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (!isWritingMode) return;
+        setDraggingId(id);
+        setHasDragged(false);
+    };
+
+    const handleAnnotationClick = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (!isWritingMode || hasDragged) return;
+        setLockedAnnotationId(id);
+    };
+
     const updateAnnotation = (id: string, text: string) => {
         setAnnotations(prev => prev.map(a => a.id === id ? { ...a, text } : a));
     };
@@ -168,6 +210,7 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
     const removeAnnotation = (id: string) => {
         setAnnotations(prev => prev.filter(a => a.id !== id));
         if (lockedAnnotationId === id) setLockedAnnotationId(null);
+        if (draggingId === id) setDraggingId(null);
     };
 
     const handleDownload = () => {
@@ -323,6 +366,8 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
             .filter(a => a.pageNumber === pageNum)
             .map((anno) => {
                 const isLocked = lockedAnnotationId === anno.id;
+                const isDragging = draggingId === anno.id;
+
                 return (
                     <div
                         key={anno.id}
@@ -330,11 +375,13 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                             position: 'absolute',
                             left: `${anno.x}px`,
                             top: `${anno.y}px`,
-                            zIndex: 30,
-                            transform: 'translate(0, -20px)' // Adjusted to be less "high" than -100%
+                            zIndex: isDragging ? 100 : 30,
+                            transform: 'translate(0, -20px)',
+                            cursor: !isWritingMode ? 'default' : (isDragging ? 'grabbing' : 'grab')
                         }}
-                        className="group"
-                        onClick={(e) => e.stopPropagation()}
+                        className={`group transition-transform active:scale-105 ${isDragging ? 'opacity-70' : ''}`}
+                        onMouseDown={(e) => handleAnnotationMouseDown(e, anno.id)}
+                        onClick={(e) => handleAnnotationClick(e, anno.id)}
                     >
                         <div className="relative flex items-center">
                             {/* Hidden span to measure text width and drive the container size */}
@@ -352,21 +399,29 @@ export function PDFViewer({ base64, fileName, fileType = 'pdf', onAnnotationsCha
                                         (e.target as HTMLElement).blur();
                                     }
                                 }}
-                                className={`absolute inset-0 w-full bg-transparent border-b-2 ${isLocked ? 'border-blue-600' : 'border-transparent'} text-blue-900 font-bold text-sm outline-none px-0 transition-all`}
+                                className={`absolute inset-0 w-full bg-transparent border-b-2 ${isLocked ? 'border-blue-600' : 'border-transparent'} text-blue-900 font-bold text-sm outline-none px-0 transition-all pointer-events-none select-none`}
+                                style={{
+                                    pointerEvents: isLocked ? 'auto' : 'none',
+                                    userSelect: isLocked ? 'auto' : 'none'
+                                }}
                                 placeholder={isLocked ? "Scrivi qui..." : ""}
                                 readOnly={!isLocked}
                             />
 
                             {isLocked && (
-                                <div className="absolute -top-4 left-0 text-[8px] font-black text-blue-600 bg-white/40 px-1 rounded whitespace-nowrap">MANUAL OVERRIDE</div>
+                                <div className="absolute -top-4 left-0 text-[8px] font-black text-blue-600 bg-white/40 px-1 rounded whitespace-nowrap pointer-events-none">MANUAL OVERRIDE</div>
                             )}
 
                             {!isLocked && (
                                 <Button
                                     variant="destructive"
                                     size="icon"
-                                    className="h-4 w-4 rounded-full absolute -right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all bg-red-500 hover:bg-black border-none shadow-md"
-                                    onClick={() => removeAnnotation(anno.id)}
+                                    className="h-4 w-4 rounded-full absolute -right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all bg-red-500 hover:bg-black border-none shadow-md pointer-events-auto"
+                                    onMouseDown={(e) => e.stopPropagation()} // Prevent drag start when clicking delete
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        removeAnnotation(anno.id);
+                                    }}
                                 >
                                     <X className="w-2.5 h-2.5 text-white" />
                                 </Button>
