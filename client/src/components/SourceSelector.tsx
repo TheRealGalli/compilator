@@ -1,6 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { FileText, Image, Music, Check } from "lucide-react";
+import { FileText, Image, Music, Pin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -83,7 +83,7 @@ export function SourceSelector({ sources, onToggle, onToggleMaster }: SourceSele
                   onClick={() => onToggleMaster?.(source.id)}
                   className={`h-6 w-6 flex-shrink-0 transition-all ${source.isMaster ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}
                 >
-                  <Check className={`w-3.5 h-3.5 ${source.isMaster ? 'text-blue-500 stroke-[3px]' : 'text-muted-foreground'}`} />
+                  <Pin className={`w-3.5 h-3.5 ${source.isMaster ? 'text-blue-500 stroke-[3px]' : 'text-muted-foreground'}`} />
                 </Button>
               </div>
             );
