@@ -928,7 +928,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[API compile-scanned-form] Compiling form: ${pinnedSource.name}`);
 
-      const { extractFormFields, decideFieldContents, generateSVGWithFields, getPDFDimensions } = await import('./form-compiler');
+      const { extractFormFields, decideFieldContents, auditFieldPlacements, generateSVGWithFields, getPDFDimensions } = await import('./form-compiler');
       const { flattenPDF } = await import('./pdf-utils');
 
       // Convert base64 to buffer
@@ -970,9 +970,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const documentContext = instructions || 'Modulo generico da compilare';
-      const fieldValues = await decideFieldContents(fields, documentContext, model, pdfBuffer.toString('base64'));
+      const initialFieldValues = await decideFieldContents(fields, documentContext, model, pdfBuffer.toString('base64'));
 
-      console.log(`[API compile-scanned-form] Generated ${Object.keys(fieldValues).length} field values`);
+      console.log(`[API compile-scanned-form] Initial generation: ${Object.keys(initialFieldValues).length} values. Starting visual audit...`);
+
+      // Step 2.5: Visual Grounding Audit (The "Red Pin" logic)
+      const fieldValues = await auditFieldPlacements(
+        pdfBuffer.toString('base64'),
+        initialFieldValues,
+        fields,
+        model
+      );
+
+      console.log(`[API compile-scanned-form] Audit complete. Using ${Object.keys(fieldValues).length} refined values.`);
 
       // Step 3: Generate SVG overlay (NEW APPROACH - no PDF modification)
       console.log('[API compile-scanned-form] Step 3: Generating SVG overlay...');

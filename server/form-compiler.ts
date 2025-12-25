@@ -324,21 +324,116 @@ ${documentContext}
         const result = await geminiModel.generateContent({
             contents: [{ role: 'user', parts: parts }]
         });
-        const response = await result.response;
-        const text = response.text();
 
-        // Find JSON block
+        let text = '';
+        try {
+            const response = await result.response;
+            if (typeof response.text === 'function') {
+                text = response.text();
+            } else {
+                text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            }
+        } catch (e) {
+            console.error('[decideFieldContents] Error extracting text:', e);
+            text = JSON.stringify(result);
+        }
+
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
             console.error('[decideFieldContents] No JSON found in response:', text);
             return {};
         }
 
-        return JSON.parse(jsonMatch[0]);
+        const mappings = JSON.parse(jsonMatch[0]);
+        console.log(`[decideFieldContents] Generated ${Object.keys(mappings).length} field mappings`);
+        return mappings;
 
     } catch (error: any) {
         console.error('[decideFieldContents] Error:', error.message);
         return {};
+    }
+}
+
+/**
+ * Visual Audit: Gemini Vision analyzes the proposed placements and corrects them.
+ * This is the "Red Pin" logic: checking if characters land exactly where they should.
+ */
+export async function auditFieldPlacements(
+    pdfBase64: string,
+    proposedMappings: FieldMapping,
+    fields: FormField[],
+    geminiModel: any
+): Promise<FieldMapping> {
+    try {
+        console.log('[auditFieldPlacements] Starting visual audit for precision...');
+
+        const auditDescription = Object.keys(proposedMappings).map(idx => {
+            const m = proposedMappings[idx];
+            const field = fields[parseInt(idx)];
+            const val = typeof m === 'string' ? m : m.value;
+            const x = typeof m === 'object' ? m.x : 0;
+            const y = typeof m === 'object' ? m.y : 0;
+            return `Campo ${idx} ("${field.fieldName}"): Valore="${val}", Proposta X=${x?.toFixed(3)}, Y=${y?.toFixed(3)}`;
+        }).join('\n');
+
+        let prompt = `Sei un esperto di precisione tipografica. Analizza l'immagine del modulo e verifica se le coordinate (x,y) proposte fanno "poggiare" il testo esattamente sopra le righe fisiche o nei box.
+
+**COORDINATE PROPOSTE:**
+${auditDescription}
+
+**ISTRUZIONI DI CONTROLLO:**
+1. Osserva l'immagine reale. Dove vedi una riga orizzontale, il testo deve stare circa 1-2 pixel SOPRA di essa.
+2. Se vedi dei box (quadratini per Codice Fiscale, etc.), il carattere deve essere CENTRATO perfettamente nel box.
+3. Se le coordinate proposte sono palesemente fuori riga o fuori box, CORREGGILE (x, y) basandoti solo sulla visione.
+4. Se sono accettabili, confermale.
+5. Usa coordinate normalizzate (0-1).
+
+**OUTPUT RICHIESTO (solo JSON):**
+{
+  "0": { "value": "Valore", "x": 0.123, "y": 0.456 },
+  ...
+}`;
+
+        const parts: any[] = [
+            { text: prompt },
+            {
+                inlineData: {
+                    data: pdfBase64,
+                    mimeType: 'application/pdf'
+                }
+            }
+        ];
+
+        const result = await geminiModel.generateContent({
+            contents: [{ role: 'user', parts: parts }]
+        });
+
+        let text = '';
+        try {
+            const response = await result.response;
+            if (typeof response.text === 'function') {
+                text = response.text();
+            } else {
+                text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            }
+        } catch (e) {
+            console.error('[auditFieldPlacements] Error extracting response:', e);
+            return proposedMappings;
+        }
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            console.warn('[auditFieldPlacements] Audit failed to return JSON, using original mappings');
+            return proposedMappings;
+        }
+
+        const auditedMappings = JSON.parse(jsonMatch[0]);
+        console.log(`[auditFieldPlacements] Visual audit completed. Corrections: ${Object.keys(auditedMappings).length}`);
+        return auditedMappings;
+
+    } catch (error: any) {
+        console.error('[auditFieldPlacements] Error during audit:', error.message);
+        return proposedMappings;
     }
 }
 
