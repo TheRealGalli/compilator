@@ -146,7 +146,25 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
             }
         }
 
+
+
+
         console.log(`[extractFormFields] Found ${fields.length} form fields`);
+
+        // FALLBACK: If Form Parser found 0 fields, try OCR Processor
+        if (fields.length === 0) {
+            const ocrProcessorId = process.env.DOCUMENT_AI_PROCESSOR_ID_2;
+
+            if (ocrProcessorId) {
+                console.log('[extractFormFields] ⚠️ Form Parser found 0 fields - trying OCR fallback...');
+                const ocrFields = await extractFieldsFromOCR(pdfBuffer, projectId, ocrProcessorId);
+                console.log(`[extractFormFields] ✅ OCR Processor found ${ocrFields.length} fields`);
+                return ocrFields;
+            } else {
+                console.warn('[extractFormFields] DOCUMENT_AI_PROCESSOR_ID_2 not set - no OCR fallback available');
+            }
+        }
+
         return fields;
 
     } catch (error) {
@@ -154,6 +172,100 @@ export async function extractFormFields(pdfBuffer: Buffer, projectId: string): P
         throw new Error(`Failed to extract form fields: ${error}`);
     }
 }
+
+/**
+ * Fallback: Extract form fields using OCR Processor
+ * Uses pattern matching on OCR text to identify form fields
+ */
+async function extractFieldsFromOCR(pdfBuffer: Buffer, projectId: string, ocrProcessorId: string): Promise<FormField[]> {
+    try {
+        const location = 'eu';
+        const apiEndpoint = `${location}-documentai.googleapis.com`;
+        const client = new DocumentProcessorServiceClient({ apiEndpoint });
+
+        const processorName = `projects/${projectId}/locations/${location}/processors/${ocrProcessorId}`;
+        console.log(`[extractFieldsFromOCR] Using OCR processor: ${processorName}`);
+
+        const base64Content = pdfBuffer.toString('base64');
+
+        const request = {
+            name: processorName,
+            rawDocument: {
+                content: base64Content,
+                mimeType: 'application/pdf',
+            },
+        };
+
+        const [result] = await client.processDocument(request);
+        const { document } = result;
+
+        if (!document?.pages) {
+            console.warn('[extractFieldsFromOCR] No pages found');
+            return [];
+        }
+
+        const fields: FormField[] = [];
+
+        // Patterns for Italian form fields
+        const formPatterns = [
+            { pattern: /(.+?):\s*_{3,}/gi, type: 'text' },
+            { pattern: /(.+?)\s+_{5,}/gi, type: 'text' },
+            { pattern: /Il\/La\s+sottoscritto\/a/i, type: 'text', name: 'Il/La sottoscritto/a' },
+            { pattern: /nato\s+il/i, type: 'date', name: 'nato il' },
+            { pattern: /Data\s*[_\.]{2,}/i, type: 'date', name: 'Data' },
+            { pattern: /Firma.*titolare/i, type: 'signature', name: 'Firma del titolare' },
+            { pattern: /codice\s+fiscale/i, type: 'text', name: 'Codice Fiscale' },
+        ];
+
+        for (const page of document.pages) {
+            if (!page.paragraphs) continue;
+
+            for (const paragraph of page.paragraphs) {
+                const textAnchor = paragraph.layout?.textAnchor;
+                if (!textAnchor) continue;
+
+                const startIndex = textAnchor.textSegments?.[0]?.startIndex || 0;
+                const endIndex = textAnchor.textSegments?.[0]?.endIndex || 0;
+                const text = document.text?.substring(Number(startIndex), Number(endIndex)) || '';
+
+                const boundingPoly = paragraph.layout?.boundingPoly;
+                if (!boundingPoly?.normalizedVertices) continue;
+
+                for (const { pattern, type, name } of formPatterns) {
+                    const match = text.match(pattern);
+                    if (match) {
+                        const fieldName = name || (match[1]?.trim()) || text.substring(0, 50);
+
+                        const vertices = boundingPoly.normalizedVertices.filter(
+                            (v): v is { x: number; y: number } =>
+                                v !== null && v !== undefined &&
+                                typeof v.x === 'number' && typeof v.y === 'number'
+                        );
+
+                        if (vertices.length > 0) {
+                            fields.push({
+                                fieldName: fieldName.trim(),
+                                fieldType: type,
+                                boundingBox: { normalizedVertices: vertices },
+                                confidence: paragraph.layout?.confidence || 0.8,
+                                pageNumber: 0
+                            });
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        console.log(`[extractFieldsFromOCR] Found ${fields.length} fields via OCR pattern matching`);
+        return fields;
+
+    } catch (error: any) {
+        console.error('[extractFieldsFromOCR] Error:', error.message);
+        return [];
+    }
+}
+
 
 /**
  * Use Gemini to decide what content to fill in each field
