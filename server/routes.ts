@@ -1050,6 +1050,7 @@ ${masterSource ? `
 
 **ISTRUZIONI GENERALI:**
 - **COERENZA:** Mantieni un tono professionale e coerente con il documento.
+- **STRUTTURA:** Se un dato è ripetitivo (es. elenco di persone, beni, importi), DEVI usare le **Tabelle Markdown** (| Intestazione | ...). È obbligatorio per la leggibilità.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
 
 ${detailedAnalysis ? `

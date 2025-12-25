@@ -6,56 +6,15 @@ interface FormattedMessageProps {
 }
 
 export function FormattedMessage({ content, className = '' }: FormattedMessageProps) {
-    // Format line with highlighting (bold and bullets)
-    const formatLine = (text: string, lineIndex: number) => {
-        if (!text) return <div key={lineIndex} className="h-4" />; // Empty line
+    const lines = content.split('\n');
+    const elements: JSX.Element[] = [];
 
-        // Check for headers (Lines starting with #)
-        const headerMatch = text.match(/^(#{1,6})\s+(.*)/);
-        if (headerMatch) {
-            const [, hashes, title] = headerMatch;
-            const level = hashes.length;
-            const sizeClass = level === 1 ? "text-lg font-bold mt-4 mb-2" :
-                level === 2 ? "text-base font-bold mt-3 mb-2" :
-                    "text-sm font-bold mt-2 mb-1";
-
-            return (
-                <div key={lineIndex} className={`${sizeClass} text-foreground`}>
-                    {formatInline(title, lineIndex)}
-                </div>
-            );
-        }
-
-        // Check for bullet points to highlight them
-        // Matches: * text, - text, or indented versions
-        const bulletMatch = text.match(/^(\s*)([\*\-\•])(\s+)(.*)/);
-
-        if (bulletMatch) {
-            const [, indent, bullet, space, content] = bulletMatch;
-            return (
-                <div key={lineIndex} className="whitespace-pre-wrap py-0.5">
-                    {indent}
-                    <span className="text-blue-600 font-bold">{bullet}</span>
-                    {space}
-                    {formatInline(content, lineIndex)}
-                </div>
-            );
-        }
-
-        return (
-            <div key={lineIndex} className="whitespace-pre-wrap min-h-[1.2em]">
-                {formatInline(text, lineIndex)}
-            </div>
-        );
-    };
-
-    // Format inline text (bold **...**)
-    const formatInline = (text: string, lineIndex: number) => {
+    // Helper to format inline text (bold **...**)
+    const formatInline = (text: string, lineIndex: number | string) => {
         const parts: (string | JSX.Element)[] = [];
         let currentText = text;
         let keyCounter = 0;
 
-        // Handle bold: **text** -> <strong>text</strong>
         const boldRegex = /\*\*(.+?)\*\*/g;
         let lastIndex = 0;
         let match;
@@ -79,11 +38,107 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         return parts.length > 0 ? parts : text;
     };
 
+    let i = 0;
+    while (i < lines.length) {
+        const line = lines[i].trim();
+
+        // 1. Detect Tables (| col | col |)
+        if (line.startsWith('|') && line.endsWith('|')) {
+            const tableRows: string[][] = [];
+            let j = i;
+
+            while (j < lines.length && lines[j].trim().startsWith('|') && lines[j].trim().endsWith('|')) {
+                const rawLine = lines[j].trim();
+                // Skip separator lines (| --- | --- |) but keep track of them for styling if needed
+                if (!rawLine.match(/^[|\s\-:]+$/)) {
+                    const cells = rawLine.split('|').slice(1, -1).map(c => c.trim());
+                    tableRows.push(cells);
+                }
+                j++;
+            }
+
+            if (tableRows.length > 0) {
+                elements.push(
+                    <div key={`table-${i}`} className="my-4 overflow-x-auto rounded-lg border border-border shadow-sm">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-muted/50 border-b border-border">
+                                    {tableRows[0].map((cell, idx) => (
+                                        <th key={`th-${idx}`} className="p-3 text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                                            {formatInline(cell, `th-${i}-${idx}`)}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {tableRows.slice(1).map((row, rowIdx) => (
+                                    <tr key={`tr-${rowIdx}`} className="hover:bg-muted/30 transition-colors">
+                                        {row.map((cell, colIdx) => (
+                                            <td key={`td-${colIdx}`} className="p-3 text-sm">
+                                                {formatInline(cell, `td-${i}-${rowIdx}-${colIdx}`)}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                );
+            }
+            i = j; // Move to the end of the table
+            continue;
+        }
+
+        // 2. Detect Headers
+        const headerMatch = line.match(/^(#{1,6})\s+(.*)/);
+        if (headerMatch) {
+            const [, hashes, title] = headerMatch;
+            const level = hashes.length;
+            const sizeClass = level === 1 ? "text-xl font-bold mt-6 mb-3" :
+                level === 2 ? "text-lg font-bold mt-5 mb-2" :
+                    "text-base font-bold mt-4 mb-2";
+
+            elements.push(
+                <div key={`header-${i}`} className={`${sizeClass} text-foreground border-b border-border/40 pb-1`}>
+                    {formatInline(title, `header-${i}`)}
+                </div>
+            );
+            i++;
+            continue;
+        }
+
+        // 3. Detect Bullet Points
+        const bulletMatch = line.match(/^(\s*)([\*\-\•])(\s+)(.*)/);
+        if (bulletMatch) {
+            const [, indent, bullet, space, content] = bulletMatch;
+            elements.push(
+                <div key={`bullet-${i}`} className="flex items-start gap-2 py-1 ml-4">
+                    <span className="text-blue-500 font-bold mt-1.5">•</span>
+                    <div className="flex-1 whitespace-pre-wrap">
+                        {formatInline(content, `bullet-${i}`)}
+                    </div>
+                </div>
+            );
+            i++;
+            continue;
+        }
+
+        // 4. Regular Lines
+        if (line === '') {
+            elements.push(<div key={`empty-${i}`} className="h-2" />);
+        } else {
+            elements.push(
+                <div key={`p-${i}`} className="py-1 whitespace-pre-wrap leading-relaxed text-foreground/90">
+                    {formatInline(lines[i], `p-${i}`)}
+                </div>
+            );
+        }
+        i++;
+    }
+
     return (
-        <div
-            className={`formatted-message text-sm leading-relaxed ${className} break-words overflow-wrap-anywhere`}
-        >
-            {content.split('\n').map((line, index) => formatLine(line, index))}
+        <div className={`formatted-message text-sm ${className} space-y-1`}>
+            {elements}
         </div>
     );
 }

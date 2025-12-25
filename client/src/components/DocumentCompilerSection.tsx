@@ -446,34 +446,40 @@ export function DocumentCompilerSection({
         // Table Detection (| col | col |)
         if (line.startsWith('|') && line.endsWith('|')) {
           // Check if it's a separator line (| --- | --- |)
-          if (line.match(/^[|\s-]+$/)) continue;
+          if (line.match(/^[|\s\-:]+$/)) continue;
 
-          const cells = line.split('|').filter(c => c.trim() !== '' || line.indexOf('|' + c + '|') !== -1).map(c => c.trim());
-          // Safety filter for empty splits at edges
-          const actualCells = cells.filter((_, idx) => idx > 0 || line.startsWith(cells[0]));
-          // Re-parsing logic for better accuracy
-          const cleanCells = line.split('|').slice(1, -1).map(c => c.trim());
+          const cells = line.split('|').slice(1, -1).map(c => c.trim());
 
-          currentTableRows.push(new TableRow({
-            children: cleanCells.map(cellText => new TableCell({
-              children: [new Paragraph({
-                children: parseInline(cleanText(cellText), { size: 20 }),
-              })],
-              width: { size: (100 / cleanCells.length) * 50, type: WidthType.PERCENTAGE },
-              shading: i === 0 || lines[i - 1]?.trim() === '' ? { fill: "F7F7F7" } : undefined
-            }))
-          }));
+          if (cells.length > 0) {
+            currentTableRows.push(new TableRow({
+              children: cells.map((cellText, colIdx) => new TableCell({
+                children: [new Paragraph({
+                  children: parseInline(cleanText(cellText), { size: 20 }),
+                  alignment: AlignmentType.LEFT
+                })],
+                // DOCX uses a scale of 5000 for 100% width in PERCENTAGE mode
+                width: { size: (100 / cells.length) * 50, type: WidthType.PERCENTAGE },
+                shading: currentTableRows.length === 0 ? { fill: "F7F7F7" } : undefined,
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+                  bottom: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+                  left: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+                  right: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+                }
+              }))
+            }));
+          }
           continue;
         } else if (currentTableRows.length > 0) {
           // Close table
           docChildren.push(new Table({
             rows: currentTableRows,
-            width: { size: 100, type: WidthType.PERCENTAGE },
+            width: { size: 100 * 50, type: WidthType.PERCENTAGE }, // 5000 = 100%
             borders: {
-              top: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-              bottom: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-              left: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-              right: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+              top: { style: BorderStyle.SINGLE, size: 2, color: "37352F" },
+              bottom: { style: BorderStyle.SINGLE, size: 2, color: "37352F" },
+              left: { style: BorderStyle.SINGLE, size: 2, color: "37352F" },
+              right: { style: BorderStyle.SINGLE, size: 2, color: "37352F" },
               insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
               insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
             }
