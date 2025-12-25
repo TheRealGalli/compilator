@@ -1012,7 +1012,7 @@ ${extractedFields && extractedFields.length > 0 ? `
 ${manualAnnotations && manualAnnotations.length > 0 ? `
 4. **ANNOTAZIONI MANUALI STUDIO (Priorità Massima):**
    L'utente ha aggiunto manualmente i seguenti testi sull'anteprima del documento:
-   ${manualAnnotations.map((a: any) => `- "${a.text}"`).join('\n')}
+   ${manualAnnotations.map((a: any) => `- Pagina ${a.pageNumber}: "${a.text}"`).join('\n')}
    QUESTI DATI HANNO LA PRIORITÀ su qualsiasi altra fonte. Usali per sovrascrivere o completare i campi corrispondenti nel template.
 ` : ''}
 

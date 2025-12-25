@@ -212,6 +212,7 @@ interface Document {
 
 interface Annotation {
   id: string;
+  pageNumber: number;
   x: number;
   y: number;
   text: string;
@@ -665,109 +666,14 @@ export function DocumentCompilerSection({
                 const isText = pinnedSource.type.includes('text/plain') || pinnedSource.name.endsWith('.txt');
                 const isCSV = pinnedSource.type.includes('text/csv') || pinnedSource.name.endsWith('.csv');
 
-                if (isPDF) {
+                if (isPDF || isText || isCSV) {
                   return (
                     <PDFViewer
                       base64={pinnedSource.base64 || ''}
                       fileName={pinnedSource.name}
+                      fileType={isPDF ? 'pdf' : 'text'}
                       onAnnotationsChange={setManualAnnotations}
                     />
-                  );
-                }
-
-                if (isText || isCSV) {
-                  const safeDecodeBase64 = (b64: string) => {
-                    try {
-                      const binString = atob(b64);
-                      const bytes = new Uint8Array(binString.length);
-                      for (let i = 0; i < binString.length; i++) {
-                        bytes[i] = binString.charCodeAt(i);
-                      }
-                      return new TextDecoder().decode(bytes);
-                    } catch (e) {
-                      return "Errore decodifica testo.";
-                    }
-                  };
-
-                  const handleDownloadText = () => {
-                    const content = safeDecodeBase64(pinnedSource.base64 || '');
-                    const blob = new Blob([content], { type: pinnedSource.type });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = pinnedSource.name;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                  };
-
-                  const handlePrintText = () => {
-                    const content = safeDecodeBase64(pinnedSource.base64 || '');
-                    const printWindow = window.open('', '_blank');
-                    if (printWindow) {
-                      printWindow.document.write(`<pre style="white-space: pre-wrap; font-family: monospace; padding: 20px;">${content}</pre>`);
-                      printWindow.document.close();
-                      printWindow.print();
-                    }
-                  };
-
-                  return (
-                    <Card className="h-full flex flex-col overflow-hidden bg-card border-border shadow-sm">
-                      <div className="h-10 bg-[#1e1e1e] flex items-center justify-between px-4 z-20">
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-medium text-white/90">Studio Preview</span>
-                          <div className="h-4 w-px bg-white/10 mx-1" />
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-white/40 hover:text-white hover:bg-white/10 gap-1 h-7 px-2 font-normal">
-                                <Type className="w-3.5 h-3.5" />
-                                <span className="text-[10px]">IMPOSTAZIONI</span>
-                                <ChevronDown className="w-3 h-3 opacity-50" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-56 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800">
-                              <DropdownMenuLabel>Personalizza Anteprima</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <div className="p-4 space-y-4">
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-foreground">Dimensione Caratteri</span>
-                                    <span className="text-xs text-muted-foreground">{studioFontSize}px</span>
-                                  </div>
-                                  <Slider
-                                    value={[studioFontSize]}
-                                    onValueChange={(v) => setStudioFontSize(v[0])}
-                                    min={8}
-                                    max={32}
-                                    step={1}
-                                  />
-                                </div>
-                              </div>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                          <p className="text-[11px] text-white/40 truncate max-w-[300px]">{pinnedSource.name}</p>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={handlePrintText} title="Stampa" className="text-white/40 hover:text-white hover:bg-white/10 h-7 w-7">
-                              <Printer className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={handleDownloadText} title="Scarica" className="text-white/40 hover:text-white hover:bg-white/10 h-7 w-7">
-                              <Download className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                      <div
-                        className="flex-1 overflow-auto p-12 font-mono whitespace-pre-wrap selection:bg-indigo-500/30 selection:text-current text-foreground/90 bg-background/50 transition-all duration-200"
-                        style={{ fontSize: `${studioFontSize}px` }}
-                      >
-                        {safeDecodeBase64(pinnedSource.base64 || '')}
-                      </div>
-                    </Card>
                   );
                 }
 
