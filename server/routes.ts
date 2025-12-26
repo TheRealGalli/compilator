@@ -819,7 +819,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Initialize Vertex AI
       const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
-      const location = 'us-central1';
+      const location = 'europe-west1';
       const vertexAI = new VertexAI({ project: projectId, location });
       const model = vertexAI.getGenerativeModel({
         model: 'gemini-2.0-flash-exp',
@@ -831,10 +831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ]
       });
 
-      // Convert base64 to proper format for Gemini
-      const buffer = Buffer.from(source.base64, 'base64');
-
-      // Prepare multimodal content
+      // Prepare multimodal content once
       const filePart = await fileToPart(source.base64, source.type);
 
       const systemPrompt = `Sei un assistente di analisi documentale specializzato. Il tuo compito è fornire una preview intelligente e strutturata del documento.
@@ -853,6 +850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 - Massimo 500 parole
 - Linguaggio professionale ma accessibile`;
 
+      // Simplified prompt construction
       const userPrompt = `Analizza questo documento e fornisci una preview intelligente seguendo le istruzioni del sistema.`;
 
       const request = {
@@ -860,7 +858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: 'user',
           parts: [
             { text: systemPrompt },
-            await fileToPart(source.base64, source.type),
+            filePart,
             { text: userPrompt }
           ]
         }]
@@ -1103,9 +1101,11 @@ ISTRUZIONI OUTPUT:
 - Non dire "Ecco il documento", restituisci SOLO il testo del documento.
 `;
 
-      console.log('[DEBUG Compile] Pre-processing multimodal parts...');
-      const preProcessedSourceParts = multimodalFiles?.length > 0 ? await aiService.processMultimodalParts(multimodalFiles) : [];
-      const preProcessedMasterParts = masterSource ? await aiService.processMultimodalParts([masterSource]) : [];
+      console.log('[DEBUG Compile] Pre-processing multimodal parts in parallel...');
+      const [preProcessedSourceParts, preProcessedMasterParts] = await Promise.all([
+        multimodalFiles?.length > 0 ? aiService.processMultimodalParts(multimodalFiles) : Promise.resolve([]),
+        masterSource ? aiService.processMultimodalParts([masterSource]) : Promise.resolve([])
+      ]);
 
       console.log('[DEBUG Compile] Calling AiService.compileDocument (Unified Pass: Content + Layout)...');
       const { content: finalContent } = await aiService.compileDocument({
@@ -1469,25 +1469,16 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       const multimodalFiles: any[] = [];
 
       if (sources && Array.isArray(sources)) {
-        for (const source of sources) {
+        const sourceResults = await Promise.all(sources.map(async (source) => {
           try {
-            let buffer: Buffer;
             let base64: string;
-
             if (source.base64) {
               base64 = source.base64;
-              buffer = Buffer.from(base64, 'base64');
-            } else if (source.url) {
-              // Parsing GCS URL logic omitted for brevity as mainly local files used now or simpler download
-              // Assuming simplified context where we might not hit this path often, but keeping basic logic safe
-              // For now, if no base64, skip or implement downloadFile if needed
-              // Re-implementing basic check:
-              continue;
             } else {
-              continue;
+              return null;
             }
 
-            if (source.type.startsWith('video/')) continue;
+            if (source.type.startsWith('video/')) return null;
 
             const isMultimodal =
               source.type.startsWith('image/') ||
@@ -1497,22 +1488,39 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
               source.type === 'application/msword'; // Old DOC
 
             if (isMultimodal) {
-              // For multimodal files, we'll process them with fileToPart later
-              multimodalFiles.push({
-                name: source.name,
-                mimeType: source.type,
-                base64: base64,
-                isMemory: source.isMemory
-              });
-              filesContext += `- ${source.name} (${source.type})\n`;
+              return {
+                multimodal: {
+                  name: source.name,
+                  mimeType: source.type,
+                  base64: base64,
+                  isMemory: source.isMemory
+                }
+              };
             } else {
-              const textContent = await extractText(buffer!, source.type);
+              const buffer = Buffer.from(base64, 'base64');
+              const textContent = await extractText(buffer, source.type);
               if (textContent) {
-                filesContext += `\n--- CONTENUTO FILE: ${source.name} ---\n${textContent}\n--- FINE CONTENUTO FILE ---\n`;
+                return {
+                  text: {
+                    name: source.name,
+                    content: textContent
+                  }
+                };
               }
             }
           } catch (error) {
             console.error(`Error processing file ${source.name}:`, error);
+          }
+          return null;
+        }));
+
+        for (const result of sourceResults) {
+          if (!result) continue;
+          if (result.multimodal) {
+            multimodalFiles.push(result.multimodal);
+            filesContext += `- ${result.multimodal.name} (${result.multimodal.mimeType})\n`;
+          } else if (result.text) {
+            filesContext += `\n--- CONTENUTO FILE: ${result.text.name} ---\n${result.text.content}\n--- FINE CONTENUTO FILE ---\n`;
           }
         }
       }
@@ -1591,11 +1599,8 @@ ${filesContext}
       if (multimodalFiles.length > 0 && coreMessages.length > 0) {
         const lastMsg = coreMessages[coreMessages.length - 1];
         if (lastMsg.role === 'user') {
-          for (const f of multimodalFiles) {
-            const mimeType = f.mimeType;
-            const filePart = await fileToPart(f.base64, mimeType);
-            (lastMsg.parts as any[]).push(filePart);
-          }
+          const fileParts = await Promise.all(multimodalFiles.map(f => fileToPart(f.base64, f.mimeType)));
+          (lastMsg.parts as any[]).push(...fileParts);
         }
       }
 

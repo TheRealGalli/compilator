@@ -19,12 +19,11 @@ export class AiService {
      * Public helper to process multimodal files once and reuse across passes.
      */
     async processMultimodalParts(files: any[]): Promise<any[]> {
-        const parts: any[] = [];
-        for (const file of files) {
+        return Promise.all(files.map(async (file) => {
             const mimeType = file.mimeType || file.type || '';
             const base64Data = file.data || file.base64 || '';
 
-            if (!mimeType || !base64Data) continue;
+            if (!mimeType || !base64Data) return null;
 
             const isDOCX = mimeType.includes('wordprocessingml') || mimeType.includes('msword');
 
@@ -33,20 +32,20 @@ export class AiService {
                     console.log(`[AiService] Extracting text from DOCX file for Gemini pass...`);
                     const buffer = Buffer.from(base64Data, 'base64');
                     const { value: text } = await mammoth.extractRawText({ buffer });
-                    parts.push({ text: `[CONTENUTO DOCUMENTO WORD]:\n${text}` });
+                    return { text: `[CONTENUTO DOCUMENTO WORD]:\n${text}` };
                 } catch (err) {
                     console.error('[AiService] Error extracting DOCX text:', err);
+                    return null;
                 }
             } else {
-                parts.push({
+                return {
                     inlineData: {
                         mimeType: mimeType,
                         data: base64Data
                     }
-                });
+                };
             }
-        }
-        return parts;
+        })).then(parts => parts.filter(p => p !== null));
     }
 
     /**
@@ -69,13 +68,13 @@ export class AiService {
             });
 
             // Use pre-processed parts if provided to save latency
-            const multimodalParts = params.preProcessedParts || await this.processMultimodalParts(params.multimodalFiles);
-            const messageParts: any[] = [{ text: params.userPrompt }, ...multimodalParts];
+            // Parallel pre-processing
+            const [multimodalParts, masterParts] = await Promise.all([
+                params.preProcessedParts ? Promise.resolve(params.preProcessedParts) : this.processMultimodalParts(params.multimodalFiles),
+                (params.masterSource && params.masterSource.base64) ? this.processMultimodalParts([params.masterSource]) : Promise.resolve([])
+            ]);
 
-            if (params.masterSource && params.masterSource.base64) {
-                const masterParts = await this.processMultimodalParts([params.masterSource]);
-                messageParts.push(...masterParts);
-            }
+            const messageParts: any[] = [{ text: params.userPrompt }, ...multimodalParts, ...masterParts];
 
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
