@@ -445,14 +445,14 @@ export function DocumentCompilerSection({
         if (currentTableRows.length > 0) {
           docChildren.push(new Table({
             rows: currentTableRows,
-            width: { size: 100 * 50, type: WidthType.PERCENTAGE }, // 5000 = 100%
+            width: { size: 9038, type: WidthType.DXA }, // ~16cm (standard A4 content width)
             borders: {
-              top: { style: BorderStyle.SINGLE, size: 4, color: "37352F" },
-              bottom: { style: BorderStyle.SINGLE, size: 4, color: "37352F" },
-              left: { style: BorderStyle.SINGLE, size: 4, color: "37352F" },
-              right: { style: BorderStyle.SINGLE, size: 4, color: "37352F" },
-              insideHorizontal: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
-              insideVertical: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+              top: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+              bottom: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+              left: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+              right: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
+              insideVertical: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
             }
           }));
           docChildren.push(new Paragraph({ text: "" }));
@@ -465,8 +465,6 @@ export function DocumentCompilerSection({
 
         // Table Detection (| col | col |)
         if (line.startsWith('|') && line.endsWith('|')) {
-          // Check if it's a separator line (| --- | --- |) 
-          // Improved regex to be more specific to markdown separators
           if (line.match(/^\|[\s\-:|]+\|$/) && line.includes('-')) {
             continue;
           }
@@ -479,16 +477,15 @@ export function DocumentCompilerSection({
                 children: [new Paragraph({
                   children: parseInline(cleanText(cellText), { size: 20 }),
                   alignment: AlignmentType.LEFT,
-                  spacing: { before: 80, after: 80 } // Add some vertical padding inside cells
+                  spacing: { before: 80, after: 80 }
                 })],
-                // DOCX uses a scale of 5000 for 100% width in PERCENTAGE mode
-                width: { size: (100 / cells.length) * 50, type: WidthType.PERCENTAGE },
-                shading: currentTableRows.length === 0 ? { fill: "F7F7F7" } : undefined,
+                width: { size: 9038 / cells.length, type: WidthType.DXA },
+                shading: currentTableRows.length === 0 ? { fill: "F2F2F2" } : undefined,
                 borders: {
-                  top: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
-                  bottom: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
-                  left: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
-                  right: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+                  top: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
+                  bottom: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
+                  left: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
+                  right: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
                 }
               }))
             }));
