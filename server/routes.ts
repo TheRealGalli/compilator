@@ -1484,7 +1484,9 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
             const isMultimodal =
               source.type.startsWith('image/') ||
               source.type === 'application/pdf' ||
-              source.type.startsWith('audio/') ||
+              source.type.startsWith('audio/');
+
+            const isDOCX =
               source.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX
               source.type === 'application/msword'; // Old DOC
 
@@ -1557,7 +1559,8 @@ ${filesContext}
 2. **FORMATTAZIONE AVANZATA (Tabelle):** Se devi presentare dati comparativi, elenchi di importi, nomi o dati strutturati, **USA SEMPRE le Tabelle Markdown**.
    - Sintassi: | Colonna 1 | Colonna 2 |
    - Ogni riga deve iniziare e finire con "|".
-   - **IMPORTANTE:** NON inserire i nomi dei file o citazioni delle fonti (es. Documento.pdf) dentro le celle delle tabelle. Le citazioni vanno messe nel testo descrittivo o alla fine dei paragrafi.
+   - **DIVIETO ASSOLUTO:** NON creare mai colonne denominate "FONTE", "SOURCE", "ORIGINE" o simili all'interno delle tabelle.
+   - **REGOLE CITAZIONI:** I nomi dei documenti (es. Documento.pdf) NON devono MAI apparire dentro le celle. Le citazioni vanno messe esclusivamente alla fine del paragrafo descrittivo o in una nota esterna alla tabella.
 3. Fornisci risposte concise, precise e ben strutturate usando intestazioni (#) e grassetti (**testo**).
 4. Cita sempre la fonte se possibile (escluse info memoria).
 5. Se la risposta non è nei documenti, dichiaralo.
@@ -1581,7 +1584,7 @@ ${filesContext}
       }
 
       const model = vertex_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-1.5-flash",
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemInstruction }]
