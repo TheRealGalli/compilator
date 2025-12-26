@@ -1584,7 +1584,7 @@ ${filesContext}
       }
 
       const model = vertex_ai.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemInstruction }]
