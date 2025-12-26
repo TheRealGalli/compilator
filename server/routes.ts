@@ -1048,14 +1048,10 @@ ${masterSource ? `
    - **STILE:** Usa questo documento come riferimento per lo STILE e il LAYOUT del documento finale.
 ` : ''}
 
-**ISTRUZIONI GENERALI:**
-- **COERENZA:** Mantieni un tono professionale e coerente con il documento.
-- **FORMATTAZIONE AGENTICA:** 
-  - Se un dato è ripetitivo o strutturato (es. elenco di persone, beni, importi, dati catastali), usa **elenchi puntati** o **elenchi numerati**.
-  - **NON** usare tabelle markdown in questa fase di compilazione per garantire la massima compatibilità con il formato DOCX.
-  - Usa Markdown standard per la gerarchia (# Titolo, ## Sottotitolo).
-  - **GRASSETTO OBBLIGATORIO:** Inserisci SEMPRE i dati estratti e i valori compilati tra doppi asterischi (es: **Mario Rossi**) per evidenziarli nel testo.
-  - Usa il **grassetto** anche per termini chiave, nomi propri, date o importi importanti.
+- **GESTIONE CHECKBOX:**
+  - Se il template o il MASTER contengono checkbox (es. "[ ]", "☐", o punti elenco che fungono da scelta), devi **spuntarli precisamente** in base ai dati trovati nelle fonti.
+  - Usa la notazione standard: **[x]** per opzione selezionata e **[ ]** per opzione non selezionata.
+  - Esempio: Se trovi "Mezzi propri" selezionato nel Master, scrivi **[x] Mezzi propri** nel documento finale.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
 
 ${detailedAnalysis ? `

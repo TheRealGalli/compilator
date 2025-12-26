@@ -413,27 +413,63 @@ export function DocumentCompilerSection({
         return text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDDFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
       };
 
-      // Helper to parse inline formatting (like **bold**)
+      // Helper to parse inline formatting (like **bold** and [x]/[ ])
       const parseInline = (text: string, options: { size?: number, color?: string, bold?: boolean } = {}) => {
+        // First handle bold splitting
         const parts = text.split(/(\*\*.*?\*\*)/g);
-        return parts.map(part => {
+        const runs: any[] = [];
+
+        parts.forEach(part => {
           if (part.startsWith('**') && part.endsWith('**')) {
-            return new TextRun({
-              text: part.slice(2, -2),
-              bold: true,
+            const boldText = part.slice(2, -2);
+            runs.push(...renderCheckboxesInDocx(boldText, { ...options, bold: true }));
+          } else {
+            runs.push(...renderCheckboxesInDocx(part, options));
+          }
+        });
+        return runs;
+      };
+
+      // Helper to render checkbox symbols in DOCX
+      const renderCheckboxesInDocx = (text: string, options: { size?: number, color?: string, bold?: boolean } = {}) => {
+        const checkboxRegex = /\[([ xX])\]/g;
+        const runs: any[] = [];
+        let lastIdx = 0;
+        let match;
+
+        while ((match = checkboxRegex.exec(text)) !== null) {
+          if (match.index > lastIdx) {
+            runs.push(new TextRun({
+              text: text.substring(lastIdx, match.index),
+              bold: options.bold || false,
               font: "Arial",
               size: options.size || 24,
               color: options.color || "37352F"
-            });
+            }));
           }
-          return new TextRun({
-            text: part,
+
+          const isChecked = match[1].toLowerCase() === 'x';
+          runs.push(new TextRun({
+            text: isChecked ? " ☒ " : " ☐ ",
+            bold: true, // Make checkboxes bold for visibility
+            font: "MS Gothic", // Use MS Gothic for reliable symbol rendering
+            size: options.size || 24,
+            color: isChecked ? "1D4ED8" : "37352F" // Blue for checked, dark for unchecked
+          }));
+          lastIdx = match.index + match[0].length;
+        }
+
+        if (lastIdx < text.length) {
+          runs.push(new TextRun({
+            text: text.substring(lastIdx),
             bold: options.bold || false,
             font: "Arial",
             size: options.size || 24,
             color: options.color || "37352F"
-          });
-        });
+          }));
+        }
+
+        return runs;
       };
 
       const lines = compiledContent.split('\n');

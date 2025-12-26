@@ -12,30 +12,65 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
     // Helper to format inline text (bold **...**)
     const formatInline = (text: string, lineIndex: number | string) => {
         const parts: (string | JSX.Element)[] = [];
-        let currentText = text;
+        const currentText = text;
         let keyCounter = 0;
 
+        // We'll replace bold first, then handle checkboxes within the remaining parts
         const boldRegex = /\*\*(.+?)\*\*/g;
         let lastIndex = 0;
         let match;
 
         while ((match = boldRegex.exec(currentText)) !== null) {
             if (match.index > lastIndex) {
-                parts.push(currentText.substring(lastIndex, match.index));
+                const textPart = currentText.substring(lastIndex, match.index);
+                parts.push(...renderCheckboxes(textPart, `text-${lineIndex}-${keyCounter++}`));
             }
             parts.push(
                 <strong key={`bold-${lineIndex}-${keyCounter++}`} className="font-semibold text-foreground">
-                    {match[1]}
+                    {formatInline(match[1], `bold-inner-${lineIndex}-${keyCounter}`)}
                 </strong>
             );
             lastIndex = match.index + match[0].length;
         }
 
         if (lastIndex < currentText.length) {
-            parts.push(currentText.substring(lastIndex));
+            const textPart = currentText.substring(lastIndex);
+            parts.push(...renderCheckboxes(textPart, `text-end-${lineIndex}-${keyCounter++}`));
         }
 
-        return parts.length > 0 ? parts : text;
+        return parts.length > 0 ? parts : currentText;
+    };
+
+    // Helper to render checkboxes [x] and [ ] as UI elements
+    const renderCheckboxes = (text: string, baseKey: string) => {
+        const checkboxParts: (string | JSX.Element)[] = [];
+        const checkboxRegex = /\[([ xX])\]/g;
+        let lastIdx = 0;
+        let cMatch;
+        let cCounter = 0;
+
+        while ((cMatch = checkboxRegex.exec(text)) !== null) {
+            if (cMatch.index > lastIdx) {
+                checkboxParts.push(text.substring(lastIdx, cMatch.index));
+            }
+            const isChecked = cMatch[1].toLowerCase() === 'x';
+            checkboxParts.push(
+                <span key={`${baseKey}-cb-${cCounter++}`} className="inline-flex items-center mx-1">
+                    {isChecked ? (
+                        <span className="w-4 h-4 rounded border border-blue-500 bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold">✓</span>
+                    ) : (
+                        <span className="w-4 h-4 rounded border border-muted-foreground/40 bg-muted/20 flex items-center justify-center" />
+                    )}
+                </span>
+            );
+            lastIdx = cMatch.index + cMatch[0].length;
+        }
+
+        if (lastIdx < text.length) {
+            checkboxParts.push(text.substring(lastIdx));
+        }
+
+        return checkboxParts;
     };
 
     let i = 0;
