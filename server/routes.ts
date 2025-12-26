@@ -1024,10 +1024,11 @@ ${hasMemory ? `
    - Usa questo file per recuperare l'IDENTITÀ di chi scrive (Nome, Cognome, Indirizzo, Ruolo).
    - NON usare questi dati se il template richiede i dati di una controparte (es. destinatario).
 ` : ''}
-2. **NO ALLUCINAZIONI (Tassativo):**
-   - Se un dato (es. Data di nascita, Codice Fiscale) non è presente né nella Memoria né nei Documenti: SCRIVI "[DATO MANCANTE]".
-   - **VIETATO** inventare dati anagrafici (es. "Mario Rossi", date a caso).
-   - È meglio un campo vuoto che un dato falso.
+2. **NO ALLUCINAZIONI & REGOLE DI ESTRAZIONE (Tassativo):**
+   - Prima di dichiarare un dato come mancante, controlla SCRUPOLOSAMENTE: **Memoria di Sistema**, tutti i **Documenti allegati**, la **Fonte Master** e il testo del **Template** stesso (che potrebbe contenere dati precompilati).
+   - Se un dato è presente in QUALSIASI di queste fonti: **USALO**.
+   - Solo se il dato è assolutamente assente ovunque: SCRIVI "[DATO MANCANTE]".
+   - **VIETATO** inventare dati anagrafici (es. "Mario Rossi", date a caso). È meglio un campo vuoto che un dato falso, ma è UN ERRORE dichiarare mancate informazioni presenti nelle fonti.
 
 ${extractedFields && extractedFields.length > 0 ? `
 3. **STRUTTURA DOCUMENTO TARGET (Intelligence Gemini Vision):**
@@ -1042,10 +1043,10 @@ ${manualAnnotations && manualAnnotations.length > 0 ? `
    QUESTI DATI HANNO LA PRIORITÀ su qualsiasi altra fonte. Usali per sovrascrivere o completare i campi corrispondenti nel template.
 ` : ''}
 ${masterSource ? `
-4. **MASTER SOURCE (Spunta Blu) - Riferimento Formattazione:**
+4. **MASTER SOURCE (Spunta Blu) - Fonte Primaria di Dati e Stile:**
    Il documento "${masterSource.name}" è contrassegnato come MASTER.
-   - Usa questo documento come riferimento principale per lo STILE, il LAYOUT e la STRUTTURA del documento finale.
-   - Se il template è mancante o generico, imita la formattazione del Master Source.
+   - **DATI:** Estrai con priorità massima ogni informazione utile (nomi, date, importi) da questo documento. Se il Master dice "Dott. Mario Zanchi", NON scrivere "[DATO MANCANTE]".
+   - **STILE:** Usa questo documento come riferimento per lo STILE e il LAYOUT del documento finale.
 ` : ''}
 
 **ISTRUZIONI GENERALI:**
