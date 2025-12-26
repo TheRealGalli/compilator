@@ -1050,9 +1050,9 @@ ${masterSource ? `
 
 **ISTRUZIONI GENERALI:**
 - **COERENZA:** Mantieni un tono professionale e coerente con il documento.
-- **FORMATTAZIONE AGENTICA (Singolo Passaggio):** 
-  - Se un dato è ripetitivo o strutturato (es. elenco di persone, beni, importi, dati catastali), **DEVI** usare le **Tabelle Markdown** (| Intestazione | ...).
-  - **REGOLE TABELLE:** NON inserire nomi di file o citazioni delle fonti (es. [documento.pdf]) dentro le celle delle tabelle, a meno che non sia strettamente necessario per il dato stesso. Le fonti devono stare nel testo normale o alla fine dei paragrafi.
+- **FORMATTAZIONE AGENTICA:** 
+  - Se un dato è ripetitivo o strutturato (es. elenco di persone, beni, importi, dati catastali), usa **elenchi puntati** o **elenchi numerati**.
+  - **NON** usare tabelle markdown in questa fase di compilazione per garantire la massima compatibilità con il formato DOCX.
   - Usa Markdown standard per la gerarchia (# Titolo, ## Sottotitolo).
   - Usa il **grassetto** per termini chiave, nomi propri, date o importi importanti.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.

@@ -104,25 +104,23 @@ export class AiService {
 Il tuo compito è prendere una BOZZA di testo e rifinirla esteticamente SENZA ALTERARE I DATI.
 
 **REGOLE D'ORO (LAYOUT AGENT):**
-1. **TABELLE MARKDOWN (OBBLIGATORIE):** 
-   - Se i dati sono strutturati (es: liste di persone, elenchi di beni, coordinate catastali, importi), DEVI usare le Tabelle Markdown.
-   - Sintassi: | Intestazione 1 | Intestazione 2 | ...
-   - Includi SEMPRE la riga di separazione | :--- | :--- | ...
-   - Ogni riga deve iniziare e finire con "|".
+1. **STRUTTURA PROFESSIONALE:** 
+   - Se i dati sono strutturati (es: liste di persone, elenchi di beni, coordinate catastali, importi), usa **elenchi puntati** o **elenchi numerati**.
+   - **NON** usare tabelle markdown per garantire la compatibilità con l'esportazione DOCX.
 
 2. **GERARCHIA VISIVA:** 
    - Usa Markdown standard (# Titolo, ## Sottotitolo).
    - Usa il **grassetto** per termini chiave, nomi propri, date o importi importanti.
 
 3. **MASTER ALIGNMENT:** 
-   - Se fornito un "Master Source", imita la sua struttura delle sezioni e l'uso di tabelle.
+   - Se fornito un "Master Source", imita la sua struttura delle sezioni e il suo stile.
 
 **RESTRIZIONI:**
 - Restituisci SOLO il testo rifinito.
 - Non aggiungere commenti personali.
 - Mantieni rigorosamente i dati della bozza originale.`;
 
-            const userPrompt = `Rifinisci la formattazione di questa bozza seguendo le regole di layout. Crea tabelle markdown dove vedi dati strutturati.
+            const userPrompt = `Rifinisci la formattazione di questa bozza seguendo le regole di layout. Usa elenchi puliti e strutturati dove vedi dati ripetitivi.
 ${params.formalTone ? "Usa un tono professionale e formale." : ""}
 
 BOZZA DA RIFINIRE:

@@ -405,7 +405,7 @@ export function DocumentCompilerSection({
     if (!compiledContent) return;
 
     try {
-      const { Document: DocxDocument, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, Footer, SimpleField, AlignmentType } = await import("docx");
+      const { Document: DocxDocument, Packer, Paragraph, TextRun, Footer, SimpleField, AlignmentType } = await import("docx");
       const { saveAs } = await import("file-saver");
 
       // Helper to strip emojis (Standard ranges without u flag for compatibility)
@@ -438,63 +438,9 @@ export function DocumentCompilerSection({
 
       const lines = compiledContent.split('\n');
       const docChildren: any[] = [];
-      let currentTableRows: any[] = [];
-
-      // Helper to close and push table
-      const pushCurrentTable = () => {
-        if (currentTableRows.length > 0) {
-          docChildren.push(new Table({
-            rows: currentTableRows,
-            width: { size: 9038, type: WidthType.DXA }, // ~16cm (standard A4 content width)
-            borders: {
-              top: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-              bottom: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-              left: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-              right: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-              insideHorizontal: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
-              insideVertical: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
-            }
-          }));
-          docChildren.push(new Paragraph({ text: "" }));
-          currentTableRows = [];
-        }
-      };
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-
-        // Table Detection (| col | col |)
-        if (line.startsWith('|') && line.endsWith('|')) {
-          if (line.match(/^\|[\s\-:|]+\|$/) && line.includes('-')) {
-            continue;
-          }
-
-          const cells = line.split('|').slice(1, -1).map(c => c.trim());
-
-          if (cells.length > 0) {
-            currentTableRows.push(new TableRow({
-              children: cells.map((cellText, colIdx) => new TableCell({
-                children: [new Paragraph({
-                  children: parseInline(cleanText(cellText), { size: 20 }),
-                  alignment: AlignmentType.LEFT,
-                  spacing: { before: 80, after: 80 }
-                })],
-                width: { size: 9038 / cells.length, type: WidthType.DXA },
-                shading: currentTableRows.length === 0 ? { fill: "F2F2F2" } : undefined,
-                borders: {
-                  top: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
-                  bottom: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
-                  left: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
-                  right: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" },
-                }
-              }))
-            }));
-          }
-          continue;
-        } else {
-          // If not a table line, push existing table if any
-          pushCurrentTable();
-        }
 
         const rawText = cleanText(line);
         if (!rawText) {
@@ -539,9 +485,6 @@ export function DocumentCompilerSection({
           }));
         }
       }
-
-      // Final push for any table at the end of the document
-      pushCurrentTable();
 
       const doc = new DocxDocument({
         styles: {
