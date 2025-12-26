@@ -847,8 +847,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 5. Usa un formato leggibile con sezioni chiare
 
 **FORMATO OUTPUT:**
-- Usa intestazioni in grassetto (**Titolo**)
-- Elenca punti chiave
+- Usa intestazioni (#) e grassetti (**Titolo**)
+- **Tabelle Markdown:** Usa le tabelle (| Col | Col |) per dati strutturati, importi o elenchi tecnici.
+- Elenca punti chiave (•)
 - Massimo 500 parole
 - Linguaggio professionale ma accessibile`;
 
@@ -1545,9 +1546,12 @@ ${filesContext}
 
 **ISTRUZIONI BASE:**
 1. Analizza attentamente i documenti forniti.
-2. Fornisci risposte concise, precise e ben strutturate.
-3. Cita sempre la fonte se possibile (escluse info memoria).
-4. Se la risposta non è nei documenti, dichiaralo.
+2. **FORMATTAZIONE AVANZATA (Tabelle):** Se devi presentare dati comparativi, elenchi di importi, nomi o dati strutturati, **USA SEMPRE le Tabelle Markdown**.
+   - Sintassi: | Colonna 1 | Colonna 2 |
+   - Ogni riga deve iniziare e finire con "|".
+3. Fornisci risposte concise, precise e ben strutturate usando intestazioni (#) e grassetti (**testo**).
+4. Cita sempre la fonte se possibile (escluse info memoria).
+5. Se la risposta non è nei documenti, dichiaralo.
 `;
 
       if (webResearch) {
