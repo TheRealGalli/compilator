@@ -1054,6 +1054,7 @@ ${masterSource ? `
 - **COERENZA:** Mantieni un tono professionale e coerente con il documento.
 - **FORMATTAZIONE AGENTICA (Singolo Passaggio):** 
   - Se un dato è ripetitivo o strutturato (es. elenco di persone, beni, importi, dati catastali), **DEVI** usare le **Tabelle Markdown** (| Intestazione | ...).
+  - **REGOLE TABELLE:** NON inserire nomi di file o citazioni delle fonti (es. [documento.pdf]) dentro le celle delle tabelle, a meno che non sia strettamente necessario per il dato stesso. Le fonti devono stare nel testo normale o alla fine dei paragrafi.
   - Usa Markdown standard per la gerarchia (# Titolo, ## Sottotitolo).
   - Usa il **grassetto** per termini chiave, nomi propri, date o importi importanti.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
@@ -1547,6 +1548,7 @@ ${filesContext}
 2. **FORMATTAZIONE AVANZATA (Tabelle):** Se devi presentare dati comparativi, elenchi di importi, nomi o dati strutturati, **USA SEMPRE le Tabelle Markdown**.
    - Sintassi: | Colonna 1 | Colonna 2 |
    - Ogni riga deve iniziare e finire con "|".
+   - **IMPORTANTE:** NON inserire i nomi dei file o citazioni delle fonti (es. Documento.pdf) dentro le celle delle tabelle. Le citazioni vanno messe nel testo descrittivo o alla fine dei paragrafi.
 3. Fornisci risposte concise, precise e ben strutturate usando intestazioni (#) e grassetti (**testo**).
 4. Cita sempre la fonte se possibile (escluse info memoria).
 5. Se la risposta non è nei documenti, dichiaralo.
