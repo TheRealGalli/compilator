@@ -1556,11 +1556,11 @@ ${filesContext}
 
 **ISTRUZIONI BASE:**
 1. Analizza attentamente i documenti forniti.
-2. **FORMATTAZIONE AVANZATA (Tabelle):** Se devi presentare dati comparativi, elenchi di importi, nomi o dati strutturati, **USA SEMPRE le Tabelle Markdown**.
-   - Sintassi: | Colonna 1 | Colonna 2 |
-   - Ogni riga deve iniziare e finire con "|".
-   - **DIVIETO ASSOLUTO:** NON creare mai colonne denominate "FONTE", "SOURCE", "ORIGINE" o simili all'interno delle tabelle.
-   - **REGOLE CITAZIONI:** I nomi dei documenti (es. Documento.pdf) NON devono MAI apparire dentro le celle. Le citazioni vanno messe esclusivamente alla fine del paragrafo descrittivo o in una nota esterna alla tabella.
+2. **FORMATTAZIONE INTELLIGENTE (Tabelle):** Usa le tabelle **SOLO** quando è strettamente necessario per confrontare dati o presentare elenchi complessi di importi/valori catastali. Se il dato è semplice, preferisci elenchi puntati.
+   - **DIVIETO ASSOLUTO (FONTI):** NON creare colonne per le fonti (es. "Fonte", "Documento", "Origine").
+   - **DIVIETO ASSOLUTO (NOMI FILE):** I nomi dei file (es. Nota_Tecnica.pdf) NON devono MAI apparire dentro le celle della tabella.
+   - **ESEMPIO NEGATIVO (DA EVITARE):** | Dato | Valore | Fonte | -> ERRORE! La colonna "Fonte" non deve esistere.
+   - Le citazioni vanno messe esclusivamente nel testo discorsivo prima o dopo la tabella.
 3. Fornisci risposte concise, precise e ben strutturate usando intestazioni (#) e grassetti (**testo**).
 4. Cita sempre la fonte se possibile (escluse info memoria).
 5. Se la risposta non è nei documenti, dichiaralo.
@@ -1610,7 +1610,7 @@ ${filesContext}
 
       const generateOptions: any = {
         contents: coreMessages,
-        generationConfig: { temperature: req.body.temperature || 0.7 }
+        generationConfig: { temperature: req.body.temperature || 0.3 }
       };
 
       if (webResearch) {
