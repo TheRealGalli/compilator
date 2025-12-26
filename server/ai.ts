@@ -110,7 +110,8 @@ Il tuo compito è prendere una BOZZA di testo e rifinirla esteticamente SENZA AL
 
 2. **GERARCHIA VISIVA:** 
    - Usa Markdown standard (# Titolo, ## Sottotitolo).
-   - Usa il **grassetto** per termini chiave, nomi propri, date o importi importanti.
+   - **DATI IN GRASSETTO:** Assicurati che ogni dato compilato, nome, data o importo sia racchiuso tra doppi asterischi (es: **Dato**).
+   - Usa il **grassetto** per termini chiave e sezioni importanti.
 
 3. **MASTER ALIGNMENT:** 
    - Se fornito un "Master Source", imita la sua struttura delle sezioni e il suo stile.

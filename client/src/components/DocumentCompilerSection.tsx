@@ -422,7 +422,7 @@ export function DocumentCompilerSection({
               text: part.slice(2, -2),
               bold: true,
               font: "Arial",
-              size: options.size || 22,
+              size: options.size || 24,
               color: options.color || "37352F"
             });
           }
@@ -430,7 +430,7 @@ export function DocumentCompilerSection({
             text: part,
             bold: options.bold || false,
             font: "Arial",
-            size: options.size || 22,
+            size: options.size || 24,
             color: options.color || "37352F"
           });
         });
@@ -452,17 +452,17 @@ export function DocumentCompilerSection({
         // Detect Headers (# Header)
         if (rawText.startsWith('# ')) {
           docChildren.push(new Paragraph({
-            children: parseInline(rawText.substring(2), { size: 32, bold: true }),
+            children: parseInline(rawText.substring(2), { size: 36, bold: true }),
             spacing: { before: 400, after: 200 }
           }));
         } else if (rawText.startsWith('## ')) {
           docChildren.push(new Paragraph({
-            children: parseInline(rawText.substring(3), { size: 28, bold: true }),
+            children: parseInline(rawText.substring(3), { size: 30, bold: true }),
             spacing: { before: 300, after: 150 }
           }));
         } else if (rawText.startsWith('### ')) {
           docChildren.push(new Paragraph({
-            children: parseInline(rawText.substring(4), { size: 24, bold: true }),
+            children: parseInline(rawText.substring(4), { size: 27, bold: true }),
             spacing: { before: 200, after: 100 }
           }));
         }
@@ -492,7 +492,7 @@ export function DocumentCompilerSection({
             document: {
               run: {
                 font: "Arial",
-                size: 22,
+                size: 24,
                 color: "37352F",
               },
               paragraph: {
@@ -514,7 +514,7 @@ export function DocumentCompilerSection({
                       text: "** ",
                       color: "0066CC", // Blue
                       bold: true,
-                      size: 22,
+                      size: 20,
                       font: "Arial"
                     }),
                     new SimpleField("PAGE"),

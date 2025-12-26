@@ -1054,7 +1054,8 @@ ${masterSource ? `
   - Se un dato è ripetitivo o strutturato (es. elenco di persone, beni, importi, dati catastali), usa **elenchi puntati** o **elenchi numerati**.
   - **NON** usare tabelle markdown in questa fase di compilazione per garantire la massima compatibilità con il formato DOCX.
   - Usa Markdown standard per la gerarchia (# Titolo, ## Sottotitolo).
-  - Usa il **grassetto** per termini chiave, nomi propri, date o importi importanti.
+  - **GRASSETTO OBBLIGATORIO:** Inserisci SEMPRE i dati estratti e i valori compilati tra doppi asterischi (es: **Mario Rossi**) per evidenziarli nel testo.
+  - Usa il **grassetto** anche per termini chiave, nomi propri, date o importi importanti.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
 
 ${detailedAnalysis ? `

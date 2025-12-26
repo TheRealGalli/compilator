@@ -94,12 +94,12 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         if (headerMatch) {
             const [, hashes, title] = headerMatch;
             const level = hashes.length;
-            const sizeClass = level === 1 ? "text-xl font-bold mt-6 mb-3" :
-                level === 2 ? "text-lg font-bold mt-5 mb-2" :
-                    "text-base font-bold mt-4 mb-2";
+            const sizeClass = level === 1 ? "text-2xl font-bold mt-8 mb-4" :
+                level === 2 ? "text-xl font-bold mt-6 mb-3" :
+                    "text-lg font-bold mt-5 mb-2";
 
             elements.push(
-                <div key={`header-${i}`} className={`${sizeClass} text-foreground border-b border-border/40 pb-1`}>
+                <div key={`header-${i}`} className={`${sizeClass} text-foreground border-b border-border/40 pb-2`}>
                     {formatInline(title, `header-${i}`)}
                 </div>
             );
@@ -137,7 +137,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
     }
 
     return (
-        <div className={`formatted-message text-sm ${className} space-y-1`}>
+        <div className={`formatted-message text-base ${className} space-y-1`}>
             {elements}
         </div>
     );
