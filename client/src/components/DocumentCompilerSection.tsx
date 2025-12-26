@@ -440,13 +440,36 @@ export function DocumentCompilerSection({
       const docChildren: any[] = [];
       let currentTableRows: any[] = [];
 
+      // Helper to close and push table
+      const pushCurrentTable = () => {
+        if (currentTableRows.length > 0) {
+          docChildren.push(new Table({
+            rows: currentTableRows,
+            width: { size: 100 * 50, type: WidthType.PERCENTAGE }, // 5000 = 100%
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 4, color: "37352F" },
+              bottom: { style: BorderStyle.SINGLE, size: 4, color: "37352F" },
+              left: { style: BorderStyle.SINGLE, size: 4, color: "37352F" },
+              right: { style: BorderStyle.SINGLE, size: 4, color: "37352F" },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+              insideVertical: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+            }
+          }));
+          docChildren.push(new Paragraph({ text: "" }));
+          currentTableRows = [];
+        }
+      };
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
 
         // Table Detection (| col | col |)
         if (line.startsWith('|') && line.endsWith('|')) {
-          // Check if it's a separator line (| --- | --- |)
-          if (line.match(/^[|\s\-:]+$/)) continue;
+          // Check if it's a separator line (| --- | --- |) 
+          // Improved regex to be more specific to markdown separators
+          if (line.match(/^\|[\s\-:|]+\|$/) && line.includes('-')) {
+            continue;
+          }
 
           const cells = line.split('|').slice(1, -1).map(c => c.trim());
 
@@ -455,37 +478,25 @@ export function DocumentCompilerSection({
               children: cells.map((cellText, colIdx) => new TableCell({
                 children: [new Paragraph({
                   children: parseInline(cleanText(cellText), { size: 20 }),
-                  alignment: AlignmentType.LEFT
+                  alignment: AlignmentType.LEFT,
+                  spacing: { before: 80, after: 80 } // Add some vertical padding inside cells
                 })],
                 // DOCX uses a scale of 5000 for 100% width in PERCENTAGE mode
                 width: { size: (100 / cells.length) * 50, type: WidthType.PERCENTAGE },
                 shading: currentTableRows.length === 0 ? { fill: "F7F7F7" } : undefined,
                 borders: {
-                  top: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-                  bottom: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-                  left: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-                  right: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+                  top: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+                  bottom: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+                  left: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+                  right: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
                 }
               }))
             }));
           }
           continue;
-        } else if (currentTableRows.length > 0) {
-          // Close table
-          docChildren.push(new Table({
-            rows: currentTableRows,
-            width: { size: 100 * 50, type: WidthType.PERCENTAGE }, // 5000 = 100%
-            borders: {
-              top: { style: BorderStyle.SINGLE, size: 2, color: "37352F" },
-              bottom: { style: BorderStyle.SINGLE, size: 2, color: "37352F" },
-              left: { style: BorderStyle.SINGLE, size: 2, color: "37352F" },
-              right: { style: BorderStyle.SINGLE, size: 2, color: "37352F" },
-              insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-              insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-            }
-          }));
-          docChildren.push(new Paragraph({ text: "" }));
-          currentTableRows = [];
+        } else {
+          // If not a table line, push existing table if any
+          pushCurrentTable();
         }
 
         const rawText = cleanText(line);
@@ -493,6 +504,7 @@ export function DocumentCompilerSection({
           docChildren.push(new Paragraph({ text: "" }));
           continue;
         }
+        // ... (rest of headers logic remains same)
 
         // Detect Headers (# Header)
         if (rawText.startsWith('# ')) {
@@ -530,6 +542,9 @@ export function DocumentCompilerSection({
           }));
         }
       }
+
+      // Final push for any table at the end of the document
+      pushCurrentTable();
 
       const doc = new DocxDocument({
         styles: {
