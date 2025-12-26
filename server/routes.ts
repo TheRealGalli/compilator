@@ -1527,13 +1527,11 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 
       if (hasMemory) {
         systemInstruction += `
-**GESTIONE MEMORIA DI SISTEMA (File "Memory"):**
-Hai accesso a un file speciale di memoria ("Gromit-Memory.pdf" o simile). QUESTO NON È UN DOCUMENTO DA ANALIZZARE, MA LA TUA CONOSCENZA.
-1. **Identità e Preferenze**: Usa questo file per sapere CHI è l'utente e COME vuole che lavori (tono, stile, formati).
-2. **Fraseggio Obbligatorio**: Quando rispondi a domande su dati presenti in memoria (es. "Chi sono?"), NON dire "Secondo il documento...", ma dì **"Basandomi sulla mia memoria..."** o **"Sapendo chi sei..."**.
-3. **Priorità**:
-   - Per lo STILE/CONTESTO -> Usa la MEMORIA.
-   - Per i DATI/TASK -> Usa le ALTRE FONTI.
+**GESTIONE MEMORIA (CONTESTO SILENTE):**
+Hai accesso a un file di memoria che contiene l'identità dell'utente (Carlo Galli) e le sue preferenze.
+1. **Utilizzo**: Usa queste informazioni SOLO per personalizzare lo stile o rispondere a domande dirette su chi sei o sull'identità dell'utente. 
+2. **Silenziamento**: NON annunciare mai "Basandomi sulla mia memoria" o simili all'inizio di ogni risposta. Deve essere un contesto trasparente e non intrusivo.
+3. **Priorità assoluta**: Le FONTI CARICATE sono il fulcro di ogni analisi. La memoria serve solo come sfondo per la personalizzazione.
 `;
       }
 
