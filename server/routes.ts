@@ -232,7 +232,14 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
       const result = await mammoth.extractRawText({ buffer });
       console.log(`[DEBUG extractText] DOCX parsed, text length: ${result.value.length}`);
       return result.value;
-    } else if (mimeType === 'text/plain' || mimeType === 'text/csv' || mimeType === 'text/tab-separated-values') {
+    } else if (
+      mimeType === 'text/plain' ||
+      mimeType === 'text/csv' ||
+      mimeType === 'text/tab-separated-values' ||
+      mimeType === 'text/markdown' ||
+      mimeType === 'text/rtf' ||
+      mimeType === 'application/rtf'
+    ) {
       const text = buffer.toString('utf-8');
       console.log(`[DEBUG extractText] Text-based file (${mimeType}), length: ${text.length}`);
       return text;
@@ -776,7 +783,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Strip data URI prefix if present
     const cleanBase64 = base64Data.split(',')[1] || base64Data;
 
-    if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
+    const isMultimodal =
+      mimeType.startsWith('image/') ||
+      mimeType === 'application/pdf' ||
+      mimeType.startsWith('audio/') ||
+      mimeType.startsWith('video/') ||
+      mimeType === 'text/markdown' ||
+      mimeType === 'application/rtf' ||
+      mimeType === 'text/rtf' ||
+      mimeType === 'application/json' ||
+      mimeType === 'text/html' ||
+      mimeType === 'application/xml' ||
+      mimeType === 'text/xml';
+
+    if (isMultimodal) {
       return {
         inlineData: {
           mimeType: mimeType,
@@ -1480,7 +1500,15 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
             const isMultimodal =
               source.type.startsWith('image/') ||
               source.type === 'application/pdf' ||
-              source.type.startsWith('audio/');
+              source.type.startsWith('audio/') ||
+              source.type.startsWith('video/') ||
+              source.type === 'text/markdown' ||
+              source.type === 'application/rtf' ||
+              source.type === 'text/rtf' ||
+              source.type === 'application/json' ||
+              source.type === 'text/html' ||
+              source.type === 'application/xml' ||
+              source.type === 'text/xml';
 
             const isDOCX =
               source.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX

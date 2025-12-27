@@ -45,7 +45,7 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
         ref={inputRef}
         type="file"
         multiple
-        accept=".pdf,.txt,.docx,.doc,.csv,image/*,audio/*"
+        accept=".pdf,.txt,.docx,.doc,.csv,.rtf,.md,.json,.xml,.html,image/*,audio/*"
         className="hidden"
         onChange={handleFileChange}
         data-testid="input-file-hidden"
@@ -53,10 +53,10 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
       <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
       <h3 className="text-lg font-medium mb-2">Trascina i file qui o clicca per sfogliare</h3>
       <p className="text-sm text-muted-foreground">
-        Testo: PDF, DOCX, TXT, CSV | Immagini: JPG, PNG, WebP | Audio: MP3, WAV, FLAC
+        Standard: PDF, DOCX, RTF, MD, CSV, JSON | Media: JPG, PNG, WebP, HEIC | Audio: MP3, WAV, M4A
       </p>
       <p className="text-xs text-muted-foreground/60 mt-2">
-        Max 30MB per fonte supportati
+        Sistemi intelligenti: Elaborazione multimodale Gemini attiva (Max 30MB)
       </p>
     </div>
   );

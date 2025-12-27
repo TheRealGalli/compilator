@@ -25,6 +25,19 @@ export class AiService {
 
             if (!mimeType || !base64Data) return null;
 
+            const isMultimodal =
+                mimeType.startsWith('image/') ||
+                mimeType === 'application/pdf' ||
+                mimeType.startsWith('audio/') ||
+                mimeType.startsWith('video/') ||
+                mimeType === 'text/markdown' ||
+                mimeType === 'application/rtf' ||
+                mimeType === 'text/rtf' ||
+                mimeType === 'application/json' ||
+                mimeType === 'text/html' ||
+                mimeType === 'application/xml' ||
+                mimeType === 'text/xml';
+
             const isDOCX = mimeType.includes('wordprocessingml') || mimeType.includes('msword');
 
             if (isDOCX) {
@@ -37,13 +50,22 @@ export class AiService {
                     console.error('[AiService] Error extracting DOCX text:', err);
                     return null;
                 }
-            } else {
+            } else if (isMultimodal) {
                 return {
                     inlineData: {
                         mimeType: mimeType,
                         data: base64Data
                     }
                 };
+            } else {
+                // Fallback to text decoding for unknown/plain types
+                try {
+                    const text = Buffer.from(base64Data, 'base64').toString('utf-8');
+                    return { text: `[CONTENUTO FILE ${mimeType}]:\n${text}` };
+                } catch (err) {
+                    console.error('[AiService] Fallback text extraction failed:', err);
+                    return null;
+                }
             }
         })).then(parts => parts.filter(p => p !== null));
     }

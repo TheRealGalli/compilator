@@ -610,7 +610,7 @@ export function DocumentCompilerSection({
                 <input
                   id="template-upload"
                   type="file"
-                  accept=".txt,.md"
+                  accept=".txt,.md,.rtf"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
