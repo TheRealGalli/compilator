@@ -1480,6 +1480,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 
       // Download and process files
       let filesContext = '';
+      let memoryContext = '';
       if (fetchedContentContext) {
         filesContext += fetchedContentContext;
       }
@@ -1530,7 +1531,8 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
                 return {
                   text: {
                     name: source.name,
-                    content: textContent
+                    content: textContent,
+                    isMemory: source.isMemory
                   }
                 };
               }
@@ -1545,9 +1547,17 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
           if (!result) continue;
           if (result.multimodal) {
             multimodalFiles.push(result.multimodal);
-            filesContext += `- ${result.multimodal.name} (${result.multimodal.mimeType})\n`;
+            if (!result.multimodal.isMemory) {
+              filesContext += `- ${result.multimodal.name} (${result.multimodal.mimeType})\n`;
+            } else {
+              memoryContext += `[DISPONIBILE ALLEGATO MULTIMODALE DI MEMORIA: ${result.multimodal.name}]\n`;
+            }
           } else if (result.text) {
-            filesContext += `\n--- CONTENUTO FILE: ${result.text.name} ---\n${result.text.content}\n--- FINE CONTENUTO FILE ---\n`;
+            if (result.text.isMemory) {
+              memoryContext += `[INFO PRELEVATE DALLA TUA MEMORIA INTERNA]:\n${result.text.content}\n`;
+            } else {
+              filesContext += `\n--- CONTENUTO FILE: ${result.text.name} ---\n${result.text.content}\n--- FINE CONTENUTO FILE ---\n`;
+            }
           }
         }
       }
@@ -1566,6 +1576,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 **GESTIONE MEMORIA (CONTESTO SILENTE):**
 Hai accesso a un file di memoria che contiene l'identità dell'utente (Carlo Galli) e le sue preferenze.
 1. **Utilizzo**: Usa queste informazioni SOLO per personalizzare lo stile o rispondere a domande dirette su chi sei o sull'identità dell'utente. 
+${memoryContext}
 2. **Silenziamento**: NON menzionare MAI il file "Gromit-Memory.pdf" o "Memoria/Profilo" nella risposta. Deve essere un contesto trasparente. L'utente non deve sapere che stai leggendo un file specifico di memoria, deve sembrare che tu conosca già queste informazioni.
 3. **Priorità assoluta**: Le FONTI CARICATE sono il fulcro di ogni analisi. La memoria serve solo come sfondo per la personalizzazione.
 `;

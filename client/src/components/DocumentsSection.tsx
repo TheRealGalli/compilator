@@ -672,7 +672,7 @@ export function DocumentsSection() {
         </div>
       )}
 
-      {sources.length > 0 && (
+      {sources.filter(s => !s.isMemory).length > 0 && (
         <div className="flex-1 overflow-auto">
           <h3 className="text-lg font-semibold mb-4">
             Fonti Caricate ({sources.filter(s => !s.isMemory).length}/{maxSources})
