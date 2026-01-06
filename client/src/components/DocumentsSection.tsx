@@ -59,6 +59,12 @@ export function DocumentsSection() {
             description: `Limite massimo di ${maxSources} fonti raggiunto.`,
             variant: "destructive",
           });
+        } else if (result === 'invalid_format') {
+          toast({
+            title: "Formato non supportato",
+            description: `"${file.name}" non è in un formato supportato (Standard: PDF, DOCX, RTF, MD, CSV, JSON).`,
+            variant: "destructive",
+          });
         } else if (result === 'duplicate') {
           toast({
             title: "File duplicato",

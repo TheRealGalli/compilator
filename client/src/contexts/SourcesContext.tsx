@@ -14,7 +14,7 @@ export interface Source {
 
 interface SourcesContextType {
     sources: Source[];
-    addSource: (file: File, options?: { isMemory?: boolean }) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'>;
+    addSource: (file: File, options?: { isMemory?: boolean }) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'invalid_format' | 'error'>;
     removeSource: (id: string) => void;
     toggleSource: (id: string) => void;
     toggleMaster: (id: string) => void; // New: Master Source Toggle
@@ -28,10 +28,16 @@ const SourcesContext = createContext<SourcesContextType | undefined>(undefined);
 const MAX_SOURCES = 10;
 const MAX_FILE_SIZE_MB = 30;
 
+const ALLOWED_EXTENSIONS = [
+    'pdf', 'docx', 'doc', 'txt', 'csv', 'rtf', 'md', 'json', 'xml', 'html',
+    'jpg', 'jpeg', 'png', 'webp', 'heic',
+    'mp3', 'wav', 'm4a'
+];
+
 export function SourcesProvider({ children }: { children: ReactNode }) {
     const [sources, setSources] = useState<Source[]>([]);
 
-    const addSource = useCallback(async (file: File, options?: { isMemory?: boolean }): Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'error'> => {
+    const addSource = useCallback(async (file: File, options?: { isMemory?: boolean }): Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'invalid_format' | 'error'> => {
         if (!options?.isMemory) {
             const userSources = sources.filter(s => !s.isMemory);
             if (userSources.length >= MAX_SOURCES) {
@@ -46,6 +52,12 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
             console.warn(`File too large: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
             return 'file_too_large';
+        }
+
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        if (!extension || !ALLOWED_EXTENSIONS.includes(extension)) {
+            console.warn(`Invalid file format: ${file.name}`);
+            return 'invalid_format';
         }
 
         try {

@@ -25,6 +25,7 @@ interface Message {
   audioUrl?: string;
   groundingMetadata?: any;
   searchEntryPoint?: string;
+  shortTitle?: string;
 }
 
 interface ChatInterfaceProps {
@@ -269,6 +270,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         groundingMetadata: data.groundingMetadata,
         searchEntryPoint: data.searchEntryPoint,
+        shortTitle: data.shortTitle,
       };
 
       if (data.file) {

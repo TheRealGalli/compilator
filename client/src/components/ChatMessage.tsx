@@ -16,6 +16,7 @@ interface ChatMessageProps {
   groundingMetadata?: any;
   searchEntryPoint?: string;
   userInitial?: string;
+  shortTitle?: string;
 }
 
 export function ChatMessage({
@@ -26,7 +27,8 @@ export function ChatMessage({
   audioUrl,
   groundingMetadata,
   searchEntryPoint,
-  userInitial
+  userInitial,
+  shortTitle
 }: ChatMessageProps) {
   const { toast } = useToast();
   const { addSource } = useSources();
@@ -40,20 +42,29 @@ export function ChatMessage({
 
   const handleAddAsSource = async () => {
     try {
-      // Create a unique filename based on time
-      const fileName = `AI_Response_${Date.now()}.txt`;
+      // Create a unique filename based on short title or time
+      const sanitizedTitle = shortTitle
+        ? shortTitle.replace(/[^a-z0-9]/gi, '_').substring(0, 30)
+        : `AI_Response_${Date.now()}`;
+      const fileName = `${sanitizedTitle}.txt`;
       const file = new File([content], fileName, { type: "text/plain" });
-      const success = await addSource(file);
+      const result = await addSource(file);
 
-      if (success) {
+      if (result === 'success') {
         toast({
           title: "Aggiunto alle fonti",
-          description: "La risposta è stata salvata come nuova fonte.",
+          description: `La risposta è stata salvata come "${fileName}".`,
+        });
+      } else if (result === 'invalid_format') {
+        toast({
+          title: "Formato non supportato",
+          description: "La risposta non può essere salvata in questo formato.",
+          variant: "destructive",
         });
       } else {
         toast({
           title: "Impossibile aggiungere",
-          description: "Limite fonti raggiunto o errore sconosciuto.",
+          description: result === 'limit_reached' ? "Limite fonti raggiunto." : "Errore durante il salvataggio.",
           variant: "destructive",
         });
       }

@@ -1566,10 +1566,17 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 **GESTIONE MEMORIA (CONTESTO SILENTE):**
 Hai accesso a un file di memoria che contiene l'identità dell'utente (Carlo Galli) e le sue preferenze.
 1. **Utilizzo**: Usa queste informazioni SOLO per personalizzare lo stile o rispondere a domande dirette su chi sei o sull'identità dell'utente. 
-2. **Silenziamento**: NON annunciare mai "Basandomi sulla mia memoria" o simili all'inizio di ogni risposta. Deve essere un contesto trasparente e non intrusivo.
+2. **Silenziamento**: NON menzionare MAI il file "Gromit-Memory.pdf" o "Memoria/Profilo" nella risposta. Deve essere un contesto trasparente. L'utente non deve sapere che stai leggendo un file specifico di memoria, deve sembrare che tu conosca già queste informazioni.
 3. **Priorità assoluta**: Le FONTI CARICATE sono il fulcro di ogni analisi. La memoria serve solo come sfondo per la personalizzazione.
 `;
       }
+
+      systemInstruction += `
+
+**TITOLO RIASSUNTIVO (OBBLIGATORIO):**
+Alla fine di ogni risposta, aggiungi SEMPRE un titolo estremamente breve (max 5 parole) che riassuma il contenuto del messaggio, racchiuso tra i tag <short_title> e </short_title>.
+Esempio: <short_title>Analisi Contratto Locazione</short_title>
+`;
 
       // ... rest of prompt ...
       systemInstruction += `
@@ -1661,7 +1668,14 @@ ${filesContext}
         }
       }
 
-      res.json({ text, groundingMetadata, searchEntryPoint });
+      let shortTitle = "";
+      const titleMatch = text.match(/<short_title>([\s\S]*?)<\/short_title>/);
+      if (titleMatch) {
+        shortTitle = titleMatch[1].trim();
+        text = text.replace(/<short_title>[\s\S]*?<\/short_title>/, "").trim();
+      }
+
+      res.json({ text, groundingMetadata, searchEntryPoint, shortTitle });
 
     } catch (error: any) {
       console.error('Errore durante chat:', error);
