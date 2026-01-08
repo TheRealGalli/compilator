@@ -1563,7 +1563,8 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       }
 
       // Calculate max response length
-      const maxChars = (multimodalFiles.length > 0 || filesContext.length > 5000) ? 12000 : 5000;
+      // Calculate max response length - increased for technical datasets
+      const maxChars = (multimodalFiles.length > 0 || filesContext.length > 10000) ? 50000 : 25000;
 
       let systemInstruction = `Sei un assistente AI di ricerca esperto e professionale.
 `;
@@ -1598,14 +1599,15 @@ ${filesContext}
 
 **ISTRUZIONI BASE:**
 1. Analizza attentamente i documenti forniti.
-2. **FORMATTAZIONE INTELLIGENTE (Tabelle):** Usa le tabelle **SOLO** quando è strettamente necessario per confrontare dati o presentare elenchi complessi di importi/valori catastali. Se il dato è semplice, preferisci elenchi puntati.
+2. **RICHIESTE TECNICHE (JSON/CODICE)**: Se l'utente chiede dataset, codice o JSON, fornisci l'intero output richiesto senza omissioni, assicurandoti che sia completo e ben formattato in blocchi di codice markdown (\`\`\`).
+3. **FORMATTAZIONE INTELLIGENTE (Tabelle):** Usa le tabelle **SOLO** quando è strettamente necessario per confrontare dati o presentare elenchi complessi di importi/valori catastali. Se il dato è semplice, preferisci elenchi puntati.
    - **DIVIETO ASSOLUTO (FONTI):** NON creare colonne per le fonti (es. "Fonte", "Documento", "Origine").
    - **DIVIETO ASSOLUTO (NOMI FILE):** I nomi dei file (es. Nota_Tecnica.pdf) NON devono MAI apparire dentro le celle della tabella.
    - **ESEMPIO NEGATIVO (DA EVITARE):** | Dato | Valore | Fonte | -> ERRORE! La colonna "Fonte" non deve esistere.
    - Le citazioni vanno messe esclusivamente nel testo discorsivo prima o dopo la tabella.
-3. Fornisci risposte concise, precise e ben strutturate usando intestazioni (#) e grassetti (**testo**).
-4. Cita sempre la fonte se possibile (escluse info memoria).
-5. Se la risposta non è nei documenti, dichiaralo.
+4. Fornisci risposte concise, precise e ben strutturate usando intestazioni (#), grassetti (**testo**) e blocchi di codice (\`\`\`) per una lettura agevole.
+5. Cita sempre la fonte se possibile (escluse info memoria).
+6. Se la risposta non è nei documenti, dichiaralo.
 `;
 
       if (webResearch) {

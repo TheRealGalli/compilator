@@ -77,6 +77,29 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
     while (i < lines.length) {
         const line = lines[i].trim();
 
+        // 0. Detect Code Blocks (```)
+        if (line.startsWith('```')) {
+            const lang = line.slice(3).trim();
+            const codeLines: string[] = [];
+            let j = i + 1;
+            while (j < lines.length && !lines[j].trim().startsWith('```')) {
+                codeLines.push(lines[j]);
+                j++;
+            }
+            elements.push(
+                <div key={`code-${i}`} className="my-4 relative group">
+                    <div className="absolute top-0 right-0 px-2 py-1 text-[10px] font-mono text-muted-foreground bg-muted/50 rounded-bl rounded-tr-lg uppercase tracking-wider">
+                        {lang || 'code'}
+                    </div>
+                    <pre className="p-4 bg-muted/40 rounded-lg border border-border overflow-x-auto text-xs font-mono leading-relaxed">
+                        <code>{codeLines.join('\n')}</code>
+                    </pre>
+                </div>
+            );
+            i = j + 1;
+            continue;
+        }
+
         // 1. Detect Tables (| col | col |)
         if (line.startsWith('|') && line.endsWith('|')) {
             const tableRows: string[][] = [];
