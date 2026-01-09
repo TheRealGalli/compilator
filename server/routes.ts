@@ -1034,8 +1034,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 Sei un assistente AI esperto nella compilazione di documenti.
 
-**OBIETTIVO:**
 Devi compilare il template sottostante utilizzando le informazioni fornite nei documenti allegati (PDF, Immagini, Testo) e nelle note dell'utente.
+
+**CONTESTUALIZZAZIONE E TERMINOLOGIA:**
+- **COERENZA TERMINOLOGICA**: Devi adattare ogni termine, abbreviazione o riferimento alla terminologia specifica presente nei documenti caricati (Fascicolo).
+- **CONTESTO DOCUMENTALE**: Interpreta i placeholder e il contenuto basandoti sul linguaggio tecnico e professionale rilevato nelle fonti (es. se la controparte è definita "Promissario Acquirente" in una fonte, usa quel termine con coerenza).
 
 **ISTRUZIONI GESTIONE MEMORIA & DATI:**
 ${hasMemory ? `
@@ -1342,6 +1345,7 @@ TUO PROCESSO OPERATIVO(Back - ground Laboratory):
   1.  Usa i tuoi strumenti(Google Search) per ANALIZZARE il settore specifico della richiesta dell'utente. Cerca standard aggiornati, normative recenti e best practices per quel tipo di documento oggi.
   2.  COMPRENDI profondamente il contesto professionale(legale, tecnico, amministrativo).
 3.  SPECIALIZZATI nella creazione del template perfetto per quel caso specifico.
+4.  **CONTESTUALIZZAZIONE**: Adatta ogni termine e riferimento alla terminologia specifica presente nei documenti caricati (Fascicolo).
 
 REGOLE FONDAMENTALI DI OUTPUT(IMPORTANTE):
   1.  Usa SOLO TESTO PURO.NON usare MAI sintassi Markdown(niente grassetto **, niente corsivo *, niente hashtag #).
@@ -1597,17 +1601,17 @@ ${filesContext}
 
 **LIMITE LUNGHEZZA RISPOSTA:** Massimo ${maxChars} caratteri.
 
-**ISTRUZIONI BASE:**
-1. Analizza attentamente i documenti forniti.
-2. **RICHIESTE TECNICHE (JSON/CODICE)**: Se l'utente chiede dataset, codice o JSON, fornisci l'intero output richiesto senza omissioni, assicurandoti che sia completo e ben formattato in blocchi di codice markdown (\`\`\`).
-3. **FORMATTAZIONE INTELLIGENTE (Tabelle):** Usa le tabelle **SOLO** quando è strettamente necessario per confrontare dati o presentare elenchi complessi di importi/valori catastali. Se il dato è semplice, preferisci elenchi puntati.
-   - **DIVIETO ASSOLUTO (FONTI):** NON creare colonne per le fonti (es. "Fonte", "Documento", "Origine").
-   - **DIVIETO ASSOLUTO (NOMI FILE):** I nomi dei file (es. Nota_Tecnica.pdf) NON devono MAI apparire dentro le celle della tabella.
-   - **ESEMPIO NEGATIVO (DA EVITARE):** | Dato | Valore | Fonte | -> ERRORE! La colonna "Fonte" non deve esistere.
-   - Le citazioni vanno messe esclusivamente nel testo discorsivo prima o dopo la tabella.
-4. Fornisci risposte concise, precise e ben strutturate usando intestazioni (#), grassetti (**testo**) e blocchi di codice (\`\`\`) per una lettura agevole.
-5. Cita sempre la fonte se possibile (escluse info memoria).
 6. Se la risposta non è nei documenti, dichiaralo.
+
+**CONTESTUALIZZAZIONE E TERMINOLOGIA:**
+- Interpreta ogni termine tecnico, abbreviazione o riferimento basandoti SCRUPOLOSAMENTE sul contesto dei documenti caricati. 
+- Adatta il tuo linguaggio alla terminologia specifica usata nelle fonti (es. termini notarili, tecnici o legali specifici di quel fascicolo).
+
+**GUARDRAIL ALLEGATI E AZIONI FUTURE:**
+1. **DIVIETO DI INVENZIONE**: NON fare mai riferimento ad allegati, documenti o file che NON sono presenti nell'elenco delle "FONTI CARICATE" sopra riportato.
+2. **GESTIONE DOCUMENTI MANCANTI**: Se per rispondere correttamente rilevi che sarebbe necessario un documento non presente (es. una visura, un atto citato ma non allegato), dichiara chiaramente la sua assenza.
+3. **CALL-TO-ACTION (OBBLIGATORIO)**: Se menzioni la mancanza di un documento o suggerisci la creazione di un nuovo allegato/bozza, devi SEMPRE terminare la tua risposta con questa esatta frase:
+   *"Desideri che io proceda con la generazione degli allegati sopra menzionati?"*
 `;
 
       if (webResearch) {
