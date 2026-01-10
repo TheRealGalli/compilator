@@ -100,7 +100,10 @@ export class AiService {
 
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
-                generationConfig: { temperature: 0.2 }
+                generationConfig: {
+                    maxOutputTokens: 16384,
+                    temperature: 0.2
+                }
             });
 
             const content = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -162,7 +165,10 @@ ${params.draftContent}`;
 
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
-                generationConfig: { temperature: 0.1 }
+                generationConfig: {
+                    maxOutputTokens: 16384,
+                    temperature: 0.1
+                }
             });
 
             return result.response.candidates?.[0]?.content?.parts?.[0]?.text || params.draftContent;

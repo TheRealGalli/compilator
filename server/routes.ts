@@ -1411,6 +1411,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       const result = await model.generateContent({
         contents: [{ role: 'user', parts: parts }],
         generationConfig: {
+          maxOutputTokens: 16384,
           temperature: 0.7,
         }
       });
@@ -1615,7 +1616,8 @@ ${filesContext}
 `;
 
       if (webResearch) {
-        systemInstruction += `\n**MODALITÀ WEB RESEARCH ATTIVA**: Usa lo strumento di ricerca per link o info mancanti.`;
+        systemInstruction += `\n**MODALITÀ WEB RESEARCH ATTIVA**: Usa lo strumento di ricerca per link o info mancanti.
+- **GROUNDING VS COMPLETEZZA**: Se l'utente richiede un intero dataset, JSON o un output tecnico esteso, dai priorità alla COMPLETEZZA dell'output (come da ISTRUZIONI BASE) anche se stai usando informazioni prelevate dal web. NON troncare dataset per brevità.`;
       }
 
       // Initialize Vertex AI
@@ -1658,7 +1660,10 @@ ${filesContext}
 
       const generateOptions: any = {
         contents: coreMessages,
-        generationConfig: { temperature: req.body.temperature || 0.3 }
+        generationConfig: {
+          maxOutputTokens: 16384,
+          temperature: req.body.temperature || 0.3
+        }
       };
 
       if (webResearch) {
