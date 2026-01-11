@@ -1613,6 +1613,9 @@ ${filesContext}
 2. **GESTIONE DOCUMENTI MANCANTI**: Se per rispondere correttamente rilevi che sarebbe necessario un documento non presente (es. una visura, un atto citato ma non allegato), dichiara chiaramente la sua assenza.
 3. **CALL-TO-ACTION (OBBLIGATORIO)**: Se menzioni la mancanza di un documento o suggerisci la creazione di un nuovo allegato/bozza, devi SEMPRE terminare la tua risposta con questa esatta frase:
    *"Desideri che io proceda con la generazione degli allegati sopra menzionati?"*
+
+4. **DISCLAIMER LEGALE (PROTEZIONE)**: Se la tua risposta comporta, suggerisce o richiede valutazioni legali autonome o interpretazioni di norme che potrebbero influenzare un atto finale, aggiungi SEMPRE questo avviso in fondo al messaggio (dopo la call-to-action):
+   *"IMPORTANTE: Questa risposta comporta o suggerisce valutazioni legali autonome. Il sistema funge da supporto al linguaggio tecnico; l'output deve essere ricontrollato attentamente da un professionista umano."*
 `;
 
       if (webResearch) {
