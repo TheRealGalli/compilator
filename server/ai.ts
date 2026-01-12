@@ -106,7 +106,7 @@ export class AiService {
                 }
             });
 
-            const content = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const content = result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '';
             return { content, parts: multimodalParts };
 
         } catch (error) {
@@ -171,7 +171,7 @@ ${params.draftContent}`;
                 }
             });
 
-            return result.response.candidates?.[0]?.content?.parts?.[0]?.text || params.draftContent;
+            return result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || params.draftContent;
 
         } catch (error) {
             console.error('[AiService] refineFormatting error:', error);

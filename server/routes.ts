@@ -1416,7 +1416,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
         }
       });
 
-      const generatedTemplate = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const generatedTemplate = result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '';
       console.log(`[DEBUG Template Gen]Success, length: ${generatedTemplate.length} `);
 
       res.json({ template: generatedTemplate });
@@ -1683,7 +1683,7 @@ ${filesContext}
       if (response.candidates && response.candidates.length > 0) {
         const candidate = response.candidates[0];
         if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-          text = candidate.content.parts[0].text || '';
+          text = candidate.content.parts.map((p: any) => p.text || '').join('');
         }
         if (candidate.groundingMetadata) {
           groundingMetadata = candidate.groundingMetadata;
@@ -1760,7 +1760,7 @@ ${filesContext}
       });
 
       const response = await result.response;
-      const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+      const text = response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('');
 
       console.log('[API Identity] Extraction result:', text);
 
