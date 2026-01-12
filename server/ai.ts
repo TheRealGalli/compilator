@@ -101,7 +101,7 @@ export class AiService {
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
                 generationConfig: {
-                    maxOutputTokens: 16384,
+                    maxOutputTokens: 50000,
                     temperature: 0.2
                 }
             });
@@ -166,7 +166,7 @@ ${params.draftContent}`;
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
                 generationConfig: {
-                    maxOutputTokens: 16384,
+                    maxOutputTokens: 50000,
                     temperature: 0.1
                 }
             });

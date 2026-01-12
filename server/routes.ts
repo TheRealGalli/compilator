@@ -1411,7 +1411,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       const result = await model.generateContent({
         contents: [{ role: 'user', parts: parts }],
         generationConfig: {
-          maxOutputTokens: 16384,
+          maxOutputTokens: 50000,
           temperature: 0.7,
         }
       });
@@ -1567,9 +1567,8 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
         }
       }
 
-      // Calculate max response length
-      // Calculate max response length - increased for technical datasets
-      const maxChars = (multimodalFiles.length > 0 || filesContext.length > 10000) ? 50000 : 25000;
+      // Calculate max response length - using tokens as per user request
+      const maxTokens = 50000;
 
       let systemInstruction = `Sei un assistente AI di ricerca esperto e professionale.
 `;
@@ -1600,7 +1599,7 @@ Esempio: <short_title>Analisi Contratto Locazione</short_title>
 **DOCUMENTI E CONTESTO DISPONIBILI:**
 ${filesContext}
 
-**LIMITE LUNGHEZZA RISPOSTA:** Massimo ${maxChars} caratteri.
+**LIMITE LUNGHEZZA RISPOSTA:** Massimo 50.000 token.
 
 6. Se la risposta non è nei documenti, dichiaralo.
 
@@ -1664,7 +1663,7 @@ ${filesContext}
       const generateOptions: any = {
         contents: coreMessages,
         generationConfig: {
-          maxOutputTokens: 16384,
+          maxOutputTokens: 50000,
           temperature: req.body.temperature || 0.3
         }
       };
