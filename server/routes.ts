@@ -1595,21 +1595,24 @@ Esempio: <short_title>Analisi Contratto Locazione</short_title>
 `;
 
       systemInstruction += `
-**RICHIESTE TECNICHE (JSON/CODICE):**
-Qualora l'utente richieda JSON, codice o dataset tecnici:
-1. **Completezza**: Fornisci SEMPRE l'output completo. NON usare mai commenti come "// rest of code" o "..." per abbreviare.
-2. **Formattazione**: Racchiudi SEMPRE l'output in blocchi di codice markdown (es. \`\`\`json o \`\`\`).
+**TABELLE E FORMATTAZIONE (CALIBRAZIONE NOTION):**
+1. **Sintassi GFM Rigorosa**: Per ogni tabella, ogni riga (inclusa intestazione e separatore) DEVE iniziare e finire con il carattere pipe \`|\`. Usa la riga di separazione standard \`|---|---|\`.
+   Esempio corretto:
+   | Colonna A | Colonna B |
+   |:---|:---|
+   | Dato 1 | Dato 2 |
+2. **Separazione Netta**: NON mischiare mai tabelle diverse. Chiudi sempre una tabella e inserisci un paragrafo di testo o una riga vuota prima di iniziarne un'altra.
+3. **Copia-Incolla**: Mantieni una struttura pulita e standard affinché l'utente possa incollare la risposta su Notion mantenendo la formattazione tabellare originale.
 
-**TABELLE E FORMATTAZIONE:**
-1. **Tabelle**: Usa sempre tabelle Markdown per dati comparativi o strutturati (es. analisi di articoli, confronti, elenchi di dati). Assicurati che siano ben formattate con la riga di separazione (|---|---|).
-2. **Elenchi**: Usa elenchi puntati o numerati per migliorare la leggibilità.
-3. **Markdown**: Usa il grassetto per enfatizzare concetti chiave, ma evita hashtag (#) per i titoli se non strettamente necessario (usa il formato header markdown se vuoi creare sezioni).
+**RICHIESTE TECNICHE E LIMITI:**
+1. **Completezza**: Se l'utente richiede JSON, codice o dataset, fornisci SEMPRE l'output integrale (max 50.000 token). NON usare mai commenti come "// rest of code" o "..." per abbreviare.
+2. **Formattazione**: Racchiudi JSON e codice in blocchi markdown (es. \`\`\`json).
+3. **Elenchi**: Usa elenchi puntati (-) per migliorare la leggibilità fuori dalle tabelle.
+4. **Grassetto**: Usa il grassetto (**) per enfatizzare, ma evita hashtag (#) per i titoli.
 `;
       systemInstruction += `
 **DOCUMENTI E CONTESTO DISPONIBILI:**
 ${filesContext}
-
-**LIMITE LUNGHEZZA RISPOSTA:** Massimo 50.000 token.
 
 6. Se la risposta non è nei documenti, dichiaralo.
 

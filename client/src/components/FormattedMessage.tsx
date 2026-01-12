@@ -100,17 +100,21 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             continue;
         }
 
-        // 1. Detect Tables (| col | col |)
-        if (line.startsWith('|') && line.endsWith('|')) {
+        // 1. Detect Tables (| col | col ...)
+        if (line.startsWith('|')) {
             const tableRows: string[][] = [];
             let j = i;
 
-            while (j < lines.length && lines[j].trim().startsWith('|') && lines[j].trim().endsWith('|')) {
+            while (j < lines.length && lines[j].trim().startsWith('|')) {
                 const rawLine = lines[j].trim();
-                // Skip separator lines (| --- | --- |) but keep track of them for styling if needed
-                if (!rawLine.match(/^[|\s\-:]+$/)) {
-                    const cells = rawLine.split('|').slice(1, -1).map(c => c.trim());
-                    tableRows.push(cells);
+                // Skip separator lines (| --- | --- |) 
+                if (!rawLine.match(/^[|\s\-:.]+$/)) {
+                    let cells = rawLine.split('|').slice(1);
+                    // If it ends with |, the last element is empty, so remove it
+                    if (rawLine.endsWith('|')) {
+                        cells = cells.slice(0, -1);
+                    }
+                    tableRows.push(cells.map(c => c.trim()));
                 }
                 j++;
             }
@@ -122,7 +126,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                             <thead>
                                 <tr className="bg-muted/50 border-b border-border">
                                     {tableRows[0].map((cell, idx) => (
-                                        <th key={`th-${idx}`} className="p-3 text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                                        <th key={`th-${idx}`} className="p-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                             {formatInline(cell, `th-${i}-${idx}`)}
                                         </th>
                                     ))}
@@ -142,9 +146,9 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                         </table>
                     </div>
                 );
+                i = j;
+                continue;
             }
-            i = j; // Move to the end of the table
-            continue;
         }
 
         // 2. Detect Headers
