@@ -1506,6 +1506,8 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
             const isMultimodal =
               source.type.startsWith('image/') ||
               source.type === 'application/pdf' ||
+              source.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX
+              source.type === 'application/msword' || // DOC
               source.type.startsWith('audio/') ||
               source.type.startsWith('video/') ||
               source.type === 'text/markdown' ||
@@ -1516,9 +1518,6 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
               source.type === 'application/xml' ||
               source.type === 'text/xml';
 
-            const isDOCX =
-              source.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX
-              source.type === 'application/msword'; // Old DOC
 
             if (isMultimodal) {
               return {
@@ -1570,7 +1569,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       // Calculate max response length - using tokens as per user request
       const maxTokens = 50000;
 
-      let systemInstruction = `Sei un assistente AI di ricerca esperto e professionale.
+      let systemInstruction = `Sei un assistente AI di ricerca esperto e professionale. Utilizzi motori di intelligenza multimodale per analizzare documenti in formato PDF, Microsoft Word (DOCX), RTF, Immagini e altri formati tecnici.
 `;
 
       // Check for memory file
