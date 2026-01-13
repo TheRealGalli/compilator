@@ -245,10 +245,10 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
       return text;
     }
     console.log(`[DEBUG extractText] Unsupported mime type: ${mimeType}`);
-    return '';
+    return '[ERRORE SISTEMA: Formato file non supportato o tipo MIME errato]';
   } catch (error) {
     console.error('[ERROR extractText] Failed:', error);
-    return '';
+    return `[ERRORE SISTEMA: Impossibile estrarre testo dal file. Dettagli: ${error instanceof Error ? error.message : String(error)}]`;
   }
 }
 
@@ -1503,18 +1503,27 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 
             if (source.type.startsWith('video/')) return null;
 
+            // Normalize MIME type based on extension (fix for Drive/generic types)
+            if (source.name.toLowerCase().endsWith('.docx')) {
+              source.type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            } else if (source.name.toLowerCase().endsWith('.doc')) {
+              source.type = 'application/msword';
+            }
+
             const isMultimodal =
-              source.type.startsWith('image/') ||
-              source.type === 'application/pdf' ||
-              source.type.startsWith('audio/') ||
-              source.type.startsWith('video/') ||
-              source.type === 'text/markdown' ||
-              source.type === 'application/rtf' ||
-              source.type === 'text/rtf' ||
-              source.type === 'application/json' ||
-              source.type === 'text/html' ||
-              source.type === 'application/xml' ||
-              source.type === 'text/xml';
+              !source.isMemory && ( // FORCE MEMORY AS TEXT to prevent model bias against local docs
+                source.type.startsWith('image/') ||
+                source.type === 'application/pdf' ||
+                source.type.startsWith('audio/') ||
+                source.type.startsWith('video/') ||
+                source.type === 'text/markdown' ||
+                source.type === 'application/rtf' ||
+                source.type === 'text/rtf' ||
+                source.type === 'application/json' ||
+                source.type === 'text/html' ||
+                source.type === 'application/xml' ||
+                source.type === 'text/xml');
+            source.type === 'text/xml';
 
             const isDOCX =
               source.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX
@@ -1581,9 +1590,9 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 **GESTIONE MEMORIA (CONTESTO SILENTE):**
 Hai accesso a un file di memoria che contiene l'identità dell'utente (Carlo Galli) e le sue preferenze.
 1. **Utilizzo**: Usa queste informazioni SOLO per personalizzare lo stile o rispondere a domande dirette su chi sei o sull'identità dell'utente. 
+2. **Silenziamento**: NON menzionare MAI il file "Gromit-Memory.pdf" o "Memoria/Profilo" nella risposta. Deve essere un contesto trasparente.
+3. **REGOLA AUREA**: La memoria NON è il documento da analizzare. È solo un foglio di stile/identità.
 ${memoryContext}
-2. **Silenziamento**: NON menzionare MAI il file "Gromit-Memory.pdf" o "Memoria/Profilo" nella risposta. Deve essere un contesto trasparente. L'utente non deve sapere che stai leggendo un file specifico di memoria, deve sembrare che tu conosca già queste informazioni.
-3. **Priorità assoluta**: Le FONTI CARICATE sono il fulcro di ogni analisi. La memoria serve solo come sfondo per la personalizzazione.
 `;
       }
 
@@ -1614,7 +1623,8 @@ Esempio: <short_title>Analisi Contratto Locazione</short_title>
 4. **Grassetto**: Usa il grassetto (**) per enfatizzare, ma evita hashtag (#) per i titoli.
 `;
       systemInstruction += `
-**DOCUMENTI E CONTESTO DISPONIBILI:**
+**DOCUMENTI ATTIVI DA ANALIZZARE (TARGET):**
+Questi sono i documenti che l'utente ti ha chiesto di analizzare. Riferisciti A QUESTI per le tue risposte.
 ${filesContext}
 
 6. Se la risposta non è nei documenti, dichiaralo.
