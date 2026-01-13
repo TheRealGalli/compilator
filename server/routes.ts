@@ -786,8 +786,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const isMultimodal =
       mimeType.startsWith('image/') ||
       mimeType === 'application/pdf' ||
-      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX
-      mimeType === 'application/msword' || // DOC
       mimeType.startsWith('audio/') ||
       mimeType.startsWith('video/') ||
       mimeType === 'text/markdown' ||
@@ -805,6 +803,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data: cleanBase64
         }
       };
+    } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || mimeType === 'application/msword') {
+      // Handle DOCX by extracting text
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      const textContent = await extractText(buffer, mimeType);
+      return { text: `Contenuto del documento Word (DOCX):\n${textContent}` };
     } else if (mimeType.startsWith('text/')) {
       // For other text-based files, just decode
       const textContent = Buffer.from(cleanBase64, 'base64').toString('utf-8');
@@ -1503,8 +1506,6 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
             const isMultimodal =
               source.type.startsWith('image/') ||
               source.type === 'application/pdf' ||
-              source.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX
-              source.type === 'application/msword' || // DOC
               source.type.startsWith('audio/') ||
               source.type.startsWith('video/') ||
               source.type === 'text/markdown' ||
@@ -1514,6 +1515,10 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
               source.type === 'text/html' ||
               source.type === 'application/xml' ||
               source.type === 'text/xml';
+
+            const isDOCX =
+              source.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX
+              source.type === 'application/msword'; // Old DOC
 
 
             if (isMultimodal) {
