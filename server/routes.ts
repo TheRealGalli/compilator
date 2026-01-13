@@ -786,6 +786,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const isMultimodal =
       mimeType.startsWith('image/') ||
       mimeType === 'application/pdf' ||
+      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX
+      mimeType === 'application/msword' || // DOC
       mimeType.startsWith('audio/') ||
       mimeType.startsWith('video/') ||
       mimeType === 'text/markdown' ||
@@ -803,11 +805,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data: cleanBase64
         }
       };
-    } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || mimeType === 'application/msword') {
-      // Handle DOCX by extracting text
-      const buffer = Buffer.from(cleanBase64, 'base64');
-      const textContent = await extractText(buffer, mimeType);
-      return { text: `Contenuto del documento Word (DOCX):\n${textContent}` };
     } else if (mimeType.startsWith('text/')) {
       // For other text-based files, just decode
       const textContent = Buffer.from(cleanBase64, 'base64').toString('utf-8');
@@ -1554,11 +1551,11 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
             if (!result.multimodal.isMemory) {
               filesContext += `- ${result.multimodal.name} (${result.multimodal.mimeType})\n`;
             } else {
-              memoryContext += `[DISPONIBILE ALLEGATO MULTIMODALE DI MEMORIA: ${result.multimodal.name}]\n`;
+              memoryContext += `[SISTEMA: Memoria Multimodale Identità]\n`;
             }
           } else if (result.text) {
             if (result.text.isMemory) {
-              memoryContext += `[INFO PRELEVATE DALLA TUA MEMORIA INTERNA]:\n${result.text.content}\n`;
+              memoryContext += `[SISTEMA: Memoria Testuale Identità]:\n${result.text.content}\n`;
             } else {
               filesContext += `\n--- CONTENUTO FILE: ${result.text.name} ---\n${result.text.content}\n--- FINE CONTENUTO FILE ---\n`;
             }
@@ -1577,12 +1574,12 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 
       if (hasMemory) {
         systemInstruction += `
-**GESTIONE MEMORIA (CONTESTO SILENTE):**
-Hai accesso a un file di memoria che contiene l'identità dell'utente (Carlo Galli) e le sue preferenze.
-1. **Utilizzo**: Usa queste informazioni SOLO per personalizzare lo stile o rispondere a domande dirette su chi sei o sull'identità dell'utente. 
+**GESTIONE MEMORIA (SILENZIAMENTO ASSOLUTO):**
+Hai accesso a un contesto di memoria che descrive l'utente (Carlo Galli). 
+1. **Regola d'Oro**: NON menzionare MAI il file di memoria, il suo nome ("Gromit-Memory.pdf"), né il fatto che tu stia leggendo un profilo utente. Deve sembrare che tu conosca Carlo Galli per esperienza diretta, non perché stai leggendo un allegato.
+2. **Utilizzo**: Usa queste info SOLO per dare del "tu" o personalizzare i saluti/lo stile. 
 ${memoryContext}
-2. **Silenziamento**: NON menzionare MAI il file "Gromit-Memory.pdf" o "Memoria/Profilo" nella risposta. Deve essere un contesto trasparente. L'utente non deve sapere che stai leggendo un file specifico di memoria, deve sembrare che tu conosca già queste informazioni.
-3. **Priorità assoluta**: Le FONTI CARICATE sono il fulcro di ogni analisi. La memoria serve solo come sfondo per la personalizzazione.
+3. **Divieto di Citazione**: Sotto nessuna circostanza devi elencare o includere la memoria tra le "fonti caricate" o i "documenti forniti" nella tua risposta. La memoria è silente e invisibile.
 `;
       }
 
@@ -1620,7 +1617,9 @@ ${filesContext}
 - Adatta il tuo linguaggio alla terminologia specifica usata nelle fonti (es. termini notarili, tecnici o legali specifici di quel fascicolo).
 
 **GUARDRAIL ALLEGATI E AZIONI FUTURE:**
-1. **DIVIETO DI INVENZIONE**: NON fare mai riferimento ad allegati, documenti o file che NON sono presenti nell'elenco delle "FONTI CARICATE" sopra riportato.
+1. **DIVIETO DI INVENZIONE E CITAZIONE MEMORIA**: 
+   - NON fare mai riferimento ad allegati, documenti o file che NON sono presenti nell'elenco delle "FONTI CARICATE" sopra riportato.
+   - Sotto nessuna circostanza devi elencare, citare o menzionare la tua memoria ("Gromit-Memory.pdf" o "SISTEMA") tra le fonti, i documenti forniti o nelle tabelle.
 2. **GESTIONE DOCUMENTI MANCANTI**: Se per rispondere correttamente rilevi che sarebbe necessario un documento non presente (es. una visura, un atto citato ma non allegato), dichiara chiaramente la sua assenza.
 3. **CALL-TO-ACTION (OBBLIGATORIO)**: Se menzioni la mancanza di un documento o suggerisci la creazione di un nuovo allegato/bozza, devi SEMPRE terminare la tua risposta con questa esatta frase:
    *"Desideri che io proceda con la generazione degli allegati sopra menzionati?"*
