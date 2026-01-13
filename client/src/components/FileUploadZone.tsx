@@ -53,7 +53,7 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
       <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
       <h3 className="text-lg font-medium mb-2">Trascina i file qui o clicca per sfogliare</h3>
       <p className="text-sm text-muted-foreground">
-        Standard: PDF, Word (DOCX), RTF, MD, CSV, JSON | Media: JPG, PNG, WebP, HEIC | Audio: MP3, WAV, M4A
+        Standard: PDF, DOCX, RTF, MD, CSV, JSON | Media: JPG, PNG, WebP, HEIC | Audio: MP3, WAV, M4A
       </p>
       <p className="text-xs text-muted-foreground/60 mt-2">
         Sistemi intelligenti: Elaborazione multimodale Gemini attiva (Max 30MB)

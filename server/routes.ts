@@ -1520,7 +1520,6 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
               source.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // DOCX
               source.type === 'application/msword'; // Old DOC
 
-
             if (isMultimodal) {
               return {
                 multimodal: {
@@ -1556,11 +1555,11 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
             if (!result.multimodal.isMemory) {
               filesContext += `- ${result.multimodal.name} (${result.multimodal.mimeType})\n`;
             } else {
-              memoryContext += `[SISTEMA: Memoria Multimodale Identità]\n`;
+              memoryContext += `[DISPONIBILE ALLEGATO MULTIMODALE DI MEMORIA: ${result.multimodal.name}]\n`;
             }
           } else if (result.text) {
             if (result.text.isMemory) {
-              memoryContext += `[SISTEMA: Memoria Testuale Identità]:\n${result.text.content}\n`;
+              memoryContext += `[INFO PRELEVATE DALLA TUA MEMORIA INTERNA]:\n${result.text.content}\n`;
             } else {
               filesContext += `\n--- CONTENUTO FILE: ${result.text.name} ---\n${result.text.content}\n--- FINE CONTENUTO FILE ---\n`;
             }
@@ -1571,7 +1570,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       // Calculate max response length - using tokens as per user request
       const maxTokens = 50000;
 
-      let systemInstruction = `Sei un assistente AI di ricerca esperto e professionale. Utilizzi motori di intelligenza multimodale per analizzare documenti in formato PDF, Microsoft Word (DOCX), RTF, Immagini e altri formati tecnici.
+      let systemInstruction = `Sei un assistente AI di ricerca esperto e professionale.
 `;
 
       // Check for memory file
@@ -1579,12 +1578,12 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 
       if (hasMemory) {
         systemInstruction += `
-**GESTIONE MEMORIA (SILENZIAMENTO ASSOLUTO):**
-Hai accesso a un contesto di memoria che descrive l'utente (Carlo Galli). 
-1. **Regola d'Oro**: NON menzionare MAI il file di memoria, il suo nome ("Gromit-Memory.pdf"), né il fatto che tu stia leggendo un profilo utente. Deve sembrare che tu conosca Carlo Galli per esperienza diretta, non perché stai leggendo un allegato.
-2. **Utilizzo**: Usa queste info SOLO per dare del "tu" o personalizzare i saluti/lo stile. 
+**GESTIONE MEMORIA (CONTESTO SILENTE):**
+Hai accesso a un file di memoria che contiene l'identità dell'utente (Carlo Galli) e le sue preferenze.
+1. **Utilizzo**: Usa queste informazioni SOLO per personalizzare lo stile o rispondere a domande dirette su chi sei o sull'identità dell'utente. 
 ${memoryContext}
-3. **Divieto di Citazione**: Sotto nessuna circostanza devi elencare o includere la memoria tra le "fonti caricate" o i "documenti forniti" nella tua risposta. La memoria è silente e invisibile.
+2. **Silenziamento**: NON menzionare MAI il file "Gromit-Memory.pdf" o "Memoria/Profilo" nella risposta. Deve essere un contesto trasparente. L'utente non deve sapere che stai leggendo un file specifico di memoria, deve sembrare che tu conosca già queste informazioni.
+3. **Priorità assoluta**: Le FONTI CARICATE sono il fulcro di ogni analisi. La memoria serve solo come sfondo per la personalizzazione.
 `;
       }
 
@@ -1602,8 +1601,11 @@ Esempio: <short_title>Analisi Contratto Locazione</short_title>
    | Colonna A | Colonna B |
    |:---|:---|
    | Dato 1 | Dato 2 |
-2. **Separazione Netta**: NON mischiare mai tabelle diverse. Chiudi sempre una tabella e inserisci un paragrafo di testo o una riga vuota prima di iniziarne un'altra.
-3. **Copia-Incolla**: Mantieni una struttura pulita e standard affinché l'utente possa incollare la risposta su Notion mantenendo la formattazione tabellare originale.
+2. **RESTRIZIONE TABELLE**: Usa le tabelle **STRETTAMENTE NECESSARIE SOLO PER LISTE DI DATI O PARAGONI**. 
+   - **VIETATO** scrivere risposte discorsive, spiegazioni o frasi lunghe all'interno di una tabella.
+   - Le spiegazioni e il testo discorsivo devono essere sempre fuori dalle tabelle, come normali paragrafi.
+3. **Separazione Netta**: NON mischiare mai tabelle diverse. Chiudi sempre una tabella e inserisci un paragrafo di testo o una riga vuota prima di iniziarne un'altra.
+4. **Copia-Incolla**: Mantieni una struttura pulita e standard affinché l'utente possa incollare la risposta su Notion mantenendo la formattazione tabellare originale.
 
 **RICHIESTE TECNICHE E LIMITI:**
 1. **Completezza**: Se l'utente richiede JSON, codice o dataset, fornisci SEMPRE l'output integrale (max 50.000 token). NON usare mai commenti come "// rest of code" o "..." per abbreviare.
@@ -1622,9 +1624,7 @@ ${filesContext}
 - Adatta il tuo linguaggio alla terminologia specifica usata nelle fonti (es. termini notarili, tecnici o legali specifici di quel fascicolo).
 
 **GUARDRAIL ALLEGATI E AZIONI FUTURE:**
-1. **DIVIETO DI INVENZIONE E CITAZIONE MEMORIA**: 
-   - NON fare mai riferimento ad allegati, documenti o file che NON sono presenti nell'elenco delle "FONTI CARICATE" sopra riportato.
-   - Sotto nessuna circostanza devi elencare, citare o menzionare la tua memoria ("Gromit-Memory.pdf" o "SISTEMA") tra le fonti, i documenti forniti o nelle tabelle.
+1. **DIVIETO DI INVENZIONE**: NON fare mai riferimento ad allegati, documenti o file che NON sono presenti nell'elenco delle "FONTI CARICATE" sopra riportato.
 2. **GESTIONE DOCUMENTI MANCANTI**: Se per rispondere correttamente rilevi che sarebbe necessario un documento non presente (es. una visura, un atto citato ma non allegato), dichiara chiaramente la sua assenza.
 3. **CALL-TO-ACTION (OBBLIGATORIO)**: Se menzioni la mancanza di un documento o suggerisci la creazione di un nuovo allegato/bozza, devi SEMPRE terminare la tua risposta con questa esatta frase:
    *"Desideri che io proceda con la generazione degli allegati sopra menzionati?"*

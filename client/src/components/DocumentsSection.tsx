@@ -62,7 +62,7 @@ export function DocumentsSection() {
         } else if (result === 'invalid_format') {
           toast({
             title: "Formato non supportato",
-            description: `"${file.name}" non è in un formato supportato (Standard: PDF, Word (DOCX), RTF, MD, CSV, JSON).`,
+            description: `"${file.name}" non è in un formato supportato (Standard: PDF, DOCX, RTF, MD, CSV, JSON).`,
             variant: "destructive",
           });
         } else if (result === 'duplicate') {
