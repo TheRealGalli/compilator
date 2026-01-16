@@ -1668,7 +1668,19 @@ ${filesContext}
         vertex_ai = vertexAICache.client;
       } else {
         console.log(`[API Chat] Initializing new Vertex AI client for ${location} (Tuned Model)`);
-        vertex_ai = new VertexAI({ project, location });
+
+        let authOptions = undefined;
+        if (process.env.GCP_CREDENTIALS) {
+          try {
+            const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
+            authOptions = { credentials };
+            console.log('[API Chat] Loaded GCP_CREDENTIALS from environment');
+          } catch (e) {
+            console.error('[ERROR] Failed to parse GCP_CREDENTIALS:', e);
+          }
+        }
+
+        vertex_ai = new VertexAI({ project, location, googleAuthOptions: authOptions });
         vertexAICache = { client: vertex_ai, project, location };
       }
 
