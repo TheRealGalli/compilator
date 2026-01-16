@@ -38,8 +38,8 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 // --- TUNED MODEL CONFIGURATION (ANALYZER ONLY) ---
 const ANALYZER_LOCATION = 'europe-west8';
 // Use full resource name for Tuned Models
-const ANALYZER_MODEL_ID = 'projects/983823068962/locations/europe-west8/models/2041793092780032000';
-// const ANALYZER_MODEL_ID = 'gemini-1.5-flash-002'; // TEST: Base model to verify europe-west8 connectivity
+// const ANALYZER_MODEL_ID = 'projects/983823068962/locations/europe-west8/models/2041793092780032000';
+const ANALYZER_MODEL_ID = 'gemini-2.5-flash'; // TEST: Base model to verify europe-west8 connectivity
 // -------------------------------------------------
 
 // Configurazione multer per gestire upload di file in memoria
