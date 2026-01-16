@@ -1657,7 +1657,9 @@ ${filesContext}
 
       // Initialize Vertex AI
       // Use Project Number matching the Tuned Model for consistency
-      const project = '983823068962'; // Explicit Project Number
+      // Use APP Project ID for Context/Auth, even when calling external Tuned Model
+      const project = process.env.GCP_PROJECT_ID || 'compilator-479214';
+      // const project = '983823068962'; // OLD: Model Project Number (Caused Auth Mismatch)
       const location = ANALYZER_LOCATION; // europe-west8
       const { VertexAI } = await import("@google-cloud/vertexai");
 
