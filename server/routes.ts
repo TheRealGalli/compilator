@@ -1654,16 +1654,22 @@ ${filesContext}
       }
 
       // Initialize Vertex AI
-      const project = process.env.GCP_PROJECT_ID;
+      const project = process.env.GCP_PROJECT_ID || 'compilator-479214'; // Fallback to hardcoded ID
       const location = ANALYZER_LOCATION; // Use european-west8 for Tuned Model
       const { VertexAI } = await import("@google-cloud/vertexai");
+
+      // Force cleanup of cache if location mismatch (simplistic cache invalidation)
+      if (vertexAICache && vertexAICache.location !== location) {
+        vertexAICache = null;
+      }
 
       let vertex_ai;
       if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
         vertex_ai = vertexAICache.client;
       } else {
+        console.log(`[API Chat] Initializing new Vertex AI client for ${location} (Tuned Model)`);
         vertex_ai = new VertexAI({ project, location });
-        vertexAICache = { client: vertex_ai, project: project!, location };
+        vertexAICache = { client: vertex_ai, project, location };
       }
 
       const model = vertex_ai.getGenerativeModel({
