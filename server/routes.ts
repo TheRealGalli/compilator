@@ -245,7 +245,10 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
       mimeType === 'text/tab-separated-values' ||
       mimeType === 'text/markdown' ||
       mimeType === 'text/rtf' ||
-      mimeType === 'application/rtf'
+      mimeType === 'application/rtf' ||
+      mimeType === 'application/json' ||
+      mimeType === 'application/ld+json' ||
+      mimeType === 'application/x-jsonlines'
     ) {
       const text = buffer.toString('utf-8');
       console.log(`[DEBUG extractText] Text-based file (${mimeType}), length: ${text.length}`);
