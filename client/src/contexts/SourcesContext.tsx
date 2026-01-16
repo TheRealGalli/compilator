@@ -29,7 +29,7 @@ const MAX_SOURCES = 10;
 const MAX_FILE_SIZE_MB = 30;
 
 const ALLOWED_EXTENSIONS = [
-    'pdf', 'docx', 'doc', 'txt', 'csv', 'rtf', 'md', 'json', 'xml', 'html',
+    'pdf', 'docx', 'doc', 'txt', 'csv', 'rtf', 'md', 'json', 'jsonl', 'xml', 'html',
     'jpg', 'jpeg', 'png', 'webp', 'heic',
     'mp3', 'wav', 'm4a'
 ];
