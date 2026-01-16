@@ -1750,6 +1750,14 @@ ${filesContext}
           console.log('[DEBUG Chat] Disabled tools for Tuned Model request');
         }
 
+        // Check if systemInstruction is being passed correctly
+        if (tunedOptions.systemInstruction) {
+          console.log('[DEBUG Chat] System Instruction present in payload (first 100 chars):',
+            JSON.stringify(tunedOptions.systemInstruction).substring(0, 100) + '...');
+        } else {
+          console.warn('[CRITICAL Chat] System Instruction ISSING in tunedOptions!');
+        }
+
         result = await model.generateContent(tunedOptions);
       } catch (tunedError: any) {
         console.error('[CRITICAL Chat] Tuned Model failed generation.', {
