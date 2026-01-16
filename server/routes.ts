@@ -37,8 +37,8 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // --- TUNED MODEL CONFIGURATION (ANALYZER ONLY) ---
 const ANALYZER_LOCATION = 'europe-west8';
-// Use just the Model ID number, letting the SDK construct the full path with the client's project/location
-const ANALYZER_MODEL_ID = '2041793092780032000'; // Was full generic path before
+// Use full resource name for Tuned Models
+const ANALYZER_MODEL_ID = 'projects/983823068962/locations/europe-west8/models/2041793092780032000';
 // -------------------------------------------------
 
 // Configurazione multer per gestire upload di file in memoria
@@ -1683,7 +1683,9 @@ ${filesContext}
           }
         }
 
-        vertex_ai = new VertexAI({ project, location, googleAuthOptions: authOptions });
+        const apiEndpoint = `${location}-aiplatform.googleapis.com`;
+        console.log(`[DEBUG Chat] Using explicit API Endpoint: ${apiEndpoint}`);
+        vertex_ai = new VertexAI({ project, location, apiEndpoint, googleAuthOptions: authOptions });
         vertexAICache = { client: vertex_ai, project, location };
       }
 
