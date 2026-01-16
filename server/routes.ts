@@ -1656,8 +1656,8 @@ ${filesContext}
       }
 
       // Initialize Vertex AI
-      // Use App's Project ID for Quota/Auth, even if model is in another project
-      const project = process.env.GCP_PROJECT_ID || 'compilator-479214';
+      // Use Project Number matching the Tuned Model for consistency
+      const project = '983823068962'; // Explicit Project Number
       const location = ANALYZER_LOCATION; // europe-west8
       const { VertexAI } = await import("@google-cloud/vertexai");
 
