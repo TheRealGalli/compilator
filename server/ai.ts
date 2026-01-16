@@ -5,9 +5,9 @@ export class AiService {
     private vertex_ai: VertexAI;
     private projectId: string;
     private location: string;
-    private modelId = 'gemini-2.5-flash';
+    private modelId = 'projects/983823068962/locations/europe-west8/models/2041793092780032000';
 
-    constructor(projectId: string, location: string = 'europe-west1') {
+    constructor(projectId: string, location: string = 'europe-west8') {
         this.projectId = projectId;
         this.location = location;
         this.vertex_ai = new VertexAI({ project: projectId, location: location });
