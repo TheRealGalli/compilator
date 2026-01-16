@@ -1600,18 +1600,19 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
             }
           }
         }
+      }
 
-        // Calculate max response length - using tokens as per user request
-        const maxTokens = 50000;
+      // Calculate max response length - using tokens as per user request
+      const maxTokens = 50000;
 
-        let systemInstruction = `Sei un assistente AI di ricerca esperto e professionale.
+      let systemInstruction = `Sei un assistente AI di ricerca esperto e professionale.
 `;
 
-        // Check for memory file
-        const hasMemory = sources?.some((s: any) => s.isMemory);
+      // Check for memory file
+      const hasMemory = sources?.some((s: any) => s.isMemory);
 
-        if (hasMemory) {
-          systemInstruction += `
+      if (hasMemory) {
+        systemInstruction += `
 **GESTIONE MEMORIA (CONTESTO SILENTE):**
 Hai accesso a un file di memoria che contiene l'identità dell'utente (Carlo Galli) e le sue preferenze.
 1. **Utilizzo**: Usa queste informazioni SOLO per personalizzare lo stile o rispondere a domande dirette su chi sei o sull'identità dell'utente. 
@@ -1619,16 +1620,16 @@ Hai accesso a un file di memoria che contiene l'identità dell'utente (Carlo Gal
 3. **REGOLA AUREA**: La memoria NON è il documento da analizzare. È solo un foglio di stile/identità.
 ${memoryContext}
 `;
-        }
+      }
 
-        systemInstruction += `
+      systemInstruction += `
 
 **TITOLO RIASSUNTIVO (OBBLIGATORIO):**
 Alla fine di ogni risposta, aggiungi SEMPRE un titolo estremamente breve (max 5 parole) che riassuma il contenuto del messaggio, racchiuso tra i tag <short_title> e </short_title>.
 Esempio: <short_title>Analisi Contratto Locazione</short_title>
 `;
 
-        systemInstruction += `
+      systemInstruction += `
 **TABELLE E FORMATTAZIONE (CALIBRAZIONE NOTION):**
 1. **Sintassi GFM Rigorosa**: Per ogni tabella, ogni riga (inclusa intestazione e separatore) DEVE iniziare e finire con il carattere pipe \`|\`. Usa la riga di separazione standard \`|---|---|\`.
    Esempio corretto:
@@ -1647,7 +1648,7 @@ Esempio: <short_title>Analisi Contratto Locazione</short_title>
 3. **Elenchi**: Usa elenchi puntati (-) per migliorare la leggibilità fuori dalle tabelle.
 4. **Grassetto**: Usa il grassetto (**) per enfatizzare, ma evita hashtag (#) per i titoli.
 `;
-        systemInstruction += `
+      systemInstruction += `
 **DOCUMENTI ATTIVI DA ANALIZZARE (TARGET):**
 Questi sono i documenti che l'utente ti ha chiesto di analizzare. Riferisciti A QUESTI per le tue risposte.
 ${filesContext}
@@ -1668,154 +1669,154 @@ ${filesContext}
    *"IMPORTANTE: Questa risposta comporta o suggerisce valutazioni legali autonome. Il sistema funge da supporto al linguaggio tecnico; l'output deve essere ricontrollato attentamente da un professionista umano."*
 `;
 
-        if (webResearch) {
-          systemInstruction += `\n**MODALITÀ WEB RESEARCH ATTIVA**: Usa lo strumento di ricerca per link o info mancanti.
+      if (webResearch) {
+        systemInstruction += `\n**MODALITÀ WEB RESEARCH ATTIVA**: Usa lo strumento di ricerca per link o info mancanti.
 - **GROUNDING VS COMPLETEZZA**: Se l'utente richiede un intero dataset, JSON o un output tecnico esteso, dai priorità alla COMPLETEZZA dell'output (come da ISTRUZIONI BASE) anche se stai usando informazioni prelevate dal web. NON troncare dataset per brevità.`;
-        }
-
-        // Initialize Vertex AI
-        const project = process.env.GCP_PROJECT_ID;
-        const location = 'europe-west1'; // Revert to standard region
-        const { VertexAI } = await import("@google-cloud/vertexai");
-
-        // Force cleanup of cache if location mismatch
-        if (vertexAICache && (vertexAICache.location !== location || vertexAICache.project !== project)) {
-          console.log('[DEBUG Chat] Clearing Vertex AI Cache due to project/location change');
-          vertexAICache = null;
-        }
-
-        let vertex_ai;
-        if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
-          vertex_ai = vertexAICache.client;
-        } else {
-          console.log(`[API Chat] Initializing new Vertex AI client for ${location}`);
-
-          let authOptions = undefined;
-          if (process.env.GCP_CREDENTIALS) {
-            try {
-              const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
-              authOptions = { credentials };
-            } catch (e) {
-              console.error('[API Chat] Failed to parse GCP_CREDENTIALS', e);
-            }
-          }
-
-          vertex_ai = new VertexAI({ project, location, googleAuthOptions: authOptions });
-          vertexAICache = { client: vertex_ai, project: project!, location };
-        }
-
-        console.log(`[DEBUG Chat] Using Project: ${project}, Location: ${location}`);
-        console.log(`[DEBUG Chat] Model ID: ${ANALYZER_MODEL_ID}`); // Will be 'gemini-2.5-flash'
-
-        const model = vertex_ai.getGenerativeModel({
-          model: ANALYZER_MODEL_ID,
-          systemInstruction: {
-            role: 'system',
-            parts: [{ text: systemInstruction }]
-          }
-        });
-
-        // Map messages
-        const coreMessages = messages.map((msg: any) => {
-          // Simplified mapping
-          const role = msg.role === 'assistant' ? 'model' : 'user';
-          const parts = [{ text: typeof msg.content === 'string' ? msg.content : '' }];
-          return { role, parts };
-        });
-
-        // Vertex AI requires history to start with 'user'. Remove leading 'model' messages.
-        while (coreMessages.length > 0 && coreMessages[0].role === 'model') {
-          console.log('[DEBUG Chat] Removed leading MODEL message from history to satisfy API requirements.');
-          coreMessages.shift();
-        }
-
-        // Attach multimodal to last message
-        if (multimodalFiles.length > 0 && coreMessages.length > 0) {
-          const lastMsg = coreMessages[coreMessages.length - 1];
-          if (lastMsg.role === 'user') {
-            const fileParts = await Promise.all(multimodalFiles.map(f => fileToPart(f.base64, f.mimeType)));
-            (lastMsg.parts as any[]).push(...fileParts);
-          }
-        }
-
-        const generateOptions: any = {
-          contents: coreMessages,
-          generationConfig: {
-            maxOutputTokens: 50000,
-            temperature: req.body.temperature || 0.3
-          }
-        };
-
-        if (webResearch) {
-          generateOptions.tools = [{ googleSearch: {} }];
-        }
-
-        let result;
-        try {
-          console.log(`[DEBUG Chat] Attempting generation with Tuned Model: ${ANALYZER_MODEL_ID}`);
-          console.log('[DEBUG Chat] GenerateOptions Payload:', JSON.stringify(generateOptions, null, 2));
-
-          // Tuned Models often have issues with tools/Search. Disable them for the tuned attempt.
-          // We keep this filter as it's a known constraint.
-          const tunedOptions = { ...generateOptions };
-          if (tunedOptions.tools) {
-            delete tunedOptions.tools;
-            console.log('[DEBUG Chat] Disabled tools for Tuned Model request');
-          }
-
-          // Check if systemInstruction is being passed correctly
-          if (tunedOptions.systemInstruction) {
-            console.log('[DEBUG Chat] System Instruction present in payload (first 100 chars):',
-              JSON.stringify(tunedOptions.systemInstruction).substring(0, 100) + '...');
-          } else {
-            console.warn('[CRITICAL Chat] System Instruction MISSSING in tunedOptions!');
-          }
-
-          result = await model.generateContent(tunedOptions);
-        } catch (tunedError: any) {
-          console.error('[CRITICAL Chat] Tuned Model failed generation.', {
-            message: tunedError.message,
-            status: tunedError.status,
-            statusText: tunedError.statusText,
-            response: tunedError.response ? JSON.stringify(tunedError.response) : 'No response body',
-            rawResponse: tunedError.rawResponse
-          });
-          throw tunedError;
-        }
-
-        const response = await result.response;
-
-        let text = '';
-        let groundingMetadata = null;
-        let searchEntryPoint = null;
-
-        if (response.candidates && response.candidates.length > 0) {
-          const candidate = response.candidates[0];
-          if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-            text = candidate.content.parts.map((p: any) => p.text || '').join('');
-          }
-          if (candidate.groundingMetadata) {
-            groundingMetadata = candidate.groundingMetadata;
-            if (groundingMetadata.searchEntryPoint?.renderedContent) {
-              searchEntryPoint = groundingMetadata.searchEntryPoint.renderedContent;
-            }
-          }
-        }
-
-        let shortTitle = "";
-        const titleMatch = text.match(/<short_title>([\s\S]*?)<\/short_title>/);
-        if (titleMatch) {
-          shortTitle = titleMatch[1].trim();
-          text = text.replace(/<short_title>[\s\S]*?<\/short_title>/, "").trim();
-        }
-
-        res.json({ text, groundingMetadata, searchEntryPoint, shortTitle });
-
-      } catch (error: any) {
-        console.error('Errore durante chat:', error);
-        res.status(500).json({ error: error.message || 'Errore durante chat' });
       }
-    });
+
+      // Initialize Vertex AI
+      const project = process.env.GCP_PROJECT_ID;
+      const location = 'europe-west1'; // Revert to standard region
+      const { VertexAI } = await import("@google-cloud/vertexai");
+
+      // Force cleanup of cache if location mismatch
+      if (vertexAICache && (vertexAICache.location !== location || vertexAICache.project !== project)) {
+        console.log('[DEBUG Chat] Clearing Vertex AI Cache due to project/location change');
+        vertexAICache = null;
+      }
+
+      let vertex_ai;
+      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+        vertex_ai = vertexAICache.client;
+      } else {
+        console.log(`[API Chat] Initializing new Vertex AI client for ${location}`);
+
+        let authOptions = undefined;
+        if (process.env.GCP_CREDENTIALS) {
+          try {
+            const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
+            authOptions = { credentials };
+          } catch (e) {
+            console.error('[API Chat] Failed to parse GCP_CREDENTIALS', e);
+          }
+        }
+
+        vertex_ai = new VertexAI({ project, location, googleAuthOptions: authOptions });
+        vertexAICache = { client: vertex_ai, project: project!, location };
+      }
+
+      console.log(`[DEBUG Chat] Using Project: ${project}, Location: ${location}`);
+      console.log(`[DEBUG Chat] Model ID: ${ANALYZER_MODEL_ID}`); // Will be 'gemini-2.5-flash'
+
+      const model = vertex_ai.getGenerativeModel({
+        model: ANALYZER_MODEL_ID,
+        systemInstruction: {
+          role: 'system',
+          parts: [{ text: systemInstruction }]
+        }
+      });
+
+      // Map messages
+      const coreMessages = messages.map((msg: any) => {
+        // Simplified mapping
+        const role = msg.role === 'assistant' ? 'model' : 'user';
+        const parts = [{ text: typeof msg.content === 'string' ? msg.content : '' }];
+        return { role, parts };
+      });
+
+      // Vertex AI requires history to start with 'user'. Remove leading 'model' messages.
+      while (coreMessages.length > 0 && coreMessages[0].role === 'model') {
+        console.log('[DEBUG Chat] Removed leading MODEL message from history to satisfy API requirements.');
+        coreMessages.shift();
+      }
+
+      // Attach multimodal to last message
+      if (multimodalFiles.length > 0 && coreMessages.length > 0) {
+        const lastMsg = coreMessages[coreMessages.length - 1];
+        if (lastMsg.role === 'user') {
+          const fileParts = await Promise.all(multimodalFiles.map(f => fileToPart(f.base64, f.mimeType)));
+          (lastMsg.parts as any[]).push(...fileParts);
+        }
+      }
+
+      const generateOptions: any = {
+        contents: coreMessages,
+        generationConfig: {
+          maxOutputTokens: 50000,
+          temperature: req.body.temperature || 0.3
+        }
+      };
+
+      if (webResearch) {
+        generateOptions.tools = [{ googleSearch: {} }];
+      }
+
+      let result;
+      try {
+        console.log(`[DEBUG Chat] Attempting generation with Tuned Model: ${ANALYZER_MODEL_ID}`);
+        console.log('[DEBUG Chat] GenerateOptions Payload:', JSON.stringify(generateOptions, null, 2));
+
+        // Tuned Models often have issues with tools/Search. Disable them for the tuned attempt.
+        // We keep this filter as it's a known constraint.
+        const tunedOptions = { ...generateOptions };
+        if (tunedOptions.tools) {
+          delete tunedOptions.tools;
+          console.log('[DEBUG Chat] Disabled tools for Tuned Model request');
+        }
+
+        // Check if systemInstruction is being passed correctly
+        if (tunedOptions.systemInstruction) {
+          console.log('[DEBUG Chat] System Instruction present in payload (first 100 chars):',
+            JSON.stringify(tunedOptions.systemInstruction).substring(0, 100) + '...');
+        } else {
+          console.warn('[CRITICAL Chat] System Instruction MISSSING in tunedOptions!');
+        }
+
+        result = await model.generateContent(tunedOptions);
+      } catch (tunedError: any) {
+        console.error('[CRITICAL Chat] Tuned Model failed generation.', {
+          message: tunedError.message,
+          status: tunedError.status,
+          statusText: tunedError.statusText,
+          response: tunedError.response ? JSON.stringify(tunedError.response) : 'No response body',
+          rawResponse: tunedError.rawResponse
+        });
+        throw tunedError;
+      }
+
+      const response = await result.response;
+
+      let text = '';
+      let groundingMetadata = null;
+      let searchEntryPoint = null;
+
+      if (response.candidates && response.candidates.length > 0) {
+        const candidate = response.candidates[0];
+        if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+          text = candidate.content.parts.map((p: any) => p.text || '').join('');
+        }
+        if (candidate.groundingMetadata) {
+          groundingMetadata = candidate.groundingMetadata;
+          if (groundingMetadata.searchEntryPoint?.renderedContent) {
+            searchEntryPoint = groundingMetadata.searchEntryPoint.renderedContent;
+          }
+        }
+      }
+
+      let shortTitle = "";
+      const titleMatch = text.match(/<short_title>([\s\S]*?)<\/short_title>/);
+      if (titleMatch) {
+        shortTitle = titleMatch[1].trim();
+        text = text.replace(/<short_title>[\s\S]*?<\/short_title>/, "").trim();
+      }
+
+      res.json({ text, groundingMetadata, searchEntryPoint, shortTitle });
+
+    } catch (error: any) {
+      console.error('Errore durante chat:', error);
+      res.status(500).json({ error: error.message || 'Errore durante chat' });
+    }
+  });
 
 
   // --- EXTRACT IDENTITY ENDPOINT ---
