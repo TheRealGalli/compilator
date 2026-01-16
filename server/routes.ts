@@ -1684,6 +1684,10 @@ ${filesContext}
         vertexAICache = { client: vertex_ai, project, location };
       }
 
+      console.log(`[DEBUG Chat] Using Project: ${project}, Location: ${location}`);
+      console.log(`[DEBUG Chat] Model ID: ${ANALYZER_MODEL_ID}`);
+      console.log(`[DEBUG Chat] Auth Options Present: ${!!vertex_ai.preview.googleAuthOptions}`); // internal check
+
       const model = vertex_ai.getGenerativeModel({
         model: ANALYZER_MODEL_ID, // Use Notaro Gromit Tuned Model
         systemInstruction: {
