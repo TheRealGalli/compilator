@@ -1753,20 +1753,11 @@ ${filesContext}
         }
 
         // Check if systemInstruction is being passed correctly
-        // Check if systemInstruction is being passed correctly
-        /*
         if (tunedOptions.systemInstruction) {
           console.log('[DEBUG Chat] System Instruction present in payload (first 100 chars):',
             JSON.stringify(tunedOptions.systemInstruction).substring(0, 100) + '...');
         } else {
           console.warn('[CRITICAL Chat] System Instruction MISSSING in tunedOptions!');
-        }
-        */
-
-        // TEST: Remove systemInstruction entirely to check if it causes the crash
-        if (tunedOptions.systemInstruction) {
-          console.log('[DEBUG Chat] REMOVING systemInstruction for compatibility test');
-          delete tunedOptions.systemInstruction;
         }
 
         result = await model.generateContent(tunedOptions);
