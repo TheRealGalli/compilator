@@ -35,6 +35,11 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 // Cache for Document AI layout results (Key: base64 hash, Value: discovered fields)
 // [Removed legacy layout cache]
 
+// --- TUNED MODEL CONFIGURATION (ANALYZER ONLY) ---
+const ANALYZER_LOCATION = 'europe-west8';
+const ANALYZER_MODEL_ID = 'projects/983823068962/locations/europe-west8/models/2041793092780032000';
+// -------------------------------------------------
+
 // Configurazione multer per gestire upload di file in memoria
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -1650,7 +1655,7 @@ ${filesContext}
 
       // Initialize Vertex AI
       const project = process.env.GCP_PROJECT_ID;
-      const location = 'europe-west1';
+      const location = ANALYZER_LOCATION; // Use european-west8 for Tuned Model
       const { VertexAI } = await import("@google-cloud/vertexai");
 
       let vertex_ai;
@@ -1662,7 +1667,7 @@ ${filesContext}
       }
 
       const model = vertex_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: ANALYZER_MODEL_ID, // Use Notaro Gromit Tuned Model
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemInstruction }]
