@@ -1654,12 +1654,14 @@ ${filesContext}
       }
 
       // Initialize Vertex AI
-      const project = process.env.GCP_PROJECT_ID || 'compilator-479214'; // Fallback to hardcoded ID
-      const location = ANALYZER_LOCATION; // Use european-west8 for Tuned Model
+      // USE PROJECT NUMBER FROM MODEL ID TO AVOID MISMATCH
+      const project = '983823068962';
+      const location = ANALYZER_LOCATION; // europe-west8
       const { VertexAI } = await import("@google-cloud/vertexai");
 
       // Force cleanup of cache if location mismatch (simplistic cache invalidation)
-      if (vertexAICache && vertexAICache.location !== location) {
+      if (vertexAICache && (vertexAICache.location !== location || vertexAICache.project !== project)) {
+        console.log('[DEBUG Chat] Clearing Vertex AI Cache due to project/location change');
         vertexAICache = null;
       }
 
@@ -1725,7 +1727,19 @@ ${filesContext}
         generateOptions.tools = [{ googleSearch: {} }];
       }
 
-      const result = await model.generateContent(generateOptions);
+      let result;
+      try {
+        result = await model.generateContent(generateOptions);
+      } catch (genError: any) {
+        console.error('[CRITICAL Chat] Error calling Vertex AI generateContent:', genError);
+        // Try to log more details if available
+        if (genError.response) {
+          console.error('[CRITICAL Chat] Logged Response Status:', genError.response.status);
+          console.error('[CRITICAL Chat] Logged Response Headers:', genError.response.headers);
+        }
+        throw genError;
+      }
+
       const response = await result.response;
 
       let text = '';
