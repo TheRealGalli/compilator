@@ -1709,6 +1709,12 @@ ${filesContext}
         return { role, parts };
       });
 
+      // Vertex AI requires history to start with 'user'. Remove leading 'model' messages.
+      while (coreMessages.length > 0 && coreMessages[0].role === 'model') {
+        console.log('[DEBUG Chat] Removed leading MODEL message from history to satisfy API requirements.');
+        coreMessages.shift();
+      }
+
       // Attach multimodal to last message
       if (multimodalFiles.length > 0 && coreMessages.length > 0) {
         const lastMsg = coreMessages[coreMessages.length - 1];
