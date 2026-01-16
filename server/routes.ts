@@ -36,9 +36,9 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 // [Removed legacy layout cache]
 
 // --- TUNED MODEL CONFIGURATION (ANALYZER ONLY) ---
-const ANALYZER_LOCATION = 'europe-west8';
+const ANALYZER_LOCATION = 'europe-west1';
 // Use full resource name for Tuned Models
-const ANALYZER_MODEL_ID = 'projects/983823068962/locations/europe-west8/models/2041793092780032000';
+const ANALYZER_MODEL_ID = 'gemini-2.5-flash';
 // const ANALYZER_MODEL_ID = 'gemini-2.5-flash'; // TEST: Base model to verify europe-west8 connectivity
 // -------------------------------------------------
 
@@ -1656,14 +1656,11 @@ ${filesContext}
       }
 
       // Initialize Vertex AI
-      // Use Project Number matching the Tuned Model for consistency
-      // Use APP Project ID for Context/Auth, even when calling external Tuned Model
-      const project = process.env.GCP_PROJECT_ID || 'compilator-479214';
-      // const project = '983823068962'; // OLD: Model Project Number (Caused Auth Mismatch)
-      const location = ANALYZER_LOCATION; // europe-west8
+      const project = process.env.GCP_PROJECT_ID;
+      const location = 'europe-west1'; // Revert to standard region
       const { VertexAI } = await import("@google-cloud/vertexai");
 
-      // Force cleanup of cache if location mismatch (simplistic cache invalidation)
+      // Force cleanup of cache if location mismatch
       if (vertexAICache && (vertexAICache.location !== location || vertexAICache.project !== project)) {
         console.log('[DEBUG Chat] Clearing Vertex AI Cache due to project/location change');
         vertexAICache = null;
@@ -1673,31 +1670,27 @@ ${filesContext}
       if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
         vertex_ai = vertexAICache.client;
       } else {
-        console.log(`[API Chat] Initializing new Vertex AI client for ${location} (Tuned Model)`);
+        console.log(`[API Chat] Initializing new Vertex AI client for ${location}`);
 
         let authOptions = undefined;
         if (process.env.GCP_CREDENTIALS) {
           try {
             const credentials = JSON.parse(process.env.GCP_CREDENTIALS);
             authOptions = { credentials };
-            console.log('[API Chat] Loaded GCP_CREDENTIALS from environment');
           } catch (e) {
-            console.error('[ERROR] Failed to parse GCP_CREDENTIALS:', e);
+            console.error('[API Chat] Failed to parse GCP_CREDENTIALS', e);
           }
         }
 
-        const apiEndpoint = `${location}-aiplatform.googleapis.com`;
-        console.log(`[DEBUG Chat] Using explicit API Endpoint: ${apiEndpoint}`);
-        vertex_ai = new VertexAI({ project, location, apiEndpoint, googleAuthOptions: authOptions });
-        vertexAICache = { client: vertex_ai, project, location };
+        vertex_ai = new VertexAI({ project, location, googleAuthOptions: authOptions });
+        vertexAICache = { client: vertex_ai, project: project!, location };
       }
 
       console.log(`[DEBUG Chat] Using Project: ${project}, Location: ${location}`);
-      console.log(`[DEBUG Chat] Model ID: ${ANALYZER_MODEL_ID}`);
-      console.log(`[DEBUG Chat] Auth Options Present: ${!!vertex_ai.preview.googleAuthOptions}`); // internal check
+      console.log(`[DEBUG Chat] Model ID: ${ANALYZER_MODEL_ID}`); // Will be 'gemini-2.5-flash'
 
       const model = vertex_ai.getGenerativeModel({
-        model: ANALYZER_MODEL_ID, // Use Notaro Gromit Tuned Model
+        model: ANALYZER_MODEL_ID,
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemInstruction }]
