@@ -37,7 +37,8 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // --- TUNED MODEL CONFIGURATION (ANALYZER ONLY) ---
 const ANALYZER_LOCATION = 'europe-west8';
-const ANALYZER_MODEL_ID = 'projects/983823068962/locations/europe-west8/models/2041793092780032000';
+// Use just the Model ID number, letting the SDK construct the full path with the client's project/location
+const ANALYZER_MODEL_ID = '2041793092780032000'; // Was full generic path before
 // -------------------------------------------------
 
 // Configurazione multer per gestire upload di file in memoria
@@ -1729,6 +1730,7 @@ ${filesContext}
 
       let result;
       try {
+        console.log('[DEBUG Chat] GenerateOptions Payload:', JSON.stringify(generateOptions, null, 2));
         result = await model.generateContent(generateOptions);
       } catch (genError: any) {
         console.error('[CRITICAL Chat] Error calling Vertex AI generateContent:', genError);
