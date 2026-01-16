@@ -1739,16 +1739,37 @@ ${filesContext}
 
       let result;
       try {
+        console.log(`[DEBUG Chat] Attempting generation with Tuned Model: ${ANALYZER_MODEL_ID}`);
         console.log('[DEBUG Chat] GenerateOptions Payload:', JSON.stringify(generateOptions, null, 2));
-        result = await model.generateContent(generateOptions);
-      } catch (genError: any) {
-        console.error('[CRITICAL Chat] Error calling Vertex AI generateContent:', genError);
-        // Try to log more details if available
-        if (genError.response) {
-          console.error('[CRITICAL Chat] Logged Response Status:', genError.response.status);
-          console.error('[CRITICAL Chat] Logged Response Headers:', genError.response.headers);
+
+        // Tuned Models often have issues with tools/Search. Disable them for the tuned attempt.
+        const tunedOptions = { ...generateOptions };
+        if (tunedOptions.tools) {
+          delete tunedOptions.tools;
+          console.log('[DEBUG Chat] Disabled tools for Tuned Model request');
         }
-        throw genError;
+
+        result = await model.generateContent(tunedOptions);
+      } catch (tunedError: any) {
+        console.error('[CRITICAL Chat] Tuned Model failed. Falling back to Base Model.', {
+          message: tunedError.message,
+          status: tunedError.status,
+          statusText: tunedError.statusText,
+          // Try to log response body/details if available
+          response: tunedError.response ? JSON.stringify(tunedError.response) : 'No response body',
+          rawResponse: tunedError.rawResponse
+        });
+
+        // Fallback to Base Model
+        console.log('[DEBUG Chat] Fallback: Initializing gemini-2.5-flash');
+        const fallbackModel = vertex_ai.getGenerativeModel({
+          model: 'gemini-2.5-flash',
+          safetySettings: model.safetySettings,
+          generationConfig: model.generationConfig
+        });
+
+        // Use original options (potentially with Tools) for base model
+        result = await fallbackModel.generateContent(generateOptions);
       }
 
       const response = await result.response;
