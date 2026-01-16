@@ -1743,6 +1743,7 @@ ${filesContext}
         console.log('[DEBUG Chat] GenerateOptions Payload:', JSON.stringify(generateOptions, null, 2));
 
         // Tuned Models often have issues with tools/Search. Disable them for the tuned attempt.
+        // We keep this filter as it's a known constraint.
         const tunedOptions = { ...generateOptions };
         if (tunedOptions.tools) {
           delete tunedOptions.tools;
@@ -1751,25 +1752,14 @@ ${filesContext}
 
         result = await model.generateContent(tunedOptions);
       } catch (tunedError: any) {
-        console.error('[CRITICAL Chat] Tuned Model failed. Falling back to Base Model.', {
+        console.error('[CRITICAL Chat] Tuned Model failed generation.', {
           message: tunedError.message,
           status: tunedError.status,
           statusText: tunedError.statusText,
-          // Try to log response body/details if available
           response: tunedError.response ? JSON.stringify(tunedError.response) : 'No response body',
           rawResponse: tunedError.rawResponse
         });
-
-        // Fallback to Base Model
-        console.log('[DEBUG Chat] Fallback: Initializing gemini-2.5-flash');
-        const fallbackModel = vertex_ai.getGenerativeModel({
-          model: 'gemini-2.5-flash',
-          safetySettings: model.safetySettings,
-          generationConfig: model.generationConfig
-        });
-
-        // Use original options (potentially with Tools) for base model
-        result = await fallbackModel.generateContent(generateOptions);
+        throw tunedError;
       }
 
       const response = await result.response;
