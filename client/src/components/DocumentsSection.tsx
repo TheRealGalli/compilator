@@ -171,8 +171,7 @@ export function DocumentsSection() {
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: data.mimeType });
         const file = new File([blob], data.name, { type: data.mimeType });
-
-        const result = await addSource(file);
+        const result = await addSource(file, { driveId: fileId });
         if (result === 'success') {
           toast({
             title: "File Importato",

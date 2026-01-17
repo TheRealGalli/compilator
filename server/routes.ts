@@ -244,6 +244,19 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
       const result = await mammoth.extractRawText({ buffer });
       console.log(`[DEBUG extractText] DOCX parsed, text length: ${result.value.length}`);
       return result.value;
+    } else if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+      // XLSX Support via SheetJS (xlsx)
+      const xlsx = await import('xlsx');
+      const workbook = xlsx.read(buffer, { type: 'buffer' });
+      let fullText = '';
+      workbook.SheetNames.forEach(sheetName => {
+        const sheet = workbook.Sheets[sheetName];
+        // Convert sheet to CSV for text representation
+        const csv = xlsx.utils.sheet_to_csv(sheet);
+        fullText += `[FOGLIO DI CALCOLO: ${sheetName}]\n${csv}\n\n`;
+      });
+      console.log(`[DEBUG extractText] XLSX parsed, sheets: ${workbook.SheetNames.length}`);
+      return fullText;
     } else if (
       mimeType === 'text/plain' ||
       mimeType === 'text/csv' ||
@@ -627,14 +640,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         finalMimeType = 'text/plain';
         finalFileName = fileName.endsWith('.txt') ? fileName : `${fileName}.txt`;
       } else if (mimeType === 'application/vnd.google-apps.spreadsheet') {
-        // Export Google Sheet as CSV
+        // Export Google Sheet as XLSX
         const exportRes = await drive.files.export({
           fileId: id,
-          mimeType: 'text/csv'
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         }, { responseType: 'arraybuffer' });
         data = Buffer.from(exportRes.data as ArrayBuffer);
-        finalMimeType = 'text/csv';
-        finalFileName = fileName.endsWith('.csv') ? fileName : `${fileName}.csv`;
+        finalMimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        finalFileName = fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`;
       } else {
         // Download binary file (PDF, etc.)
         const downloadRes = await drive.files.get({
@@ -1564,7 +1577,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
               return {
                 multimodal: {
                   name: source.name,
-                  id: source.id,
+                  id: source.driveId || source.id,
                   mimeType: source.type,
                   base64: base64,
                   isMemory: source.isMemory
@@ -1577,7 +1590,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
                 return {
                   text: {
                     name: source.name,
-                    id: source.id,
+                    id: source.driveId || source.id,
                     content: textContent,
                     isMemory: source.isMemory
                   }

@@ -10,11 +10,12 @@ export interface Source {
     base64?: string;
     isMemory?: boolean;
     isMaster?: boolean; // Master source for formatting (Blue Check)
+    driveId?: string; // Original Google Drive ID
 }
 
 interface SourcesContextType {
     sources: Source[];
-    addSource: (file: File, options?: { isMemory?: boolean }) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'invalid_format' | 'error'>;
+    addSource: (file: File, options?: { isMemory?: boolean; driveId?: string }) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'invalid_format' | 'error'>;
     removeSource: (id: string) => void;
     toggleSource: (id: string) => void;
     toggleMaster: (id: string) => void; // New: Master Source Toggle
@@ -37,7 +38,7 @@ const ALLOWED_EXTENSIONS = [
 export function SourcesProvider({ children }: { children: ReactNode }) {
     const [sources, setSources] = useState<Source[]>([]);
 
-    const addSource = useCallback(async (file: File, options?: { isMemory?: boolean }): Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'invalid_format' | 'error'> => {
+    const addSource = useCallback(async (file: File, options?: { isMemory?: boolean; driveId?: string }): Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'invalid_format' | 'error'> => {
         if (!options?.isMemory) {
             const userSources = sources.filter(s => !s.isMemory);
             if (userSources.length >= MAX_SOURCES) {
@@ -79,7 +80,8 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 type: file.type,
                 size: file.size,
                 base64: base64,
-                isMemory: options?.isMemory
+                isMemory: options?.isMemory,
+                driveId: options?.driveId
             };
 
             setSources(prev => [...prev, newSource]);

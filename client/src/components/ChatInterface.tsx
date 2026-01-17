@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { getApiUrl } from "@/lib/api-config";
 import { useSources } from "@/contexts/SourcesContext";
 import { useGoogleDrive } from "@/contexts/GoogleDriveContext";
+import { DriveLogo } from "./ConnectorsSection";
 
 interface Message {
   id: string;
@@ -414,28 +415,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
               <div className="w-px h-4 bg-border mx-2" />
 
-              {userIdentity && (
-                <>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`rounded-full w-8 h-8 ${isDriveMode ? 'bg-green-100 text-green-600' : 'text-muted-foreground'}`}
-                        onClick={() => setIsDriveMode(!isDriveMode)}
-                        disabled={isLoading || isTranscribing}
-                      >
-                        <HardDrive className="w-4 h-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{isDriveMode ? "Drive Mode ATTIVO (Modifica file)" : "Attiva Drive Mode"}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <div className="w-px h-4 bg-border mx-2" />
-                </>
-              )}
-
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -452,6 +431,28 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                   <p>{isRecording ? "Ferma registrazione e invia" : "Attiva input vocale (STT)"}</p>
                 </TooltipContent>
               </Tooltip>
+
+              {userIdentity && (
+                <>
+                  <div className="w-px h-4 bg-border mx-2" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`rounded-full w-8 h-8 ${isDriveMode ? 'bg-green-100' : ''}`}
+                        onClick={() => setIsDriveMode(!isDriveMode)}
+                        disabled={isLoading || isTranscribing}
+                      >
+                        <DriveLogo className={`w-5 h-5 ${!isDriveMode ? 'opacity-50 grayscale' : ''}`} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{isDriveMode ? "Drive Mode ATTIVO (Modifica file)" : "Attiva Drive Mode"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </>
+              )}
             </div>
 
             <div className="flex gap-2">
