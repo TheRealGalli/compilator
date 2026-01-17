@@ -47,6 +47,7 @@ export async function uploadFile(
 
   // Genera un URL firmato valido per 7 giorni
   const [signedUrl] = await file.getSignedUrl({
+    version: 'v4',
     action: 'read',
     expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 giorni
   });
