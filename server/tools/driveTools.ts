@@ -105,6 +105,68 @@ export async function updateDriveFile(
 }
 
 /**
+ * Downloads a file from Drive, handling Google Docs export logic.
+ */
+export async function downloadDriveFile(
+    tokens: any,
+    fileId: string
+): Promise<{ buffer: Buffer; mimeType: string; name: string } | null> {
+    try {
+        const auth = new google.auth.OAuth2();
+        auth.setCredentials(tokens);
+        const drive = google.drive({ version: 'v3', auth });
+
+        const fileMetadata = await drive.files.get({
+            fileId: fileId,
+            fields: 'id, name, mimeType, size'
+        });
+
+        const mimeType = fileMetadata.data.mimeType || 'application/octet-stream';
+        const fileName = fileMetadata.data.name || 'documento';
+
+        let data: Buffer;
+        let finalMimeType = mimeType;
+        let finalFileName = fileName;
+
+        if (mimeType === 'application/vnd.google-apps.document') {
+            // Export Google Doc as text
+            const exportRes = await drive.files.export({
+                fileId: fileId,
+                mimeType: 'text/plain'
+            }, { responseType: 'arraybuffer' });
+            data = Buffer.from(exportRes.data as ArrayBuffer);
+            finalMimeType = 'text/plain';
+            finalFileName = fileName.endsWith('.txt') ? fileName : `${fileName}.txt`;
+        } else if (mimeType === 'application/vnd.google-apps.spreadsheet') {
+            // Export Google Sheet as XLSX
+            const exportRes = await drive.files.export({
+                fileId: fileId,
+                mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            }, { responseType: 'arraybuffer' });
+            data = Buffer.from(exportRes.data as ArrayBuffer);
+            finalMimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            finalFileName = fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`;
+        } else {
+            // Download binary file
+            const downloadRes = await drive.files.get({
+                fileId: fileId,
+                alt: 'media'
+            }, { responseType: 'arraybuffer' });
+            data = Buffer.from(downloadRes.data as ArrayBuffer);
+        }
+
+        return {
+            buffer: data,
+            mimeType: finalMimeType,
+            name: finalFileName
+        };
+    } catch (error) {
+        console.error(`[Drive Tool] Failed to download file ${fileId}:`, error);
+        return null;
+    }
+}
+
+/**
  * Creates a NEW file in Google Drive.
  * 
  * @param tokens - The user's OAuth2 tokens

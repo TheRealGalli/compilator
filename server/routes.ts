@@ -22,7 +22,7 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } f
 import { AiService } from './ai'; // Import new AI Service
 import type { FormField } from './form-compiler';
 import { generatePDF, generateDOCX, generateMD, generateJSONL } from './tools/fileGenerator'; // Import Generators
-import { updateDriveFile, createDriveFile } from './tools/driveTools'; // Import Drive Tools for Write Access
+import { updateDriveFile, createDriveFile, downloadDriveFile } from './tools/driveTools'; // Import Drive Tools for Write Access
 
 // Initialize AI Service
 const aiService = new AiService(process.env.GCP_PROJECT_ID || 'compilator-479214');
@@ -1484,6 +1484,31 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
           if (!a.isMemory && b.isMemory) return 1;
           return 0;
         });
+
+        // 0. LIVE DRIVE REFRESH (If Drive Mode active)
+        // When Drive Mode is ON, we ignore the stale content provided by frontend and fetch fresh content from Drive ID.
+        if (driveMode) {
+          console.log('[Drive Mode] Active. Checking for Drive sources to refresh...');
+          const tokens = getGoogleTokens(req);
+          if (tokens) {
+            for (const source of sources) {
+              if (source.driveId) {
+                console.log(`[Drive Mode] Refreshing content for ${source.name} (${source.driveId})...`);
+                const freshFile = await downloadDriveFile(tokens, source.driveId);
+                if (freshFile) {
+                  // Update source with FRESH content
+                  source.base64 = freshFile.buffer.toString('base64');
+                  source.type = freshFile.mimeType;
+                  source.name = freshFile.name; // Name might change (e.g. .txt appended)
+                  // Also update driveId if for some reason it's different? No, keep it.
+                  console.log(`[Drive Mode] Source refreshed: ${source.name}`);
+                }
+              }
+            }
+          } else {
+            console.warn('[Drive Mode] No Google Tokens found. Cannot refresh sources.');
+          }
+        }
       }
 
       // Parse messages if string (multipart/form-data)
