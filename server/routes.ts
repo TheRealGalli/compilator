@@ -1820,6 +1820,19 @@ ${filesContext}
         tools = [...fileGenerationTools];
       }
 
+      // --- KEYWORD HEURISTIC FORCED TOOL MODE ---
+      // If user asks for a file/download, FORCE the model to use the tool (ANY mode).
+      let toolMode = 'AUTO';
+      const lastUserMsg = messages[messages.length - 1];
+      if (lastUserMsg && lastUserMsg.role === 'user' && typeof lastUserMsg.content === 'string') {
+        const lowerMsg = lastUserMsg.content.toLowerCase();
+        const fileKeywords = ['file', 'scarica', 'download', 'pdf', 'docx', 'json', 'csv', 'dataset', 'crea un file', 'generate file', 'export'];
+        if (!webResearch && fileKeywords.some(kw => lowerMsg.includes(kw))) {
+          console.log('[API Chat] File intent detected in user query -> FORCING tool mode to ANY');
+          toolMode = 'ANY';
+        }
+      }
+
       // --- 2. INITIAL GENERATION ---
       const generateOptions: any = {
         contents: coreMessages,
@@ -1827,7 +1840,7 @@ ${filesContext}
         // STRICT TOOL CONFIGURATION
         toolConfig: tools.length > 0 ? {
           functionCallingConfig: {
-            mode: 'AUTO',
+            mode: toolMode,
           }
         } : undefined,
         systemInstruction: {
