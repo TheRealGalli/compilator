@@ -23,8 +23,62 @@ export async function updateDriveFile(
 
         const drive = google.drive({ version: 'v3', auth });
 
-        // 1. Update file metadata (optional, e.g. name, but here we just update content)
-        // 2. Update file media
+        // Check file type first
+        const fileMetadata = await drive.files.get({
+            fileId: fileId,
+            fields: 'mimeType, name'
+        });
+
+        const currentMimeType = fileMetadata.data.mimeType;
+        console.log(`[Drive Tool] Updating file ${fileId} (${currentMimeType})`);
+
+        // Handle Google Docs specifically using Docs API
+        if (currentMimeType === 'application/vnd.google-apps.document') {
+            console.log(`[Drive Tool] Detected Google Doc. Switching to Docs API.`);
+            const docs = google.docs({ version: 'v1', auth });
+
+            // 1. Get document to determine bounds
+            const doc = await docs.documents.get({ documentId: fileId });
+            const content = doc.data.body?.content;
+            if (!content || content.length === 0) throw new Error('Could not retrieve document content');
+
+            // 2. Prepare batch update
+            const lastIndex = content[content.length - 1].endIndex;
+            const requests = [];
+
+            // Delete existing content (preserve EOF marker)
+            if (lastIndex && lastIndex > 2) {
+                requests.push({
+                    deleteContentRange: {
+                        range: {
+                            startIndex: 1,
+                            endIndex: lastIndex - 1
+                        }
+                    }
+                });
+            }
+
+            // Insert new content
+            if (newContent.length > 0) {
+                requests.push({
+                    insertText: {
+                        location: { index: 1 },
+                        text: newContent
+                    }
+                });
+            }
+
+            if (requests.length > 0) {
+                await docs.documents.batchUpdate({
+                    documentId: fileId,
+                    requestBody: { requests }
+                });
+            }
+
+            return { success: true, id: fileId };
+        }
+
+        // Standard Drive File Update (Text, Binary, etc.)
         const media = {
             mimeType: mimeType,
             body: newContent
