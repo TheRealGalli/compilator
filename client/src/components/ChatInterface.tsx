@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, Bot, Globe, Mic, Square, Asterisk } from "lucide-react";
+import { Send, Bot, Globe, Mic, Square, Asterisk, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -44,6 +44,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [webResearch, setWebResearch] = useState(false);
+  const [isDriveMode, setIsDriveMode] = useState(false);
   const { toast } = useToast();
   const { selectedSources, masterSource } = useSources();
 
@@ -249,6 +250,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         sources: selectedSources,
         temperature: 0.7,
         webResearch: webResearch,
+        driveMode: isDriveMode,
         masterSource: masterSource ? {
           name: masterSource.name,
           type: masterSource.type,
@@ -411,6 +413,28 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
               />
 
               <div className="w-px h-4 bg-border mx-2" />
+
+              {userIdentity && (
+                <>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`rounded-full w-8 h-8 ${isDriveMode ? 'bg-green-100 text-green-600' : 'text-muted-foreground'}`}
+                        onClick={() => setIsDriveMode(!isDriveMode)}
+                        disabled={isLoading || isTranscribing}
+                      >
+                        <HardDrive className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{isDriveMode ? "Drive Mode ATTIVO (Modifica file)" : "Attiva Drive Mode"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <div className="w-px h-4 bg-border mx-2" />
+                </>
+              )}
 
               <Tooltip>
                 <TooltipTrigger asChild>

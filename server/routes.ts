@@ -1461,7 +1461,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
   // Endpoint per chat con AI (con streaming e file support)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
-      const { temperature, webResearch } = req.body;
+      const { temperature, webResearch, driveMode } = req.body;
       let { messages, sources } = req.body; // sources: array of {name, type, size, url: GCS URL, isMemory?: boolean}
 
       // Prioritize Memory files (Hierarchical Context: System > Memory > Sources > User)
@@ -1564,6 +1564,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
               return {
                 multimodal: {
                   name: source.name,
+                  id: source.id,
                   mimeType: source.type,
                   base64: base64,
                   isMemory: source.isMemory
@@ -1576,6 +1577,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
                 return {
                   text: {
                     name: source.name,
+                    id: source.id,
                     content: textContent,
                     isMemory: source.isMemory
                   }
@@ -1593,7 +1595,8 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
           if (result.multimodal) {
             multimodalFiles.push(result.multimodal);
             if (!result.multimodal.isMemory) {
-              filesContext += `- ${result.multimodal.name} (${result.multimodal.mimeType})\n`;
+              const idInfo = result.multimodal.id ? ` [ID: ${result.multimodal.id}]` : '';
+              filesContext += `- ${result.multimodal.name}${idInfo} (${result.multimodal.mimeType})\n`;
             } else {
               memoryContext += `[DISPONIBILE ALLEGATO MULTIMODALE DI MEMORIA: ${result.multimodal.name}]\n`;
             }
@@ -1601,7 +1604,8 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
             if (result.text.isMemory) {
               memoryContext += `[INFO PRELEVATE DALLA TUA MEMORIA INTERNA]:\n${result.text.content}\n`;
             } else {
-              filesContext += `\n--- CONTENUTO FILE: ${result.text.name} ---\n${result.text.content}\n--- FINE CONTENUTO FILE ---\n`;
+              const idInfo = result.text.id ? ` [ID: ${result.text.id}]` : '';
+              filesContext += `\n--- CONTENUTO FILE: ${result.text.name}${idInfo} ---\n${result.text.content}\n--- FINE CONTENUTO FILE ---\n`;
             }
           }
         }
@@ -1758,7 +1762,8 @@ ${filesContext}
 
 
       // --- 1. TOOL DEFINITIONS ---
-      const fileGenerationTools = [{
+      // --- 1. TOOL DEFINITIONS ---
+      const standardGenerationTools = [{
         functionDeclarations: [
           {
             name: "generate_pdf",
@@ -1807,7 +1812,12 @@ ${filesContext}
               },
               required: ["data", "filename"]
             }
-          },
+          }
+        ]
+      }];
+
+      const driveTools = [{
+        functionDeclarations: [
           {
             name: "update_drive_file",
             description: "Updates (overwrites) the content of an EXISTING file in user's Google Drive. Use this to modify a file you are analyzing.",
@@ -1841,12 +1851,16 @@ ${filesContext}
 
       if (webResearch) {
         // MODE: Web Research ON -> Only Google Search allowed
-        console.log('[API Chat] Web Research IS ACTIVE. Disabling File Generation Tools to prevent API conflict.');
+        console.log('[API Chat] Web Research IS ACTIVE. Disabling File Generation & Drive Tools.');
         tools = [{ googleSearch: {} }];
+      } else if (driveMode) {
+        // MODE: Drive Mode ON -> Only Drive tools allowed
+        console.log('[API Chat] Drive Mode IS ACTIVE. Enabling Drive Write Tools ONLY.');
+        tools = driveTools;
       } else {
-        // MODE: Web Research OFF -> File Generation Tools allowed
-        console.log('[API Chat] Web Research IS OFF. Enabling File Generation Tools.');
-        tools = [...fileGenerationTools];
+        // MODE: Standard -> File Generation Tools allowed
+        console.log('[API Chat] Standard Mode. Enabling File Generation Tools.');
+        tools = standardGenerationTools;
       }
 
       // --- KEYWORD HEURISTIC FORCED TOOL MODE ---
@@ -1856,7 +1870,7 @@ ${filesContext}
       if (lastUserMsg && lastUserMsg.role === 'user' && typeof lastUserMsg.content === 'string') {
         const lowerMsg = lastUserMsg.content.toLowerCase();
         // Updated keywords to be action-oriented to avoid false positives on "Analyze this file"
-        const fileKeywords = ['scarica', 'download', 'crea un file', 'genera file', 'generate file', 'export', 'dammi il pdf', 'dammi il docx', 'dammi il json', 'voglio il file'];
+        const fileKeywords = ['scarica', 'download', 'crea un file', 'genera file', 'generate file', 'export', 'dammi il pdf', 'dammi il docx', 'dammi il json', 'voglio il file', 'aggiorna', 'modifica', 'update', 'sovrascrivi', 'save to drive', 'salva su drive'];
         if (!webResearch && fileKeywords.some(kw => lowerMsg.includes(kw))) {
           console.log('[API Chat] File intent detected in user query -> FORCING tool mode to ANY');
           toolMode = 'ANY';
