@@ -1824,6 +1824,12 @@ ${filesContext}
       const generateOptions: any = {
         contents: coreMessages,
         tools: tools,
+        // STRICT TOOL CONFIGURATION
+        toolConfig: tools.length > 0 ? {
+          functionCallingConfig: {
+            mode: 'AUTO',
+          }
+        } : undefined,
         systemInstruction: {
           role: 'system',
           parts: [{ text: systemInstruction }]
