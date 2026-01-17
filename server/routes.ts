@@ -1937,7 +1937,7 @@ ${filesContext}
               const uploadResult = await uploadFile(buffer, path.basename(filePath), 'application/octet-stream');
               toolResult = {
                 downloadUrl: uploadResult.publicUrl,
-                message: `File generated successfully. Users can download it here: ${uploadResult.publicUrl}`
+                message: `File generated successfully. Users can download it here: ${uploadResult.publicUrl}\n\nIMPORTANT: You MUST return this link to the user formatted as a Markdown link, like this:\n[${path.basename(filePath)}](${uploadResult.publicUrl})`
               } as any;
             }
 
