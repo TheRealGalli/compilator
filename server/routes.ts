@@ -1823,6 +1823,16 @@ Puoi generare file scaricabili per l'utente su richiesta.
       const generateOptions: any = {
         contents: coreMessages,
         tools: tools,
+        systemInstruction: {
+          role: 'system',
+          parts: [{ text: systemInstruction }]
+        },
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ],
         generationConfig: {
           maxOutputTokens: 50000,
           temperature: req.body.temperature || 0.3
@@ -1833,23 +1843,28 @@ Puoi generare file scaricabili per l'utente su richiesta.
       // We keep this check but currently we are on base model so tools are active.
       const tunedOptions = { ...generateOptions };
 
-      // Check if systemInstruction is being passed correctly
-      if (tunedOptions.systemInstruction) {
-        console.log('[DEBUG Chat] System Instruction present in payload (first 100 chars):',
-          JSON.stringify(tunedOptions.systemInstruction).substring(0, 100) + '...');
-      } else {
-        console.warn('[CRITICAL Chat] System Instruction MISSSING in tunedOptions!');
-      }
-
+      console.log('[DEBUG Chat] Payload prepared. Calling generateContent...');
       let result;
       try {
+        const start = Date.now();
         result = await model.generateContent(tunedOptions);
+        console.log(`[DEBUG Chat] generateContent returned in ${Date.now() - start}ms`);
       } catch (err: any) {
         console.error('Generation Error:', err);
         throw err;
       }
 
       let response = await result.response;
+
+      // Log Finish Reason for debugging
+      if (response.candidates && response.candidates.length > 0) {
+        console.log('[DEBUG Chat] Finish Reason:', response.candidates[0].finishReason);
+        if (response.candidates[0].safetyRatings) {
+          console.log('[DEBUG Chat] Safety Ratings:', JSON.stringify(response.candidates[0].safetyRatings));
+        }
+      } else {
+        console.warn('[DEBUG Chat] No candidates in response!', JSON.stringify(response));
+      }
 
       // --- 3. TOOL EXECUTION LOOP ---
       // Handle function calls (multi-turn)
