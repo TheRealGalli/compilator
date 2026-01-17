@@ -1826,7 +1826,8 @@ ${filesContext}
       const lastUserMsg = messages[messages.length - 1];
       if (lastUserMsg && lastUserMsg.role === 'user' && typeof lastUserMsg.content === 'string') {
         const lowerMsg = lastUserMsg.content.toLowerCase();
-        const fileKeywords = ['file', 'scarica', 'download', 'pdf', 'docx', 'json', 'csv', 'dataset', 'crea un file', 'generate file', 'export'];
+        // Updated keywords to be action-oriented to avoid false positives on "Analyze this file"
+        const fileKeywords = ['scarica', 'download', 'crea un file', 'genera file', 'generate file', 'export', 'dammi il pdf', 'dammi il docx', 'dammi il json', 'voglio il file'];
         if (!webResearch && fileKeywords.some(kw => lowerMsg.includes(kw))) {
           console.log('[API Chat] File intent detected in user query -> FORCING tool mode to ANY');
           toolMode = 'ANY';
