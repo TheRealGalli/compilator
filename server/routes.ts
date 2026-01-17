@@ -1641,6 +1641,7 @@ Esempio: <short_title>Analisi Contratto Locazione</short_title>
    - Le spiegazioni e il testo discorsivo devono essere sempre fuori dalle tabelle, come normali paragrafi.
 3. **Separazione Netta**: NON mischiare mai tabelle diverse. Chiudi sempre una tabella e inserisci un paragrafo di testo o una riga vuota prima di iniziarne un'altra.
 4. **Copia-Incolla**: Mantieni una struttura pulita e standard affinché l'utente possa incollare la risposta su Notion mantenendo la formattazione tabellare originale.
+5. **DIVIETO ASSOLUTO HTML**: NON usare mai tag HTML (es. <br>, <br/>, <hr>) per la formattazione. Usa SOLO Markdown standard. Se devi andare a capo all'interno di una cella, NON farlo (rompe il Markdown); piuttosto usa elenchi puntati fuori dalla tabella.
 
 **RICHIESTE TECNICHE E LIMITI:**
 1. **Completezza**: Se l'utente richiede JSON, codice o dataset, fornisci SEMPRE l'output integrale (max 50.000 token). NON usare mai commenti come "// rest of code" o "..." per abbreviare.
@@ -1759,9 +1760,9 @@ ${filesContext}
         // Tuned Models often have issues with tools/Search. Disable them for the tuned attempt.
         // We keep this filter as it's a known constraint.
         const tunedOptions = { ...generateOptions };
+        // Tools enabled for base model
         if (tunedOptions.tools) {
-          delete tunedOptions.tools;
-          console.log('[DEBUG Chat] Disabled tools for Tuned Model request');
+          console.log('[DEBUG Chat] Tools included in request:', JSON.stringify(tunedOptions.tools));
         }
 
         // Check if systemInstruction is being passed correctly
