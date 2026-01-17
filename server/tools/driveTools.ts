@@ -78,6 +78,11 @@ export async function updateDriveFile(
             return { success: true, id: fileId };
         }
 
+        // Handle Google Sheets specifically (Block updates to prevent silent failure)
+        if (currentMimeType === 'application/vnd.google-apps.spreadsheet') {
+            throw new Error("Direct editing of Google Sheets is not currently supported. Please generate a new file instead.");
+        }
+
         // Standard Drive File Update (Text, Binary, etc.)
         const media = {
             mimeType: mimeType,
