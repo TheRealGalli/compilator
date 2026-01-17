@@ -21,6 +21,7 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } f
 // [pdfjs-dist removed - using client-side extraction instead]
 import { AiService } from './ai'; // Import new AI Service
 import type { FormField } from './form-compiler';
+import { generatePDF, generateDOCX, generateMD, generateJSONL } from './tools/fileGenerator'; // Import Generators
 
 // Initialize AI Service
 const aiService = new AiService(process.env.GCP_PROJECT_ID || 'compilator-479214');
@@ -1668,6 +1669,16 @@ ${filesContext}
 
 4. **DISCLAIMER LEGALE (PROTEZIONE)**: Se la tua risposta comporta, suggerisce o richiede valutazioni legali autonome o interpretazioni di norme che potrebbero influenzare un atto finale, aggiungi SEMPRE questo avviso in fondo al messaggio (dopo la call-to-action):
    *"IMPORTANTE: Questa risposta comporta o suggerisce valutazioni legali autonome. Il sistema funge da supporto al linguaggio tecnico; l'output deve essere ricontrollato attentamente da un professionista umano."*
+
+**CAPACITÀ DI GENERAZIONE FILE:**
+Puoi generare file scaricabili per l'utente su richiesta.
+- **Formati Supportati**:
+  1. **PDF**: \`generate_pdf\` (per documenti formattati, contratti, report).
+  2. **DOCX**: \`generate_docx\` (per documenti modificabili Word).
+  3. **Markdown**: \`generate_md\` (per note tecniche o documentazione).
+  4. **JSONL**: \`generate_jsonl\` (per dataset).
+- **Limitazioni**: NON puoi generare altri formati (es. RTF, ODG, ZIP). Se l'utente chiede un formato non supportato, proponi uno di quelli disponibili.
+
 `;
 
       if (webResearch) {
@@ -1740,53 +1751,174 @@ ${filesContext}
         }
       }
 
+
+      // --- 1. TOOL DEFINITIONS ---
+      const fileGenerationTools = [{
+        functionDeclarations: [
+          {
+            name: "generate_pdf",
+            description: "Generates a downloadable PDF file with the given content. Use this when the user asks for a PDF.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                content: { type: "STRING", description: "The text content of the PDF." },
+                filename: { type: "STRING", description: "The desired filename (e.g., document.pdf)." }
+              },
+              required: ["content", "filename"]
+            }
+          },
+          {
+            name: "generate_docx",
+            description: "Generates a downloadable DOCX (Word) file. Use this when the user asks for a Word document.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                content: { type: "STRING", description: "The text content of the DOCX." },
+                filename: { type: "STRING", description: "The desired filename (e.g., document.docx)." }
+              },
+              required: ["content", "filename"]
+            }
+          },
+          {
+            name: "generate_md",
+            description: "Generates a downloadable Markdown (.md) file. Use this for notes or documentation.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                content: { type: "STRING", description: "The markdown content." },
+                filename: { type: "STRING", description: "The desired filename (e.g., notes.md)." }
+              },
+              required: ["content", "filename"]
+            }
+          },
+          {
+            name: "generate_jsonl",
+            description: "Generates a downloadable JSONL dataset file. Use this for datasets.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                data: { type: "STRING", description: "The JSONL data string." },
+                filename: { type: "STRING", description: "The desired filename (e.g., dataset.jsonl)." }
+              },
+              required: ["data", "filename"]
+            }
+          }
+        ]
+      }];
+
+      // Initialize tools array
+      let tools: any[] = [...fileGenerationTools];
+      if (webResearch) {
+        tools.push({ googleSearch: {} });
+      }
+
+      // --- 2. INITIAL GENERATION ---
       const generateOptions: any = {
         contents: coreMessages,
+        tools: tools,
         generationConfig: {
           maxOutputTokens: 50000,
           temperature: req.body.temperature || 0.3
         }
       };
 
-      if (webResearch) {
-        generateOptions.tools = [{ googleSearch: {} }];
+      // Tuned Models often have issues with tools/Search.
+      // We keep this check but currently we are on base model so tools are active.
+      const tunedOptions = { ...generateOptions };
+
+      // Check if systemInstruction is being passed correctly
+      if (tunedOptions.systemInstruction) {
+        console.log('[DEBUG Chat] System Instruction present in payload (first 100 chars):',
+          JSON.stringify(tunedOptions.systemInstruction).substring(0, 100) + '...');
+      } else {
+        console.warn('[CRITICAL Chat] System Instruction MISSSING in tunedOptions!');
       }
 
       let result;
       try {
-        console.log(`[DEBUG Chat] Attempting generation with Tuned Model: ${ANALYZER_MODEL_ID}`);
-        console.log('[DEBUG Chat] GenerateOptions Payload:', JSON.stringify(generateOptions, null, 2));
-
-        // Tuned Models often have issues with tools/Search. Disable them for the tuned attempt.
-        // We keep this filter as it's a known constraint.
-        const tunedOptions = { ...generateOptions };
-        // Tools enabled for base model
-        if (tunedOptions.tools) {
-          console.log('[DEBUG Chat] Tools included in request:', JSON.stringify(tunedOptions.tools));
-        }
-
-        // Check if systemInstruction is being passed correctly
-        if (tunedOptions.systemInstruction) {
-          console.log('[DEBUG Chat] System Instruction present in payload (first 100 chars):',
-            JSON.stringify(tunedOptions.systemInstruction).substring(0, 100) + '...');
-        } else {
-          console.warn('[CRITICAL Chat] System Instruction MISSSING in tunedOptions!');
-        }
-
         result = await model.generateContent(tunedOptions);
-      } catch (tunedError: any) {
-        console.error('[CRITICAL Chat] Tuned Model failed generation.', {
-          message: tunedError.message,
-          status: tunedError.status,
-          statusText: tunedError.statusText,
-          response: tunedError.response ? JSON.stringify(tunedError.response) : 'No response body',
-          rawResponse: tunedError.rawResponse
-        });
-        throw tunedError;
+      } catch (err: any) {
+        console.error('Generation Error:', err);
+        throw err;
       }
 
-      const response = await result.response;
+      let response = await result.response;
 
+      // --- 3. TOOL EXECUTION LOOP ---
+      // Handle function calls (multi-turn)
+      let functionCalls = response.candidates?.[0]?.content?.parts?.filter((p: any) => p.functionCall);
+
+      while (functionCalls && functionCalls.length > 0) {
+        console.log('[API Chat] Model requested function calls:', functionCalls.length);
+
+        // Append the model's request (with function calls) to history
+        // Note: coreMessages needs the FunctionCall part to be valid history
+        // We reconstruct the last message to include the function call
+        const modelCallParts = response.candidates![0].content.parts;
+        coreMessages.push({ role: 'model', parts: modelCallParts });
+
+        const functionResponses: any[] = [];
+
+        for (const callPart of functionCalls) {
+          const call = callPart.functionCall;
+          console.log(`[API Chat] Executing tool: ${call.name}`);
+
+          let toolResult = { error: 'Unknown tool' };
+
+          try {
+            const args = call.args;
+            let filePath: string | null = null;
+
+            if (call.name === 'generate_pdf') {
+              filePath = await generatePDF(args.content as string, args.filename as string);
+            } else if (call.name === 'generate_docx') {
+              filePath = await generateDOCX(args.content as string, args.filename as string);
+            } else if (call.name === 'generate_md') {
+              filePath = await generateMD(args.content as string, args.filename as string);
+            } else if (call.name === 'generate_jsonl') {
+              filePath = await generateJSONL(args.data as string, args.filename as string);
+            }
+
+            if (filePath) {
+              const buffer = fs.readFileSync(filePath);
+              const uploadResult = await uploadFile(buffer, path.basename(filePath), 'application/octet-stream');
+              toolResult = {
+                downloadUrl: uploadResult.publicUrl,
+                message: `File generated successfully. Users can download it here: ${uploadResult.publicUrl}`
+              } as any;
+            }
+
+          } catch (e: any) {
+            console.error(`[API Chat] Tool execution failed:`, e);
+            toolResult = { error: e.message };
+          }
+
+          functionResponses.push({
+            functionResponse: {
+              name: call.name,
+              response: { result: toolResult }
+            }
+          });
+        }
+
+        // Append function responses to history
+        coreMessages.push({ role: 'function', parts: functionResponses });
+
+        // Call model again with updated history
+        console.log('[API Chat] Sending tool outputs back to model...');
+        tunedOptions.contents = coreMessages; // Update context
+        // Remove tools for the final response? No, keep them just in case, or remove to prevent loops? 
+        // Usually keep them.
+
+        result = await model.generateContent(tunedOptions);
+        response = await result.response;
+
+        // Check for recursive calls (unlikely but possible)
+        functionCalls = response.candidates?.[0]?.content?.parts?.filter((p: any) => p.functionCall);
+      }
+
+      // --- 4. FINAL RESPONSE PROCESSING ---
+      // (Standard text extraction)
       let text = '';
       let groundingMetadata = null;
       let searchEntryPoint = null;
@@ -1803,6 +1935,7 @@ ${filesContext}
           }
         }
       }
+
 
       let shortTitle = "";
       const titleMatch = text.match(/<short_title>([\s\S]*?)<\/short_title>/);
