@@ -1806,10 +1806,17 @@ Puoi generare file scaricabili per l'utente su richiesta.
         ]
       }];
 
-      // Initialize tools array
-      let tools: any[] = [...fileGenerationTools];
+      // Initialize tools array based on Web Research toggle (Mutually Exclusive)
+      let tools: any[] = [];
+
       if (webResearch) {
-        tools.push({ googleSearch: {} });
+        // MODE: Web Research ON -> Only Google Search allowed
+        console.log('[API Chat] Web Research IS ACTIVE. Disabling File Generation Tools to prevent API conflict.');
+        tools = [{ googleSearch: {} }];
+      } else {
+        // MODE: Web Research OFF -> File Generation Tools allowed
+        console.log('[API Chat] Web Research IS OFF. Enabling File Generation Tools.');
+        tools = [...fileGenerationTools];
       }
 
       // --- 2. INITIAL GENERATION ---
