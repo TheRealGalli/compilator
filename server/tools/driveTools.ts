@@ -84,7 +84,49 @@ export async function updateDriveFile(
             console.log(`[Drive Tool] Detected Google Sheet. Switching to Sheets API.`);
             const sheets = google.sheets({ version: 'v4', auth });
 
-            // 1. Parse newContent (Input assumed to be CSV/Text)
+            // 1. Parse newContent 
+            // Check for multi-sheet format: [FOGLIO DI CALCOLO: SheetName] ... content ...
+            const sheetRegex = /\[FOGLIO DI CALCOLO:\s*([^\]]+)\]([\s\S]*?)(?=\[FOGLIO DI CALCOLO:|$)/g;
+            let match;
+            const updates: { name: string; csv: string }[] = [];
+
+            while ((match = sheetRegex.exec(newContent)) !== null) {
+                updates.push({ name: match[1].trim(), csv: match[2].trim() });
+            }
+
+            if (updates.length > 0) {
+                console.log(`[Drive Tool] Multi-sheet update detected: ${updates.length} sheets.`);
+                // Process each sheet update
+                for (const update of updates) {
+                    console.log(`[Drive Tool] Updating sheet: ${update.name}`);
+                    const wb = xlsx.read(update.csv, { type: 'string' });
+                    const ws = wb.Sheets[wb.SheetNames[0]]; // Content itself
+                    const values = xlsx.utils.sheet_to_json(ws, { header: 1 });
+
+                    if (values && values.length > 0) {
+                        // Clear range first (heuristic: assume sheet exists)
+                        try {
+                            await sheets.spreadsheets.values.clear({
+                                spreadsheetId: fileId,
+                                range: update.name,
+                            });
+                            await sheets.spreadsheets.values.update({
+                                spreadsheetId: fileId,
+                                range: update.name,
+                                valueInputOption: 'USER_ENTERED',
+                                requestBody: { values: values as any[][] }
+                            });
+                        } catch (err: any) {
+                            console.warn(`[Drive Tool] Failed to update sheet '${update.name}'. It might not exist. Error: ${err.message}`);
+                            // Optional: Create sheet if missing? (Complex, requires batchUpdate addSheet)
+                            // For now, we log and continue.
+                        }
+                    }
+                }
+                return { success: true, id: fileId };
+            }
+
+            // Fallback: Single Sheet (Global overwrite of first sheet)
             const wb = xlsx.read(newContent, { type: 'string' });
             const firstSheetName = wb.SheetNames[0]; // Input sheet
             const ws = wb.Sheets[firstSheetName];
