@@ -22,6 +22,7 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } f
 import { AiService } from './ai'; // Import new AI Service
 import type { FormField } from './form-compiler';
 import { generatePDF, generateDOCX, generateMD, generateJSONL } from './tools/fileGenerator'; // Import Generators
+import { updateDriveFile, createDriveFile } from './tools/driveTools'; // Import Drive Tools for Write Access
 
 // Initialize AI Service
 const aiService = new AiService(process.env.GCP_PROJECT_ID || 'compilator-479214');
@@ -367,7 +368,7 @@ async function getOAuth2Client() {
 
 const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
-  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive',
   'https://www.googleapis.com/auth/drive.metadata.readonly'
 ];
 
@@ -1761,11 +1762,11 @@ ${filesContext}
         functionDeclarations: [
           {
             name: "generate_pdf",
-            description: "Generates a downloadable PDF file with the given content. Use this when the user asks for a PDF.",
+            description: "Generates a downloadable PDF file from text content. Use this when the user specifically asks for a PDF.",
             parameters: {
               type: "OBJECT",
               properties: {
-                content: { type: "STRING", description: "The text content of the PDF." },
+                content: { type: "STRING", description: "The text content to convert to PDF." },
                 filename: { type: "STRING", description: "The desired filename (e.g., document.pdf)." }
               },
               required: ["content", "filename"]
@@ -1773,11 +1774,11 @@ ${filesContext}
           },
           {
             name: "generate_docx",
-            description: "Generates a downloadable DOCX (Word) file. Use this when the user asks for a Word document.",
+            description: "Generates a downloadable DOCX (Word) file. Use this for editable documents.",
             parameters: {
               type: "OBJECT",
               properties: {
-                content: { type: "STRING", description: "The text content of the DOCX." },
+                content: { type: "STRING", description: "The content of the document." },
                 filename: { type: "STRING", description: "The desired filename (e.g., document.docx)." }
               },
               required: ["content", "filename"]
@@ -1785,12 +1786,12 @@ ${filesContext}
           },
           {
             name: "generate_md",
-            description: "Generates a downloadable Markdown (.md) file. Use this for notes or documentation.",
+            description: "Generates a downloadable Markdown (.md) file. Use this for documentation.",
             parameters: {
               type: "OBJECT",
               properties: {
                 content: { type: "STRING", description: "The markdown content." },
-                filename: { type: "STRING", description: "The desired filename (e.g., notes.md)." }
+                filename: { type: "STRING", description: "The desired filename (e.g., readme.md)." }
               },
               required: ["content", "filename"]
             }
@@ -1805,6 +1806,31 @@ ${filesContext}
                 filename: { type: "STRING", description: "The desired filename (e.g., dataset.jsonl)." }
               },
               required: ["data", "filename"]
+            }
+          },
+          {
+            name: "update_drive_file",
+            description: "Updates (overwrites) the content of an EXISTING file in user's Google Drive. Use this to modify a file you are analyzing.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                fileId: { type: "STRING", description: "The Google Drive File ID to update." },
+                newContent: { type: "STRING", description: "The new text content for the file." }
+              },
+              required: ["fileId", "newContent"]
+            }
+          },
+          {
+            name: "create_drive_file",
+            description: "Creates a NEW file directly in user's Google Drive (instead of a temporary download link).",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                fileName: { type: "STRING", description: "Name of the new file." },
+                content: { type: "STRING", description: "Content of the file." },
+                folderId: { type: "STRING", description: "Optional: ID of the parent folder to create the file in." }
+              },
+              required: ["fileName", "content"]
             }
           }
         ]
@@ -1925,14 +1951,55 @@ ${filesContext}
             const args = call.args;
             let filePath: string | null = null;
 
-            if (call.name === 'generate_pdf') {
-              filePath = await generatePDF(args.content as string, args.filename as string);
+            if (call.name === 'update_drive_file') {
+              const { fileId, newContent } = args as any;
+              console.log(`[Tool Execution] Updating Drive File: ${fileId}`);
+              const tokens = getGoogleTokens(req); // Get user tokens from request
+              if (!tokens) throw new Error("Google Authentication required to update Drive files.");
+
+              const result = await updateDriveFile(tokens, fileId, newContent);
+
+              if (result.success) {
+                toolResult = {
+                  message: `File updated successfully in Google Drive. ID: ${result.id}.`
+                } as any;
+              } else {
+                toolResult = {
+                  message: `Failed to update file: ${result.error}` // Return error as message to model
+                } as any;
+              }
+            } else if (call.name === 'create_drive_file') {
+              const { fileName, content, folderId } = args as any;
+              console.log(`[Tool Execution] Creating Drive File: ${fileName}`);
+              const tokens = getGoogleTokens(req);
+              if (!tokens) throw new Error("Google Authentication required to create Drive files.");
+
+              const result = await createDriveFile(tokens, fileName, content, 'text/plain', folderId);
+
+              if (result.success) {
+                toolResult = {
+                  message: `File created successfully in Google Drive. ID: ${result.id}. Link: ${result.webViewLink}`
+                } as any;
+              } else {
+                toolResult = {
+                  message: `Failed to create file: ${result.error}` // Return error as message
+                } as any;
+              }
+            } else if (call.name === 'generate_pdf') {
+              const filePath = await generatePDF((args as any).content, (args as any).filename);
+              console.log(`[Tool Execution] PDF Generated at ${filePath}`);
+              const buffer = fs.readFileSync(filePath);
+              const uploadResult = await uploadFile(buffer, path.basename(filePath), 'application/pdf');
+              toolResult = {
+                downloadUrl: uploadResult.publicUrl,
+                message: `File generated successfully. Users can download it here: ${uploadResult.publicUrl}\n\nIMPORTANT: You MUST return this link to the user formatted as a Markdown link, like this:\n[${path.basename(filePath)}](${uploadResult.publicUrl})`
+              } as any;
             } else if (call.name === 'generate_docx') {
-              filePath = await generateDOCX(args.content as string, args.filename as string);
+              filePath = await generateDOCX((args as any).content, (args as any).filename);
             } else if (call.name === 'generate_md') {
-              filePath = await generateMD(args.content as string, args.filename as string);
+              filePath = await generateMD((args as any).content, (args as any).filename);
             } else if (call.name === 'generate_jsonl') {
-              filePath = await generateJSONL(args.data as string, args.filename as string);
+              filePath = await generateJSONL((args as any).data, (args as any).filename);
             }
 
             if (filePath) {
