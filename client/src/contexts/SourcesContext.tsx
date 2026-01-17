@@ -31,6 +31,7 @@ const MAX_FILE_SIZE_MB = 30;
 
 const ALLOWED_EXTENSIONS = [
     'pdf', 'docx', 'doc', 'txt', 'csv', 'rtf', 'md', 'json', 'jsonl', 'xml', 'html',
+    'xlsx', 'xls',
     'jpg', 'jpeg', 'png', 'webp', 'heic',
     'mp3', 'wav', 'm4a'
 ];
