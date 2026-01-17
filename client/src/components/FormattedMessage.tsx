@@ -23,7 +23,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         while ((match = boldRegex.exec(currentText)) !== null) {
             if (match.index > lastIndex) {
                 const textPart = currentText.substring(lastIndex, match.index);
-                parts.push(...renderCheckboxes(textPart, `text-${lineIndex}-${keyCounter++}`));
+                parts.push(...renderLinks(textPart, `text-${lineIndex}-${keyCounter++}`));
             }
             parts.push(
                 <strong key={`bold-${lineIndex}-${keyCounter++}`} className="font-semibold text-foreground">
@@ -35,10 +35,49 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
 
         if (lastIndex < currentText.length) {
             const textPart = currentText.substring(lastIndex);
-            parts.push(...renderCheckboxes(textPart, `text-end-${lineIndex}-${keyCounter++}`));
+            parts.push(...renderLinks(textPart, `text-end-${lineIndex}-${keyCounter++}`));
         }
 
         return parts.length > 0 ? parts : currentText;
+    };
+
+    // Helper to render links [text](url)
+    const renderLinks = (text: string, baseKey: string) => {
+        const linkParts: (string | JSX.Element)[] = [];
+        const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+        let lastIdx = 0;
+        let match;
+        let counter = 0;
+
+        while ((match = linkRegex.exec(text)) !== null) {
+            if (match.index > lastIdx) {
+                const textPart = text.substring(lastIdx, match.index);
+                linkParts.push(...renderCheckboxes(textPart, `${baseKey}-prelink-${counter}`));
+            }
+
+            const linkText = match[1];
+            const linkUrl = match[2];
+
+            linkParts.push(
+                <a
+                    key={`${baseKey}-link-${counter++}`}
+                    href={linkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline font-medium break-all"
+                >
+                    {linkText}
+                </a>
+            );
+            lastIdx = match.index + match[0].length;
+        }
+
+        if (lastIdx < text.length) {
+            const textPart = text.substring(lastIdx);
+            linkParts.push(...renderCheckboxes(textPart, `${baseKey}-postlink-${counter}`));
+        }
+
+        return linkParts;
     };
 
     // Helper to render checkboxes [x] and [ ] as UI elements
