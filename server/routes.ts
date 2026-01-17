@@ -1959,9 +1959,13 @@ ${filesContext}
 
         // Call model again with updated history
         console.log('[API Chat] Sending tool outputs back to model...');
-        tunedOptions.contents = coreMessages; // Update context
-        // Remove tools for the final response? No, keep them just in case, or remove to prevent loops? 
-        // Usually keep them.
+        tunedOptions.contents = coreMessages;
+
+        // CRITICAL FIX: Reset toolConfig to AUTO (or remove the ANY constraint) so the model can speak!
+        if (tunedOptions.toolConfig && tunedOptions.toolConfig.functionCallingConfig) {
+          console.log('[API Chat] Resetting tool mode to AUTO for follow-up response.');
+          tunedOptions.toolConfig.functionCallingConfig.mode = 'AUTO';
+        }
 
         result = await model.generateContent(tunedOptions);
         response = await result.response;
