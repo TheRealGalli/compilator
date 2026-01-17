@@ -1877,7 +1877,17 @@ ${filesContext}
       // Handle function calls (multi-turn)
       let functionCalls = response.candidates?.[0]?.content?.parts?.filter((p: any) => p.functionCall);
 
+      const MAX_TOOL_LOOPS = 5;
+      let loopCount = 0;
+
       while (functionCalls && functionCalls.length > 0) {
+        loopCount++;
+        console.log(`[API Chat] Tool Loop Iteration ${loopCount}/${MAX_TOOL_LOOPS}`);
+        if (loopCount > MAX_TOOL_LOOPS) {
+          console.warn('[API Chat] Max tool loops reached. Breaking to prevent infinite loop.');
+          break;
+        }
+
         console.log('[API Chat] Model requested function calls:', functionCalls.length);
 
         // Append the model's request (with function calls) to history
