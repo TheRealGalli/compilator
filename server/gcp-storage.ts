@@ -59,6 +59,38 @@ export async function uploadFile(
 }
 
 /**
+ * Configure bucket lifecycle to auto-delete files after 30 days.
+ * This is called on server startup to ensure the policy is active.
+ */
+export async function configureBucketLifecycle(): Promise<void> {
+  try {
+    const bucket = storage.bucket(BUCKET_NAME);
+    const [exists] = await bucket.exists();
+
+    if (exists) {
+      console.log(`[GCS] Configuring lifecycle policy for bucket: ${BUCKET_NAME}`);
+      // Overwrite lifecycle rules to ensure only one rule exists: delete after 30 days
+      await bucket.setMetadata({
+        lifecycle: {
+          rule: [
+            {
+              action: { type: 'Delete' },
+              condition: { age: 30 }, // Days
+            },
+          ],
+        },
+      });
+      console.log(`[GCS] Lifecycle policy set: Delete objects older than 30 days.`);
+    } else {
+      console.warn(`[GCS] Bucket ${BUCKET_NAME} does not exist. Skipping lifecycle config.`);
+    }
+  } catch (error) {
+    console.error('[GCS] Error configuring bucket lifecycle:', error);
+    // Don't crash the server if this fails, just log it.
+  }
+}
+
+/**
  * Carica un file su Google Cloud Storage in un percorso specifico
  */
 export async function uploadFileToPath(

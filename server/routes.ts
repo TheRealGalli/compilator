@@ -5,7 +5,7 @@ import path from 'path';
 import multer from "multer";
 import compression from "compression";
 import { storage } from "./storage";
-import { uploadFile, downloadFile, deleteFile, fileExists, uploadFileToPath, listFiles, saveDocumentChunks, loadMultipleDocumentChunks } from "./gcp-storage";
+import { uploadFile, downloadFile, deleteFile, fileExists, uploadFileToPath, listFiles, saveDocumentChunks, loadMultipleDocumentChunks, configureBucketLifecycle } from "./gcp-storage";
 import { getModelApiKey } from "./gcp-secrets";
 import mammoth from 'mammoth';
 import * as cheerio from 'cheerio';
@@ -25,6 +25,9 @@ import { generatePDF, generateDOCX, generateMD, generateJSONL } from './tools/fi
 
 // Initialize AI Service
 const aiService = new AiService(process.env.GCP_PROJECT_ID || 'compilator-479214');
+
+// Initialize GCS Bucket Lifecycle (Auto-delete files after 30 days)
+configureBucketLifecycle().catch(err => console.error('[GCS] Failed to configure lifecycle:', err));
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
