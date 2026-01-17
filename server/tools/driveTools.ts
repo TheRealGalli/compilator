@@ -2,6 +2,7 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import fs from 'fs';
+import * as xlsx from 'xlsx';
 
 /**
  * Updates an existing file in Google Drive with new content.
@@ -78,9 +79,40 @@ export async function updateDriveFile(
             return { success: true, id: fileId };
         }
 
-        // Handle Google Sheets specifically (Block updates to prevent silent failure)
+        // Handle Google Sheets specifically
         if (currentMimeType === 'application/vnd.google-apps.spreadsheet') {
-            throw new Error("Direct editing of Google Sheets is not currently supported. Please generate a new file instead.");
+            console.log(`[Drive Tool] Detected Google Sheet. Switching to Sheets API.`);
+            const sheets = google.sheets({ version: 'v4', auth });
+
+            // 1. Parse newContent (Input assumed to be CSV/Text)
+            const wb = xlsx.read(newContent, { type: 'string' });
+            const firstSheetName = wb.SheetNames[0]; // Input sheet
+            const ws = wb.Sheets[firstSheetName];
+            const values = xlsx.utils.sheet_to_json(ws, { header: 1 }); // 2D Array
+
+            if (!values || values.length === 0) {
+                throw new Error("Parsed content is empty. Please provide valid CSV data.");
+            }
+
+            // 2. Get target spreadsheet details to find the first sheet name
+            const meta = await sheets.spreadsheets.get({ spreadsheetId: fileId });
+            const targetSheetTitle = meta.data.sheets?.[0]?.properties?.title || 'Sheet1';
+
+            // 3. Clear existing content
+            await sheets.spreadsheets.values.clear({
+                spreadsheetId: fileId,
+                range: targetSheetTitle,
+            });
+
+            // 4. Update with new values
+            await sheets.spreadsheets.values.update({
+                spreadsheetId: fileId,
+                range: targetSheetTitle,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: { values: values as any[][] }
+            });
+
+            return { success: true, id: fileId };
         }
 
         // Standard Drive File Update (Text, Binary, etc.)
