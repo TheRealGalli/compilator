@@ -265,9 +265,13 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
             for (let C = range.s.c; C <= range.e.c; ++C) {
               const cell_address = xlsx.utils.encode_cell({ r: R, c: C });
               const cell = sheet[cell_address];
-              if (cell && cell.v !== undefined && cell.v !== null) {
-                // Formatting: [A1] Value | ...
-                sheetContent += `[${cell_address}] ${cell.v} | `;
+              if (cell && (cell.v !== undefined || cell.f)) {
+                // Formatting: [A1] Value {Formula: =...} |
+                let cellText = `[${cell_address}] ${cell.v !== undefined ? cell.v : ''}`;
+                if (cell.f) {
+                  cellText += ` {Formula: =${cell.f}}`;
+                }
+                sheetContent += `${cellText} | `;
               }
             }
             sheetContent += "\n";
@@ -1731,12 +1735,20 @@ ${filesContext}
 
 **STRATEGIA MODIFICA DRIVE (WORD & SHEETS):**
 1. **Google Sheets (Fogli di Calcolo)**:
-   - Il contenuto ti viene presentato come una lista di celle: \`[A1] Valore | [B1] Valore...\`.
+   - Il contenuto ti viene presentato come una lista di celle: \`[A1] Valore {Formula: =...} | [B1] Valore...\`.
    - **STRUMENTO**: Usa \`update_sheet_cell_range(fileId, range, values)\`.
+     - Puoi scrivere valori PURI o FORMULE (es. "=SUM(A1:A5)").
    - **AGGIORNAMENTI MIRATI**: Non riscriverti tutto il foglio. Modifica SOLO le celle necessarie.
      - Esempio: Per cambiare la data in B2, usa range="B2" e values=[["2024"]].
    - **APPEND**: Per aggiungere righe, cerca l'ultima riga occupata nella lista celle e scrivi nella successiva.
    - **NON DISTRUGGERE IL LAYOUT**: Scrivi solo dove serve. Non sovrascrivere intestazioni o celle vuote se non richiesto.
+
+   **PROTOCOLLO TASK COMPLESSI (OBBLIGATORIO):**
+   Se l'utente richiede modifiche strutturali pesanti, calcoli complessi o ristrutturazioni massive:
+   1. **STOP**: NON eseguire subito gli strumenti.
+   2. **PIANIFICA**: Proponi un piano step-by-step in chat spiegando la logica (es. "1. Analizzo colonne, 2. Creo le formule in X, 3. Aggiorno totali").
+   3. **ATTENDI**: Chiedi conferma ("Procedo con l'esecuzione?").
+   4. **ESEGUI**: Solo dopo l'ok, usa gli strumenti.
 
 2. **Google Docs (Word)**:
    - Usa \`update_drive_file\` con il testo completo. Qui devi riscrivere l'intero documento aggiornato.
