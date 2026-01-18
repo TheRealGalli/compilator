@@ -256,9 +256,26 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
       let fullText = '';
       workbook.SheetNames.forEach(sheetName => {
         const sheet = workbook.Sheets[sheetName];
-        // Convert sheet to CSV for text representation
-        const csv = xlsx.utils.sheet_to_csv(sheet);
-        fullText += `[FOGLIO DI CALCOLO: ${sheetName}]\n${csv}\n\n`;
+        // Convert sheet to coordinate-aware text for precise editing
+        const rangeStr = sheet['!ref'];
+        if (rangeStr) {
+          const range = xlsx.utils.decode_range(rangeStr);
+          let sheetContent = "";
+          for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+              const cell_address = xlsx.utils.encode_cell({ r: R, c: C });
+              const cell = sheet[cell_address];
+              if (cell && cell.v !== undefined && cell.v !== null) {
+                // Formatting: [A1] Value | ...
+                sheetContent += `[${cell_address}] ${cell.v} | `;
+              }
+            }
+            sheetContent += "\n";
+          }
+          fullText += `[FOGLIO DI CALCOLO: ${sheetName}]\n${sheetContent}\n\n`;
+        } else {
+          fullText += `[FOGLIO DI CALCOLO: ${sheetName}]\n(Foglio Vuoto)\n\n`;
+        }
       });
       console.log(`[DEBUG extractText] XLSX parsed, sheets: ${workbook.SheetNames.length}`);
       return fullText;
@@ -1711,6 +1728,19 @@ ${filesContext}
 **CONTESTUALIZZAZIONE E TERMINOLOGIA:**
 - Interpreta ogni termine tecnico, abbreviazione o riferimento basandoti SCRUPOLOSAMENTE sul contesto dei documenti caricati. 
 - Adatta il tuo linguaggio alla terminologia specifica usata nelle fonti (es. termini notarili, tecnici o legali specifici di quel fascicolo).
+
+**STRATEGIA MODIFICA DRIVE (WORD & SHEETS):**
+1. **Google Sheets (Fogli di Calcolo)**:
+   - Il contenuto ti viene presentato come una lista di celle: \`[A1] Valore | [B1] Valore...\`.
+   - **STRUMENTO**: Usa \`update_sheet_cell_range(fileId, range, values)\`.
+   - **AGGIORNAMENTI MIRATI**: Non riscriverti tutto il foglio. Modifica SOLO le celle necessarie.
+     - Esempio: Per cambiare la data in B2, usa range="B2" e values=[["2024"]].
+   - **APPEND**: Per aggiungere righe, cerca l'ultima riga occupata nella lista celle e scrivi nella successiva.
+   - **NON DISTRUGGERE IL LAYOUT**: Scrivi solo dove serve. Non sovrascrivere intestazioni o celle vuote se non richiesto.
+
+2. **Google Docs (Word)**:
+   - Usa \`update_drive_file\` con il testo completo. Qui devi riscrivere l'intero documento aggiornato.
+
 
 **GUARDRAIL ALLEGATI E AZIONI FUTURE:**
 1. **DIVIETO DI INVENZIONE**: NON fare mai riferimento ad allegati, documenti o file che NON sono presenti nell'elenco delle "FONTI CARICATE" sopra riportato.
