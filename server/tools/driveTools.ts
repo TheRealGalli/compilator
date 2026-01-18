@@ -299,3 +299,37 @@ export async function createDriveFile(
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Updates a specific range of cells in a Google Sheet.
+ * @param tokens - User tokens
+ * @param fileId - Spreadsheet ID
+ * @param range - A1 notation range (e.g. 'Sheet1!A1:B2')
+ * @param values - 2D Array of values
+ */
+export async function updateSheetCellRange(
+    tokens: any,
+    fileId: string,
+    range: string,
+    values: string[][]
+): Promise<{ success: boolean; id?: string; error?: string }> {
+    try {
+        const auth = new google.auth.OAuth2();
+        auth.setCredentials(tokens);
+
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        await sheets.spreadsheets.values.update({
+            spreadsheetId: fileId,
+            range: range,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: values }
+        });
+
+        console.log(`[Drive Tool] Sheet range ${range} updated successfully.`);
+        return { success: true, id: fileId };
+    } catch (error: any) {
+        console.error('[Drive Tool] Error updating sheet range:', error);
+        return { success: false, error: error.message };
+    }
+}

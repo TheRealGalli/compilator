@@ -22,7 +22,12 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } f
 import { AiService } from './ai'; // Import new AI Service
 import type { FormField } from './form-compiler';
 import { generatePDF, generateDOCX, generateMD, generateJSONL } from './tools/fileGenerator'; // Import Generators
-import { updateDriveFile, createDriveFile, downloadDriveFile } from './tools/driveTools'; // Import Drive Tools for Write Access
+import {
+  updateDriveFile,
+  downloadDriveFile,
+  createDriveFile,
+  updateSheetCellRange
+} from './tools/driveTools'; // Import Drive Tools for Write Access
 
 // Initialize AI Service
 const aiService = new AiService(process.env.GCP_PROJECT_ID || 'compilator-479214');
@@ -1869,6 +1874,26 @@ ${filesContext}
             }
           },
           {
+            name: "update_sheet_cell_range",
+            description: "Updates a specific range of cells in a Google Sheet. Efficient for modifying spreadsheets without rewriting the whole file.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                fileId: { type: "STRING", description: "The Google Sheet File ID." },
+                range: { type: "STRING", description: "The A1 notation of the range to update (e.g., 'Sheet1!A1:B2')." },
+                values: {
+                  type: "ARRAY",
+                  description: "A 2D array of values to write into the range.",
+                  items: {
+                    type: "ARRAY",
+                    items: { type: "STRING" }
+                  }
+                }
+              },
+              required: ["fileId", "range", "values"]
+            }
+          },
+          {
             name: "create_drive_file",
             description: "Creates a NEW file directly in user's Google Drive (instead of a temporary download link).",
             parameters: {
@@ -2018,6 +2043,24 @@ ${filesContext}
               } else {
                 toolResult = {
                   message: `Failed to update file: ${result.error}` // Return error as message to model
+                } as any;
+              }
+            } else if (call.name === 'update_sheet_cell_range') {
+              const { fileId, range, values } = args as any;
+              console.log(`[Tool Execution] Updating Sheet Range: ${fileId}, Range: ${range}`);
+              const tokens = getGoogleTokens(req);
+              if (!tokens) throw new Error("Google Authentication required to update Drive files.");
+
+              // Call the new drive tool function
+              const result = await updateSheetCellRange(tokens, fileId, range, values);
+
+              if (result.success) {
+                toolResult = {
+                  message: `Sheet range updated successfully. ID: ${result.id}.`
+                } as any;
+              } else {
+                toolResult = {
+                  message: `Failed to update sheet range: ${result.error}`
                 } as any;
               }
             } else if (call.name === 'create_drive_file') {
