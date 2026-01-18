@@ -1738,6 +1738,7 @@ ${filesContext}
    - Il contenuto ti viene presentato come una lista di celle: \`[A1] Valore {Formula: =...} | [B1] Valore...\`.
    - **STRUMENTO**: Usa \`update_sheet_cell_range(fileId, range, values)\`.
      - Puoi scrivere valori PURI o FORMULE (es. "=SUM(A1:A5)").
+     - **ATTENZIONE LOCALE (IMPORTANTE)**: Se il foglio è in Italiano (Euro, date GG/MM), usa il **PUNTO E VIRGOLA (;)** come separatore argomenti (es. \`= SUMIF(A: A; "Casa"; B:B)\`). La virgola (,) rompe la formula perché è usata per i decimali.
    - **AGGIORNAMENTI MIRATI**: Non riscriverti tutto il foglio. Modifica SOLO le celle necessarie.
      - **REGOLA ANTI-ERRORE**: Specifica sempre solo la **CELLA INIZIALE** (es. "B2") come range. Mai un range chiuso (es. "B2:C5") per evitare mismatch di dimensioni.
      - Esempio Corretto: range="B2", values=[["2024", "Gennaio"]] (scrive in B2 e C2).
