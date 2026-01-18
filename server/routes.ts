@@ -26,7 +26,9 @@ import {
   updateDriveFile,
   downloadDriveFile,
   createDriveFile,
-  updateSheetCellRange
+  updateSheetCellRange,
+  getSheetMetadata,
+  updateSheetMetadata
 } from './tools/driveTools'; // Import Drive Tools for Write Access
 
 // Initialize AI Service
@@ -1739,6 +1741,10 @@ ${filesContext}
    - **STRUMENTO**: Usa \`update_sheet_cell_range(fileId, range, values)\`.
      - Puoi scrivere valori PURI o FORMULE (es. "=SUM(A1:A5)").
      - **ATTENZIONE LOCALE (IMPORTANTE)**: Se il foglio è in Italiano (Euro, date GG/MM), usa il **PUNTO E VIRGOLA (;)** come separatore argomenti (es. \`= SUMIF(A: A; "Casa"; B:B)\`). La virgola (,) rompe la formula perché è usata per i decimali.
+     - **METADATI (Menu a tendina, Colori)**:
+       - Per VEDERE regole di validazione (es. opzioni dropdown) o colori: Usa \`get_sheet_metadata(fileId)\`.
+       - Per MODIFICARE regole/colori: Usa \`update_sheet_metadata(fileId, requests)\`.
+       - Esempio creazione Dropdown: requests=[{setDataValidation: {range: {...}, rule: {condition: {type: 'ONE_OF_LIST', values: [{userEnteredValue: 'Si'}, {userEnteredValue: 'No'}]}}}}].
    - **AGGIORNAMENTI MIRATI**: Non riscriverti tutto il foglio. Modifica SOLO le celle necessarie.
      - **REGOLA ANTI-ERRORE**: Specifica sempre solo la **CELLA INIZIALE** (es. "B2") come range. Mai un range chiuso (es. "B2:C5") per evitare mismatch di dimensioni.
      - Esempio Corretto: range="B2", values=[["2024", "Gennaio"]] (scrive in B2 e C2).
@@ -1949,6 +1955,33 @@ ${filesContext}
               },
               required: ["fileName", "content"]
             }
+          },
+          {
+            name: "get_sheet_metadata",
+            description: "Retrieves metadata for a Google Sheet, such as Data Validation rules (dropdowns), formatting, and named ranges. Use this to understand the structure before modifying.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                fileId: { type: "STRING", description: "The Google Sheet File ID (spreadsheetId)." }
+              },
+              required: ["fileId"]
+            }
+          },
+          {
+            name: "update_sheet_metadata",
+            description: "Updates metadata of a Google Sheet details (Validation Rules, Formatting, etc.) using the batchUpdate API format.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                fileId: { type: "STRING", description: "The Google Sheet File ID." },
+                requests: {
+                  type: "ARRAY",
+                  description: "Array of Google Sheets API Request objects (e.g. setDataValidation, repeatCell).",
+                  items: { type: "OBJECT" }
+                }
+              },
+              required: ["fileId", "requests"]
+            }
           }
         ]
       }];
@@ -2044,212 +2077,238 @@ ${filesContext}
       const MAX_TOOL_LOOPS = 5;
       let loopCount = 0;
 
-      while (functionCalls && functionCalls.length > 0) {
-        loopCount++;
-        console.log(`[API Chat] Tool Loop Iteration ${loopCount}/${MAX_TOOL_LOOPS}`);
-        if (loopCount > MAX_TOOL_LOOPS) {
-          console.warn('[API Chat] Max tool loops reached. Breaking to prevent infinite loop.');
-          break;
-        }
+while (functionCalls && functionCalls.length > 0) {
+    loopCount++;
+    console.log(`[API Chat] Tool Loop Iteration ${loopCount}/${MAX_TOOL_LOOPS}`);
+    if (loopCount > MAX_TOOL_LOOPS) {
+        console.warn('[API Chat] Max tool loops reached. Breaking to prevent infinite loop.');
+        break;
+    }
 
-        console.log('[API Chat] Model requested function calls:', functionCalls.length);
+    console.log('[API Chat] Model requested function calls:', functionCalls.length);
 
-        // Append the model's request (with function calls) to history
-        // Note: coreMessages needs the FunctionCall part to be valid history
-        // We reconstruct the last message to include the function call
-        const modelCallParts = response.candidates![0].content.parts;
-        coreMessages.push({ role: 'model', parts: modelCallParts });
+    // Append the model's request (with function calls) to history
+    // Note: coreMessages needs the FunctionCall part to be valid history
+    // We reconstruct the last message to include the function call
+    const modelCallParts = response.candidates![0].content.parts;
+    coreMessages.push({ role: 'model', parts: modelCallParts });
 
-        const functionResponses: any[] = [];
+    const functionResponses: any[] = [];
 
-        for (const callPart of functionCalls) {
-          const call = callPart.functionCall;
-          console.log(`[API Chat] Executing tool: ${call.name}`);
+    for (const callPart of functionCalls) {
+        const call = callPart.functionCall;
+        console.log(`[API Chat] Executing tool: ${call.name}`);
 
-          let toolResult = { error: 'Unknown tool' };
+        let toolResult = { error: 'Unknown tool' };
 
-          try {
+        try {
             const args = call.args;
             let filePath: string | null = null;
 
             if (call.name === 'update_drive_file') {
-              const { fileId, newContent } = args as any;
-              console.log(`[Tool Execution] Updating Drive File: ${fileId}`);
-              const tokens = getGoogleTokens(req); // Get user tokens from request
-              if (!tokens) throw new Error("Google Authentication required to update Drive files.");
+                const { fileId, newContent } = args as any;
+                console.log(`[Tool Execution] Updating Drive File: ${fileId}`);
+                const tokens = getGoogleTokens(req); // Get user tokens from request
+                if (!tokens) throw new Error("Google Authentication required to update Drive files.");
 
-              const result = await updateDriveFile(tokens, fileId, newContent);
+                const result = await updateDriveFile(tokens, fileId, newContent);
 
-              if (result.success) {
-                toolResult = {
-                  message: `File updated successfully in Google Drive. ID: ${result.id}.`
-                } as any;
-              } else {
-                toolResult = {
-                  message: `Failed to update file: ${result.error}` // Return error as message to model
-                } as any;
-              }
+                if (result.success) {
+                    toolResult = {
+                        message: `File updated successfully in Google Drive. ID: ${result.id}.`
+                    } as any;
+                } else {
+                    toolResult = {
+                        message: `Failed to update file: ${result.error}` // Return error as message to model
+                    } as any;
+                }
             } else if (call.name === 'update_sheet_cell_range') {
-              const { fileId, range, values } = args as any;
-              console.log(`[Tool Execution] Updating Sheet Range: ${fileId}, Range: ${range}`);
-              const tokens = getGoogleTokens(req);
-              if (!tokens) throw new Error("Google Authentication required to update Drive files.");
+                const { fileId, range, values } = args as any;
+                console.log(`[Tool Execution] Updating Sheet Range: ${fileId}, Range: ${range}`);
+                const tokens = getGoogleTokens(req);
+                if (!tokens) throw new Error("Google Authentication required to update Drive files.");
 
-              // Call the new drive tool function
-              const result = await updateSheetCellRange(tokens, fileId, range, values);
+                // Call the new drive tool function
+                const result = await updateSheetCellRange(tokens, fileId, range, values);
 
-              if (result.success) {
-                toolResult = {
-                  message: `Sheet range updated successfully. ID: ${result.id}.`
-                } as any;
-              } else {
-                toolResult = {
-                  message: `Failed to update sheet range: ${result.error}`
-                } as any;
-              }
+                if (result.success) {
+                    toolResult = {
+                        message: `Sheet range updated successfully. ID: ${result.id}.`
+                    } as any;
+                } else {
+                    toolResult = {
+                        message: `Failed to update sheet range: ${result.error}`
+                    } as any;
+                }
             } else if (call.name === 'create_drive_file') {
-              const { fileName, content, folderId } = args as any;
-              console.log(`[Tool Execution] Creating Drive File: ${fileName}`);
-              const tokens = getGoogleTokens(req);
-              if (!tokens) throw new Error("Google Authentication required to create Drive files.");
+                const { fileName, content, folderId } = args as any;
+                console.log(`[Tool Execution] Creating Drive File: ${fileName}`);
+                const tokens = getGoogleTokens(req);
+                if (!tokens) throw new Error("Google Authentication required to create Drive files.");
 
-              const result = await createDriveFile(tokens, fileName, content, 'text/plain', folderId);
+                const result = await createDriveFile(tokens, fileName, content, 'text/plain', folderId);
 
-              if (result.success) {
-                toolResult = {
-                  message: `File created successfully in Google Drive. ID: ${result.id}. Link: ${result.webViewLink}`
-                } as any;
-              } else {
-                toolResult = {
-                  message: `Failed to create file: ${result.error}` // Return error as message
-                } as any;
-              }
+                if (result.success) {
+                    toolResult = {
+                        message: `File created successfully in Google Drive. ID: ${result.id}. Link: ${result.webViewLink}`
+                    } as any;
+                } else {
+                    toolResult = {
+                        message: `Failed to create file: ${result.error}` // Return error as message
+                    } as any;
+                }
+            } else if (call.name === 'get_sheet_metadata') {
+                const { fileId } = args as any;
+                console.log(`[Tool Execution] Getting Sheet Metadata: ${fileId}`);
+                const tokens = getGoogleTokens(req);
+                if (!tokens) throw new Error("Authentication required.");
+
+                const result = await getSheetMetadata(tokens, fileId);
+
+                if (result.success) {
+                    toolResult = { metadata: result.metadata } as any;
+                } else {
+                    toolResult = { message: `Failed to get metadata: ${result.error}` } as any;
+                }
+            } else if (call.name === 'update_sheet_metadata') {
+                const { fileId, requests } = args as any;
+                console.log(`[Tool Execution] Updating Sheet Metadata: ${fileId}`);
+                const tokens = getGoogleTokens(req);
+                if (!tokens) throw new Error("Authentication required.");
+
+                const result = await updateSheetMetadata(tokens, fileId, requests);
+
+                if (result.success) {
+                    toolResult = { message: `Sheet metadata updated successfully.` } as any;
+                } else {
+                    toolResult = { message: `Failed to update metadata: ${result.error}` } as any;
+                }
             } else if (call.name === 'generate_pdf') {
-              const filePath = await generatePDF((args as any).content, (args as any).filename);
-              console.log(`[Tool Execution] PDF Generated at ${filePath}`);
-              const buffer = fs.readFileSync(filePath);
-              const uploadResult = await uploadFile(buffer, path.basename(filePath), 'application/pdf');
-              toolResult = {
-                downloadUrl: uploadResult.publicUrl,
-                message: `File generated successfully. Users can download it here: ${uploadResult.publicUrl}\n\nIMPORTANT: You MUST return this link to the user formatted as a Markdown link, like this:\n[${path.basename(filePath)}](${uploadResult.publicUrl})`
-              } as any;
+                const filePath = await generatePDF((args as any).content, (args as any).filename);
+                console.log(`[Tool Execution] PDF Generated at ${filePath}`);
+                const buffer = fs.readFileSync(filePath);
+                const uploadResult = await uploadFile(buffer, path.basename(filePath), 'application/pdf');
+                toolResult = {
+                    downloadUrl: uploadResult.publicUrl,
+                    message: `File generated successfully. Users can download it here: ${uploadResult.publicUrl}\n\nIMPORTANT: You MUST return this link to the user formatted as a Markdown link, like this:\n[${path.basename(filePath)}](${uploadResult.publicUrl})`
+                } as any;
             } else if (call.name === 'generate_docx') {
-              filePath = await generateDOCX((args as any).content, (args as any).filename);
+                filePath = await generateDOCX((args as any).content, (args as any).filename);
             } else if (call.name === 'generate_md') {
-              filePath = await generateMD((args as any).content, (args as any).filename);
+                filePath = await generateMD((args as any).content, (args as any).filename);
             } else if (call.name === 'generate_jsonl') {
-              filePath = await generateJSONL((args as any).data, (args as any).filename);
+                filePath = await generateJSONL((args as any).data, (args as any).filename);
             }
 
             if (filePath) {
-              const buffer = fs.readFileSync(filePath);
-              const uploadResult = await uploadFile(buffer, path.basename(filePath), 'application/octet-stream');
-              toolResult = {
-                downloadUrl: uploadResult.publicUrl,
-                message: `File generated successfully. Users can download it here: ${uploadResult.publicUrl}\n\nIMPORTANT: You MUST return this link to the user formatted as a Markdown link, like this:\n[${path.basename(filePath)}](${uploadResult.publicUrl})`
-              } as any;
+                const buffer = fs.readFileSync(filePath);
+                const uploadResult = await uploadFile(buffer, path.basename(filePath), 'application/octet-stream');
+                toolResult = {
+                    downloadUrl: uploadResult.publicUrl,
+                    message: `File generated successfully. Users can download it here: ${uploadResult.publicUrl}\n\nIMPORTANT: You MUST return this link to the user formatted as a Markdown link, like this:\n[${path.basename(filePath)}](${uploadResult.publicUrl})`
+                } as any;
             }
 
-          } catch (e: any) {
+        } catch (e: any) {
             console.error(`[API Chat] Tool execution failed:`, e);
             toolResult = { error: e.message };
-          }
+        }
 
-          functionResponses.push({
+        functionResponses.push({
             functionResponse: {
-              name: call.name,
-              response: { result: toolResult }
+                name: call.name,
+                response: { result: toolResult }
             }
-          });
-        }
-
-        // Append function responses to history
-        coreMessages.push({ role: 'function', parts: functionResponses });
-
-        // Call model again with updated history
-        console.log('[API Chat] Sending tool outputs back to model...');
-        tunedOptions.contents = coreMessages;
-
-        // CRITICAL FIX: Reset toolConfig to AUTO (or remove the ANY constraint) so the model can speak!
-        if (tunedOptions.toolConfig && tunedOptions.toolConfig.functionCallingConfig) {
-          console.log('[API Chat] Resetting tool mode to AUTO for follow-up response.');
-          tunedOptions.toolConfig.functionCallingConfig.mode = 'AUTO';
-        }
-
-        result = await model.generateContent(tunedOptions);
-        response = await result.response;
-
-        // Check for recursive calls (unlikely but possible)
-        functionCalls = response.candidates?.[0]?.content?.parts?.filter((p: any) => p.functionCall);
-      }
-
-      // --- 4. FINAL RESPONSE PROCESSING ---
-      // (Standard text extraction)
-      let text = '';
-      let groundingMetadata = null;
-      let searchEntryPoint = null;
-
-      if (response.candidates && response.candidates.length > 0) {
-        const candidate = response.candidates[0];
-        if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-          text = candidate.content.parts.map((p: any) => p.text || '').join('');
-        }
-        if (candidate.groundingMetadata) {
-          groundingMetadata = candidate.groundingMetadata;
-          if (groundingMetadata.searchEntryPoint?.renderedContent) {
-            searchEntryPoint = groundingMetadata.searchEntryPoint.renderedContent;
-          }
-        }
-      }
-
-
-      let shortTitle = "";
-      const titleMatch = text.match(/<short_title>([\s\S]*?)<\/short_title>/);
-      if (titleMatch) {
-        shortTitle = titleMatch[1].trim();
-        text = text.replace(/<short_title>[\s\S]*?<\/short_title>/, "").trim();
-      }
-
-      res.json({ text, groundingMetadata, searchEntryPoint, shortTitle });
-
-    } catch (error: any) {
-      console.error('Errore durante chat:', error);
-      res.status(500).json({ error: error.message || 'Errore durante chat' });
+        });
     }
-  });
 
+    // Append function responses to history
+    coreMessages.push({ role: 'function', parts: functionResponses });
 
-  // --- EXTRACT IDENTITY ENDPOINT ---
-  app.post('/api/extract-identity', async (req: Request, res: Response) => {
-    try {
-      console.log('[API Identity] Extracting identity from memory file...');
-      const { fileData, mimeType } = req.body;
+    // Call model again with updated history
+    console.log('[API Chat] Sending tool outputs back to model...');
+    tunedOptions.contents = coreMessages;
 
-      if (!fileData || !mimeType) {
-        return res.status(400).json({ error: 'File data required' });
+    // CRITICAL FIX: Reset toolConfig to AUTO (or remove the ANY constraint) so the model can speak!
+    if (tunedOptions.toolConfig && tunedOptions.toolConfig.functionCallingConfig) {
+        console.log('[API Chat] Resetting tool mode to AUTO for follow-up response.');
+        tunedOptions.toolConfig.functionCallingConfig.mode = 'AUTO';
+    }
+
+    result = await model.generateContent(tunedOptions);
+    response = await result.response;
+
+    // Check for recursive calls (unlikely but possible)
+    functionCalls = response.candidates?.[0]?.content?.parts?.filter((p: any) => p.functionCall);
+}
+
+    // --- 4. FINAL RESPONSE PROCESSING ---
+    // (Standard text extraction)
+    let text = '';
+    let groundingMetadata = null;
+    let searchEntryPoint = null;
+
+    if (response.candidates && response.candidates.length > 0) {
+      const candidate = response.candidates[0];
+      if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+        text = candidate.content.parts.map((p: any) => p.text || '').join('');
       }
-
-      const project = process.env.GCP_PROJECT_ID;
-      const location = 'europe-west1';
-      const { VertexAI } = await import("@google-cloud/vertexai");
-
-      let vertex_ai;
-      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
-        vertex_ai = vertexAICache.client;
-      } else {
-        vertex_ai = new VertexAI({ project, location });
-        vertexAICache = { client: vertex_ai, project: project!, location };
-      }
-
-      const model = vertex_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        systemInstruction: {
-          role: 'system',
-          parts: [{ text: "Sei un estrattore di entità. Il tuo UNICO scopo è leggere il documento e trovare il NOME e COGNOME della persona a cui appartiene o che ha scritto il documento. Restituisci SOLO un JSON valido." }]
+      if (candidate.groundingMetadata) {
+        groundingMetadata = candidate.groundingMetadata;
+        if (groundingMetadata.searchEntryPoint?.renderedContent) {
+          searchEntryPoint = groundingMetadata.searchEntryPoint.renderedContent;
         }
-      });
+      }
+    }
 
-      const prompt = `Analizza questo file di memoria personale.
+
+    let shortTitle = "";
+    const titleMatch = text.match(/<short_title>([\s\S]*?)<\/short_title>/);
+    if (titleMatch) {
+      shortTitle = titleMatch[1].trim();
+      text = text.replace(/<short_title>[\s\S]*?<\/short_title>/, "").trim();
+    }
+
+    res.json({ text, groundingMetadata, searchEntryPoint, shortTitle });
+
+  } catch (error: any) {
+    console.error('Errore durante chat:', error);
+    res.status(500).json({ error: error.message || 'Errore durante chat' });
+  }
+});
+
+
+// --- EXTRACT IDENTITY ENDPOINT ---
+app.post('/api/extract-identity', async (req: Request, res: Response) => {
+  try {
+    console.log('[API Identity] Extracting identity from memory file...');
+    const { fileData, mimeType } = req.body;
+
+    if (!fileData || !mimeType) {
+      return res.status(400).json({ error: 'File data required' });
+    }
+
+    const project = process.env.GCP_PROJECT_ID;
+    const location = 'europe-west1';
+    const { VertexAI } = await import("@google-cloud/vertexai");
+
+    let vertex_ai;
+    if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+      vertex_ai = vertexAICache.client;
+    } else {
+      vertex_ai = new VertexAI({ project, location });
+      vertexAICache = { client: vertex_ai, project: project!, location };
+    }
+
+    const model = vertex_ai.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: {
+        role: 'system',
+        parts: [{ text: "Sei un estrattore di entità. Il tuo UNICO scopo è leggere il documento e trovare il NOME e COGNOME della persona a cui appartiene o che ha scritto il documento. Restituisci SOLO un JSON valido." }]
+      }
+    });
+
+    const prompt = `Analizza questo file di memoria personale.
       Estrai il NOME COMPLETO della persona.
       Restituisci un JSON in questo formato esatto:
       {
@@ -2258,86 +2317,86 @@ ${filesContext}
       }
       Se non trovi nulla, restituisci null.`;
 
-      const result = await model.generateContent({
-        contents: [{
-          role: 'user',
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType, data: fileData } }
-          ]
-        }],
-        generationConfig: { responseMimeType: "application/json" }
-      });
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType, data: fileData } }
+        ]
+      }],
+      generationConfig: { responseMimeType: "application/json" }
+    });
 
-      const response = await result.response;
-      const text = response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('');
+    const response = await result.response;
+    const text = response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('');
 
-      console.log('[API Identity] Extraction result:', text);
+    console.log('[API Identity] Extraction result:', text);
 
-      let identity = null;
-      if (text) {
-        try {
-          identity = JSON.parse(text);
-        } catch (e) {
-          console.error('Failed to parse identity JSON', e);
-        }
+    let identity = null;
+    if (text) {
+      try {
+        identity = JSON.parse(text);
+      } catch (e) {
+        console.error('Failed to parse identity JSON', e);
       }
-
-      res.json({ identity });
-
-    } catch (error: any) {
-      console.error('Error in Identity endpoint:', error);
-      res.status(500).json({ error: error.message });
     }
-  });
 
-  // --- MASTER ENDPOINT (Red Pin) ---
-  app.post('/api/master', async (req: Request, res: Response) => {
-    try {
-      console.log('[API Master] Endpoint triggered (Red Pin Active)');
-      const { messages, sources, temperature, webResearch } = req.body;
+    res.json({ identity });
 
-      // Placeholder for future Master Logic
-      // Currently acts as a pass-through to Gemini 2.5 Flash with specific system context
+  } catch (error: any) {
+    console.error('Error in Identity endpoint:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
-      const project = process.env.GCP_PROJECT_ID;
-      const location = 'europe-west1';
-      const { VertexAI } = await import("@google-cloud/vertexai");
+// --- MASTER ENDPOINT (Red Pin) ---
+app.post('/api/master', async (req: Request, res: Response) => {
+  try {
+    console.log('[API Master] Endpoint triggered (Red Pin Active)');
+    const { messages, sources, temperature, webResearch } = req.body;
 
-      let vertex_ai;
-      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
-        vertex_ai = vertexAICache.client;
-      } else {
-        vertex_ai = new VertexAI({ project, location });
-        vertexAICache = { client: vertex_ai, project: project!, location };
+    // Placeholder for future Master Logic
+    // Currently acts as a pass-through to Gemini 2.5 Flash with specific system context
+
+    const project = process.env.GCP_PROJECT_ID;
+    const location = 'europe-west1';
+    const { VertexAI } = await import("@google-cloud/vertexai");
+
+    let vertex_ai;
+    if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+      vertex_ai = vertexAICache.client;
+    } else {
+      vertex_ai = new VertexAI({ project, location });
+      vertexAICache = { client: vertex_ai, project: project!, location };
+    }
+
+    const model = vertex_ai.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: {
+        role: 'system',
+        parts: [{ text: "Sei il MASTER AI. Hai priorità assoluta sulla fonte pinnata. [LOGICA DA SVILUPPARE]" }]
       }
+    });
 
-      const model = vertex_ai.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        systemInstruction: {
-          role: 'system',
-          parts: [{ text: "Sei il MASTER AI. Hai priorità assoluta sulla fonte pinnata. [LOGICA DA SVILUPPARE]" }]
-        }
-      });
+    // Basic generation
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: messages?.[messages.length - 1]?.content || 'Hello' }] }],
+      generationConfig: { temperature: 0.7 }
+    });
 
-      // Basic generation
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: messages?.[messages.length - 1]?.content || 'Hello' }] }],
-        generationConfig: { temperature: 0.7 }
-      });
+    const response = await result.response;
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || 'Master Endpoint: No response.';
 
-      const response = await result.response;
-      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || 'Master Endpoint: No response.';
+    res.json({ text, groundingMetadata: null, searchEntryPoint: null });
 
-      res.json({ text, groundingMetadata: null, searchEntryPoint: null });
+  } catch (error: any) {
+    console.error('Error in Master endpoint:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
-    } catch (error: any) {
-      console.error('Error in Master endpoint:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
+const httpServer = createServer(app);
 
-  const httpServer = createServer(app);
-
-  return httpServer;
+return httpServer;
 }

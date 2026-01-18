@@ -333,3 +333,64 @@ export async function updateSheetCellRange(
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Retrieves metadata for a Google Sheet, including Data Validation rules and Formatting.
+ */
+export async function getSheetMetadata(
+    tokens: any,
+    fileId: string
+): Promise<{ success: boolean; metadata?: any; error?: string }> {
+    try {
+        const auth = new google.auth.OAuth2();
+        auth.setCredentials(tokens);
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        // Fetch Grid Data with specific fields to reduce payload size
+        const response = await sheets.spreadsheets.get({
+            spreadsheetId: fileId,
+            includeGridData: true,
+            // We only want:
+            // - Sheet Properties (Title, ID, GridProperties)
+            // - Data (Validation, Formatting)
+            fields: 'sheets(properties(title,sheetId,gridProperties),data(rowData(values(userEnteredFormat(backgroundColor,textFormat),dataValidation))))'
+        });
+
+        return { success: true, metadata: response.data };
+    } catch (error: any) {
+        console.error('[Drive Tool] Error getting sheet metadata:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Updates Google Sheet metadata (Validation, Formatting) via batchUpdate.
+ */
+export async function updateSheetMetadata(
+    tokens: any,
+    fileId: string,
+    requests: any[]
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        if (!requests || requests.length === 0) {
+            throw new Error("No requests provided for metadata update.");
+        }
+
+        const auth = new google.auth.OAuth2();
+        auth.setCredentials(tokens);
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: fileId,
+            requestBody: {
+                requests: requests
+            }
+        });
+
+        console.log(`[Drive Tool] Metadata updated for file ${fileId}`);
+        return { success: true };
+    } catch (error: any) {
+        console.error('[Drive Tool] Error updating sheet metadata:', error);
+        return { success: false, error: error.message };
+    }
+}
