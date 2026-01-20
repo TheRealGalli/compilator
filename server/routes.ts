@@ -237,7 +237,7 @@ async function fetchUrlContent(url: string, retryCount = 0): Promise<string | nu
   }
 }
 
-async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
+async function extractText(buffer: Buffer, mimeType: string, driveId?: string): Promise<string> {
   try {
     console.log(`[DEBUG extractText] Processing ${mimeType}, buffer size: ${buffer.length}`);
     if (mimeType === 'application/pdf') {
@@ -314,7 +314,11 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
           }
 
           // Disclaimer about Metadata
-          fullText += `\n[NOTA SISTEMA: Questo è un file locale. Le regole di validazione (menu a tendina, colori condizionali) NON sono visibili qui. Per analizzare quelle regole, carica il file su Google Drive e usa la modalità Drive.]\n\n`;
+          if (driveId) {
+            fullText += `\n[DRIVE CONNECTED: ID ${driveId}. Usa 'get_sheet_metadata("${driveId}")' per vedere regole di validazione e menu a tendina.]\n\n`;
+          } else {
+            fullText += `\n[NOTA SISTEMA: Questo è un file locale. Le regole di validazione (menu a tendina, colori condizionali) NON sono visibili qui. Per analizzare quelle regole, carica il file su Google Drive e usa la modalità Drive.]\n\n`;
+          }
         } else {
           fullText += `[FOGLIO DI CALCOLO: ${sheetName}]\n(Foglio Vuoto)\n\n`;
         }
@@ -1674,7 +1678,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
               };
             } else {
               const buffer = Buffer.from(base64, 'base64');
-              const textContent = await extractText(buffer, source.type);
+              const textContent = await extractText(buffer, source.type, source.driveId || source.id);
               if (textContent) {
                 return {
                   text: {
