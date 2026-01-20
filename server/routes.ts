@@ -301,14 +301,20 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
             if (limitReached) break;
           }
 
+          // Attempt to extract simplistic metadata if available (SheetJS Community is limited)
+          if (sheet['!autofilter']) {
+            fullText += `[METADATA: AutoFilter rilevato nel range ${sheet['!autofilter'].ref}]\n`;
+          }
+
           fullText += `[FOGLIO DI CALCOLO: ${sheetName}]\n${sheetContent}\n`;
           if (limitReached) {
-            fullText += `\n[ATTENZIONE: Foglio troncato. Visualizzate prime ${MAX_CELLS_PER_SHEET} celle PIENE (non vuote). Usa 'get_sheet_metadata' per vedere la struttura completa.]\n\n`;
+            fullText += `\n[ATTENZIONE: Foglio troncato. Visualizzate prime ${MAX_CELLS_PER_SHEET} celle PIENE (non vuote).]\n`;
           } else if (range.e.r > endRow) {
-            fullText += `\n[ATTENZIONE: Foglio troncato per sicurezza (Max ${safetyMaxRows} righe scansionate).]\n\n`;
-          } else {
-            fullText += "\n\n";
+            fullText += `\n[ATTENZIONE: Foglio troncato per sicurezza (Max ${safetyMaxRows} righe scansionate).]\n`;
           }
+
+          // Disclaimer about Metadata
+          fullText += `\n[NOTA SISTEMA: Questo è un file locale. Le regole di validazione (menu a tendina, colori condizionali) NON sono visibili qui. Per analizzare quelle regole, carica il file su Google Drive e usa la modalità Drive.]\n\n`;
         } else {
           fullText += `[FOGLIO DI CALCOLO: ${sheetName}]\n(Foglio Vuoto)\n\n`;
         }
@@ -1770,13 +1776,15 @@ ${filesContext}
    - Il contenuto ti viene presentato come una lista di celle: \`[A1] Valore {Formula: =...} | [B1] Valore...\`.
    - **STRUMENTO**: Usa \`update_sheet_cell_range(fileId, range, values)\`.
      - Puoi scrivere valori PURI o FORMULE (es. "=SUM(A1:A5)").
-     - **ATTENZIONE LOCALE (IMPORTANTE)**: Se il foglio è in Italiano (Euro, date GG/MM), usa il **PUNTO E VIRGOLA (;)** come separatore argomenti (es. \`= SUMIF(A: A; "Casa"; B:B)\`). La virgola (,) rompe la formula perché è usata per i decimali.
-     - **METADATI E REGOLE (IMPORTANTE)**:
-       - Il contenuto default è SOLO TESTO/VALORI. Le regole (Dropdown, Validazione, Colori) sono INVISIBILI a meno che tu non le cerchi.
-       - Se l'utente chiede "Analizza le regole", "Controlla la struttura", "Vedi i menu a tendina" o "Perché questa cella è rossa?":
-         - DEVI OBBLIGATORIAMENTE usare \`get_sheet_metadata(fileId)\`.
-       - Per MODIFICARE regole/colori: Usa \`update_sheet_metadata(fileId, requests)\`.
-       - Esempio creazione Dropdown: requests=[{setDataValidation: {range: {...}, rule: {condition: {type: 'ONE_OF_LIST', values: [{userEnteredValue: 'Si'}, {userEnteredValue: 'No'}]}}}}].
+      - **ATTENZIONE LOCALE (IMPORTANTE)**: Se il foglio è in Italiano (Euro, date GG/MM), usa il **PUNTO E VIRGOLA (;)** come separatore argomenti (es. \`= SUMIF(A: A; "Casa"; B:B)\`). La virgola (,) rompe la formula perché è usata per i decimali.
+      - **METADATI E REGOLE (IMPORTANTE)**:
+        - Il contenuto default è SOLO TESTO/VALORI.
+        - **SE IL FILE È SU DRIVE (Drive Mode ON)**:
+          - Usa 'get_sheet_metadata(fileId)' per vedere regole di validazione e menu a tendina.
+          - Usa 'update_sheet_metadata(fileId, requests)' per modificare regole/colori.
+        - **SE IL FILE È LOCALE (Upload)**:
+          - NON puoi usare i tool di metadati. Basati solo sul testo estratto o chiedi all'utente di metterlo su Drive.
+      - **ATTACHMENTS (Drive Mode)**: Se sei in Drive Mode, NON chiedere "Vuoi generare file?". Modifica DIRETTAMENTE i file su Drive. È inutile generare copie off-line quando puoi modificare l'originale.
    - **AGGIORNAMENTI MIRATI**: Non riscriverti tutto il foglio. Modifica SOLO le celle necessarie.
      - **REGOLA ANTI-ERRORE**: Specifica sempre solo la **CELLA INIZIALE** (es. "B2") come range. Mai un range chiuso (es. "B2:C5") per evitare mismatch di dimensioni.
      - Esempio Corretto: range="B2", values=[["2024", "Gennaio"]] (scrive in B2 e C2).
