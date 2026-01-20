@@ -243,7 +243,10 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
     if (mimeType === 'application/pdf') {
       // Use dynamic import for pdf-parse (ESM module)
       const pdfParseModule = await import('pdf-parse');
-      const pdfParse = (pdfParseModule as any).default || pdfParseModule;
+      // Fix for "pdfParse is not a function" - handle both default and direct export
+      const pdfParse = (pdfParseModule as any).default ? (pdfParseModule as any).default : pdfParseModule;
+
+      console.log('[DEBUG extractText] Calling pdfParse...');
       const data = await pdfParse(buffer);
       console.log(`[DEBUG extractText] PDF parsed, text length: ${data.text.length}, pages: ${data.numpages}`);
       return data.text;
@@ -251,34 +254,59 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
       const result = await mammoth.extractRawText({ buffer });
       console.log(`[DEBUG extractText] DOCX parsed, text length: ${result.value.length}`);
       return result.value;
-    } else if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
       // XLSX Support via SheetJS (xlsx)
       const xlsx = await import('xlsx');
       const workbook = xlsx.read(buffer, { type: 'buffer' });
       let fullText = '';
+      const MAX_CELLS_PER_SHEET = 10000; // Safety limit for 512MB RAM environment
+
       workbook.SheetNames.forEach(sheetName => {
         const sheet = workbook.Sheets[sheetName];
-        // Convert sheet to coordinate-aware text for precise editing
         const rangeStr = sheet['!ref'];
+
         if (rangeStr) {
           const range = xlsx.utils.decode_range(rangeStr);
+          const totalCells = (range.e.r - range.s.r + 1) * (range.e.c - range.s.c + 1);
+
           let sheetContent = "";
-          for (let R = range.s.r; R <= range.e.r; ++R) {
+          let cellsProcessed = 0;
+          let limitReached = false;
+
+          // If too huge, just take the first 5000 rows to avoid infinite loop overhead in extreme cases
+          const safetyMaxRows = 5000;
+          const endRow = range.e.r > (range.s.r + safetyMaxRows) ? (range.s.r + safetyMaxRows) : range.e.r;
+
+          for (let R = range.s.r; R <= endRow; ++R) {
             for (let C = range.s.c; C <= range.e.c; ++C) {
               const cell_address = xlsx.utils.encode_cell({ r: R, c: C });
               const cell = sheet[cell_address];
+
+              // Smart Filter: Only consider cells with actual content (Value or Formula)
               if (cell && (cell.v !== undefined || cell.f)) {
-                // Formatting: [A1] Value {Formula: =...} |
-                let cellText = `[${cell_address}] ${cell.v !== undefined ? cell.v : ''}`;
-                if (cell.f) {
-                  cellText += ` {Formula: =${cell.f}}`;
+                if (cellsProcessed >= MAX_CELLS_PER_SHEET) {
+                  limitReached = true;
+                  break;
                 }
+
+                let cellText = `[${cell_address}] ${cell.v !== undefined ? cell.v : ''}`;
+                if (cell.f) cellText += ` {Formula: =${cell.f}}`;
                 sheetContent += `${cellText} | `;
+
+                cellsProcessed++;
               }
             }
-            sheetContent += "\n";
+            sheetContent += "\n"; // Add newline after row even if empty, preserving structure
+            if (limitReached) break;
           }
-          fullText += `[FOGLIO DI CALCOLO: ${sheetName}]\n${sheetContent}\n\n`;
+
+          fullText += `[FOGLIO DI CALCOLO: ${sheetName}]\n${sheetContent}\n`;
+          if (limitReached) {
+            fullText += `\n[ATTENZIONE: Foglio troncato. Visualizzate prime ${MAX_CELLS_PER_SHEET} celle PIENE (non vuote). Usa 'get_sheet_metadata' per vedere la struttura completa.]\n\n`;
+          } else if (range.e.r > endRow) {
+            fullText += `\n[ATTENZIONE: Foglio troncato per sicurezza (Max ${safetyMaxRows} righe scansionate).]\n\n`;
+          } else {
+            fullText += "\n\n";
+          }
         } else {
           fullText += `[FOGLIO DI CALCOLO: ${sheetName}]\n(Foglio Vuoto)\n\n`;
         }
