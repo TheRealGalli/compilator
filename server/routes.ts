@@ -254,7 +254,9 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
       const result = await mammoth.extractRawText({ buffer });
       console.log(`[DEBUG extractText] DOCX parsed, text length: ${result.value.length}`);
       return result.value;
+    } else if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || mimeType === 'application/vnd.ms-excel') {
       // XLSX Support via SheetJS (xlsx)
+      console.log(`[DEBUG extractText] Processing XLSX file...`);
       const xlsx = await import('xlsx');
       const workbook = xlsx.read(buffer, { type: 'buffer' });
       let fullText = '';
