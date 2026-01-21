@@ -163,12 +163,19 @@ export default async function runApp(
   // Use the exported app instance which is already configured
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    // Set CORS headers for error responses too
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+
+    console.error(`[SYSTEM ERROR] ${status} - ${message}`, err);
+    res.status(status).json({ message, error: message });
   });
 
   // importantly run the final setup after setting up all the other routes so

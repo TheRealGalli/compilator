@@ -376,46 +376,37 @@ export async function getSheetMetadata(
             const validations: any[] = [];
             const formats: any[] = [];
 
-            // Heuristic: Group identical consecutive validations/formats to save tokens
-            gridData.forEach((row, rIdx) => {
+            // SAFETY: Limit number of rows processed to avoid OOM
+            const MAX_ROWS = 2000;
+            const rowsToProcess = gridData.slice(0, MAX_ROWS);
+
+            rowsToProcess.forEach((row, rIdx) => {
                 const values = row.values || [];
                 values.forEach((cell, cIdx) => {
                     if (cell.dataValidation) {
-                        const rule = JSON.stringify(cell.dataValidation);
-                        const existing = validations.find(v => v.ruleJson === rule);
-                        if (existing) {
-                            // Expand range (simplified: just track hit cells for now to save complexity)
-                            // Better: Just list the cell for now, or group by rule
-                            if (!existing.cells) existing.cells = [];
-                            existing.cells.push(`${String.fromCharCode(65 + cIdx)}${rIdx + 1}`);
-                        } else {
-                            validations.push({
-                                ruleJson: rule,
-                                rule: cell.dataValidation,
-                                cells: [`${String.fromCharCode(65 + cIdx)}${rIdx + 1}`]
-                            });
+                        const ruleJson = JSON.stringify(cell.dataValidation);
+                        let existing = validations.find(v => v.ruleJson === ruleJson);
+                        if (!existing) {
+                            existing = { ruleJson, rule: cell.dataValidation, cells: [] };
+                            validations.push(existing);
                         }
+                        if (existing.cells.length < 500) existing.cells.push(`${String.fromCharCode(65 + cIdx)}${rIdx + 1}`);
                     }
 
-                    // Only track "significant" formats (e.g. bold or non-white background)
                     const format = cell.userEnteredFormat;
                     if (format) {
                         const isBold = format.textFormat?.bold;
-                        const hasBg = format.backgroundColor && (format.backgroundColor.red || format.backgroundColor.green || format.backgroundColor.blue);
+                        const bgColor = format.backgroundColor;
+                        const hasBg = bgColor && ((bgColor.red || 0) < 0.98 || (bgColor.green || 0) < 0.98 || (bgColor.blue || 0) < 0.98);
 
                         if (isBold || hasBg) {
                             const formatJson = JSON.stringify(format);
-                            const existing = formats.find(f => f.formatJson === formatJson);
-                            if (existing) {
-                                if (!existing.cells) existing.cells = [];
-                                existing.cells.push(`${String.fromCharCode(65 + cIdx)}${rIdx + 1}`);
-                            } else {
-                                formats.push({
-                                    formatJson: formatJson,
-                                    format: format,
-                                    cells: [`${String.fromCharCode(65 + cIdx)}${rIdx + 1}`]
-                                });
+                            let existing = formats.find(f => f.formatJson === formatJson);
+                            if (!existing) {
+                                existing = { formatJson, format, cells: [] };
+                                formats.push(existing);
                             }
+                            if (existing.cells.length < 500) existing.cells.push(`${String.fromCharCode(65 + cIdx)}${rIdx + 1}`);
                         }
                     }
                 });
@@ -434,7 +425,6 @@ export async function getSheetMetadata(
             return {
                 title,
                 sheetId: sheet.properties?.sheetId,
-                gridProperties: sheet.properties?.gridProperties,
                 validations: cleanValidations,
                 significantFormats: cleanFormats
             };
