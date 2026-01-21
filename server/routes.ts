@@ -244,7 +244,15 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
       // Use dynamic import for pdf-parse (ESM module)
       const pdfParseModule = await import('pdf-parse');
       // Fix for "pdfParse is not a function" - handle both default and direct export
-      const pdfParse = (pdfParseModule as any).default ? (pdfParseModule as any).default : pdfParseModule;
+      let pdfParse: any;
+      if (typeof pdfParseModule === 'function') {
+        pdfParse = pdfParseModule;
+      } else if (pdfParseModule && typeof (pdfParseModule as any).default === 'function') {
+        pdfParse = (pdfParseModule as any).default;
+      } else {
+        // Fallback for some Node environments
+        pdfParse = (pdfParseModule as any);
+      }
 
       console.log('[DEBUG extractText] Calling pdfParse...');
       const data = await pdfParse(buffer);
