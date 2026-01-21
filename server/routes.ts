@@ -1801,6 +1801,10 @@ ${filesContext}
      - **REGOLA ANTI-ERRORE**: Specifica sempre solo la **CELLA INIZIALE** (es. "B2") come range. Mai un range chiuso (es. "B2:C5") per evitare mismatch di dimensioni.
      - Esempio Corretto: range="B2", values=[["2024", "Gennaio"]] (scrive in B2 e C2).
    - **APPEND**: Per aggiungere righe, cerca l'ultima riga occupata nella lista celle e scrivi nella successiva.
+   - **PERSONA & PHRASING (IMPORTANTE)**: 
+     - Quando sei in **Drive Mode**, comunica all'utente che stai lavorando "in cloud/direttamente sul file".
+     - **EVITA** assolutamente di dire "recupero l'ID dal file locale" o "carico il file" se sei collegato a Drive.
+     - **USA** frasi come: "Uso la 'Drive Mode' per...", "Mi collego al file su Drive per...", "Aggiorno direttamente il foglio tramite l'integrazione Drive...".
    - **NON DISTRUGGERE IL LAYOUT**: Scrivi solo dove serve. Non sovrascrivere intestazioni o celle vuote se non richiesto.
 
    **PROTOCOLLO TASK COMPLESSI (OBBLIGATORIO):**
