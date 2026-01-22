@@ -12,7 +12,7 @@ interface GmailMessage {
     attachmentCount?: number;
 }
 
-export type GmailCategory = 'primary' | 'social' | 'promotions' | 'updates';
+export type GmailCategory = 'primary' | 'social' | 'promotions' | 'updates' | 'sent';
 
 interface GmailContextType {
     isConnected: boolean;

@@ -571,6 +571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (category === 'social') categoryFilter = 'category:social';
       else if (category === 'promotions') categoryFilter = 'category:promotions';
       else if (category === 'updates') categoryFilter = 'category:updates';
+      else if (category === 'sent') categoryFilter = 'label:sent';
 
       const searchQuery = q ? `${categoryFilter} ${q}` : categoryFilter;
 

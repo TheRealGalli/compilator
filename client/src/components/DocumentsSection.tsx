@@ -1,7 +1,7 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2, Brain } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2, Brain, Send } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -117,7 +117,9 @@ export function DocumentsSection() {
         }
 
         // Add email body
-        const fileName = `Gmail_${subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+        const emailDate = messages.find(m => m.id === msgId)?.date;
+        const dateSuffix = emailDate ? `_${format(new Date(emailDate), 'yyMMdd_HHmm')}` : '';
+        const fileName = `Gmail_${subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}${dateSuffix}.txt`;
         const file = new File([data.body], fileName, { type: 'text/plain' });
         await addSource(file);
 
@@ -134,7 +136,7 @@ export function DocumentsSection() {
 
           // Rename attachment to link it to the email
           const safeSubject = subject.replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 30);
-          const attachName = `Allegato_da_${safeSubject}_${attach.name}`;
+          const attachName = `Allegato_da_${safeSubject}${dateSuffix}_${attach.name}`;
           const attachFile = new File([blob], attachName, { type: attach.mimeType });
 
           await addSource(attachFile);
@@ -255,6 +257,7 @@ export function DocumentsSection() {
         <div className="flex px-6 border-b border-border/40 gap-8 overflow-x-auto">
           {[
             { id: 'primary', label: 'Principali', icon: Inbox, color: 'text-blue-600', border: 'border-blue-600' },
+            { id: 'sent', label: 'Inviati', icon: Send, color: 'text-gray-600', border: 'border-gray-600' },
             { id: 'promotions', label: 'Promozioni', icon: Tag, color: 'text-green-600', border: 'border-green-600' },
             { id: 'social', label: 'Social', icon: Users, color: 'text-purple-600', border: 'border-purple-600' },
             { id: 'updates', label: 'Aggiornamenti', icon: Info, color: 'text-orange-600', border: 'border-orange-600' },
