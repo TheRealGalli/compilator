@@ -118,7 +118,7 @@ export function DocumentsSection() {
 
         // Add email body
         const emailDate = messages.find(m => m.id === msgId)?.date;
-        const dateSuffix = emailDate ? `_${format(new Date(emailDate), 'yyMMdd_HHmm')}` : '';
+        const dateSuffix = emailDate ? `_${format(new Date(emailDate), 'dd/MM/yy_HH:mm')}` : '';
         const fileName = `Gmail_${subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}${dateSuffix}.txt`;
         const file = new File([data.body], fileName, { type: 'text/plain' });
         await addSource(file);
