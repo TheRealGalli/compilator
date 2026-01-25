@@ -13,9 +13,9 @@
     "db:push": "drizzle-kit push",
     "ios": "echo 'Use npm run expo:ios for the professional experience' && ./scripts/open-simulator.sh",
     "ios:dev": "npm run dev & sleep 5 && npm run ios",
-    "expo": "npm run dev & sleep 5 && npx expo start",
-    "expo:ios": "npm run dev & sleep 5 && npx expo start --ios",
-    "expo:android": "npm run dev & sleep 5 && npx expo start --android"
+    "expo": "lsof -ti:5001 | xargs kill -9 2>/dev/null || true; npm run dev & sleep 5 && npx expo start",
+    "expo:ios": "lsof -ti:5001 | xargs kill -9 2>/dev/null || true; npm run dev & sleep 5 && npx expo start --ios",
+    "expo:android": "lsof -ti:5001 | xargs kill -9 2>/dev/null || true; npm run dev & sleep 5 && npx expo start --android"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.43",

@@ -50,33 +50,32 @@ export function MobileBlocker() {
     if (!isBlocked) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-[#000a1a] flex items-center justify-center overflow-hidden touch-none select-none">
-            {/* Dark Ambient Background with Depth */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#0044cc_0%,_#000a1a_100%)] opacity-25" />
+        <div className="fixed inset-0 z-[9999] bg-[#0055ff] flex items-center justify-center overflow-hidden touch-none select-none">
+            {/* Vibrant Background Sync */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#2277ff_0%,_#0055ff_100%)] opacity-50" />
 
             <motion.div
                 style={{ rotateX, rotateY, perspective: 1500 }}
                 className="relative z-10 w-full max-w-[min(94vw,520px)] aspect-square"
             >
                 {/* Main Crystal Container */}
-                <div className="w-full h-full relative rounded-3xl overflow-hidden border border-white/40 backdrop-blur-[40px] bg-white/[0.02] shadow-[0_60px_150px_rgba(0,0,0,0.9),inset_0_0_80px_rgba(255,255,255,0.05)]">
+                <div className="w-full h-full relative rounded-3xl overflow-hidden border border-white/40 backdrop-blur-[30px] bg-white/[0.05] shadow-[0_60px_150px_rgba(0,0,0,0.6),inset_0_0_80px_rgba(255,255,255,0.05)]">
 
-                    {/* The Actual High-Res Image from Assets */}
+                    {/* The Actual High-Res Image - Focused on the board */}
                     <img
                         src={chessBoardImage}
                         alt="Chess Board"
-                        className="absolute inset-0 w-full h-full object-contain p-[3.2%]"
+                        className="absolute inset-0 w-[112%] h-[112%] max-w-none object-cover left-[-6%] top-[-6%] opacity-95"
                     />
 
-                    {/* Interactive Overlay Grid (Precisely Aligned) */}
-                    {/* Centered 8x8 grid that matches the image visual board */}
-                    <div className="absolute inset-0 flex items-center justify-center p-[4%]">
-                        <div className="w-full h-full grid grid-cols-8 grid-rows-8 p-[10.5%]">
+                    {/* Interactive Overlay Grid (Precisely Aligned to the Board) */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-[83.5%] h-[83.5%] grid grid-cols-8 grid-rows-8">
                             {Array.from({ length: 64 }).map((_, i) => {
                                 return (
                                     <div
                                         key={i}
-                                        className="w-full h-full transition-all duration-300 hover:bg-white/[0.12] active:bg-white/[0.2] cursor-pointer rounded-sm border border-transparent active:border-white/20"
+                                        className="w-full h-full transition-all duration-300 hover:bg-white/[0.15] active:bg-white/[0.25] cursor-pointer border border-white/5 active:border-white/30"
                                         onClick={() => console.log(`Square ${i} clicked`)}
                                     />
                                 );
@@ -85,16 +84,16 @@ export function MobileBlocker() {
                     </div>
 
                     {/* Premium Glass Glare Effects */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.1)_0%,_transparent_50%)] pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.15)_0%,_transparent_60%)] pointer-events-none" />
 
                     {/* Framed Internal Bezel */}
-                    <div className="absolute inset-[3px] rounded-[22px] border border-white/20 pointer-events-none shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]" />
+                    <div className="absolute inset-[4px] rounded-[22px] border border-white/25 pointer-events-none shadow-[inset_0_0_30px_rgba(255,255,255,0.1)]" />
                 </div>
             </motion.div>
 
-            {/* Cinematic light halo behind the board */}
-            <div className="absolute w-[80%] h-[80%] bg-blue-600/5 blur-[180px] -z-1" />
+            {/* Ambient glow behind the board */}
+            <div className="absolute w-[90%] h-[90%] bg-blue-400/10 blur-[200px] -z-1" />
         </div>
     );
 }

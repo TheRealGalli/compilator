@@ -12,7 +12,7 @@ COPY shared ./shared
 COPY server ./server
 
 # Installa le dipendenze (incluse dev per il build)
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # Build solo del backend
 RUN npx esbuild server/index-prod.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/index.js
@@ -24,7 +24,7 @@ WORKDIR /app
 
 # Copia solo i file necessari per la produzione
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev --legacy-peer-deps
 
 # Copia il codice compilato e i moduli necessari
 COPY --from=builder /app/dist ./dist
