@@ -49,47 +49,47 @@ export function MobileBlocker() {
     if (!isBlocked) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-[#001030] flex items-center justify-center overflow-hidden touch-none select-none">
-            {/* Ambient Background Gradient */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#0044cc_0%,_#001030_100%)] opacity-40" />
-
-            {/* Animated Light Source */}
-            <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-blue-400/10 blur-[120px]" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/5 blur-[100px]" />
+        <div className="fixed inset-0 z-[9999] bg-[#000a1a] flex items-center justify-center overflow-hidden touch-none select-none">
+            {/* Dark Ambient Background */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#0044cc_0%,_#000a1a_100%)] opacity-20" />
 
             <motion.div
-                style={{ rotateX, rotateY, perspective: 1200 }}
-                className="relative z-10 w-full max-w-[min(88vw,480px)] aspect-square"
+                style={{ rotateX, rotateY, perspective: 1500 }}
+                className="relative z-10 w-full max-w-[min(92vw,500px)] aspect-square"
             >
-                {/* Board Container with Glass Effect */}
-                <div className="w-full h-full relative rounded-2xl overflow-hidden border border-white/20 backdrop-blur-2xl bg-white/[0.03] shadow-[0_40px_100px_rgba(0,0,0,0.6),inset_0_0_40px_rgba(255,255,255,0.05)]">
+                {/* Board Container with Premium Glass Foundation */}
+                <div className="w-full h-full relative rounded-2xl overflow-hidden border border-white/30 backdrop-blur-3xl bg-white/[0.05] shadow-[0_50px_120px_rgba(0,0,0,0.8),inset_0_0_50px_rgba(255,255,255,0.05)]">
 
-                    {/* Inner depth layer for "thick glass" look */}
-                    <div className="absolute inset-[1px] rounded-[15px] border border-white/10 pointer-events-none" />
+                    {/* The Actual Image from the Photo */}
+                    <img
+                        src="/chess_board.png"
+                        alt="Chess Board"
+                        className="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-lighten"
+                    />
 
-                    {/* Chess Grid */}
-                    <div className="w-full h-full grid grid-cols-8 grid-rows-8 p-[6px]">
+                    {/* Interactive Overlay Grid (Transparent) */}
+                    <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 p-[10%]">
                         {Array.from({ length: 64 }).map((_, i) => {
-                            const row = Math.floor(i / 8);
-                            const col = i % 8;
-                            const isWhite = (row + col) % 2 === 0;
                             return (
                                 <div
                                     key={i}
-                                    className={`w-full h-full transition-all duration-700 ${isWhite
-                                            ? 'bg-white/[0.06] hover:bg-white/[0.12]'
-                                            : 'bg-black/[0.12] hover:bg-black/[0.18]'
-                                        }`}
+                                    className="w-full h-full transition-all duration-300 hover:bg-white/5 active:bg-white/10"
                                 />
                             );
                         })}
                     </div>
 
-                    {/* Surface specular/gloss highlight */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.12] via-transparent to-transparent pointer-events-none" />
-                    <div className="absolute inset-0 bg-[linear-gradient(135deg,_rgba(255,255,255,0.05)_0%,_rgba(255,255,255,0)_50%)] pointer-events-none" />
+                    {/* Specular surface glare */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_rgba(255,255,255,0.15)_0%,_transparent_60%)] pointer-events-none" />
+
+                    {/* Inner glass thickness edge */}
+                    <div className="absolute inset-[2px] rounded-xl border border-white/20 pointer-events-none" />
                 </div>
             </motion.div>
+
+            {/* Subtle glow behind the board */}
+            <div className="absolute w-[60%] h-[60%] bg-blue-500/10 blur-[150px] -z-1" />
         </div>
     );
 }
