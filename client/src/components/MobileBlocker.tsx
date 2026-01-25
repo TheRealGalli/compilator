@@ -65,21 +65,23 @@ export function MobileBlocker() {
                     <img
                         src={chessBoardImage}
                         alt="Chess Board"
-                        className="absolute inset-0 w-full h-full object-contain p-[4%]"
+                        className="absolute inset-0 w-full h-full object-contain p-[3.2%]"
                     />
 
                     {/* Interactive Overlay Grid (Precisely Aligned) */}
-                    {/* Note: Adjusting padding to match the image's grid area */}
-                    <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 p-[12%]">
-                        {Array.from({ length: 64 }).map((_, i) => {
-                            return (
-                                <div
-                                    key={i}
-                                    className="w-full h-full transition-all duration-300 hover:bg-white/[0.08] active:bg-white/[0.15] cursor-pointer rounded-sm"
-                                    onClick={() => console.log(`Square ${i} clicked`)}
-                                />
-                            );
-                        })}
+                    {/* Centered 8x8 grid that matches the image visual board */}
+                    <div className="absolute inset-0 flex items-center justify-center p-[4%]">
+                        <div className="w-full h-full grid grid-cols-8 grid-rows-8 p-[10.5%]">
+                            {Array.from({ length: 64 }).map((_, i) => {
+                                return (
+                                    <div
+                                        key={i}
+                                        className="w-full h-full transition-all duration-300 hover:bg-white/[0.12] active:bg-white/[0.2] cursor-pointer rounded-sm border border-transparent active:border-white/20"
+                                        onClick={() => console.log(`Square ${i} clicked`)}
+                                    />
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {/* Premium Glass Glare Effects */}
