@@ -70,12 +70,12 @@ export function MobileBlocker() {
 
                     {/* Interactive Overlay Grid (Precisely Aligned to the Board) */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-[83.5%] h-[83.5%] grid grid-cols-8 grid-rows-8">
+                        <div className="w-[71.5%] h-[71.5%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
                             {Array.from({ length: 64 }).map((_, i) => {
                                 return (
                                     <div
                                         key={i}
-                                        className="w-full h-full transition-all duration-300 hover:bg-white/[0.15] active:bg-white/[0.25] cursor-pointer border border-white/5 active:border-white/30"
+                                        className="w-full h-full transition-all duration-300 hover:bg-white/[0.18] active:bg-white/[0.28] cursor-pointer border border-white/5 active:border-white/30"
                                         onClick={() => console.log(`Square ${i} clicked`)}
                                     />
                                 );
