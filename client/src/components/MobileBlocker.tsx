@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, useSpring, useTransform } from "framer-motion";
+import chessBoardImage from "../assets/chess_board.png";
 
 export function MobileBlocker() {
     const [isBlocked, setIsBlocked] = useState(false);
@@ -50,46 +51,48 @@ export function MobileBlocker() {
 
     return (
         <div className="fixed inset-0 z-[9999] bg-[#000a1a] flex items-center justify-center overflow-hidden touch-none select-none">
-            {/* Dark Ambient Background */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#0044cc_0%,_#000a1a_100%)] opacity-20" />
+            {/* Dark Ambient Background with Depth */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#0044cc_0%,_#000a1a_100%)] opacity-25" />
 
             <motion.div
                 style={{ rotateX, rotateY, perspective: 1500 }}
-                className="relative z-10 w-full max-w-[min(92vw,500px)] aspect-square"
+                className="relative z-10 w-full max-w-[min(94vw,520px)] aspect-square"
             >
-                {/* Board Container with Premium Glass Foundation */}
-                <div className="w-full h-full relative rounded-2xl overflow-hidden border border-white/30 backdrop-blur-3xl bg-white/[0.05] shadow-[0_50px_120px_rgba(0,0,0,0.8),inset_0_0_50px_rgba(255,255,255,0.05)]">
+                {/* Main Crystal Container */}
+                <div className="w-full h-full relative rounded-3xl overflow-hidden border border-white/40 backdrop-blur-[40px] bg-white/[0.02] shadow-[0_60px_150px_rgba(0,0,0,0.9),inset_0_0_80px_rgba(255,255,255,0.05)]">
 
-                    {/* The Actual Image from the Photo */}
+                    {/* The Actual High-Res Image from Assets */}
                     <img
-                        src="/chess_board.png"
+                        src={chessBoardImage}
                         alt="Chess Board"
-                        className="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-lighten"
+                        className="absolute inset-0 w-full h-full object-contain p-[4%]"
                     />
 
-                    {/* Interactive Overlay Grid (Transparent) */}
-                    <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 p-[10%]">
+                    {/* Interactive Overlay Grid (Precisely Aligned) */}
+                    {/* Note: Adjusting padding to match the image's grid area */}
+                    <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 p-[12%]">
                         {Array.from({ length: 64 }).map((_, i) => {
                             return (
                                 <div
                                     key={i}
-                                    className="w-full h-full transition-all duration-300 hover:bg-white/5 active:bg-white/10"
+                                    className="w-full h-full transition-all duration-300 hover:bg-white/[0.08] active:bg-white/[0.15] cursor-pointer rounded-sm"
+                                    onClick={() => console.log(`Square ${i} clicked`)}
                                 />
                             );
                         })}
                     </div>
 
-                    {/* Specular surface glare */}
+                    {/* Premium Glass Glare Effects */}
                     <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_rgba(255,255,255,0.15)_0%,_transparent_60%)] pointer-events-none" />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.1)_0%,_transparent_50%)] pointer-events-none" />
 
-                    {/* Inner glass thickness edge */}
-                    <div className="absolute inset-[2px] rounded-xl border border-white/20 pointer-events-none" />
+                    {/* Framed Internal Bezel */}
+                    <div className="absolute inset-[3px] rounded-[22px] border border-white/20 pointer-events-none shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]" />
                 </div>
             </motion.div>
 
-            {/* Subtle glow behind the board */}
-            <div className="absolute w-[60%] h-[60%] bg-blue-500/10 blur-[150px] -z-1" />
+            {/* Cinematic light halo behind the board */}
+            <div className="absolute w-[80%] h-[80%] bg-blue-600/5 blur-[180px] -z-1" />
         </div>
     );
 }
