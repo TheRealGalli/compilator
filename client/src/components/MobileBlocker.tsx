@@ -70,7 +70,7 @@ export function MobileBlocker() {
 
                     {/* Interactive Overlay Grid (Precisely Aligned to the Board) */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-[73.1%] h-[73.1%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
+                        <div className="w-[73.5%] h-[73.5%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
                             {Array.from({ length: 64 }).map((_, i) => {
                                 return (
                                     <div
