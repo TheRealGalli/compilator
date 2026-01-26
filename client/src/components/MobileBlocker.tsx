@@ -124,7 +124,7 @@ export function MobileBlocker() {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: "100vw" }}
                                 transition={{ type: "spring", stiffness: 100, damping: 20 }}
-                                className="ml-2.5 text-white text-xl font-bold tracking-tight drop-shadow-md whitespace-nowrap"
+                                className="ml-1.5 text-white text-xl font-bold tracking-tight drop-shadow-md whitespace-nowrap"
                             >
                                 Gromit-Chess
                             </motion.span>
@@ -158,8 +158,9 @@ export function MobileBlocker() {
                                         <AnimatePresence>
                                             {isChessMode && (
                                                 <motion.div
-                                                    initial={{ opacity: 0, scale: 0.5 }}
+                                                    initial={{ opacity: 0, scale: 0.8 }}
                                                     animate={{ opacity: 1, scale: 1 }}
+                                                    transition={{ duration: 2, ease: "easeOut" }}
                                                     className="relative"
                                                 >
                                                     <ChessPiece row={row} col={col} />
