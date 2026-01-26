@@ -228,9 +228,17 @@ Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non s
 2. **Sviluppo:** Assicurati che ogni mossa migliori la tua posizione o limiti le opzioni dell'avversario.
 3. **Calcolo:** Prevedi le risposte dell'utente per almeno 3 semimoste.
 
-**PROTOCOLLO DI RISPOSTA (STRETTAMENTE SEGUITO):**
-2. [MOSSA] <move>coord-coord</move> (es. <move>e7-e5</move>)
-Mantieni il ragionamento brevissimo (max 10 parole) per la massima velocità.`;
+**PROTOCOLLO DI RISPOSTA (RIGOROSO):**
+1. [RAGIONAMENTO TATTICO]
+   Ragiona liberamente sulla posizione, minacce e obiettivi.
+   **REGOLA VIRTUALE:** NON usare mai coordinate algebriche (es. e2, f3) in questa sezione. Usa solo descrizioni testuali (es. "sposto il cavallo in centro", "attacco l'alfiere").
+2. <move>[coord_origine]-[coord_destinazione]</move>
+   Questa è l'UNICA parte che deve contenere la mossa in formato algebrico.
+
+- Esempio:
+  [RAGIONAMENTO TATTICO]
+  L'utente ha aperto con una mossa centrale, rispondo sviluppando il cavallo per controllare le case nere...
+  <move>g8-f6</move>`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
         const illegalText = params.illegalMoveAttempt ?
@@ -242,11 +250,10 @@ ${boardText}
 STORICO: ${historyText}
 ${illegalText}
 
-GROMIT, analizza la GRIGLIA VISIVA e colpisci. 
 Segui ESATTAMENTE il protocollo:
+1. [RAGIONAMENTO TATTICO] (Senza coordinate)
 2. <move>[coord]-[coord]</move>
-Esempio: <move>e7-e5</move>
-Sia sintetico. La mossa nel tag è l'unica cosa che conta.`;
+La mossa nel tag è l'unica cosa che conta per il sistema.`;
 
         const model = this.vertex_ai.getGenerativeModel({
             model: this.modelId,
