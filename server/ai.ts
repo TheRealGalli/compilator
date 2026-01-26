@@ -177,6 +177,29 @@ ${params.draftContent}`;
     }
 
     /**
+     * Converts the square-based JSON board into a visual ASCII grid for the AI.
+     */
+    private renderBoardAsText(boardJson: any): string {
+        const rows = [];
+        rows.push("   a   b   c   d   e   f   g   h");
+        rows.push(" +---+---+---+---+---+---+---+---+");
+
+        for (let r = 0; r < 8; r++) {
+            let rowStr = `${8 - r}|`;
+            for (let c = 0; c < 8; c++) {
+                const square = boardJson.find((s: any) => s.r === r && s.c === c);
+                const piece = square?.piece || "  ";
+                const display = piece === "  " ? "  " : piece;
+                rowStr += ` ${display}|`;
+            }
+            rows.push(rowStr + ` ${8 - r}`);
+            rows.push(" +---+---+---+---+---+---+---+---+");
+        }
+        rows.push("   a   b   c   d   e   f   g   h");
+        return rows.join("\n");
+    }
+
+    /**
      * Specialized method for Chess AI moves using Gemini 2.5 Flash.
      */
     async getChessMove(params: {
@@ -185,6 +208,7 @@ ${params.draftContent}`;
         illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] },
         allLegalMoves?: string[] // Optional list of strings like "a2-a4", "g8-f6"
     }): Promise<{ from: string, to: string }> {
+        const boardText = this.renderBoardAsText(params.boardJson);
         const systemPrompt = `Sei GROMIT, un'Intelligenza Artificiale di livello Gran Maestro Internazionale (Elo 3500+).
 Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non stai solo muovendo pezzi; stai conducendo una sinfonia di distruzione tattica.
 
@@ -194,18 +218,21 @@ Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non s
 - La scacchiera è immersa in un ambiente "The Real Galli" - un'interfaccia premium, scura e minimale.
 
 **PROCESSO DECISIONALE (INTERNO):**
-1. **Analisi Posizionale:** Valuta il controllo del centro, la sicurezza del King Blu (tu) e le debolezze nel King Bianco.
+1. **Analisi Visiva:** Guarda la scacchiera testuale fornita. Identifica minacce immediate, diagonali aperte e debolezze strutturali.
+2. **Sviluppo:** Assicurati che ogni mossa migliori la tua posizione o limiti le opzioni dell'avversario.
+3. **Calcolo:** Prevedi le risposte dell'utente per almeno 3 semimoste.
+
 **PROTOCOLLO DI RISPOSTA (STRETTAMENTE SEGUITO):**
 1. Inizia con il blocco:
    [RAGIONAMENTO TATTICO]
-   Qui scrivi la tua analisi profonda della posizione, minacce e obiettivi tattici.
+   Qui scrivi la tua analisi profonda della posizione, minacce e obiettivi tattici basandoti sulla GRIGLIA VISIVA.
 2. Termina con il blocco:
    [MOSSA FINALE]
    MOVE: [coord_origine] to [coord_destinazione] ###
 
 - Esempio:
   [RAGIONAMENTO TATTICO]
-  Analisi: L'utente ha lasciato indifeso il Re. Preparo attacco...
+  Analisi: L'utente ha lasciato indifeso il Re sulla diagonale h4-e1. Preparo attacco...
   [MOSSA FINALE]
   MOVE: e7 to e5 ###`;
 
@@ -213,13 +240,13 @@ Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non s
         const illegalText = params.illegalMoveAttempt ?
             `\n⚠️ AVVISO CRITICO: La tua mossa precedente (${params.illegalMoveAttempt.from} -> ${params.illegalMoveAttempt.to}) era ILLEGALE. Errore: ${params.illegalMoveAttempt.error}. DEVI scegliere una mossa valida tra queste fornite: ${params.illegalMoveAttempt.validMoves.join(', ')}.` : "";
 
-        const userPrompt = `STATO SCACCHIERA:
-${JSON.stringify(params.boardJson, null, 2)}
+        const userPrompt = `SCACCHIERA ATTUALE:
+${boardText}
 
 STORICO: ${historyText}
 ${illegalText}
 
-GROMIT, analizza la situazione e colpisci. 
+GROMIT, analizza la GRIGLIA VISIVA e colpisci. 
 Segui ESATTAMENTE il protocollo:
 1. [RAGIONAMENTO TATTICO] ...
 2. [MOSSA FINALE] MOVE: [coord] to [coord] ###`;
