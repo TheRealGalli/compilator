@@ -1,14 +1,20 @@
-import { useEffect, useState } from "react";
-import { motion, useSpring, useTransform } from "framer-motion";
+import { useEffect, useState, useMemo } from "react";
+import { motion, useSpring, useTransform, AnimatePresence } from "framer-motion";
 import { Asterisk } from "lucide-react";
+import {
+    FaChessPawn, FaChessRook, FaChessKnight, FaChessBishop,
+    FaChessQueen, FaChessKing
+} from "react-icons/fa6";
 import chessBoardImage from "../assets/chess_board.png";
 
 export function MobileBlocker() {
     const [isBlocked, setIsBlocked] = useState(false);
     const [isGromitSpinning, setIsGromitSpinning] = useState(false);
+    const [isChessMode, setIsChessMode] = useState(false);
 
     const handleGromitClick = () => {
         setIsGromitSpinning(true);
+        setIsChessMode(prev => !prev);
         setTimeout(() => setIsGromitSpinning(false), 1000);
     };
 
@@ -65,25 +71,40 @@ export function MobileBlocker() {
                 style={{ rotateX, rotateY, perspective: 1500 }}
                 className="relative z-10 w-full max-w-[min(94vw,520px)] aspect-square"
             >
-                {/* Gromit Logo - Repositioned Outside/Above the board */}
+                {/* Gromit Logo & Title - Repositioned Outside/Above the board */}
                 <div
-                    className="absolute -top-12 left-0 z-20 flex items-center -space-x-3 cursor-pointer group active:scale-95 transition-transform"
+                    className="absolute -top-12 left-0 z-20 flex items-center cursor-pointer group active:scale-95 transition-transform"
                     onClick={handleGromitClick}
                 >
-                    <Asterisk
-                        className={`text-blue-600 transition-transform duration-1000 ${isGromitSpinning ? 'rotate-[360deg]' : ''}`}
-                        style={{ filter: 'drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)' }}
-                        width={32}
-                        height={32}
-                        strokeWidth={3}
-                    />
-                    <Asterisk
-                        className="text-blue-600"
-                        style={{ filter: 'drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)' }}
-                        width={32}
-                        height={32}
-                        strokeWidth={3}
-                    />
+                    <div className="flex items-center -space-x-3">
+                        <Asterisk
+                            className={`text-blue-600 transition-transform duration-1000 ${isGromitSpinning ? 'rotate-[360deg]' : ''}`}
+                            style={{ filter: 'drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)' }}
+                            width={32}
+                            height={32}
+                            strokeWidth={3}
+                        />
+                        <Asterisk
+                            className="text-blue-600"
+                            style={{ filter: 'drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)' }}
+                            width={32}
+                            height={32}
+                            strokeWidth={3}
+                        />
+                    </div>
+
+                    <AnimatePresence>
+                        {isChessMode && (
+                            <motion.span
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -10 }}
+                                className="ml-4 text-white text-xl font-bold tracking-tight drop-shadow-md"
+                            >
+                                Gromit-Chess
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
                 </div>
 
                 {/* Main Crystal Container */}
@@ -100,12 +121,27 @@ export function MobileBlocker() {
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-[75.0%] h-[75.0%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
                             {Array.from({ length: 64 }).map((_, i) => {
+                                const row = Math.floor(i / 8);
+                                const col = i % 8;
+
                                 return (
                                     <div
                                         key={i}
-                                        className="w-full h-full transition-all duration-300 hover:bg-white/[0.18] active:bg-white/[0.28] cursor-pointer border border-white/5 active:border-white/30"
+                                        className="w-full h-full relative flex items-center justify-center transition-all duration-300 hover:bg-white/[0.1] active:bg-white/[0.2] cursor-pointer border border-white/5"
                                         onClick={() => console.log(`Square ${i} clicked`)}
-                                    />
+                                    >
+                                        <AnimatePresence>
+                                            {isChessMode && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, scale: 0.5 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    className="relative"
+                                                >
+                                                    <ChessPiece row={row} col={col} />
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
                                 );
                             })}
                         </div>
