@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, useSpring, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Asterisk } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 import {
     FaChessPawn, FaChessRook, FaChessKnight, FaChessBishop,
     FaChessQueen, FaChessKing
@@ -346,14 +347,10 @@ export function MobileBlocker() {
             const handleAiMove = async (illegalAttempt?: any) => {
                 setIsAiProcessing(true);
                 try {
-                    const response = await fetch('/api/chess/move', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            boardJson: getBoardJson(board),
-                            history: matchHistory,
-                            illegalMoveAttempt: illegalAttempt
-                        })
+                    const response = await apiRequest('POST', '/api/chess/move', {
+                        boardJson: getBoardJson(board),
+                        history: matchHistory,
+                        illegalMoveAttempt: illegalAttempt
                     });
                     const move = await response.json();
                     if (move.from && move.to) {
