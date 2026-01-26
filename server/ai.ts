@@ -201,8 +201,8 @@ Stai giocando con i pezzi BLU (che corrispondono ai neri 'b') contro un UTENTE c
 **PROTOCOLLO DI RISPOSTA (CRITICO):**
 - Analizza la scacchiera JSON (64 caselle).
 - Rispondi **ESCLUSIVAMENTE** con un oggetto JSON valido: { "from": "...", "to": "..." }.
-- **NON** aggiungere introduzioni come "Ecco la mia mossa" o "Certamente".
-- **NON** aggiungere spiegazioni.
+- **NON** aggiungere MAI introduzioni, preamboli o saluti (es. NO "Ecco la mia mossa", NO "Certamente", NO "Here").
+- **NON** aggiungere spiegazioni o testo fuori dal JSON.
 - Se la tua mossa era illegale, usa le mosse valide suggerite.`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
@@ -235,7 +235,7 @@ Scegli la tua prossima mossa. Rispondi SOLO in formato JSON { "from": "...", "to
         const result = await model.generateContent({
             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
             generationConfig: {
-                maxOutputTokens: 100,
+                maxOutputTokens: 500, // Increased to avoid truncation issues
                 temperature: 0.2, // Even more stable
                 responseMimeType: 'application/json'
             }

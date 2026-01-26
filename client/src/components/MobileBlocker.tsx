@@ -347,7 +347,6 @@ export function MobileBlocker() {
         if (isChessMode && currentTurn === 'b' && gameStatus === 'play' && !isAiProcessing) {
             const handleAiMove = async (illegalAttempt?: any) => {
                 setIsAiProcessing(true);
-                setIsLogoSpinning(true);
                 try {
                     const response = await apiRequest('POST', '/api/chess/move', {
                         boardJson: getBoardJson(board),
@@ -355,6 +354,13 @@ export function MobileBlocker() {
                         illegalMoveAttempt: illegalAttempt
                     });
                     const move = await response.json();
+
+                    // TRATTA L'ANIMAZIONE LOGO SOLO DOPO CHE LA MOSSA È ARRIVATA
+                    if (move.from && move.to) {
+                        setIsLogoSpinning(true);
+                        setTimeout(() => setIsLogoSpinning(false), 800);
+                    }
+
                     if (move.from && move.to) {
                         const from = fromAlgebraic(move.from);
                         const to = fromAlgebraic(move.to);
@@ -452,13 +458,11 @@ export function MobileBlocker() {
                         <div className="flex items-center -space-x-3 shrink-0">
                             <motion.div
                                 animate={{
-                                    rotate: isLogoSpinning ? [360, 720, 360] : (isChessMode ? 360 : 0),
+                                    rotate: isLogoSpinning ? 720 : (isChessMode ? 360 : 0),
                                     filter: getFilter(isChessMode ? 1.0 : 1.5)
                                 }}
                                 transition={{
-                                    rotate: isLogoSpinning
-                                        ? { duration: 1.5, ease: "easeInOut", repeat: Infinity }
-                                        : { duration: 1, ease: "easeInOut" },
+                                    rotate: { duration: 0.8, ease: "easeInOut" },
                                     filter: { duration: 1 }
                                 }}
                                 style={{ willChange: "transform, filter" }}
