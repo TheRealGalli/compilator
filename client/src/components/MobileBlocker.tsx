@@ -47,7 +47,6 @@ const checkDeviceSync = () => {
 
 export function MobileBlocker() {
     const [isBlocked, setIsBlocked] = useState(checkDeviceSync());
-    const [isGromitSpinning, setIsGromitSpinning] = useState(false);
     const [isChessMode, setIsChessMode] = useState(false);
     const [board, setBoard] = useState<(string | null)[][]>(INITIAL_BOARD);
     const [selectedSquare, setSelectedSquare] = useState<{ r: number, c: number } | null>(null);
@@ -70,7 +69,6 @@ export function MobileBlocker() {
     };
 
     const handleGromitClick = () => {
-        setIsGromitSpinning(true);
         setIsChessMode(prev => !prev);
         if (!isChessMode) {
             setBoard(INITIAL_BOARD);
@@ -79,7 +77,6 @@ export function MobileBlocker() {
             setTime(0);
             setTimerActive(false);
         }
-        setTimeout(() => setIsGromitSpinning(false), 1000);
     };
 
     const isValidMove = (piece: string, fromR: number, fromC: number, toR: number, toC: number): boolean => {
@@ -122,7 +119,6 @@ export function MobileBlocker() {
         if (selectedSquare) {
             const pieceAtFrom = board[selectedSquare.r][selectedSquare.c];
             if (pieceAtFrom && isValidMove(pieceAtFrom, selectedSquare.r, selectedSquare.c, r, c)) {
-                // Start timer ONLY on first valid move
                 if (!timerActive) setTimerActive(true);
 
                 const newBoard = board.map(row => [...row]);
@@ -164,6 +160,8 @@ export function MobileBlocker() {
 
     if (!isBlocked) return null;
 
+    return (
+        <div className="fixed inset-0 z-[9999] bg-[#0055ff] flex items-center justify-center overflow-hidden touch-none select-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#2277ff_0%,_#0055ff_100%)] opacity-50" />
 
             <motion.div
@@ -177,26 +175,28 @@ export function MobileBlocker() {
                     >
                         <div className="flex items-center -space-x-3">
                             <motion.div
-                                animate={{
-                                    rotate: isChessMode ? 360 : 0,
-                                    filter: getFilter(isChessMode ? 1.0 : 1.5)
-                                }}
+                                animate={{ rotate: isChessMode ? 360 : 0 }}
                                 transition={{ duration: 1, ease: "easeInOut" }}
                             >
-                                <Asterisk
-                                    className="text-blue-600"
-                                    size={32}
-                                />
+                                <motion.div
+                                    animate={{ strokeWidth: isChessMode ? 2 : 3 }}
+                                    transition={{ duration: 1, ease: "easeInOut" }}
+                                >
+                                    <Asterisk
+                                        className="text-blue-600"
+                                        size={32}
+                                        {...({ strokeWidth: isChessMode ? 2 : 3 } as any)}
+                                    />
+                                </motion.div>
                             </motion.div>
                             <motion.div
-                                animate={{
-                                    filter: getFilter(isChessMode ? 1.0 : 1.5)
-                                }}
+                                animate={{ strokeWidth: isChessMode ? 2 : 3 }}
                                 transition={{ duration: 1, ease: "easeInOut" }}
                             >
                                 <Asterisk
                                     className="text-blue-600"
                                     size={32}
+                                    {...({ strokeWidth: isChessMode ? 2 : 3 } as any)}
                                 />
                             </motion.div>
                         </div>
@@ -275,13 +275,12 @@ export function MobileBlocker() {
 
             <div className="absolute w-[90%] h-[90%] bg-blue-400/10 blur-[200px] -z-1" />
 
-    {/* Ultra-precise dynamic screen border frame */ }
-    <motion.div
-        className="fixed inset-0 pointer-events-none z-[10000] border-black opacity-100"
-        initial={{ borderWidth: isBlocked ? "9px" : "0px" }}
-        animate={{ borderWidth: isChessMode ? "6px" : "9px" }}
-        transition={{ duration: 1, ease: "easeInOut" }}
-    />
-        </div >
+            <motion.div
+                className="fixed inset-0 pointer-events-none z-[10000] border-black opacity-100"
+                initial={{ borderWidth: isBlocked ? "9px" : "0px" }}
+                animate={{ borderWidth: isChessMode ? "6px" : "9px" }}
+                transition={{ duration: 1, ease: "easeInOut" }}
+            />
+        </div>
     );
 }
