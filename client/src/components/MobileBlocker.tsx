@@ -72,11 +72,18 @@ export function MobileBlocker() {
                 >
                     <Asterisk
                         className={`text-blue-600 transition-transform duration-1000 ${isGromitSpinning ? 'rotate-[360deg]' : ''}`}
+                        style={{ filter: 'drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)' }}
                         width={32}
                         height={32}
                         strokeWidth={3}
                     />
-                    <Asterisk className="text-blue-600" width={32} height={32} strokeWidth={3} />
+                    <Asterisk
+                        className="text-blue-600"
+                        style={{ filter: 'drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)' }}
+                        width={32}
+                        height={32}
+                        strokeWidth={3}
+                    />
                 </div>
 
                 {/* Main Crystal Container */}
