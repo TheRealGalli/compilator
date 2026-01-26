@@ -160,6 +160,18 @@ export function MobileBlocker() {
 
     if (!isBlocked) return null;
 
+    const s = isChessMode ? 1.0 : 1.5;
+    const getFilter = (thickness: number) => `
+        drop-shadow(${thickness}px ${thickness}px 0 black) 
+        drop-shadow(-${thickness}px -${thickness}px 0 black) 
+        drop-shadow(${thickness}px -${thickness}px 0 black) 
+        drop-shadow(-${thickness}px ${thickness}px 0 black)
+        drop-shadow(${thickness}px 0 0 black)
+        drop-shadow(-${thickness}px 0 0 black)
+        drop-shadow(0 ${thickness}px 0 black)
+        drop-shadow(0 -${thickness}px 0 black)
+    `;
+
     return (
         <div className="fixed inset-0 z-[9999] bg-[#0055ff] flex items-center justify-center overflow-hidden touch-none select-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#2277ff_0%,_#0055ff_100%)] opacity-50" />
@@ -175,28 +187,26 @@ export function MobileBlocker() {
                     >
                         <div className="flex items-center -space-x-3">
                             <motion.div
-                                animate={{ rotate: isChessMode ? 360 : 0 }}
-                                transition={{ duration: 1, ease: "easeInOut" }}
-                            >
-                                <motion.div
-                                    animate={{ strokeWidth: isChessMode ? 2 : 3 }}
-                                    transition={{ duration: 1, ease: "easeInOut" }}
-                                >
-                                    <Asterisk
-                                        className="text-blue-600"
-                                        size={32}
-                                        {...({ strokeWidth: isChessMode ? 2 : 3 } as any)}
-                                    />
-                                </motion.div>
-                            </motion.div>
-                            <motion.div
-                                animate={{ strokeWidth: isChessMode ? 2 : 3 }}
+                                animate={{
+                                    rotate: isChessMode ? 360 : 0,
+                                    filter: getFilter(isChessMode ? 1.0 : 1.5)
+                                }}
                                 transition={{ duration: 1, ease: "easeInOut" }}
                             >
                                 <Asterisk
                                     className="text-blue-600"
                                     size={32}
-                                    {...({ strokeWidth: isChessMode ? 2 : 3 } as any)}
+                                />
+                            </motion.div>
+                            <motion.div
+                                animate={{
+                                    filter: getFilter(isChessMode ? 1.0 : 1.5)
+                                }}
+                                transition={{ duration: 1, ease: "easeInOut" }}
+                            >
+                                <Asterisk
+                                    className="text-blue-600"
+                                    size={32}
                                 />
                             </motion.div>
                         </div>
