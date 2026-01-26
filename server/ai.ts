@@ -215,54 +215,18 @@ ${params.draftContent}`;
         allLegalMoves?: string[] // Optional list of strings like "a2-a4", "g8-f6"
     }): Promise<{ from: string, to: string }> {
         const boardText = this.renderBoardAsText(params.boardJson);
-        const systemPrompt = `Sei GROMIT, un'Intelligenza Artificiale di livello Gran Maestro Internazionale (Elo 3500+).
-Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non stai solo muovendo pezzi; stai conducendo una sinfonia di distruzione tattica.
+        // HYPER-SPEED PROMPT
+        const systemPrompt = `Sei GROMIT (b). Ragiona in 1 riga e colpisci.
+AZIONE OBBLIGATORIA: <move>origine-destinazione</move> (es. <move>e7-e5</move>).
+PEZZI: b=Blu, w=Bianco, P=Pedone, R=Torre, N=Cavallo, B=Alfiere, Q=Regina, K=Re.
+REGOLE: Sii brevissimo. La mossa nel tag <move> è priorità assoluta.`;
 
-**CONTESTO AMBIENTALE:**
-- Giochi con i pezzi BLU (Black 'b').
-- L'utente gioca con i pezzi BIANCHI (White 'w').
-- La scacchiera è immersa in un ambiente "The Real Galli" - un'interfaccia premium, scura e minimale.
-
-**PROCESSO DECISIONALE (INTERNO):**
-1. **Analisi Visiva:** Guarda la scacchiera testuale fornita. Identifica minacce immediate, diagonali aperte e debolezze strutturali.
-2. **Sviluppo:** Assicurati che ogni mossa migliori la tua posizione o limiti le opzioni dell'avversario.
-3. **Calcolo:** Prevedi le risposte dell'utente per almeno 3 semimoste.
-
-**LEGENDA PEZZI:**
-- b = Blu (Tu / GROMIT)
-- w = Bianco (Utente)
-- P = Pedone, R = Torre, N = Cavallo, B = Alfiere, Q = Regina, K = Re
-
-**PROTOCOLLO DI RISPOSTA (RIGOROSO):**
-1. [RAGIONAMENTO TATTICO]
-   Ragiona liberamente sulla posizione, minacce e obiettivi.
-   **REGOLA VIRTUALE:** NON usare mai coordinate algebriche (es. e2, f3) in questa sezione. Usa solo descrizioni testuali (es. "sposto il cavallo in centro", "attacco l'alfiere").
-2. <move>[coord_origine]-[coord_destinazione]</move>
-   Questa è l'UNICA parte che deve contenere la mossa in formato algebrico.
-
-- Esempio:
-  [RAGIONAMENTO TATTICO]
-  L'utente ha aperto con una mossa centrale, rispondo sviluppando il cavallo per controllare le case nere...
-  <move>g8-f6</move>`;
-
-        const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
+        const historyText = params.history.length > 0 ? `Storico: ${params.history.join(', ')}` : "Inizio.";
         const legalMovesText = (params.allLegalMoves && params.allLegalMoves.length > 0) ?
-            `\n**MOSSE LEGALI DISPONIBILI (SCEGLINE UNA):**\n${params.allLegalMoves.join(', ')}` : "";
+            `\nMOSSE LEGALI: ${params.allLegalMoves.join(', ')}` : "";
+        const illegalText = params.illegalMoveAttempt ? `\nERRORE PRECEDENTE: ${params.illegalMoveAttempt.from}-${params.illegalMoveAttempt.to} ILLEGALE!` : "";
 
-        const illegalText = params.illegalMoveAttempt ?
-            `\n⚠️ AVVISO CRITICO: La tua mossa precedente (${params.illegalMoveAttempt.from} -> ${params.illegalMoveAttempt.to}) era ILLEGALE. Errore: ${params.illegalMoveAttempt.error}.` : "";
-
-        const userPrompt = `SCACCHIERA ATTUALE:
-${boardText}
-
-STORICO: ${historyText}
-${legalMovesText}
-${illegalText}
-
-Segui ESATTAMENTE il protocollo:
-1. [RAGIONAMENTO TATTICO] (Senza coordinate)
-2. <move>[coord]-[coord]</move>
-La mossa nel tag è l'unica cosa che conta per il sistema.`;
+        const userPrompt = `SCACCHIERA:\n${boardText}\n${historyText}${legalMovesText}${illegalText}\nProtocollo: <move> mossa </move>`;
 
         const model = this.vertex_ai.getGenerativeModel({
             model: this.modelId,
@@ -283,7 +247,7 @@ La mossa nel tag è l'unica cosa che conta per il sistema.`;
         const result = await model.generateContent({
             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
             generationConfig: {
-                maxOutputTokens: 1000,
+                maxOutputTokens: 100,
                 temperature: 0.3
             }
         });
