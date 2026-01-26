@@ -255,18 +255,29 @@ Scegli la tua prossima mossa. Rispondi SOLO in formato JSON { "from": "...", "to
         const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             cleanJson = jsonMatch[0];
-            console.log(`[AiService] Extracted JSON: "${cleanJson}"`);
         }
 
         try {
+            // Priority 1: Standard JSON parse
             const move = JSON.parse(cleanJson);
-            if (!move.from || !move.to) {
-                console.warn('[AiService] Parsed JSON missing fields:', move);
-            }
-            return move;
+            if (move.from && move.to) return move;
         } catch (e) {
-            console.error('[AiService] JSON Parse Error. Raw:', rawContent);
-            throw new Error('AI non ha restituito un JSON valido (anche dopo estrazione).');
+            console.warn('[AiService] Standard JSON parse failed, trying fallback extraction...');
         }
+
+        // Priority 2: Fallback regex extraction (handles 'from': 'a2' or from: "a2", etc)
+        try {
+            const fromMatch = rawContent.match(/['"]?from['"]?\s*:\s*['"]?([a-h][1-8])['"]?/i);
+            const toMatch = rawContent.match(/['"]?to['"]?\s*:\s*['"]?([a-h][1-8])['"]?/i);
+
+            if (fromMatch && toMatch) {
+                console.log(`[AiService] Fallback extracted move: ${fromMatch[1]} -> ${toMatch[1]}`);
+                return { from: fromMatch[1].toLowerCase(), to: toMatch[1].toLowerCase() };
+            }
+        } catch (err) {
+            console.error('[AiService] Fallback extraction failed:', err);
+        }
+
+        throw new Error(`AI non ha restituito un JSON o una mossa valida. Raw: ${rawContent.substring(0, 100)}`);
     }
 }

@@ -358,7 +358,7 @@ export function MobileBlocker() {
                     // TRATTA L'ANIMAZIONE LOGO SOLO DOPO CHE LA MOSSA È ARRIVATA
                     if (move.from && move.to) {
                         setIsLogoSpinning(true);
-                        setTimeout(() => setIsLogoSpinning(false), 800);
+                        setTimeout(() => setIsLogoSpinning(false), 1000); // Sincronizzato con 1s desktop
                     }
 
                     if (move.from && move.to) {
@@ -458,11 +458,11 @@ export function MobileBlocker() {
                         <div className="flex items-center -space-x-3 shrink-0">
                             <motion.div
                                 animate={{
-                                    rotate: isLogoSpinning ? 720 : (isChessMode ? 360 : 0),
+                                    rotate: isLogoSpinning ? [360, 720, 360] : (isChessMode ? 360 : 0),
                                     filter: getFilter(isChessMode ? 1.0 : 1.5)
                                 }}
                                 transition={{
-                                    rotate: { duration: 0.8, ease: "easeInOut" },
+                                    rotate: { duration: 1, ease: "easeInOut" },
                                     filter: { duration: 1 }
                                 }}
                                 style={{ willChange: "transform, filter" }}
