@@ -518,14 +518,14 @@ export function MobileBlocker() {
                                 </motion.span>
                             ) : (
                                 <motion.span
-                                    key="gromit-not-available"
+                                    key="gromit-play-hint"
                                     initial={{ opacity: 0, x: 20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: 20 }}
                                     transition={{ duration: 0.5, ease: "easeOut" }}
                                     className="absolute left-[56px] text-white text-xl font-bold tracking-tight drop-shadow-md whitespace-nowrap"
                                 >
-                                    Gromit non disponibile su Mobile
+                                    Gioca premendo il logo
                                 </motion.span>
                             )}
                         </AnimatePresence>
@@ -620,18 +620,30 @@ export function MobileBlocker() {
                 <div className="mt-8 w-full flex flex-col items-center gap-4">
                     {/* Captured Pieces Display */}
                     <div className="flex flex-col gap-2 w-full px-4">
-                        <div className="flex flex-wrap items-center justify-center gap-1 min-h-[32px]">
-                            <AnimatePresence>
-                                {capturedBlack.map((type, i) => (
-                                    <motion.div
-                                        key={`cap-b-${i}`}
-                                        initial={{ opacity: 0, scale: 0.5, y: -20 }}
-                                        animate={{ opacity: 1, scale: 0.7, y: 0 }}
-                                        transition={{ duration: 0.3 }}
+                        <div className="flex flex-wrap items-center justify-center gap-1 min-h-[32px] relative">
+                            <AnimatePresence mode="wait">
+                                {!isChessMode ? (
+                                    <motion.span
+                                        key="gromit-not-avail-bottom"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        className="text-white text-xl font-bold tracking-tight drop-shadow-md text-center"
                                     >
-                                        <ChessPiece type={type} />
-                                    </motion.div>
-                                ))}
+                                        Gromit non disponibile su Mobile
+                                    </motion.span>
+                                ) : (
+                                    capturedBlack.map((type, i) => (
+                                        <motion.div
+                                            key={`cap-b-${i}`}
+                                            initial={{ opacity: 0, scale: 0.5, y: -20 }}
+                                            animate={{ opacity: 1, scale: 0.7, y: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            <ChessPiece type={type} />
+                                        </motion.div>
+                                    ))
+                                )}
                             </AnimatePresence>
                         </div>
                         <div className="flex flex-wrap items-center justify-center gap-1 min-h-[32px]">
