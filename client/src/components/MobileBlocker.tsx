@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
 import { motion, useSpring, useTransform } from "framer-motion";
+import { Asterisk } from "lucide-react";
 import chessBoardImage from "../assets/chess_board.png";
 
 export function MobileBlocker() {
     const [isBlocked, setIsBlocked] = useState(false);
+    const [isGromitSpinning, setIsGromitSpinning] = useState(false);
+
+    const handleGromitClick = () => {
+        setIsGromitSpinning(true);
+        setTimeout(() => setIsGromitSpinning(false), 1000);
+    };
 
     // Spring-smoothed rotation values for premium feel
     const rotateX = useSpring(0, { stiffness: 60, damping: 20 });
@@ -60,6 +67,20 @@ export function MobileBlocker() {
             >
                 {/* Main Crystal Container */}
                 <div className="w-full h-full relative rounded-3xl overflow-hidden border border-white/40 backdrop-blur-[30px] bg-white/[0.05] shadow-[0_60px_150px_rgba(0,0,0,0.6),inset_0_0_80px_rgba(255,255,255,0.05)]">
+
+                    {/* Gromit Logo - Top Left */}
+                    <div
+                        className="absolute top-4 left-5 z-20 flex items-center -space-x-3 cursor-pointer group active:scale-95 transition-transform"
+                        onClick={handleGromitClick}
+                    >
+                        <Asterisk
+                            className={`text-blue-600 transition-transform duration-1000 ${isGromitSpinning ? 'rotate-[360deg]' : ''}`}
+                            width={32}
+                            height={32}
+                            strokeWidth={3}
+                        />
+                        <Asterisk className="text-blue-600" width={32} height={32} strokeWidth={3} />
+                    </div>
 
                     {/* The Actual High-Res Image - Focused on the board */}
                     <img
