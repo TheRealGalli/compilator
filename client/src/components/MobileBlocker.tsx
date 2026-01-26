@@ -504,9 +504,10 @@ export function MobileBlocker() {
                             </motion.div>
                         </div>
 
-                        <AnimatePresence>
-                            {isChessMode && (
+                        <AnimatePresence mode="wait">
+                            {isChessMode ? (
                                 <motion.span
+                                    key="gromit-chess"
                                     initial={{ opacity: 0, x: 20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: 20 }}
@@ -514,6 +515,17 @@ export function MobileBlocker() {
                                     className="absolute left-[56px] text-white text-xl font-bold tracking-tight drop-shadow-md whitespace-nowrap"
                                 >
                                     Gromit-Chess
+                                </motion.span>
+                            ) : (
+                                <motion.span
+                                    key="gromit-not-available"
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: 20 }}
+                                    transition={{ duration: 0.5, ease: "easeOut" }}
+                                    className="absolute left-[56px] text-white text-xl font-bold tracking-tight drop-shadow-md whitespace-nowrap"
+                                >
+                                    Gromit non disponibile su Mobile
                                 </motion.span>
                             )}
                         </AnimatePresence>

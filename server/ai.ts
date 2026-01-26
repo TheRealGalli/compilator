@@ -181,15 +181,21 @@ ${params.draftContent}`;
      */
     private renderBoardAsText(boardJson: any): string {
         const rows = [];
+        const toAlgebraic = (r: number, c: number) => {
+            const file = String.fromCharCode(97 + c);
+            const rank = 8 - r;
+            return `${file}${rank}`;
+        };
+
         rows.push("   a   b   c   d   e   f   g   h");
         rows.push(" +---+---+---+---+---+---+---+---+");
 
         for (let r = 0; r < 8; r++) {
             let rowStr = `${8 - r}|`;
             for (let c = 0; c < 8; c++) {
-                const square = boardJson.find((s: any) => s.r === r && s.c === c);
-                const piece = square?.piece || "  ";
-                const display = piece === "  " ? "  " : piece;
+                const coord = toAlgebraic(r, c);
+                const piece = boardJson[coord];
+                const display = (piece === "empty" || !piece) ? "  " : piece;
                 rowStr += ` ${display}|`;
             }
             rows.push(rowStr + ` ${8 - r}`);
