@@ -160,7 +160,6 @@ export function MobileBlocker() {
 
     if (!isBlocked) return null;
 
-    const s = isChessMode ? 1.0 : 1.5;
     const getFilter = (thickness: number) => `
         drop-shadow(${thickness}px ${thickness}px 0 black) 
         drop-shadow(-${thickness}px -${thickness}px 0 black) 
@@ -175,6 +174,13 @@ export function MobileBlocker() {
     return (
         <div className="fixed inset-0 z-[9999] bg-[#0055ff] flex items-center justify-center overflow-hidden touch-none select-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#2277ff_0%,_#0055ff_100%)] opacity-50" />
+
+            {/* Set theme-color meta tag for browser continuity */}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                :root { background: #0055ff; }
+                meta[name="theme-color"] { content: #0055ff; }
+            `}} />
 
             <motion.div
                 style={{ rotateX, rotateY, perspective: 1500 }}
@@ -284,13 +290,6 @@ export function MobileBlocker() {
             </motion.div>
 
             <div className="absolute w-[90%] h-[90%] bg-blue-400/10 blur-[200px] -z-1" />
-
-            <motion.div
-                className="fixed inset-0 pointer-events-none z-[10000] border-black opacity-100"
-                initial={{ borderWidth: isBlocked ? "9px" : "0px" }}
-                animate={{ borderWidth: isChessMode ? "6px" : "9px" }}
-                transition={{ duration: 1, ease: "easeInOut" }}
-            />
         </div>
     );
 }
