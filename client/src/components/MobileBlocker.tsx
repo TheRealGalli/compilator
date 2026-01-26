@@ -1,3 +1,4 @@
+```
 import { useEffect, useState, useMemo } from "react";
 import { motion, useSpring, useTransform, AnimatePresence } from "framer-motion";
 import { Asterisk } from "lucide-react";
@@ -7,39 +8,138 @@ import {
 } from "react-icons/fa6";
 import chessBoardImage from "../assets/chess_board.png";
 
-const ChessPiece = ({ row, col }: { row: number, col: number }) => {
-    const isWhite = row >= 6;
-    const isBlue = row <= 1;
+const INITIAL_BOARD = [
+    ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
+    ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'],
+    [null, null, null, null, null, null, null, null],
+    [null, null, null, null, null, null, null, null],
+    [null, null, null, null, null, null, null, null],
+    [null, null, null, null, null, null, null, null],
+    ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'],
+    ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
+];
 
-    if (!isWhite && !isBlue) return null;
-
+const ChessPiece = ({ type }: { type: string }) => {
+    const isWhite = type.startsWith('w');
     const colorClass = isWhite ? "text-white" : "text-blue-500";
     const shadow = "drop-shadow-[0_2px_3px_rgba(0,0,0,0.5)]";
     const size = 28;
 
-    // Initial position logic
-    if (row === 1 || row === 6) return <FaChessPawn className={`${colorClass} ${shadow}`} size={size} />;
-
-    if (row === 0 || row === 7) {
-        if (col === 0 || col === 7) return <FaChessRook className={`${colorClass} ${shadow}`} size={size} />;
-        if (col === 1 || col === 6) return <FaChessKnight className={`${colorClass} ${shadow}`} size={size} />;
-        if (col === 2 || col === 5) return <FaChessBishop className={`${colorClass} ${shadow}`} size={size} />;
-        if (col === 3) return <FaChessQueen className={`${colorClass} ${shadow}`} size={size} />;
-        if (col === 4) return <FaChessKing className={`${colorClass} ${shadow}`} size={size} />;
+    const piece = type.substring(1);
+    switch (piece) {
+        case 'P': return <FaChessPawn className={`${ colorClass } ${ shadow } `} size={size} />;
+        case 'R': return <FaChessRook className={`${ colorClass } ${ shadow } `} size={size} />;
+        case 'N': return <FaChessKnight className={`${ colorClass } ${ shadow } `} size={size} />;
+        case 'B': return <FaChessBishop className={`${ colorClass } ${ shadow } `} size={size} />;
+        case 'Q': return <FaChessQueen className={`${ colorClass } ${ shadow } `} size={size} />;
+        case 'K': return <FaChessKing className={`${ colorClass } ${ shadow } `} size={size} />;
+        default: return null;
     }
-
-    return null;
 };
 
 export function MobileBlocker() {
     const [isBlocked, setIsBlocked] = useState(false);
     const [isGromitSpinning, setIsGromitSpinning] = useState(false);
     const [isChessMode, setIsChessMode] = useState(false);
+    const [board, setBoard] = useState<(string | null)[][]>(INITIAL_BOARD);
+    const [selectedSquare, setSelectedSquare] = useState<{ r: number, c: number } | null>(null);
+    const [feedback, setFeedback] = useState<{ r: number, c: number, type: 'valid' | 'invalid' } | null>(null);
+    const [time, setTime] = useState(0);
+    const [timerActive, setTimerActive] = useState(false);
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (timerActive) {
+            interval = setInterval(() => setTime(t => t + 1), 1000);
+        }
+        return () => clearInterval(interval);
+    }, [timerActive]);
+
+    const formatTime = (seconds: number) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${ m }:${ s.toString().padStart(2, '0') } `;
+    };
 
     const handleGromitClick = () => {
         setIsGromitSpinning(true);
         setIsChessMode(prev => !prev);
+        if (!isChessMode) {
+            setBoard(INITIAL_BOARD);
+            setSelectedSquare(null);
+            setFeedback(null);
+            setTime(0);
+            setTimerActive(false);
+        }
         setTimeout(() => setIsGromitSpinning(false), 1000);
+    };
+
+    const isValidMove = (piece: string, fromR: number, fromC: number, toR: number, toC: number): boolean => {
+        const dr = Math.abs(toR - fromR);
+        const dc = Math.abs(toC - fromC);
+        const pType = piece.substring(1);
+        const isWhite = piece.startsWith('w');
+
+        // Can't stay in place
+        if (dr === 0 && dc === 0) return false;
+
+        // Basic move rules
+        switch (pType) {
+            case 'P':
+                if (isWhite) {
+                    // White Pawn
+                    if (fromC === toC && fromR - toR === 1 && !board[toR][toC]) return true;
+                    if (fromC === toC && fromR === 6 && fromR - toR === 2 && !board[toR][toC] && !board[5][toC]) return true;
+                    if (dr === 1 && dc === 1 && board[toR][toC]?.startsWith('b')) return true;
+                } else {
+                    // Blue Pawn
+                    if (fromC === toC && toR - fromR === 1 && !board[toR][toC]) return true;
+                    if (fromC === toC && fromR === 1 && toR - fromR === 2 && !board[toR][toC] && !board[2][toC]) return true;
+                    if (dr === 1 && dc === 1 && board[toR][toC]?.startsWith('w')) return true;
+                }
+                return false;
+            case 'R':
+                return (dr === 0 || dc === 0);
+            case 'N':
+                return (dr === 2 && dc === 1) || (dr === 1 && dc === 2);
+            case 'B':
+                return dr === dc;
+            case 'Q':
+                return dr === dc || dr === 0 || dc === 0;
+            case 'K':
+                return dr <= 1 && dc <= 1;
+        }
+        return false;
+    };
+
+    const handleSquareClick = (r: number, c: number) => {
+        if (!isChessMode) return;
+
+        // Start timer on first move
+        if (!timerActive) setTimerActive(true);
+
+        const piece = board[r][c];
+
+        if (selectedSquare) {
+            const pieceAtFrom = board[selectedSquare.r][selectedSquare.c];
+            if (pieceAtFrom && isValidMove(pieceAtFrom, selectedSquare.r, selectedSquare.c, r, c)) {
+                // Valid Move
+                const newBoard = board.map(row => [...row]);
+                newBoard[r][c] = pieceAtFrom;
+                newBoard[selectedSquare.r][selectedSquare.c] = null;
+                setBoard(newBoard);
+                setFeedback({ r, c, type: 'valid' });
+                setSelectedSquare(null);
+            } else {
+                // Invalid Move
+                setFeedback({ r, c, type: 'invalid' });
+                setTimeout(() => setFeedback(null), 500);
+                if (piece) setSelectedSquare({ r, c });
+                else setSelectedSquare(null);
+            }
+        } else {
+            if (piece) setSelectedSquare({ r, c });
+        }
     };
 
     // Spring-smoothed rotation values for premium feel
@@ -95,39 +195,51 @@ export function MobileBlocker() {
                 style={{ rotateX, rotateY, perspective: 1500 }}
                 className="relative z-10 w-full max-w-[min(94vw,520px)] aspect-square"
             >
-                {/* Gromit Logo & Title - Repositioned Outside/Above the board */}
-                <div
-                    className="absolute -top-12 left-0 z-20 flex items-center cursor-pointer group active:scale-95 transition-transform"
-                    onClick={handleGromitClick}
-                >
-                    <div className="flex items-center -space-x-3">
-                        <Asterisk
-                            className={`text-blue-600 transition-transform duration-1000 ${isGromitSpinning ? 'rotate-[360deg]' : ''}`}
-                            style={{ filter: 'drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)' }}
-                            width={32}
-                            height={32}
-                            strokeWidth={3}
-                        />
-                        <Asterisk
-                            className="text-blue-600"
-                            style={{ filter: 'drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)' }}
-                            width={32}
-                            height={32}
-                            strokeWidth={3}
-                        />
+                {/* Header Container */}
+                <div className="absolute -top-12 left-0 right-0 z-20 flex items-center justify-between px-1">
+                    <div
+                        className="flex items-center cursor-pointer group active:scale-95 transition-transform"
+                        onClick={handleGromitClick}
+                    >
+                        <div className="flex items-center -space-x-3">
+                            <Asterisk
+                                className={`text - blue - 600 transition - transform duration - 1000 ${ isGromitSpinning ? 'rotate-[360deg]' : '' } `}
+                                style={{ filter: 'drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)' }}
+                                size={32}
+                            />
+                            <Asterisk
+                                className="text-blue-600"
+                                style={{ filter: 'drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)' }}
+                                size={32}
+                            />
+                        </div>
+
+                        <AnimatePresence mode="wait">
+                            {isChessMode && (
+                                <motion.span
+                                    initial={{ opacity: 0, x: "100vw" }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: "100vw" }}
+                                    transition={{ type: "spring", stiffness: 100, damping: 20 }}
+                                    className="ml-1.5 text-white text-xl font-bold tracking-tight drop-shadow-md whitespace-nowrap"
+                                >
+                                    Gromit-Chess
+                                </motion.span>
+                            )}
+                        </AnimatePresence>
                     </div>
 
-                    <AnimatePresence mode="wait">
+                    {/* Timer Display */}
+                    <AnimatePresence>
                         {isChessMode && (
-                            <motion.span
-                                initial={{ opacity: 0, x: "100vw" }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: "100vw" }}
-                                transition={{ type: "spring", stiffness: 100, damping: 20 }}
-                                className="ml-1.5 text-white text-xl font-bold tracking-tight drop-shadow-md whitespace-nowrap"
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.8 }}
+                                className="bg-black/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-white font-mono text-lg shadow-lg"
                             >
-                                Gromit-Chess
-                            </motion.span>
+                                {formatTime(time)}
+                            </motion.div>
                         )}
                     </AnimatePresence>
                 </div>
@@ -145,31 +257,30 @@ export function MobileBlocker() {
                     {/* Interactive Overlay Grid (Precisely Aligned to the Board) */}
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-[75.0%] h-[75.0%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
-                            {Array.from({ length: 64 }).map((_, i) => {
-                                const row = Math.floor(i / 8);
-                                const col = i % 8;
-
-                                return (
-                                    <div
-                                        key={i}
-                                        className="w-full h-full relative flex items-center justify-center transition-all duration-300 hover:bg-white/[0.1] active:bg-white/[0.2] cursor-pointer border border-white/5"
-                                        onClick={() => console.log(`Square ${i} clicked`)}
-                                    >
-                                        <AnimatePresence>
-                                            {isChessMode && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, scale: 0.8 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    transition={{ duration: 2, ease: "easeOut" }}
-                                                    className="relative"
-                                                >
-                                                    <ChessPiece row={row} col={col} />
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                );
-                            })}
+                            {board.map((row, r) => row.map((piece, c) => (
+                                <div
+                                    key={`${ r } -${ c } `}
+                                    className={`w - full h - full relative flex items - center justify - center transition - all duration - 300 cursor - pointer border border - white / 5
+                                        ${ selectedSquare?.r === r && selectedSquare?.c === c ? 'bg-white/20' : '' }
+                                        ${ feedback?.r === r && feedback?.c === c ? (feedback.type === 'valid' ? 'bg-green-500/40' : 'bg-red-500/40') : 'hover:bg-white/10 active:bg-white/15' }
+`}
+                                    onClick={() => handleSquareClick(r, c)}
+                                >
+                                    <AnimatePresence>
+                                        {piece && (
+                                            <motion.div
+                                                key={`${ piece } -${ r } -${ c } `}
+                                                initial={isChessMode ? { opacity: 0, scale: 0.8 } : false}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ duration: 1.5, ease: "easeOut" }}
+                                                className="relative z-10"
+                                            >
+                                                <ChessPiece type={piece} />
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            )))}
                         </div>
                     </div>
 
@@ -187,3 +298,4 @@ export function MobileBlocker() {
         </div>
     );
 }
+```
