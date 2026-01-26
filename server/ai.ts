@@ -195,17 +195,19 @@ Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non s
 
 **PROCESSO DECISIONALE (INTERNO):**
 1. **Analisi Posizionale:** Valuta il controllo del centro, la sicurezza del King Blu (tu) e le debolezze nel King Bianco.
-2. **Sviluppo:** Assicurati che ogni mossa migliori la tua posizione o limiti le opzioni dell'avversario.
-3. **Calcolo:** Prevedi le risposte dell'utente per almeno 3 semimoste.
+**PROTOCOLLO DI RISPOSTA (STRETTAMENTE SEGUITO):**
+1. Inizia con il blocco:
+   [RAGIONAMENTO TATTICO]
+   Qui scrivi la tua analisi profonda della posizione, minacce e obiettivi tattici.
+2. Termina con il blocco:
+   [MOSSA FINALE]
+   MOVE: [coord_origine] to [coord_destinazione] ###
 
-**PROTOCOLLO DI RISPOSTA (JSON STRUTTURATO):**
-- Rispondi **ESCLUSIVAMENTE** con un unico oggetto JSON che segua questo schema:
-  {
-    "thought_process": "Analisi tattica della scacchiera, minacce e obiettivi...",
-    "move": { "from": "[coord_origine]", "to": "[coord_destinazione]" }
-  }
-- Esempio: { "thought_process": "Controllo il centro e minaccio la Regina.", "move": { "from": "e7", "to": "e5" } }
-- **NON** aggiungere testo fuori dal JSON. Usa notazione algebrica (a1-h8).`;
+- Esempio:
+  [RAGIONAMENTO TATTICO]
+  Analisi: L'utente ha lasciato indifeso il Re. Preparo attacco...
+  [MOSSA FINALE]
+  MOVE: e7 to e5 ###`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
         const illegalText = params.illegalMoveAttempt ?
@@ -240,8 +242,7 @@ Rispondi ESCLUSIVAMENTE con l'oggetto JSON specificato nel tuo protocollo.`;
             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
             generationConfig: {
                 maxOutputTokens: 1000,
-                temperature: 0.3,
-                responseMimeType: 'application/json'
+                temperature: 0.3
             }
         });
 
@@ -251,27 +252,16 @@ Rispondi ESCLUSIVAMENTE con l'oggetto JSON specificato nel tuo protocollo.`;
         }
 
         const rawContent = result.response.candidates[0].content?.parts?.map((p: any) => p.text || '').join('') || '';
-        console.log(`[AiService] Raw GROMIT JSON Output: "${rawContent}"`);
+        console.log(`[AiService] Full GROMIT Thought Process:\n${rawContent}`);
 
-        // EXTRACT MOVE FROM STRUCTURED JSON
-        try {
-            const parsed = JSON.parse(rawContent);
-            if (parsed.move && parsed.move.from && parsed.move.to) {
-                console.log(`[AiService] GROMIT Thought: "${parsed.thought_process}"`);
-                return { from: parsed.move.from.toLowerCase(), to: parsed.move.to.toLowerCase() };
-            }
-        } catch (e) {
-            console.warn('[AiService] Structured JSON parse failed, trying fallback extractor...');
-        }
+        // PRIORITY 1: Text-Block Extraction (MOVE: [coord] to [coord])
+        const blockMatch = rawContent.match(/MOVE:\s*([a-h][1-8])\s*(?:to|-|->)\s*([a-h][1-8]|(?:[a-h]))/i);
 
-        // FALLBACK 1: Look for "MOVE: from to to" (backward compatibility)
-        const moveMatch = rawContent.match(/MOVE:\s*([a-h][1-8])\s*(?:to|-|->)\s*([a-h][1-8]|(?:[a-h]))/i);
+        if (blockMatch) {
+            let from = blockMatch[1].toLowerCase();
+            let to = blockMatch[2].toLowerCase();
 
-        if (moveMatch) {
-            let from = moveMatch[1].toLowerCase();
-            let to = moveMatch[2].toLowerCase();
-
-            // REPAIR LOGIC: If 'to' is truncated
+            // REPAIR LOGIC: If 'to' is truncated (e.g. only 'f')
             if (to.length === 1 && params.allLegalMoves) {
                 console.warn(`[AiService] Truncated 'to' detected (${to}). Repairing...`);
                 const candidates = params.allLegalMoves.filter(m => {
@@ -281,19 +271,27 @@ Rispondi ESCLUSIVAMENTE con l'oggetto JSON specificato nel tuo protocollo.`;
 
                 if (candidates.length === 1) {
                     const repairedTo = candidates[0].split(/[- ]/)[1];
+                    console.log(`[AiService] Repair success: ${from} -> ${repairedTo}`);
                     return { from, to: repairedTo };
                 }
             }
 
-            if (to.length === 2) return { from, to };
+            if (to.length === 2) {
+                console.log(`[AiService] Extracted Move: ${from} -> ${to}`);
+                return { from, to };
+            }
         }
 
-        // FALLBACK 2: Regex for any move-like object
-        const anyJsonMatch = rawContent.match(/\{[\s\S]*"from"\s*:\s*"([a-h][1-8])"[\s\S]*"to"\s*:\s*"([a-h][1-8])"[\s\S]*\}/i);
-        if (anyJsonMatch) {
-            return { from: anyJsonMatch[1].toLowerCase(), to: anyJsonMatch[2].toLowerCase() };
-        }
+        // FALLBACK: Structured JSON (if it tries to use it anyway)
+        try {
+            const anyJson = rawContent.match(/\{[\s\S]*\}/);
+            if (anyJson) {
+                const parsed = JSON.parse(anyJson[0]);
+                const moveObj = parsed.move || parsed;
+                if (moveObj.from && moveObj.to) return { from: moveObj.from.toLowerCase(), to: moveObj.to.toLowerCase() };
+            }
+        } catch (e) { }
 
-        throw new Error(`GROMIT ha fornito una risposta non valida. Raw: ${rawContent.substring(0, 100)}...`);
+        throw new Error(`GROMIT ha fornito una risposta non valida o incompleta.`);
     }
 }
