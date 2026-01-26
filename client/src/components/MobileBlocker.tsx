@@ -243,6 +243,78 @@ export function MobileBlocker() {
         return false;
     };
 
+    const performMove = (fromR: number, fromC: number, toR: number, toC: number) => {
+        const pieceAtFrom = board[fromR][fromC];
+        if (!pieceAtFrom) return false;
+
+        if (!timerActive) setTimerActive(true);
+
+        const newBoard = board.map(row => [...row]);
+        const captured = board[toR][toC];
+
+        if (captured) {
+            if (captured.type.startsWith('w')) setCapturedWhite(prev => [...prev, captured.type]);
+            else setCapturedBlack(prev => [...prev, captured.type]);
+        }
+
+        // Execute piece movement
+        newBoard[toR][toC] = { ...pieceAtFrom, hasMoved: true };
+        newBoard[fromR][fromC] = null;
+
+        // Handle Castling execution (move the Rook too)
+        if (pieceAtFrom.type.substring(1) === 'K' && Math.abs(toC - fromC) === 2) {
+            const isShort = toC > fromC;
+            const rookFromC = isShort ? 7 : 0;
+            const rookToC = isShort ? 5 : 3;
+            const rook = board[fromR][rookFromC];
+            if (rook) {
+                newBoard[fromR][rookToC] = { ...rook, hasMoved: true };
+                newBoard[fromR][rookFromC] = null;
+            }
+        }
+
+        // Pawn Promotion (to Queen)
+        if (pieceAtFrom.type.substring(1) === 'P') {
+            const isPromotion = currentTurn === 'w' ? toR === 0 : toR === 7;
+            if (isPromotion) {
+                newBoard[toR][toC] = { ...pieceAtFrom, type: `${currentTurn}Q`, hasMoved: true };
+            }
+        }
+
+        // Detect Checkmate / Stalemate for next turn
+        const nextTurn = currentTurn === 'w' ? 'b' : 'w';
+        let hasLegalMoves = false;
+        outer: for (let fr = 0; fr < 8; fr++) {
+            for (let fc = 0; fc < 8; fc++) {
+                const p = newBoard[fr][fc];
+                if (p && p.type.startsWith(nextTurn)) {
+                    for (let tr = 0; tr < 8; tr++) {
+                        for (let tc = 0; tc < 8; tc++) {
+                            if (isValidMoveInternal(p, fr, fc, tr, tc, newBoard, true)) {
+                                hasLegalMoves = true;
+                                break outer;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!hasLegalMoves) {
+            setTimerActive(false);
+            if (isKingInCheck(newBoard, nextTurn)) setGameStatus('checkmate');
+            else setGameStatus('stalemate');
+        }
+
+        setBoard(newBoard);
+        setFeedback({ r: toR, c: toC, type: 'valid' });
+        setMatchHistory(prev => [...prev, `${toAlgebraic(fromR, fromC)}-${toAlgebraic(toR, toC)}`]);
+        setTimeout(() => setFeedback(null), 500);
+        setSelectedSquare(null);
+        setCurrentTurn(nextTurn);
+        return true;
+    };
+
     const handleSquareClick = (r: number, c: number) => {
         if (!isChessMode || gameStatus !== 'play' || currentTurn === 'b') return;
 
@@ -250,69 +322,9 @@ export function MobileBlocker() {
 
         if (selectedSquare) {
             const pieceAtFrom = board[selectedSquare.r][selectedSquare.c];
-            // Enforce turn: piece must exist and belong to the current player
             if (pieceAtFrom && pieceAtFrom.type.startsWith(currentTurn) && isValidMove(pieceAtFrom, selectedSquare.r, selectedSquare.c, r, c)) {
-                if (!timerActive) setTimerActive(true);
-
-                const newBoard = board.map(row => [...row]);
-
-                // Execute pieces movement
-                newBoard[r][c] = { ...pieceAtFrom, hasMoved: true };
-                newBoard[selectedSquare.r][selectedSquare.c] = null;
-
-                // Handle Castling execution (move the Rook too)
-                if (pieceAtFrom.type.substring(1) === 'K' && Math.abs(c - selectedSquare.c) === 2) {
-                    const isShort = c > selectedSquare.c;
-                    const rookFromC = isShort ? 7 : 0;
-                    const rookToC = isShort ? 5 : 3;
-                    const rook = board[r][rookFromC];
-                    if (rook) {
-                        newBoard[r][rookToC] = { ...rook, hasMoved: true };
-                        newBoard[r][rookFromC] = null;
-                    }
-                }
-
-                // Pawn Promotion (to Queen)
-                if (pieceAtFrom.type.substring(1) === 'P') {
-                    const isPromotion = currentTurn === 'w' ? r === 0 : r === 7;
-                    if (isPromotion) {
-                        newBoard[r][c] = { ...pieceAtFrom, type: `${currentTurn}Q`, hasMoved: true };
-                    }
-                }
-
-                // Detect Checkmate / Stalemate for next turn
-                const nextTurn = currentTurn === 'w' ? 'b' : 'w';
-                let hasLegalMoves = false;
-                outer: for (let fromR = 0; fromR < 8; fromR++) {
-                    for (let fromC = 0; fromC < 8; fromC++) {
-                        const p = newBoard[fromR][fromC];
-                        if (p && p.type.startsWith(nextTurn)) {
-                            for (let toR = 0; toR < 8; toR++) {
-                                for (let toC = 0; toC < 8; toC++) {
-                                    if (isValidMoveInternal(p, fromR, fromC, toR, toC, newBoard, true)) {
-                                        hasLegalMoves = true;
-                                        break outer;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (!hasLegalMoves) {
-                    setTimerActive(false);
-                    if (isKingInCheck(newBoard, nextTurn)) setGameStatus('checkmate');
-                    else setGameStatus('stalemate');
-                }
-
-                setBoard(newBoard);
-                setFeedback({ r, c, type: 'valid' });
-                setMatchHistory(prev => [...prev, `${toAlgebraic(selectedSquare.r, selectedSquare.c)}-${toAlgebraic(r, c)}`]);
-                setTimeout(() => setFeedback(null), 500);
-                setSelectedSquare(null);
-                setCurrentTurn(nextTurn);
+                performMove(selectedSquare.r, selectedSquare.c, r, c);
             } else {
-                // Invalid move or clicking own piece to change selection
                 setFeedback({ r, c, type: 'invalid' });
                 setTimeout(() => setFeedback(null), 500);
                 if (piece && piece.type.startsWith(currentTurn)) {
@@ -322,7 +334,6 @@ export function MobileBlocker() {
                 }
             }
         } else {
-            // Initial selection: only allow selecting pieces of the current player's color
             if (piece && piece.type.startsWith(currentTurn)) {
                 setSelectedSquare({ r, c });
             }
