@@ -228,6 +228,11 @@ Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non s
 2. **Sviluppo:** Assicurati che ogni mossa migliori la tua posizione o limiti le opzioni dell'avversario.
 3. **Calcolo:** Prevedi le risposte dell'utente per almeno 3 semimoste.
 
+**LEGENDA PEZZI:**
+- b = Blu (Tu / GROMIT)
+- w = Bianco (Utente)
+- P = Pedone, R = Torre, N = Cavallo, B = Alfiere, Q = Regina, K = Re
+
 **PROTOCOLLO DI RISPOSTA (RIGOROSO):**
 1. [RAGIONAMENTO TATTICO]
    Ragiona liberamente sulla posizione, minacce e obiettivi.
@@ -241,13 +246,17 @@ Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non s
   <move>g8-f6</move>`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
+        const legalMovesText = (params.allLegalMoves && params.allLegalMoves.length > 0) ?
+            `\n**MOSSE LEGALI DISPONIBILI (SCEGLINE UNA):**\n${params.allLegalMoves.join(', ')}` : "";
+
         const illegalText = params.illegalMoveAttempt ?
-            `\n⚠️ AVVISO CRITICO: La tua mossa precedente (${params.illegalMoveAttempt.from} -> ${params.illegalMoveAttempt.to}) era ILLEGALE. Errore: ${params.illegalMoveAttempt.error}. DEVI scegliere una mossa valida tra queste fornite: ${params.illegalMoveAttempt.validMoves.join(', ')}.` : "";
+            `\n⚠️ AVVISO CRITICO: La tua mossa precedente (${params.illegalMoveAttempt.from} -> ${params.illegalMoveAttempt.to}) era ILLEGALE. Errore: ${params.illegalMoveAttempt.error}.` : "";
 
         const userPrompt = `SCACCHIERA ATTUALE:
 ${boardText}
 
 STORICO: ${historyText}
+${legalMovesText}
 ${illegalText}
 
 Segui ESATTAMENTE il protocollo:
@@ -287,25 +296,28 @@ La mossa nel tag è l'unica cosa che conta per il sistema.`;
         const rawContent = result.response.candidates[0].content?.parts?.map((p: any) => p.text || '').join('') || '';
         console.log(`[AiService] Full GROMIT Thought Process:\n${rawContent}`);
 
-        // PRIORITY 1: XML Tag Extraction (<move>e2-e4</move>, <move>e2e4</move>, etc.)
-        const tagMatch = rawContent.match(/<move>\s*([a-h][1-8])\s*[- >to]*\s*([a-h][1-8])\s*<\/move>/i);
-        if (tagMatch) {
-            return { from: tagMatch[1].toLowerCase(), to: tagMatch[2].toLowerCase() };
+        // PRIORITY 1: XML Tag Extraction (<move>e2-e4</move>)
+        // First find the block, then extract coordinates from it.
+        const tagBlock = rawContent.match(/<move>([\s\S]*?)<\/move>/i);
+        if (tagBlock) {
+            const inner = tagBlock[1];
+            const coords = inner.match(/([a-h][1-8])/gi);
+            if (coords && coords.length >= 2) {
+                const from = coords[coords.length - 2].toLowerCase();
+                const to = coords[coords.length - 1].toLowerCase();
+                console.log(`[AiService] Extracted Move (Tag Isolation): ${from} -> ${to}`);
+                return { from, to };
+            }
         }
 
-        // FALLBACK 1: Super Aggressive Search (any 4-char string representing a move)
-        // This looks for things like "e2-e4", "e2e4", "e2 to e4", "e2 -> e4" anywhere.
+        // FALLBACK 1: Super Aggressive Search (any coordinate pair anywhere)
         const aggressiveMatch = rawContent.match(/([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])/gi);
         if (aggressiveMatch && aggressiveMatch.length > 0) {
-            // We find all candidates that look like moves
             for (let i = aggressiveMatch.length - 1; i >= 0; i--) {
                 const subMatch = aggressiveMatch[i].match(/([a-h][1-8])/gi);
                 if (subMatch && subMatch.length === 2) {
                     const from = subMatch[0].toLowerCase();
                     const to = subMatch[1].toLowerCase();
-
-                    // Filter: We only want moves that involve Black pieces (b)
-                    // If we can't be sure, we just take the last coordinate pair found in the text.
                     console.log(`[AiService] Aggressive match found: ${from} -> ${to}`);
                     return { from, to };
                 }
