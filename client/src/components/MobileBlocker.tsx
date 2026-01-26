@@ -8,15 +8,17 @@ import {
 import chessBoardImage from "../assets/chess_board.png";
 
 const INITIAL_BOARD = [
-    ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
-    ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'],
-    [null, null, null, null, null, null, null, null],
-    [null, null, null, null, null, null, null, null],
-    [null, null, null, null, null, null, null, null],
-    [null, null, null, null, null, null, null, null],
-    ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'],
-    ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
+    ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'].map(type => ({ type, hasMoved: false })),
+    ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'].map(type => ({ type, hasMoved: false })),
+    Array(8).fill(null),
+    Array(8).fill(null),
+    Array(8).fill(null),
+    Array(8).fill(null),
+    ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'].map(type => ({ type, hasMoved: false })),
+    ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR'].map(type => ({ type, hasMoved: false }))
 ];
+
+type Piece = { type: string, hasMoved: boolean } | null;
 
 const ChessPiece = ({ type }: { type: string }) => {
     const isWhite = type.startsWith('w');
@@ -48,11 +50,13 @@ const checkDeviceSync = () => {
 export function MobileBlocker() {
     const [isBlocked, setIsBlocked] = useState(checkDeviceSync());
     const [isChessMode, setIsChessMode] = useState(false);
-    const [board, setBoard] = useState<(string | null)[][]>(INITIAL_BOARD);
+    const [board, setBoard] = useState<Piece[][]>(INITIAL_BOARD.map(row => row.map(p => p ? { ...p } : null)));
     const [selectedSquare, setSelectedSquare] = useState<{ r: number, c: number } | null>(null);
     const [feedback, setFeedback] = useState<{ r: number, c: number, type: 'valid' | 'invalid' } | null>(null);
     const [time, setTime] = useState(0);
     const [timerActive, setTimerActive] = useState(false);
+    const [currentTurn, setCurrentTurn] = useState<'w' | 'b'>('w');
+    const [gameStatus, setGameStatus] = useState<'play' | 'checkmate' | 'stalemate'>('play');
 
     useEffect(() => {
         let interval: any;
@@ -71,42 +75,139 @@ export function MobileBlocker() {
     const handleGromitClick = () => {
         setIsChessMode(prev => !prev);
         if (!isChessMode) {
-            setBoard(INITIAL_BOARD);
+            setBoard(INITIAL_BOARD.map(row => row.map(p => p ? { ...p } : null)));
             setSelectedSquare(null);
             setFeedback(null);
             setTime(0);
             setTimerActive(false);
+            setCurrentTurn('w');
+            setGameStatus('play');
         }
     };
 
-    const isValidMove = (piece: string, fromR: number, fromC: number, toR: number, toC: number): boolean => {
+    const isSquareAttacked = (r: number, c: number, board: Piece[][], attackerColor: 'w' | 'b'): boolean => {
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const piece = board[row][col];
+                if (piece && piece.type.startsWith(attackerColor)) {
+                    // Simple recursive check (avoiding infinite castling check)
+                    if (isValidMoveInternal(piece, row, col, r, c, board, false)) return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    const isKingInCheck = (board: Piece[][], color: 'w' | 'b'): boolean => {
+        let kingPos = { r: -1, c: -1 };
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = board[r][c];
+                if (p?.type === `${color}K`) {
+                    kingPos = { r, c };
+                    break;
+                }
+            }
+        }
+        if (kingPos.r === -1) return false;
+        return isSquareAttacked(kingPos.r, kingPos.c, board, color === 'w' ? 'b' : 'w');
+    };
+
+    const isValidMove = (piece: Piece, fromR: number, fromC: number, toR: number, toC: number): boolean => {
+        if (!piece) return false;
+        return isValidMoveInternal(piece, fromR, fromC, toR, toC, board, true);
+    };
+
+    const isValidMoveInternal = (piece: Piece, fromR: number, fromC: number, toR: number, toC: number, currentBoard: Piece[][], checkCastling: boolean): boolean => {
+        if (!piece) return false;
         const dr = Math.abs(toR - fromR);
         const dc = Math.abs(toC - fromC);
-        const pType = piece.substring(1);
-        const isWhite = piece.startsWith('w');
+        const pType = piece.type.substring(1);
+        const isWhite = piece.type.startsWith('w');
 
         if (dr === 0 && dc === 0) return false;
 
-        const targetPiece = board[toR][toC];
-        if (targetPiece && targetPiece.startsWith(isWhite ? 'w' : 'b')) return false;
+        const targetPiece = currentBoard[toR][toC];
+        if (targetPiece && targetPiece.type.startsWith(isWhite ? 'w' : 'b')) return false;
 
+        let valid = false;
         switch (pType) {
             case 'P':
                 if (isWhite) {
-                    if (fromC === toC && fromR - toR === 1 && !board[toR][toC]) return true;
-                    if (fromC === toC && fromR === 6 && fromR - toR === 2 && !board[toR][toC] && !board[5][toC]) return true;
-                    if (dr === 1 && dc === 1 && board[toR][toC]?.startsWith('b')) return true;
+                    if (fromC === toC && fromR - toR === 1 && !currentBoard[toR][toC]) valid = true;
+                    // Pawn double move: only if hasMoved is false
+                    else if (fromC === toC && !piece.hasMoved && fromR - toR === 2 && !currentBoard[toR][toC] && !currentBoard[5][toC]) valid = true;
+                    else if (dr === 1 && dc === 1 && currentBoard[toR][toC]?.type.startsWith('b')) valid = true;
                 } else {
-                    if (fromC === toC && toR - fromR === 1 && !board[toR][toC]) return true;
-                    if (fromC === toC && fromR === 1 && toR - fromR === 2 && !board[toR][toC] && !board[2][toC]) return true;
-                    if (dr === 1 && dc === 1 && board[toR][toC]?.startsWith('w')) return true;
+                    if (fromC === toC && toR - fromR === 1 && !currentBoard[toR][toC]) valid = true;
+                    // Pawn double move: only if hasMoved is false
+                    else if (fromC === toC && !piece.hasMoved && toR - fromR === 2 && !currentBoard[toR][toC] && !currentBoard[2][toC]) valid = true;
+                    else if (dr === 1 && dc === 1 && currentBoard[toR][toC]?.type.startsWith('w')) valid = true;
                 }
-                return false;
-            case 'R': return dr === 0 || dc === 0;
-            case 'N': return (dr === 2 && dc === 1) || (dr === 1 && dc === 2);
-            case 'B': return dr === dc;
-            case 'Q': return dr === dc || dr === 0 || dc === 0;
-            case 'K': return dr <= 1 && dc <= 1;
+                break;
+            case 'R':
+                if (dr === 0 || dc === 0) {
+                    valid = !isPathBlocked(fromR, fromC, toR, toC, currentBoard);
+                }
+                break;
+            case 'N': valid = (dr === 2 && dc === 1) || (dr === 1 && dc === 2); break;
+            case 'B':
+                if (dr === dc) {
+                    valid = !isPathBlocked(fromR, fromC, toR, toC, currentBoard);
+                }
+                break;
+            case 'Q':
+                if (dr === dc || dr === 0 || dc === 0) {
+                    valid = !isPathBlocked(fromR, fromC, toR, toC, currentBoard);
+                }
+                break;
+            case 'K':
+                if (dr <= 1 && dc <= 1) valid = true;
+                // Castling logic (Arrocco)
+                else if (checkCastling && !piece.hasMoved && dr === 0 && dc === 2) {
+                    const isShort = toC > fromC;
+                    const rookC = isShort ? 7 : 0;
+                    const rook = currentBoard[fromR][rookC];
+                    if (rook && rook.type.substring(1) === 'R' && !rook.hasMoved) {
+                        const pathClear = isShort ?
+                            !currentBoard[fromR][5] && !currentBoard[fromR][6] :
+                            !currentBoard[fromR][1] && !currentBoard[fromR][2] && !currentBoard[fromR][3];
+
+                        if (pathClear) {
+                            // Can't castle out of check, through check, or into check
+                            const attackerColor = isWhite ? 'b' : 'w';
+                            if (!isKingInCheck(currentBoard, isWhite ? 'w' : 'b')) {
+                                const stepC = isShort ? 1 : -1;
+                                if (!isSquareAttacked(fromR, fromC + stepC, currentBoard, attackerColor)) {
+                                    valid = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+        }
+
+        if (valid && checkCastling) {
+            // Simulate move to ensure King isn't in check
+            const simulatedBoard = currentBoard.map(row => [...row]);
+            simulatedBoard[toR][toC] = piece;
+            simulatedBoard[fromR][fromC] = null;
+            if (isKingInCheck(simulatedBoard, isWhite ? 'w' : 'b')) return false;
+        }
+
+        return valid;
+    };
+
+    const isPathBlocked = (fromR: number, fromC: number, toR: number, toC: number, currentBoard: Piece[][]): boolean => {
+        const stepR = toR === fromR ? 0 : (toR > fromR ? 1 : -1);
+        const stepC = toC === fromC ? 0 : (toC > fromC ? 1 : -1);
+        let currR = fromR + stepR;
+        let currC = fromC + stepC;
+        while (currR !== toR || currC !== toC) {
+            if (currentBoard[currR][currC]) return true;
+            currR += stepR;
+            currC += stepC;
         }
         return false;
     };
@@ -122,12 +223,47 @@ export function MobileBlocker() {
                 if (!timerActive) setTimerActive(true);
 
                 const newBoard = board.map(row => [...row]);
-                newBoard[r][c] = pieceAtFrom;
+                newBoard[r][c] = { ...pieceAtFrom, hasMoved: true };
+
+                // Pawn Promotion (to Queen)
+                if (pieceAtFrom.type.substring(1) === 'P') {
+                    if ((currentTurn === 'w' && r === 0) || (currentTurn === 'b' && r === 7)) {
+                        newBoard[r][c] = { type: `${currentTurn}Q`, hasMoved: true };
+                    }
+                }
+
                 newBoard[selectedSquare.r][selectedSquare.c] = null;
+
+                // Checkmate / Stalemate detection for next turn
+                const nextTurn = currentTurn === 'w' ? 'b' : 'w';
+                let hasLegalMoves = false;
+                outer: for (let fromR = 0; fromR < 8; fromR++) {
+                    for (let fromC = 0; fromC < 8; fromC++) {
+                        const p = newBoard[fromR][fromC];
+                        if (p && p.type.startsWith(nextTurn)) {
+                            for (let toR = 0; toR < 8; toR++) {
+                                for (let toC = 0; toC < 8; toC++) {
+                                    if (isValidMoveInternal(p, fromR, fromC, toR, toC, newBoard, true)) {
+                                        hasLegalMoves = true;
+                                        break outer;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!hasLegalMoves) {
+                    setTimerActive(false);
+                    if (isKingInCheck(newBoard, nextTurn)) setGameStatus('checkmate');
+                    else setGameStatus('stalemate');
+                }
+
                 setBoard(newBoard);
                 setFeedback({ r, c, type: 'valid' });
                 setTimeout(() => setFeedback(null), 500);
                 setSelectedSquare(null);
+                setCurrentTurn(nextTurn);
             } else {
                 setFeedback({ r, c, type: 'invalid' });
                 setTimeout(() => setFeedback(null), 500);
@@ -256,6 +392,24 @@ export function MobileBlocker() {
                     />
 
                     <div className="absolute inset-0 flex items-center justify-center">
+                        <AnimatePresence>
+                            {gameStatus !== 'play' && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm pointer-events-none"
+                                >
+                                    <div className="bg-white/90 px-6 py-4 rounded-2xl shadow-2xl flex flex-col items-center gap-2">
+                                        <span className="text-black text-2xl font-bold tracking-tight">
+                                            {gameStatus === 'checkmate' ? 'CHECKMATE' : 'STALEMATE'}
+                                        </span>
+                                        <span className="text-blue-600 font-semibold uppercase tracking-widest text-sm">
+                                            {gameStatus === 'checkmate' ? (currentTurn === 'w' ? 'Blue wins' : 'White wins') : 'Draw'}
+                                        </span>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                         <div className="w-[75.0%] h-[75.0%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
                             {board.map((row, r) => row.map((piece, c) => (
                                 <div
@@ -269,14 +423,14 @@ export function MobileBlocker() {
                                     <AnimatePresence>
                                         {isChessMode && piece && (
                                             <motion.div
-                                                key={`${piece}-${r}-${c}`}
+                                                key={`${piece.type}-${r}-${c}`}
                                                 initial={{ opacity: 0, scale: 0.8 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.8 }}
                                                 transition={{ duration: 1.5, ease: "easeOut" }}
                                                 className="relative z-10"
                                             >
-                                                <ChessPiece type={piece} />
+                                                <ChessPiece type={piece.type} />
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
@@ -289,9 +443,9 @@ export function MobileBlocker() {
                     <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.15)_0%,_transparent_60%)] pointer-events-none" />
                     <div className="absolute inset-[4px] rounded-[22px] border border-white/25 pointer-events-none shadow-[inset_0_0_30px_rgba(255,255,255,0.1)]" />
                 </div>
-            </motion.div>
+            </motion.div >
 
             <div className="absolute w-[90%] h-[90%] bg-blue-400/10 blur-[200px] -z-1" />
-        </div>
+        </div >
     );
 }
