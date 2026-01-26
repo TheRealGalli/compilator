@@ -219,8 +219,10 @@ ${JSON.stringify(params.boardJson, null, 2)}
 STORICO: ${historyText}
 ${illegalText}
 
-GROMIT, analizza la situazione e colpisci.
-Rispondi ESCLUSIVAMENTE con l'oggetto JSON specificato nel tuo protocollo.`;
+GROMIT, analizza la situazione e colpisci. 
+Segui ESATTAMENTE il protocollo:
+1. [RAGIONAMENTO TATTICO] ...
+2. [MOSSA FINALE] MOVE: [coord] to [coord] ###`;
 
         const model = this.vertex_ai.getGenerativeModel({
             model: this.modelId,
