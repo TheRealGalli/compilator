@@ -213,17 +213,33 @@ export function MobileBlocker() {
     };
 
     const handleSquareClick = (r: number, c: number) => {
-        if (!isChessMode) return;
+        if (!isChessMode || gameStatus !== 'play') return;
 
         const piece = board[r][c];
 
         if (selectedSquare) {
             const pieceAtFrom = board[selectedSquare.r][selectedSquare.c];
-            if (pieceAtFrom && isValidMove(pieceAtFrom, selectedSquare.r, selectedSquare.c, r, c)) {
+            // Enforce turn: piece must exist and belong to the current player
+            if (pieceAtFrom && pieceAtFrom.type.startsWith(currentTurn) && isValidMove(pieceAtFrom, selectedSquare.r, selectedSquare.c, r, c)) {
                 if (!timerActive) setTimerActive(true);
 
                 const newBoard = board.map(row => [...row]);
+
+                // Execute pieces movement
                 newBoard[r][c] = { ...pieceAtFrom, hasMoved: true };
+                newBoard[selectedSquare.r][selectedSquare.c] = null;
+
+                // Handle Castling execution (move the Rook too)
+                if (pieceAtFrom.type.substring(1) === 'K' && Math.abs(c - selectedSquare.c) === 2) {
+                    const isShort = c > selectedSquare.c;
+                    const rookFromC = isShort ? 7 : 0;
+                    const rookToC = isShort ? 5 : 3;
+                    const rook = board[r][rookFromC];
+                    if (rook) {
+                        newBoard[r][rookToC] = { ...rook, hasMoved: true };
+                        newBoard[r][rookFromC] = null;
+                    }
+                }
 
                 // Pawn Promotion (to Queen)
                 if (pieceAtFrom.type.substring(1) === 'P') {
@@ -232,9 +248,7 @@ export function MobileBlocker() {
                     }
                 }
 
-                newBoard[selectedSquare.r][selectedSquare.c] = null;
-
-                // Checkmate / Stalemate detection for next turn
+                // Detect Checkmate / Stalemate for next turn
                 const nextTurn = currentTurn === 'w' ? 'b' : 'w';
                 let hasLegalMoves = false;
                 outer: for (let fromR = 0; fromR < 8; fromR++) {
@@ -265,13 +279,20 @@ export function MobileBlocker() {
                 setSelectedSquare(null);
                 setCurrentTurn(nextTurn);
             } else {
+                // Invalid move or clicking own piece to change selection
                 setFeedback({ r, c, type: 'invalid' });
                 setTimeout(() => setFeedback(null), 500);
-                if (piece) setSelectedSquare({ r, c });
-                else setSelectedSquare(null);
+                if (piece && piece.type.startsWith(currentTurn)) {
+                    setSelectedSquare({ r, c });
+                } else {
+                    setSelectedSquare(null);
+                }
             }
         } else {
-            if (piece) setSelectedSquare({ r, c });
+            // Initial selection: only allow selecting pieces of the current player's color
+            if (piece && piece.type.startsWith(currentTurn)) {
+                setSelectedSquare({ r, c });
+            }
         }
     };
 
