@@ -276,6 +276,9 @@ export function MobileBlocker() {
             </motion.div>
 
             <div className="absolute w-[90%] h-[90%] bg-blue-400/10 blur-[200px] -z-1" />
+
+            {/* Ultra-precise screen border frame */}
+            <div className="fixed inset-0 pointer-events-none z-[10000] border-[1.5px] border-black opacity-100" />
         </div>
     );
 }
