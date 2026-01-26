@@ -254,8 +254,9 @@ ${illegalText}
 
 GROMIT, analizza la GRIGLIA VISIVA e colpisci. 
 Segui ESATTAMENTE il protocollo:
-1. [RAGIONAMENTO TATTICO] ...
-2. [MOSSA FINALE] MOVE: [coord] to [coord] ###`;
+2. [MOSSA FINALE] MOVE: [coord] to [coord] ###
+Esempio: MOVE: e7 to e5 ###
+Non aggiungere altro dopo il blocco della mossa finale.`;
 
         const model = this.vertex_ai.getGenerativeModel({
             model: this.modelId,
@@ -289,30 +290,26 @@ Segui ESATTAMENTE il protocollo:
         const rawContent = result.response.candidates[0].content?.parts?.map((p: any) => p.text || '').join('') || '';
         console.log(`[AiService] Full GROMIT Thought Process:\n${rawContent}`);
 
-        // PRIORITY 1: Text-Block Extraction (MOVE: [coord] to [coord])
-        const blockMatch = rawContent.match(/MOVE:\s*([a-h][1-8])\s*(?:to|-|->)\s*([a-h][1-8]|(?:[a-h]))/i);
+        // PRIORITY 1: Flexible Text Extraction (MOVE: [coord] to/->/- [coord])
+        const blockMatch = rawContent.match(/MOVE:?\s*([a-h][1-8])\s*(?:to|-|->|a)?\s*([a-h][1-8])/i);
 
         if (blockMatch) {
             let from = blockMatch[1].toLowerCase();
             let to = blockMatch[2].toLowerCase();
+            console.log(`[AiService] Extracted Move (Regex): ${from} -> ${to}`);
+            return { from, to };
+        }
 
-            // REPAIR LOGIC: If 'to' is truncated (e.g. only 'f')
-            if (to.length === 1 && params.allLegalMoves) {
-                console.warn(`[AiService] Truncated 'to' detected (${to}). Repairing...`);
-                const candidates = params.allLegalMoves.filter(m => {
-                    const parts = m.split(/[- ]/);
-                    return parts[0] === from && parts[1].startsWith(to);
-                });
-
-                if (candidates.length === 1) {
-                    const repairedTo = candidates[0].split(/[- ]/)[1];
-                    console.log(`[AiService] Repair success: ${from} -> ${repairedTo}`);
-                    return { from, to: repairedTo };
-                }
-            }
-
-            if (to.length === 2) {
-                console.log(`[AiService] Extracted Move: ${from} -> ${to}`);
+        // FALLBACK 1: Look for any two algebraic coordinates in the text
+        const anyCoords = rawContent.match(/([a-h][1-8])\s*(?:to|-|->|a)?\s*([a-h][1-8])/gi);
+        if (anyCoords && anyCoords.length > 0) {
+            // Take the last one if there are multiple, as it's likely the final decision
+            const lastMatch = anyCoords[anyCoords.length - 1];
+            const parts = lastMatch.match(/([a-h][1-8])/gi);
+            if (parts && parts.length === 2) {
+                const from = parts[0].toLowerCase();
+                const to = parts[1].toLowerCase();
+                console.warn(`[AiService] Falling back to generic coordinate match: ${from} -> ${to}`);
                 return { from, to };
             }
         }
