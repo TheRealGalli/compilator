@@ -186,18 +186,19 @@ export function MobileBlocker() {
                 style={{ rotateX, rotateY, perspective: 1500 }}
                 className="relative z-10 w-full max-w-[min(94vw,520px)] aspect-square"
             >
-                <div className="absolute -top-14 left-0 right-0 z-20 flex items-center justify-between px-1">
+                <div className="absolute -top-16 left-0 right-0 z-20 flex items-center justify-between px-1 h-12">
                     <div
-                        className="flex items-center cursor-pointer group active:scale-95 transition-transform"
+                        className="flex items-center cursor-pointer group active:scale-95 transition-transform relative"
                         onClick={handleGromitClick}
                     >
-                        <div className="flex items-center -space-x-3">
+                        <div className="flex items-center -space-x-3 shrink-0">
                             <motion.div
                                 animate={{
                                     rotate: isChessMode ? 360 : 0,
                                     filter: getFilter(isChessMode ? 1.0 : 1.5)
                                 }}
                                 transition={{ duration: 1, ease: "easeInOut" }}
+                                style={{ willChange: "transform, filter" }}
                             >
                                 <Asterisk
                                     className="text-blue-600"
@@ -209,6 +210,7 @@ export function MobileBlocker() {
                                     filter: getFilter(isChessMode ? 1.0 : 1.5)
                                 }}
                                 transition={{ duration: 1, ease: "easeInOut" }}
+                                style={{ willChange: "filter" }}
                             >
                                 <Asterisk
                                     className="text-blue-600"
@@ -217,14 +219,14 @@ export function MobileBlocker() {
                             </motion.div>
                         </div>
 
-                        <AnimatePresence mode="wait">
+                        <AnimatePresence>
                             {isChessMode && (
                                 <motion.span
-                                    initial={{ opacity: 0, x: "100vw" }}
+                                    initial={{ opacity: 0, x: 20 }}
                                     animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: "100vw" }}
-                                    transition={{ type: "spring", stiffness: 100, damping: 20 }}
-                                    className="ml-1.5 text-white text-xl font-bold tracking-tight drop-shadow-md whitespace-nowrap"
+                                    exit={{ opacity: 0, x: 20 }}
+                                    transition={{ duration: 0.5, ease: "easeOut" }}
+                                    className="absolute left-[56px] text-white text-xl font-bold tracking-tight drop-shadow-md whitespace-nowrap"
                                 >
                                     Gromit-Chess
                                 </motion.span>
