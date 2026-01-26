@@ -237,11 +237,12 @@ export function MobileBlocker() {
                                     onClick={() => handleSquareClick(r, c)}
                                 >
                                     <AnimatePresence>
-                                        {piece && (
+                                        {isChessMode && piece && (
                                             <motion.div
                                                 key={`${piece}-${r}-${c}`}
-                                                initial={isChessMode ? { opacity: 0, scale: 0.8 } : false}
+                                                initial={{ opacity: 0, scale: 0.8 }}
                                                 animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.8 }}
                                                 transition={{ duration: 1.5, ease: "easeOut" }}
                                                 className="relative z-10"
                                             >
