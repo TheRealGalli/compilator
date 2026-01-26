@@ -60,6 +60,7 @@ export function MobileBlocker() {
     const [gameStatus, setGameStatus] = useState<'play' | 'checkmate' | 'stalemate'>('play');
     const [matchHistory, setMatchHistory] = useState<string[]>([]);
     const [isAiProcessing, setIsAiProcessing] = useState(false);
+    const [isLogoSpinning, setIsLogoSpinning] = useState(false);
     const [capturedWhite, setCapturedWhite] = useState<string[]>([]);
     const [capturedBlack, setCapturedBlack] = useState<string[]>([]);
 
@@ -346,6 +347,7 @@ export function MobileBlocker() {
         if (isChessMode && currentTurn === 'b' && gameStatus === 'play' && !isAiProcessing) {
             const handleAiMove = async (illegalAttempt?: any) => {
                 setIsAiProcessing(true);
+                setIsLogoSpinning(true);
                 try {
                     const response = await apiRequest('POST', '/api/chess/move', {
                         boardJson: getBoardJson(board),
@@ -386,6 +388,7 @@ export function MobileBlocker() {
                     console.error("AI Move failed:", error);
                 } finally {
                     setIsAiProcessing(false);
+                    setIsLogoSpinning(false);
                 }
             };
 
@@ -449,10 +452,15 @@ export function MobileBlocker() {
                         <div className="flex items-center -space-x-3 shrink-0">
                             <motion.div
                                 animate={{
-                                    rotate: isChessMode ? 360 : 0,
+                                    rotate: isLogoSpinning ? [360, 720, 360] : (isChessMode ? 360 : 0),
                                     filter: getFilter(isChessMode ? 1.0 : 1.5)
                                 }}
-                                transition={{ duration: 1, ease: "easeInOut" }}
+                                transition={{
+                                    rotate: isLogoSpinning
+                                        ? { duration: 1.5, ease: "easeInOut", repeat: Infinity }
+                                        : { duration: 1, ease: "easeInOut" },
+                                    filter: { duration: 1 }
+                                }}
                                 style={{ willChange: "transform, filter" }}
                             >
                                 <Asterisk
