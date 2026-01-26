@@ -45,11 +45,6 @@ jobs:
           echo "Repository name: $(echo $GITHUB_REPOSITORY | cut -d'/' -f2)"
           npm run build:frontend
 
-      - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@v1.4.3
-        with:
-          subject-path: 'dist/public/**'
-
       - name: Verify build output
         run: |
           if [ ! -d "dist/public" ]; then
