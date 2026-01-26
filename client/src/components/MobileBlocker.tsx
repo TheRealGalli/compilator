@@ -178,26 +178,22 @@ export function MobileBlocker() {
                         className="flex items-center cursor-pointer group active:scale-95 transition-transform"
                         onClick={handleGromitClick}
                     >
-                        <motion.div
-                            className="flex items-center"
-                            animate={{ gap: isChessMode ? "-16px" : "-10px" }}
-                            transition={{ type: "spring", stiffness: 100, damping: 20 }}
-                        >
+                        <div className="flex items-center -space-x-3">
                             <Asterisk
                                 className={`text-blue-600 transition-transform duration-1000 ${isGromitSpinning ? 'rotate-[360deg]' : ''}`}
                                 style={{
-                                    filter: 'drop-shadow(0 0 1.5px black) drop-shadow(0 0 1.5px black) drop-shadow(0 0 1px black)'
+                                    filter: 'drop-shadow(1px 1px 0px black) drop-shadow(-1px -1px 0px black) drop-shadow(1px -1px 0px black) drop-shadow(-1px 1px 0px black) drop-shadow(0 0 2px black)'
                                 }}
                                 size={32}
                             />
                             <Asterisk
                                 className="text-blue-600"
                                 style={{
-                                    filter: 'drop-shadow(0 0 1.5px black) drop-shadow(0 0 1.5px black) drop-shadow(0 0 1px black)'
+                                    filter: 'drop-shadow(1px 1px 0px black) drop-shadow(-1px -1px 0px black) drop-shadow(1px -1px 0px black) drop-shadow(-1px 1px 0px black) drop-shadow(0 0 2px black)'
                                 }}
                                 size={32}
                             />
-                        </motion.div>
+                        </div>
 
                         <AnimatePresence mode="wait">
                             {isChessMode && (
