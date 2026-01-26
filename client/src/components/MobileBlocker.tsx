@@ -107,13 +107,15 @@ export function MobileBlocker() {
 
     const handleSquareClick = (r: number, c: number) => {
         if (!isChessMode) return;
-        if (!timerActive) setTimerActive(true);
 
         const piece = board[r][c];
 
         if (selectedSquare) {
             const pieceAtFrom = board[selectedSquare.r][selectedSquare.c];
             if (pieceAtFrom && isValidMove(pieceAtFrom, selectedSquare.r, selectedSquare.c, r, c)) {
+                // Start timer ONLY on first valid move
+                if (!timerActive) setTimerActive(true);
+
                 const newBoard = board.map(row => [...row]);
                 newBoard[r][c] = pieceAtFrom;
                 newBoard[selectedSquare.r][selectedSquare.c] = null;
