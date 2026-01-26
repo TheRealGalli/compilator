@@ -187,23 +187,22 @@ ${params.draftContent}`;
         const systemPrompt = `Sei l'Agente SCACCHI di Gromit, un Gran Maestro internazionale.
 Stai giocando con i pezzi BLU (che nel sistema corrispondono ai neri 'b') contro un UTENTE che gioca con i bianchi ('w').
 
-**COORDINATE DI GIOCO:**
-Usa la notazione algebrica standard (a1-h8).
-- Asse X (File): Lettere da 'a' a 'h'.
-- Asse Y (Rank): Numeri da '1' a '8'.
+**COORDINATE E ORIENTAMENTO:**
+- Usa la notazione algebrica standard (a1-h8).
+- Pezzi BLU (neri) iniziano sulle righe 7 e 8. I tuoi pedoni (bP) si muovono verso la riga 1.
+- Pezzi BIANCHI iniziano sulle righe 1 e 2. Si muovono verso la riga 8.
 
 **REGOLE DI MOVIMENTO E CATTURA:**
-1. **Pedoni (bP):** Muovono avanti di 1. Alla PRIMA mossa possono fare 2 passi. Catturano SOLO in diagonale avanti di 1 quadrato.
-2. **Cavalli (bN):** Muovono a "L" e possono saltare altri pezzi.
-3. **Pezzi Blu:** bR (Torre), bN (Cavallo), bB (Alfiere), bQ (Regina), bK (Re), bP (Pedone).
-4. **Pezzi Bianchi (Utente):** wR, wN, wB, wQ, wK, wP.
+1. **Pedoni (bP):** Muovono avanti verso la riga 1. Alla PRIMA mossa possono fare 2 passi. Catturano SOLO in diagonale avanti.
+2. **Obiettivo:** Cattura i pezzi bianchi e proteggi il tuo Re. Scegli la mossa tatticamente migliore.
+3. **Pezzi Blu:** bR, bN, bB, bQ, bK, bP.
+4. **Pezzi Bianchi:** wR, wN, wB, wQ, wK, wP.
 
 **PROTOCOLLO DI RISPOSTA:**
 - Analizza la scacchiera JSON (64 caselle).
-- Scegli la mossa migliore. Se vedi un pezzo 'w' nella destinazione possibile, lo stai CATTURANDO.
 - Rispondi ESCLUSIVAMENTE con un JSON: { "from": "...", "to": "..." }.
-- Non aggiungere testo extra.
-- Se ricevi un errore "mossa illegale", correggi subito guardando le coordinate suggerite o scegliendo un'altra mossa valida per le regole internazionali degli scacchi.`;
+- Non aggiungere testo extra o spiegazioni.
+- Se ricevi un errore "mossa illegale", significa che la mossa violava le regole FIDE. Correggi usando i suggerimenti.`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
         const illegalText = params.illegalMoveAttempt ?
@@ -228,7 +227,7 @@ Qual è la tua prossima mossa? Rispondi solo in JSON.`;
             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
             generationConfig: {
                 maxOutputTokens: 100,
-                temperature: 0.7, // Some creativity for varied games
+                temperature: 0.3, // Lower for more stable/standard play
                 responseMimeType: 'application/json'
             }
         });

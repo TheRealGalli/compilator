@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion, useSpring, AnimatePresence } from "framer-motion";
+import { motion, useSpring, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Asterisk } from "lucide-react";
 import {
     FaChessPawn, FaChessRook, FaChessKnight, FaChessBishop,
@@ -532,40 +532,45 @@ export function MobileBlocker() {
                                 </motion.div>
                             )}
                         </AnimatePresence>
-                        <div className="w-[75.0%] h-[75.0%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
-                            {board.map((row, r) => row.map((piece, c) => (
-                                <div
-                                    key={`${r}-${c}`}
-                                    className={`w-full h-full relative flex items-center justify-center cursor-pointer border border-white/5
-                                        ${selectedSquare?.r === r && selectedSquare?.c === c ? 'bg-white/20' : ''}
-                                        ${feedback?.r === r && feedback?.c === c ? (feedback.type === 'valid' ? 'bg-green-500/40' : 'bg-red-500/40') : 'hover:bg-white/10 active:bg-white/15'}
-                                    `}
-                                    onClick={() => handleSquareClick(r, c)}
-                                >
-                                    <AnimatePresence mode="popLayout">
-                                        {isChessMode && piece && (
-                                            <motion.div
-                                                layoutId={piece.id}
-                                                key={piece.id}
-                                                initial={{ opacity: 0, scale: 0.8 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.8 }}
-                                                transition={{
-                                                    type: "spring",
-                                                    stiffness: 300,
-                                                    damping: 30,
-                                                    duration: 0.4
-                                                }}
-                                                className="relative z-10"
-                                                style={{ willChange: "transform, opacity" }}
-                                            >
-                                                <ChessPiece type={piece.type} />
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            )))}
-                        </div>
+                        <LayoutGroup>
+                            <div className="w-[75.0%] h-[75.0%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
+                                {board.map((row, r) => row.map((piece, c) => (
+                                    <div
+                                        key={`${r}-${c}`}
+                                        className={`w-full h-full relative flex items-center justify-center cursor-pointer border border-white/5
+                                            ${selectedSquare?.r === r && selectedSquare?.c === c ? 'bg-white/20' : ''}
+                                            ${feedback?.r === r && feedback?.c === c ? (feedback.type === 'valid' ? 'bg-green-500/40' : 'bg-red-500/40') : 'hover:bg-white/10 active:bg-white/15'}
+                                        `}
+                                        onClick={() => handleSquareClick(r, c)}
+                                    >
+                                        <AnimatePresence>
+                                            {isChessMode && piece && (
+                                                <motion.div
+                                                    layoutId={piece.id}
+                                                    key={piece.id}
+                                                    initial={{ opacity: 0, scale: 0.5 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.5 }}
+                                                    transition={{
+                                                        layout: {
+                                                            type: "spring",
+                                                            stiffness: 250,
+                                                            damping: 30
+                                                        },
+                                                        opacity: { duration: 0.2 },
+                                                        scale: { duration: 0.2 }
+                                                    }}
+                                                    className="relative z-10"
+                                                    style={{ willChange: "transform, opacity" }}
+                                                >
+                                                    <ChessPiece type={piece.type} />
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                )))}
+                            </div>
+                        </LayoutGroup>
                     </div>
 
                     <div className="absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-transparent pointer-events-none" />
