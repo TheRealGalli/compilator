@@ -203,16 +203,13 @@ export function MobileBlocker() {
                                     size={32}
                                 />
                             </motion.div>
-                            <motion.div
-                                animate={{ rotate: isChessMode ? 360 : 0 }}
-                                transition={{ duration: 1, ease: "easeInOut" }}
-                            >
+                            <div className="relative">
                                 <Asterisk
                                     className="text-blue-600"
                                     style={boldOutlineStyle}
                                     size={32}
                                 />
-                            </motion.div>
+                            </div>
                         </div>
 
                         <AnimatePresence mode="wait">
