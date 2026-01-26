@@ -277,8 +277,12 @@ export function MobileBlocker() {
 
             <div className="absolute w-[90%] h-[90%] bg-blue-400/10 blur-[200px] -z-1" />
 
-            {/* Ultra-precise screen border frame */}
-            <div className="fixed inset-0 pointer-events-none z-[10000] border-[3px] border-black opacity-100" />
+            {/* Ultra-precise dynamic screen border frame */}
+            <motion.div
+                className="fixed inset-0 pointer-events-none z-[10000] border-black opacity-100"
+                animate={{ borderWidth: isChessMode ? "6px" : "12px" }}
+                transition={{ duration: 1, ease: "easeInOut" }}
+            />
         </div>
     );
 }
