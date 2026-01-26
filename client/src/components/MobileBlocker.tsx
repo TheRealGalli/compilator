@@ -193,16 +193,26 @@ export function MobileBlocker() {
                         onClick={handleGromitClick}
                     >
                         <div className="flex items-center -space-x-3">
-                            <Asterisk
-                                className={`text-blue-600 transition-transform duration-1000 ${isGromitSpinning ? 'rotate-[360deg]' : ''}`}
-                                style={boldOutlineStyle}
-                                size={32}
-                            />
-                            <Asterisk
-                                className="text-blue-600"
-                                style={boldOutlineStyle}
-                                size={32}
-                            />
+                            <motion.div
+                                animate={{ rotate: isChessMode ? 360 : 0 }}
+                                transition={{ duration: 1, ease: "easeInOut" }}
+                            >
+                                <Asterisk
+                                    className="text-blue-600"
+                                    style={boldOutlineStyle}
+                                    size={32}
+                                />
+                            </motion.div>
+                            <motion.div
+                                animate={{ rotate: isChessMode ? 360 : 0 }}
+                                transition={{ duration: 1, ease: "easeInOut" }}
+                            >
+                                <Asterisk
+                                    className="text-blue-600"
+                                    style={boldOutlineStyle}
+                                    size={32}
+                                />
+                            </motion.div>
                         </div>
 
                         <AnimatePresence mode="wait">
@@ -282,7 +292,8 @@ export function MobileBlocker() {
             {/* Ultra-precise dynamic screen border frame */}
             <motion.div
                 className="fixed inset-0 pointer-events-none z-[10000] border-black opacity-100"
-                animate={{ borderWidth: isChessMode ? "6px" : "10px" }}
+                initial={{ borderWidth: isBlocked ? "9px" : "0px" }}
+                animate={{ borderWidth: isChessMode ? "6px" : "9px" }}
                 transition={{ duration: 1, ease: "easeInOut" }}
             />
         </div>
