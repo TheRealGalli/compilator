@@ -36,8 +36,17 @@ const ChessPiece = ({ type }: { type: string }) => {
     }
 };
 
+const checkDeviceSync = () => {
+    if (typeof window === "undefined") return false;
+    const ua = navigator.userAgent;
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const isIPad = (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || /iPad/.test(ua);
+    const hasMobileBypass = new URLSearchParams(window.location.search).get('mobile') === 'true';
+    return (isMobileUA || isIPad) && !hasMobileBypass;
+};
+
 export function MobileBlocker() {
-    const [isBlocked, setIsBlocked] = useState(false);
+    const [isBlocked, setIsBlocked] = useState(checkDeviceSync());
     const [isGromitSpinning, setIsGromitSpinning] = useState(false);
     const [isChessMode, setIsChessMode] = useState(false);
     const [board, setBoard] = useState<(string | null)[][]>(INITIAL_BOARD);
@@ -138,15 +147,6 @@ export function MobileBlocker() {
     const rotateY = useSpring(0, { stiffness: 60, damping: 20 });
 
     useEffect(() => {
-        const checkDevice = () => {
-            const ua = navigator.userAgent;
-            const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-            const isIPad = (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || /iPad/.test(ua);
-            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const hasMobileBypass = new URLSearchParams(window.location.search).get('mobile') === 'true';
-            setIsBlocked((isMobileUA || isIPad) && !hasMobileBypass);
-        };
-
         const handleOrientation = (e: DeviceOrientationEvent) => {
             if (e.beta !== null && e.gamma !== null) {
                 const y = Math.max(Math.min(e.gamma / 1.5, 20), -20);
@@ -156,7 +156,6 @@ export function MobileBlocker() {
             }
         };
 
-        checkDevice();
         if (window.DeviceOrientationEvent) {
             window.addEventListener("deviceorientation", handleOrientation);
         }
@@ -164,6 +163,19 @@ export function MobileBlocker() {
     }, [rotateX, rotateY]);
 
     if (!isBlocked) return null;
+
+    const boldOutlineStyle = {
+        filter: `
+            drop-shadow(1.5px 1.5px 0 black)
+            drop-shadow(-1.5px -1.5px 0 black)
+            drop-shadow(1.5px -1.5px 0 black)
+            drop-shadow(-1.5px 1.5px 0 black)
+            drop-shadow(1.5px 0 0 black)
+            drop-shadow(-1.5px 0 0 black)
+            drop-shadow(0 1.5px 0 black)
+            drop-shadow(0 -1.5px 0 black)
+        `
+    };
 
     return (
         <div className="fixed inset-0 z-[9999] bg-[#0055ff] flex items-center justify-center overflow-hidden touch-none select-none">
@@ -181,16 +193,12 @@ export function MobileBlocker() {
                         <div className="flex items-center -space-x-3">
                             <Asterisk
                                 className={`text-blue-600 transition-transform duration-1000 ${isGromitSpinning ? 'rotate-[360deg]' : ''}`}
-                                style={{
-                                    filter: 'drop-shadow(1px 1px 0px black) drop-shadow(-1px -1px 0px black) drop-shadow(1px -1px 0px black) drop-shadow(-1px 1px 0px black) drop-shadow(0 0 2px black)'
-                                }}
+                                style={boldOutlineStyle}
                                 size={32}
                             />
                             <Asterisk
                                 className="text-blue-600"
-                                style={{
-                                    filter: 'drop-shadow(1px 1px 0px black) drop-shadow(-1px -1px 0px black) drop-shadow(1px -1px 0px black) drop-shadow(-1px 1px 0px black) drop-shadow(0 0 2px black)'
-                                }}
+                                style={boldOutlineStyle}
                                 size={32}
                             />
                         </div>
