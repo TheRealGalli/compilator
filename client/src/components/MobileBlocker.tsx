@@ -65,22 +65,22 @@ export function MobileBlocker() {
                 style={{ rotateX, rotateY, perspective: 1500 }}
                 className="relative z-10 w-full max-w-[min(94vw,520px)] aspect-square"
             >
+                {/* Gromit Logo - Repositioned Outside/Above the board */}
+                <div
+                    className="absolute -top-12 left-0 z-20 flex items-center -space-x-3 cursor-pointer group active:scale-95 transition-transform"
+                    onClick={handleGromitClick}
+                >
+                    <Asterisk
+                        className={`text-blue-600 transition-transform duration-1000 ${isGromitSpinning ? 'rotate-[360deg]' : ''}`}
+                        width={32}
+                        height={32}
+                        strokeWidth={3}
+                    />
+                    <Asterisk className="text-blue-600" width={32} height={32} strokeWidth={3} />
+                </div>
+
                 {/* Main Crystal Container */}
                 <div className="w-full h-full relative rounded-3xl overflow-hidden border border-white/40 backdrop-blur-[30px] bg-white/[0.05] shadow-[0_60px_150px_rgba(0,0,0,0.6),inset_0_0_80px_rgba(255,255,255,0.05)]">
-
-                    {/* Gromit Logo - Top Left */}
-                    <div
-                        className="absolute top-4 left-5 z-20 flex items-center -space-x-3 cursor-pointer group active:scale-95 transition-transform"
-                        onClick={handleGromitClick}
-                    >
-                        <Asterisk
-                            className={`text-blue-600 transition-transform duration-1000 ${isGromitSpinning ? 'rotate-[360deg]' : ''}`}
-                            width={32}
-                            height={32}
-                            strokeWidth={3}
-                        />
-                        <Asterisk className="text-blue-600" width={32} height={32} strokeWidth={3} />
-                    </div>
 
                     {/* The Actual High-Res Image - Focused on the board */}
                     <img
@@ -91,7 +91,7 @@ export function MobileBlocker() {
 
                     {/* Interactive Overlay Grid (Precisely Aligned to the Board) */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-[74.0%] h-[74.0%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
+                        <div className="w-[75.0%] h-[75.0%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
                             {Array.from({ length: 64 }).map((_, i) => {
                                 return (
                                     <div
