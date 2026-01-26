@@ -185,7 +185,7 @@ ${params.draftContent}`;
         illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] }
     }): Promise<{ from: string, to: string }> {
         const systemPrompt = `Sei l'Agente SCACCHI di Gromit, un Gran Maestro internazionale.
-Stai giocando con i pezzi BLU (che nel sistema corrispondono ai neri 'b') contro un UTENTE che gioca con i bianchi ('w').
+Stai giocando con i pezzi BLU (che corrispondono ai neri 'b') contro un UTENTE che gioca con i bianchi ('w').
 
 **COORDINATE E ORIENTAMENTO:**
 - Usa la notazione algebrica standard (a1-h8).
@@ -198,11 +198,12 @@ Stai giocando con i pezzi BLU (che nel sistema corrispondono ai neri 'b') contro
 3. **Pezzi Blu:** bR, bN, bB, bQ, bK, bP.
 4. **Pezzi Bianchi:** wR, wN, wB, wQ, wK, wP.
 
-**PROTOCOLLO DI RISPOSTA:**
+**PROTOCOLLO DI RISPOSTA (CRITICO):**
 - Analizza la scacchiera JSON (64 caselle).
-- Rispondi ESCLUSIVAMENTE con un JSON: { "from": "...", "to": "..." }.
-- Non aggiungere testo extra o spiegazioni.
-- Se ricevi un errore "mossa illegale", significa che la mossa violava le regole FIDE. Correggi usando i suggerimenti.`;
+- Rispondi **ESCLUSIVAMENTE** con un oggetto JSON valido: { "from": "...", "to": "..." }.
+- **NON** aggiungere introduzioni come "Ecco la mia mossa" o "Certamente".
+- **NON** aggiungere spiegazioni.
+- Se la tua mossa era illegale, usa le mosse valide suggerite.`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
         const illegalText = params.illegalMoveAttempt ?
@@ -213,7 +214,7 @@ ${JSON.stringify(params.boardJson, null, 2)}
 
 ${historyText}${illegalText}
 
-Qual è la tua prossima mossa? Rispondi solo in JSON.`;
+Scegli la tua prossima mossa. Rispondi SOLO in formato JSON { "from": "...", "to": "..." }.`;
 
         const model = this.vertex_ai.getGenerativeModel({
             model: this.modelId,
@@ -235,30 +236,37 @@ Qual è la tua prossima mossa? Rispondi solo in JSON.`;
             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
             generationConfig: {
                 maxOutputTokens: 100,
-                temperature: 0.3,
+                temperature: 0.2, // Even more stable
                 responseMimeType: 'application/json'
             }
         });
 
         // Debug response object if empty
         if (!result.response.candidates || result.response.candidates.length === 0) {
-            console.error('[AiService] No candidates returned from AI. Possible blockage or invalid model.');
+            console.error('[AiService] No candidates returned from AI.');
             return { from: "", to: "" };
         }
 
-        const content = result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '{}';
-        console.log(`[AiService] Raw AI Response Content: "${content}"`);
+        const rawContent = result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '{}';
+        console.log(`[AiService] Raw AI Response: "${rawContent}"`);
+
+        // Robust JSON extraction
+        let cleanJson = rawContent;
+        const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            cleanJson = jsonMatch[0];
+            console.log(`[AiService] Extracted JSON: "${cleanJson}"`);
+        }
 
         try {
-            const move = JSON.parse(content);
+            const move = JSON.parse(cleanJson);
             if (!move.from || !move.to) {
-                console.warn('[AiService] AI returned JSON without from/to fields:', move);
+                console.warn('[AiService] Parsed JSON missing fields:', move);
             }
             return move;
         } catch (e) {
-            console.error('[AiService] Chess Move JSON parse error:', e, content);
-            throw new Error('AI non ha restituito un JSON valido per la mossa.');
+            console.error('[AiService] JSON Parse Error. Raw:', rawContent);
+            throw new Error('AI non ha restituito un JSON valido (anche dopo estrazione).');
         }
     }
 }
-
