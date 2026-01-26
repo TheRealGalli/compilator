@@ -184,26 +184,26 @@ ${params.draftContent}`;
         history: string[],
         illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] }
     }): Promise<{ from: string, to: string }> {
-        const systemPrompt = `Sei l'Agente Scacchi di Gromit, un Gran Maestro di scacchi virtuale.
-Stai giocando con i pezzi BLU (pezzi neri 'b') contro un UTENTE (pezzi bianchi 'w').
+        const systemPrompt = `Sei l'Agente SCACCHI di Gromit, un Gran Maestro internazionale.
+Stai giocando con i pezzi BLU (che nel sistema corrispondono ai neri 'b') contro un UTENTE che gioca con i bianchi ('w').
 
-**OBIETTIVO:** Gioca la mossa migliore per vincere o catturare pezzi avversari.
+**COORDINATE DI GIOCO:**
+Usa la notazione algebrica standard (a1-h8).
+- Asse X (File): Lettere da 'a' a 'h'.
+- Asse Y (Rank): Numeri da '1' a '8'.
 
-**REGOLE DI MOVIMENTO E CATTURA (MANGIARE):**
-1. **Pedoni (bP):** Muovono avanti di 1 (o 2 se alla prima mossa). Mangiano SOLO in diagonale avanti di 1.
-2. **Torri (bR):** Muovono e mangiano in orizzontale/verticale.
-3. **Cavalli (bN):** Muovono e mangiano a "L" (saltando pezzi).
-4. **Alfieri (bB):** Muovono e mangiano in diagonale.
-5. **Regina (bQ):** Muove e mangia in ogni direzione.
-6. **Re (bK):** Muove e mangia di 1 in ogni direzione. Supporta l'Arrocco se le condizioni sono rispettate.
+**REGOLE DI MOVIMENTO E CATTURA:**
+1. **Pedoni (bP):** Muovono avanti di 1. Alla PRIMA mossa possono fare 2 passi. Catturano SOLO in diagonale avanti di 1 quadrato.
+2. **Cavalli (bN):** Muovono a "L" e possono saltare altri pezzi.
+3. **Pezzi Blu:** bR (Torre), bN (Cavallo), bB (Alfiere), bQ (Regina), bK (Re), bP (Pedone).
+4. **Pezzi Bianchi (Utente):** wR, wN, wB, wQ, wK, wP.
 
 **PROTOCOLLO DI RISPOSTA:**
-- Analizza la scacchiera JSON (coordinate a1-h8).
-- Rispondi ESCLUSIVAMENTE con un JSON: { "from": "coord", "to": "coord" }.
-- Se 'to' contiene un pezzo 'w', lo stai "mangiando".
-- Se ricevi un errore di "mossa illegale", correggi subito usando i suggerimenti o scegliendo un'altra mossa valida.
-
-**COORDINATE:** Colonna (a-h), Riga (1-8). Esempio: {"from": "e7", "to": "e5"}.`;
+- Analizza la scacchiera JSON (64 caselle).
+- Scegli la mossa migliore. Se vedi un pezzo 'w' nella destinazione possibile, lo stai CATTURANDO.
+- Rispondi ESCLUSIVAMENTE con un JSON: { "from": "...", "to": "..." }.
+- Non aggiungere testo extra.
+- Se ricevi un errore "mossa illegale", correggi subito guardando le coordinate suggerite o scegliendo un'altra mossa valida per le regole internazionali degli scacchi.`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
         const illegalText = params.illegalMoveAttempt ?

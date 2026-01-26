@@ -59,6 +59,8 @@ export function MobileBlocker() {
     const [gameStatus, setGameStatus] = useState<'play' | 'checkmate' | 'stalemate'>('play');
     const [matchHistory, setMatchHistory] = useState<string[]>([]);
     const [isAiProcessing, setIsAiProcessing] = useState(false);
+    const [capturedWhite, setCapturedWhite] = useState<string[]>([]);
+    const [capturedBlack, setCapturedBlack] = useState<string[]>([]);
 
     useEffect(() => {
         let interval: any;
@@ -86,6 +88,8 @@ export function MobileBlocker() {
             setGameStatus('play');
             setMatchHistory([]);
             setIsAiProcessing(false);
+            setCapturedWhite([]);
+            setCapturedBlack([]);
         }
     };
 
@@ -347,9 +351,9 @@ export function MobileBlocker() {
                         const piece = board[from.r][from.c];
 
                         if (piece && piece.type.startsWith('b') && isValidMove(piece, from.r, from.c, to.r, to.c)) {
-                            // Valid AI move, trigger the same logic as human click
+                            // Valid AI move, trigger movement
                             setSelectedSquare(from);
-                            setTimeout(() => handleSquareClick(to.r, to.c), 600);
+                            setTimeout(() => performMove(from.r, from.c, to.r, to.c), 600);
                         } else {
                             // Illegal AI move, retry with feedback
                             const validMovesForPiece: string[] = [];
@@ -556,6 +560,40 @@ export function MobileBlocker() {
                     <div className="absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-transparent pointer-events-none" />
                     <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.15)_0%,_transparent_60%)] pointer-events-none" />
                     <div className="absolute inset-[4px] rounded-[22px] border border-white/25 pointer-events-none shadow-[inset_0_0_30px_rgba(255,255,255,0.1)]" />
+                </div>
+
+                <div className="mt-8 w-full flex flex-col items-center gap-4">
+                    {/* Captured Pieces Display */}
+                    <div className="flex flex-col gap-2 w-full px-4">
+                        <div className="flex flex-wrap items-center justify-center gap-1 min-h-[32px]">
+                            <AnimatePresence>
+                                {capturedBlack.map((type, i) => (
+                                    <motion.div
+                                        key={`cap-b-${i}`}
+                                        initial={{ opacity: 0, scale: 0.5, y: -20 }}
+                                        animate={{ opacity: 1, scale: 0.7, y: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                    >
+                                        <ChessPiece type={type} />
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-1 min-h-[32px]">
+                            <AnimatePresence>
+                                {capturedWhite.map((type, i) => (
+                                    <motion.div
+                                        key={`cap-w-${i}`}
+                                        initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                                        animate={{ opacity: 1, scale: 0.7, y: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                    >
+                                        <ChessPiece type={type} />
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </div>
+                    </div>
                 </div>
             </motion.div >
 
