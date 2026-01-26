@@ -185,25 +185,24 @@ ${params.draftContent}`;
         illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] }
     }): Promise<{ from: string, to: string }> {
         const systemPrompt = `Sei l'Agente SCACCHI di Gromit, un Gran Maestro internazionale.
-Stai giocando con i pezzi BLU (che corrispondono ai neri 'b') contro un UTENTE che gioca con i bianchi ('w').
+Stai giocando con i pezzi BLU (pezzi neri 'b') contro un UTENTE che gioca con i bianchi ('w').
 
 **COORDINATE E ORIENTAMENTO:**
 - Usa la notazione algebrica standard (a1-h8).
-- Pezzi BLU (neri) iniziano sulle righe 7 e 8. I tuoi pedoni (bP) si muovono verso la riga 1.
+- Pezzi BLU (neri) iniziano sulle righe 7 e 8. Pedoni (bP) si muovono verso la riga 1.
 - Pezzi BIANCHI iniziano sulle righe 1 e 2. Si muovono verso la riga 8.
 
 **REGOLE DI MOVIMENTO E CATTURA:**
-1. **Pedoni (bP):** Muovono avanti verso la riga 1. Alla PRIMA mossa possono fare 2 passi. Catturano SOLO in diagonale avanti.
-2. **Obiettivo:** Cattura i pezzi bianchi e proteggi il tuo Re. Scegli la mossa tatticamente migliore.
+1. **Pedoni (bP):** Muovono avanti verso la riga 1. Prima mossa: 1 o 2 passi. Catturano SOLO in diagonale avanti.
+2. **Obiettivo:** Cattura i pezzi bianchi e proteggi il tuo Re.
 3. **Pezzi Blu:** bR, bN, bB, bQ, bK, bP.
 4. **Pezzi Bianchi:** wR, wN, wB, wQ, wK, wP.
 
-**PROTOCOLLO DI RISPOSTA (CRITICO):**
-- Analizza la scacchiera JSON (64 caselle).
-- Rispondi **ESCLUSIVAMENTE** con un oggetto JSON valido: { "from": "...", "to": "..." }.
-- **NON** aggiungere MAI introduzioni, preamboli o saluti (es. NO "Ecco la mia mossa", NO "Certamente", NO "Here").
-- **NON** aggiungere spiegazioni o testo fuori dal JSON.
-- Se la tua mossa era illegale, usa le mosse valide suggerite.`;
+**PROTOCOLLO DI RISPOSTA (MOLTO IMPORTANTE):**
+- Scegli la tua mossa e rispondi seguendo ESATTAMENTE questo formato:
+  MOVE: [origine] to [destinazione]
+- Esempio: "MOVE: e7 to e5"
+- Non aggiungere introduzioni o spiegazioni. Se vuoi, puoi anche rispondere in formato JSON { "from": "...", "to": "..." }, ma il formato MOVE è preferito.`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
         const illegalText = params.illegalMoveAttempt ?
@@ -214,7 +213,7 @@ ${JSON.stringify(params.boardJson, null, 2)}
 
 ${historyText}${illegalText}
 
-Scegli la tua prossima mossa. Rispondi SOLO in formato JSON { "from": "...", "to": "..." }.`;
+Qual è la tua prossima mossa? Rispondi con: MOVE: [coord] to [coord]`;
 
         const model = this.vertex_ai.getGenerativeModel({
             model: this.modelId,
@@ -235,49 +234,45 @@ Scegli la tua prossima mossa. Rispondi SOLO in formato JSON { "from": "...", "to
         const result = await model.generateContent({
             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
             generationConfig: {
-                maxOutputTokens: 500, // Increased to avoid truncation issues
-                temperature: 0.2, // Even more stable
-                responseMimeType: 'application/json'
+                maxOutputTokens: 200,
+                temperature: 0.2
+                // NOTE: removed responseMimeType to improve model reliability
             }
         });
 
-        // Debug response object if empty
         if (!result.response.candidates || result.response.candidates.length === 0) {
             console.error('[AiService] No candidates returned from AI.');
-            return { from: "", to: "" };
+            throw new Error('AI non ha risposto.');
         }
 
-        const rawContent = result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '{}';
+        const rawContent = result.response.candidates[0].content?.parts?.map((p: any) => p.text || '').join('') || '';
         console.log(`[AiService] Raw AI Response: "${rawContent}"`);
 
-        // Robust JSON extraction
-        let cleanJson = rawContent;
+        // PRIORITY 1: Look for "MOVE: from to to"
+        const moveMatch = rawContent.match(/MOVE:\s*([a-h][1-8])\s*to\s*([a-h][1-8])/i);
+        if (moveMatch) {
+            console.log(`[AiService] Text-Match extracted move: ${moveMatch[1]} -> ${moveMatch[2]}`);
+            return { from: moveMatch[1].toLowerCase(), to: moveMatch[2].toLowerCase() };
+        }
+
+        // PRIORITY 2: Look for JSON
         const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-            cleanJson = jsonMatch[0];
-        }
-
-        try {
-            // Priority 1: Standard JSON parse
-            const move = JSON.parse(cleanJson);
-            if (move.from && move.to) return move;
-        } catch (e) {
-            console.warn('[AiService] Standard JSON parse failed, trying fallback extraction...');
-        }
-
-        // Priority 2: Fallback regex extraction (handles 'from': 'a2' or from: "a2", etc)
-        try {
-            const fromMatch = rawContent.match(/['"]?from['"]?\s*:\s*['"]?([a-h][1-8])['"]?/i);
-            const toMatch = rawContent.match(/['"]?to['"]?\s*:\s*['"]?([a-h][1-8])['"]?/i);
-
-            if (fromMatch && toMatch) {
-                console.log(`[AiService] Fallback extracted move: ${fromMatch[1]} -> ${toMatch[1]}`);
-                return { from: fromMatch[1].toLowerCase(), to: toMatch[1].toLowerCase() };
+            try {
+                const move = JSON.parse(jsonMatch[0]);
+                if (move.from && move.to) return move;
+            } catch (e) {
+                console.warn('[AiService] JSON block found but parse failed.');
             }
-        } catch (err) {
-            console.error('[AiService] Fallback extraction failed:', err);
         }
 
-        throw new Error(`AI non ha restituito un JSON o una mossa valida. Raw: ${rawContent.substring(0, 100)}`);
+        // PRIORITY 3: Fallback regex for any two coordinates
+        const coords = rawContent.match(/[a-h][1-8]/gi);
+        if (coords && coords.length >= 2) {
+            console.log(`[AiService] Regex-Fallback extracted move: ${coords[0]} -> ${coords[1]}`);
+            return { from: coords[0].toLowerCase(), to: coords[1].toLowerCase() };
+        }
+
+        throw new Error(`AI non ha restituito una mossa valida. Raw: ${rawContent.substring(0, 100)}`);
     }
 }
