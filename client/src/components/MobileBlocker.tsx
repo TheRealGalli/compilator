@@ -164,17 +164,19 @@ export function MobileBlocker() {
 
     if (!isBlocked) return null;
 
+    const s = isChessMode ? 1.0 : 1.5;
     const boldOutlineStyle = {
         filter: `
-            drop-shadow(1.5px 1.5px 0 black)
-            drop-shadow(-1.5px -1.5px 0 black)
-            drop-shadow(1.5px -1.5px 0 black)
-            drop-shadow(-1.5px 1.5px 0 black)
-            drop-shadow(1.5px 0 0 black)
-            drop-shadow(-1.5px 0 0 black)
-            drop-shadow(0 1.5px 0 black)
-            drop-shadow(0 -1.5px 0 black)
-        `
+            drop-shadow(${s}px ${s}px 0 black) 
+            drop-shadow(-${s}px -${s}px 0 black) 
+            drop-shadow(${s}px -${s}px 0 black) 
+            drop-shadow(-${s}px ${s}px 0 black)
+            drop-shadow(${s}px 0 0 black)
+            drop-shadow(-${s}px 0 0 black)
+            drop-shadow(0 ${s}px 0 black)
+            drop-shadow(0 -${s}px 0 black)
+        `,
+        transition: 'filter 1s ease-in-out'
     };
 
     return (
@@ -280,7 +282,7 @@ export function MobileBlocker() {
             {/* Ultra-precise dynamic screen border frame */}
             <motion.div
                 className="fixed inset-0 pointer-events-none z-[10000] border-black opacity-100"
-                animate={{ borderWidth: isChessMode ? "6px" : "12px" }}
+                animate={{ borderWidth: isChessMode ? "6px" : "10px" }}
                 transition={{ duration: 1, ease: "easeInOut" }}
             />
         </div>
