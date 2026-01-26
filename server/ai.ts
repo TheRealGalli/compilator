@@ -5,7 +5,7 @@ export class AiService {
     private vertex_ai: VertexAI;
     private projectId: string;
     private location: string;
-    private modelId = 'gemini-2.5-flash';
+    private modelId = 'gemini-1.5-flash';
 
     constructor(projectId: string, location: string = 'europe-west1') {
         this.projectId = projectId;
@@ -223,18 +223,26 @@ Qual è la tua prossima mossa? Rispondi solo in JSON.`;
             }
         });
 
+        console.log(`[AiService] Sending Chess Prompt to ${this.modelId}...`);
+
         const result = await model.generateContent({
             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
             generationConfig: {
                 maxOutputTokens: 100,
-                temperature: 0.3, // Lower for more stable/standard play
+                temperature: 0.3,
                 responseMimeType: 'application/json'
             }
         });
 
         const content = result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '{}';
+        console.log(`[AiService] Raw AI Response Content: "${content}"`);
+
         try {
-            return JSON.parse(content);
+            const move = JSON.parse(content);
+            if (!move.from || !move.to) {
+                console.warn('[AiService] AI returned JSON without from/to fields:', move);
+            }
+            return move;
         } catch (e) {
             console.error('[AiService] Chess Move JSON parse error:', e, content);
             throw new Error('AI non ha restituito un JSON valido per la mossa.');
