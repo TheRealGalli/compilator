@@ -1,11 +1,11 @@
-import { VertexAI } from '@google-cloud/vertexai';
+import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import mammoth from 'mammoth';
 
 export class AiService {
     private vertex_ai: VertexAI;
     private projectId: string;
     private location: string;
-    private modelId = 'gemini-1.5-flash';
+    private modelId = 'gemini-2.5-flash';
 
     constructor(projectId: string, location: string = 'europe-west1') {
         this.projectId = projectId;
@@ -220,7 +220,13 @@ Qual è la tua prossima mossa? Rispondi solo in JSON.`;
             systemInstruction: {
                 role: 'system',
                 parts: [{ text: systemPrompt }]
-            }
+            },
+            safetySettings: [
+                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            ]
         });
 
         console.log(`[AiService] Sending Chess Prompt to ${this.modelId}...`);
@@ -233,6 +239,12 @@ Qual è la tua prossima mossa? Rispondi solo in JSON.`;
                 responseMimeType: 'application/json'
             }
         });
+
+        // Debug response object if empty
+        if (!result.response.candidates || result.response.candidates.length === 0) {
+            console.error('[AiService] No candidates returned from AI. Possible blockage or invalid model.');
+            return { from: "", to: "" };
+        }
 
         const content = result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '{}';
         console.log(`[AiService] Raw AI Response Content: "${content}"`);
