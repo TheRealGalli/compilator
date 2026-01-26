@@ -256,6 +256,21 @@ export function MobileBlocker() {
                     />
 
                     <div className="absolute inset-0 flex items-center justify-center">
+                        <AnimatePresence>
+                            {!isChessMode && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.5 }}
+                                    className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none"
+                                >
+                                    <span className="text-black text-xl font-sans font-bold tracking-tight text-center px-4">
+                                        premi il logo per giocare !
+                                    </span>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                         <div className="w-[75.0%] h-[75.0%] grid grid-cols-8 grid-rows-8 translate-y-[-0.2%]">
                             {board.map((row, r) => row.map((piece, c) => (
                                 <div
