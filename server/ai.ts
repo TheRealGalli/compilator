@@ -214,90 +214,88 @@ ${params.draftContent}`;
         illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] },
         allLegalMoves?: string[] // Optional list of strings like "a2-a4", "g8-f6"
     }): Promise<{ from: string, to: string }> {
-        const boardText = this.renderBoardAsText(params.boardJson);
-        // HYPER-SPEED PROMPT
-        const systemPrompt = `Sei GROMIT (b). Ragiona in 1 riga e colpisci.
-AZIONE OBBLIGATORIA: <move>origine-destinazione</move> (es. <move>e7-e5</move>).
+        try {
+            const boardText = this.renderBoardAsText(params.boardJson);
+            // HYPER-SPEED PROMPT
+            const systemPrompt = `Sei GROMIT (b).
+OUTPUT SOLO: <move>origine-destinazione</move> (es. <move>e7-e5</move>).
 PEZZI: b=Blu, w=Bianco, P=Pedone, R=Torre, N=Cavallo, B=Alfiere, Q=Regina, K=Re.
-REGOLE: Sii brevissimo. La mossa nel tag <move> è priorità assoluta.`;
+REGOLE: Nessun testo extra. Solo il tag.`;
 
-        const historyText = params.history.length > 0 ? `Storico: ${params.history.join(', ')}` : "Inizio.";
-        const legalMovesText = (params.allLegalMoves && params.allLegalMoves.length > 0) ?
-            `\nMOSSE LEGALI: ${params.allLegalMoves.join(', ')}` : "";
-        const illegalText = params.illegalMoveAttempt ? `\nERRORE PRECEDENTE: ${params.illegalMoveAttempt.from}-${params.illegalMoveAttempt.to} ILLEGALE!` : "";
+            const historyText = params.history.length > 0 ? `Storico: ${params.history.join(', ')}` : "Inizio.";
+            const legalMovesText = (params.allLegalMoves && params.allLegalMoves.length > 0) ?
+                `\nMOSSE LEGALI: ${params.allLegalMoves.join(', ')}` : "";
+            const illegalText = params.illegalMoveAttempt ? `\nERRORE PRECEDENTE: ${params.illegalMoveAttempt.from}-${params.illegalMoveAttempt.to} ILLEGALE!` : "";
 
-        const userPrompt = `SCACCHIERA:\n${boardText}\n${historyText}${legalMovesText}${illegalText}\nProtocollo: <move> mossa </move>`;
+            const userPrompt = `SCACCHIERA:\n${boardText}\n${historyText}${legalMovesText}${illegalText}\nProtocollo: <move> mossa </move>`;
 
-        const model = this.vertex_ai.getGenerativeModel({
-            model: this.modelId,
-            systemInstruction: {
-                role: 'system',
-                parts: [{ text: systemPrompt }]
-            },
-            safetySettings: [
-                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            ]
-        });
+            const model = this.vertex_ai.getGenerativeModel({
+                model: this.modelId,
+                systemInstruction: {
+                    role: 'system',
+                    parts: [{ text: systemPrompt }]
+                },
+                safetySettings: [
+                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                ]
+            });
 
-        console.log(`[AiService] Grandmaster GROMIT is thinking (${this.modelId})...`);
+            console.log(`[AiService] Grandmaster GROMIT is thinking (${this.modelId})...`);
 
-        const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-            generationConfig: {
-                maxOutputTokens: 100,
-                temperature: 0.3
+            const result = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+                generationConfig: {
+                    maxOutputTokens: 20, // Optimization: We only need the move tag
+                    temperature: 0.1     // Optimization: Max deterministic speed
+                }
+            });
+
+            if (!result.response.candidates || result.response.candidates.length === 0) {
+                console.error('[AiService] GROMIT silent.');
+                throw new Error('GROMIT non ha risposto.');
             }
-        });
 
-        if (!result.response.candidates || result.response.candidates.length === 0) {
-            console.error('[AiService] GROMIT silent.');
-            throw new Error('GROMIT non ha risposto.');
-        }
+            const rawContent = result.response.candidates[0].content?.parts?.map((p: any) => p.text || '').join('') || '';
+            console.log(`[AiService] Full GROMIT Thought Process:\n${rawContent}`);
 
-        const rawContent = result.response.candidates[0].content?.parts?.map((p: any) => p.text || '').join('') || '';
-        console.log(`[AiService] Full GROMIT Thought Process:\n${rawContent}`);
-
-        // PRIORITY 1: XML Tag Extraction (<move>e2-e4</move>)
-        // First find the block, then extract coordinates from it.
-        const tagBlock = rawContent.match(/<move>([\s\S]*?)<\/move>/i);
-        if (tagBlock) {
-            const inner = tagBlock[1];
-            const coords = inner.match(/([a-h][1-8])/gi);
-            if (coords && coords.length >= 2) {
-                const from = coords[coords.length - 2].toLowerCase();
-                const to = coords[coords.length - 1].toLowerCase();
-                console.log(`[AiService] Extracted Move (Tag Isolation): ${from} -> ${to}`);
-                return { from, to };
-            }
-        }
-
-        // FALLBACK 1: Super Aggressive Search (any coordinate pair anywhere)
-        const aggressiveMatch = rawContent.match(/([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])/gi);
-        if (aggressiveMatch && aggressiveMatch.length > 0) {
-            for (let i = aggressiveMatch.length - 1; i >= 0; i--) {
-                const subMatch = aggressiveMatch[i].match(/([a-h][1-8])/gi);
-                if (subMatch && subMatch.length === 2) {
-                    const from = subMatch[0].toLowerCase();
-                    const to = subMatch[1].toLowerCase();
-                    console.log(`[AiService] Aggressive match found: ${from} -> ${to}`);
+            // PRIORITY 1: XML Tag Extraction (<move>e2-e4</move>)
+            const tagBlock = rawContent.match(/<move>([\s\S]*?)<\/move>/i);
+            if (tagBlock) {
+                const inner = tagBlock[1];
+                const coords = inner.match(/([a-h][1-8])/gi);
+                if (coords && coords.length >= 2) {
+                    const from = coords[coords.length - 2].toLowerCase();
+                    const to = coords[coords.length - 1].toLowerCase();
+                    console.log(`[AiService] Extracted Move: ${from} -> ${to}`);
                     return { from, to };
                 }
             }
-        }
 
-        // FALLBACK: Structured JSON (if it tries to use it anyway)
-        try {
-            const anyJson = rawContent.match(/\{[\s\S]*\}/);
-            if (anyJson) {
-                const parsed = JSON.parse(anyJson[0]);
-                const moveObj = parsed.move || parsed;
-                if (moveObj.from && moveObj.to) return { from: moveObj.from.toLowerCase(), to: moveObj.to.toLowerCase() };
+            // FALLBACK: Aggressive Search
+            const aggressiveMatch = rawContent.match(/([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])/gi);
+            if (aggressiveMatch && aggressiveMatch.length > 0) {
+                for (let i = aggressiveMatch.length - 1; i >= 0; i--) {
+                    const subMatch = aggressiveMatch[i].match(/([a-h][1-8])/gi);
+                    if (subMatch && subMatch.length === 2) {
+                        const from = subMatch[0].toLowerCase();
+                        const to = subMatch[1].toLowerCase();
+                        console.log(`[AiService] Aggressive match found: ${from} -> ${to}`);
+                        return { from, to };
+                    }
+                }
             }
-        } catch (e) { }
 
-        throw new Error(`GROMIT ha fornito una risposta non valida o incompleta.`);
+            throw new Error(`GROMIT ha fornito una risposta non valida o incompleta.`);
+
+        } catch (error: any) {
+            console.error('[AiService] CRITICAL ERROR IN CHESS MOVE:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+            if (error.response) {
+                console.error('[AiService] API Response Error Data:', JSON.stringify(error.response, null, 2));
+            }
+            throw error;
+        }
     }
 }
