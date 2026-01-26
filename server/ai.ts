@@ -248,7 +248,7 @@ REGOLE: Nessun testo extra. Solo il tag.`;
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
                 generationConfig: {
-                    maxOutputTokens: 20, // Optimization: We only need the move tag
+                    maxOutputTokens: 100, // Safe buffer for the tag
                     temperature: 0.1     // Optimization: Max deterministic speed
                 }
             });
