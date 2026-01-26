@@ -401,6 +401,7 @@ export function MobileBlocker() {
                                     }
                                 }
                             }
+                            console.warn(`[Chess AI] Rejected Move: ${move.from} -> ${move.to}. Reason: Illegal move for piece or rule violation.`);
                             handleAiMove({
                                 from: move.from,
                                 to: move.to,
@@ -408,6 +409,8 @@ export function MobileBlocker() {
                                 validMoves: validMovesForPiece
                             });
                         }
+                    } else {
+                        console.warn("[Chess AI] Server returned incomplete move object:", move);
                     }
                 } catch (error) {
                     console.error("AI Move failed:", error);
@@ -554,7 +557,7 @@ export function MobileBlocker() {
                     />
 
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <AnimatePresence>
+                        <AnimatePresence initial={false}>
                             {!isChessMode && (
                                 <motion.div
                                     key="four-oh-four"

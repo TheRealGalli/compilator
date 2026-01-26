@@ -232,15 +232,13 @@ Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non s
 1. Inizia con il blocco:
    [RAGIONAMENTO TATTICO]
    Qui scrivi la tua analisi profonda della posizione, minacce e obiettivi tattici basandoti sulla GRIGLIA VISIVA.
-2. Termina con il blocco:
-   [MOSSA FINALE]
-   MOVE: [coord_origine] to [coord_destinazione] ###
+2. Termina con la mossa racchiusa nel tag XML:
+   <move>[coord_origine]-[coord_destinazione]</move>
 
 - Esempio:
   [RAGIONAMENTO TATTICO]
-  Analisi: L'utente ha lasciato indifeso il Re sulla diagonale h4-e1. Preparo attacco...
-  [MOSSA FINALE]
-  MOVE: e7 to e5 ###`;
+  Analisi: L'utente ha lasciato indifeso il Re...
+  <move>e7-e5</move> ###`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
         const illegalText = params.illegalMoveAttempt ?
@@ -254,9 +252,9 @@ ${illegalText}
 
 GROMIT, analizza la GRIGLIA VISIVA e colpisci. 
 Segui ESATTAMENTE il protocollo:
-2. [MOSSA FINALE] MOVE: [coord] to [coord] ###
-Esempio: MOVE: e7 to e5 ###
-Non aggiungere altro dopo il blocco della mossa finale.`;
+2. <move>[coord]-[coord]</move>
+Esempio: <move>e7-e5</move>
+Non aggiungere mossa nel ragionamento. Solo nel tag finale.`;
 
         const model = this.vertex_ai.getGenerativeModel({
             model: this.modelId,
@@ -290,9 +288,17 @@ Non aggiungere altro dopo il blocco della mossa finale.`;
         const rawContent = result.response.candidates[0].content?.parts?.map((p: any) => p.text || '').join('') || '';
         console.log(`[AiService] Full GROMIT Thought Process:\n${rawContent}`);
 
-        // PRIORITY 1: Flexible Text Extraction (MOVE: [coord] to/->/- [coord])
-        const blockMatch = rawContent.match(/MOVE:?\s*([a-h][1-8])\s*(?:to|-|->|a)?\s*([a-h][1-8])/i);
+        // PRIORITY 1: XML Tag Extraction (<move>e2-e4</move>)
+        const tagMatch = rawContent.match(/<move>\s*([a-h][1-8])\s*(?:to|-|->|a)?\s*([a-h][1-8])\s*<\/move>/i);
+        if (tagMatch) {
+            let from = tagMatch[1].toLowerCase();
+            let to = tagMatch[2].toLowerCase();
+            console.log(`[AiService] Extracted Move (Tag): ${from} -> ${to}`);
+            return { from, to };
+        }
 
+        // FALLBACK 1: Flexible Text Extraction (MOVE: [coord] to/->/- [coord])
+        const blockMatch = rawContent.match(/MOVE:?\s*([a-h][1-8])\s*(?:to|-|->|a)?\s*([a-h][1-8])/i);
         if (blockMatch) {
             let from = blockMatch[1].toLowerCase();
             let to = blockMatch[2].toLowerCase();
@@ -300,10 +306,9 @@ Non aggiungere altro dopo il blocco della mossa finale.`;
             return { from, to };
         }
 
-        // FALLBACK 1: Look for any two algebraic coordinates in the text
+        // FALLBACK 2: Any coordinate pair in the text
         const anyCoords = rawContent.match(/([a-h][1-8])\s*(?:to|-|->|a)?\s*([a-h][1-8])/gi);
         if (anyCoords && anyCoords.length > 0) {
-            // Take the last one if there are multiple, as it's likely the final decision
             const lastMatch = anyCoords[anyCoords.length - 1];
             const parts = lastMatch.match(/([a-h][1-8])/gi);
             if (parts && parts.length === 2) {
