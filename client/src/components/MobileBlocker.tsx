@@ -270,7 +270,7 @@ export function MobileBlocker() {
 
                 // Pawn Promotion (to Queen)
                 if (pieceAtFrom.type.substring(1) === 'P') {
-                    const isPromotion = (currentTurn === 'w' && r === 0) || (currentTurn === 'b' && r === 7);
+                    const isPromotion = currentTurn === 'w' ? r === 0 : r === 7;
                     if (isPromotion) {
                         newBoard[r][c] = { ...pieceAtFrom, type: `${currentTurn}Q`, hasMoved: true };
                     }
