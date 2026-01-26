@@ -7,6 +7,7 @@ import {
     FaChessQueen, FaChessKing
 } from "react-icons/fa6";
 import chessBoardImage from "../assets/chess_board.png";
+import fourOhFourImage from "../assets/404_pixel_transparent.png";
 
 const INITIAL_BOARD = [
     ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'].map((type, i) => ({ type, hasMoved: false, id: `b-${type}-${i}` })),
@@ -553,6 +554,24 @@ export function MobileBlocker() {
                     />
 
                     <div className="absolute inset-0 flex items-center justify-center">
+                        <AnimatePresence>
+                            {!isChessMode && (
+                                <motion.div
+                                    key="four-oh-four"
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.8 }}
+                                    transition={{ duration: 0.6, ease: "easeInOut" }}
+                                    className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none"
+                                >
+                                    <img
+                                        src={fourOhFourImage}
+                                        alt="404"
+                                        className="w-[70%] h-auto drop-shadow-2xl"
+                                    />
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                         <AnimatePresence>
                             {gameStatus !== 'play' && (
                                 <motion.div
