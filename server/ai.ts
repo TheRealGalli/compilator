@@ -182,38 +182,48 @@ ${params.draftContent}`;
     async getChessMove(params: {
         boardJson: any,
         history: string[],
-        illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] }
+        illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] },
+        allLegalMoves?: string[] // Optional list of strings like "a2-a4", "g8-f6"
     }): Promise<{ from: string, to: string }> {
-        const systemPrompt = `Sei l'Agente SCACCHI di Gromit, un Gran Maestro internazionale.
-Stai giocando con i pezzi BLU (pezzi neri 'b') contro un UTENTE che gioca con i bianchi ('w').
+        const systemPrompt = `Sei GROMIT, un'Intelligenza Artificiale di livello Gran Maestro Internazionale (Elo 3500+).
+Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non stai solo muovendo pezzi; stai conducendo una sinfonia di distruzione tattica.
 
-**COORDINATE E ORIENTAMENTO:**
-- Usa la notazione algebrica standard (a1-h8).
-- Pezzi BLU (neri) iniziano sulle righe 7 e 8. Pedoni (bP) si muovono verso la riga 1.
-- Pezzi BIANCHI iniziano sulle righe 1 e 2. Si muovono verso la riga 8.
+**CONTESTO AMBIENTALE:**
+- Giochi con i pezzi BLU (Black 'b').
+- L'utente gioca con i pezzi BIANCHI (White 'w').
+- La scacchiera è immersa in un ambiente "The Real Galli" - un'interfaccia premium, scura e minimale.
 
-**REGOLE DI MOVIMENTO E CATTURA:**
-1. **Pedoni (bP):** Muovono avanti verso la riga 1. Prima mossa: 1 o 2 passi. Catturano SOLO in diagonale avanti.
-2. **Obiettivo:** Cattura i pezzi bianchi e proteggi il tuo Re.
-3. **Pezzi Blu:** bR, bN, bB, bQ, bK, bP.
-4. **Pezzi Bianchi:** wR, wN, wB, wQ, wK, wP.
+**PROCESSO DECISIONALE (INTERNO):**
+1. **Analisi Posizionale:** Valuta il controllo del centro, la sicurezza del King Blu (tu) e le debolezze nel King Bianco.
+2. **Sviluppo:** Assicurati che ogni mossa migliori la tua posizione o limiti le opzioni dell'avversario.
+3. **Calcolo:** Prevedi le risposte dell'utente per almeno 3 semimoste.
 
-**PROTOCOLLO DI RISPOSTA (MOLTO IMPORTANTE):**
-- Scegli la tua mossa e rispondi seguendo ESATTAMENTE questo formato:
+**PROTOCOLLO DI RISPOSTA (RIGIDO):**
+- Prima di fornire la mossa, scrivi una brevissima "RAGIONAMENTO" (una riga) che spieghi la tattica (es: "Aumento pressione sul centro", "Preparazione attacco di scoperta").
+- Fornisce poi la mossa nel formato esatto:
   MOVE: [origine] to [destinazione]
-- Esempio: "MOVE: e7 to e5"
-- Non aggiungere introduzioni o spiegazioni. Se vuoi, puoi anche rispondere in formato JSON { "from": "...", "to": "..." }, ma il formato MOVE è preferito.`;
+- Esempio di risposta completa:
+  RAGIONAMENTO: Minaccia immediata sul Re bianco tramite sviluppo del Cavallo.
+  MOVE: g8 to f6 ###
+
+**NOTE TECNICHE:**
+- Usa notazione algebrica (a1-h8).
+- I hashes alla fine (###) aiutano il sistema a capire che hai finito di parlare.`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
         const illegalText = params.illegalMoveAttempt ?
-            `\nATTENZIONE: La tua mossa precedente (${params.illegalMoveAttempt.from} -> ${params.illegalMoveAttempt.to}) era ILLEGALE. Errore: ${params.illegalMoveAttempt.error}. Mosse valide per quel pezzo: ${params.illegalMoveAttempt.validMoves.join(', ')}.` : "";
+            `\n⚠️ AVVISO CRITICO: La tua mossa precedente (${params.illegalMoveAttempt.from} -> ${params.illegalMoveAttempt.to}) era ILLEGALE. Errore: ${params.illegalMoveAttempt.error}. DEVI scegliere una mossa valida tra queste fornite: ${params.illegalMoveAttempt.validMoves.join(', ')}.` : "";
 
-        const userPrompt = `Ecco la scacchiera attuale:
+        const userPrompt = `STATO SCACCHIERA:
 ${JSON.stringify(params.boardJson, null, 2)}
 
-${historyText}${illegalText}
+STORICO: ${historyText}
+${illegalText}
 
-Qual è la tua prossima mossa? Rispondi con: MOVE: [coord] to [coord]`;
+GROMIT, analizza la situazione e colpisci.
+Rispondi con:
+RAGIONAMENTO: ...
+MOVE: [coord] to [coord] ###`;
 
         const model = this.vertex_ai.getGenerativeModel({
             model: this.modelId,
@@ -229,50 +239,60 @@ Qual è la tua prossima mossa? Rispondi con: MOVE: [coord] to [coord]`;
             ]
         });
 
-        console.log(`[AiService] Sending Chess Prompt to ${this.modelId}...`);
+        console.log(`[AiService] Grandmaster GROMIT is thinking (${this.modelId})...`);
 
         const result = await model.generateContent({
             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
             generationConfig: {
-                maxOutputTokens: 200,
-                temperature: 0.2
-                // NOTE: removed responseMimeType to improve model reliability
+                maxOutputTokens: 300,
+                temperature: 0.3 // Leggermente più alto per favorire la creatività tattica
             }
         });
 
         if (!result.response.candidates || result.response.candidates.length === 0) {
-            console.error('[AiService] No candidates returned from AI.');
-            throw new Error('AI non ha risposto.');
+            console.error('[AiService] GROMIT silent.');
+            throw new Error('GROMIT non ha risposto.');
         }
 
         const rawContent = result.response.candidates[0].content?.parts?.map((p: any) => p.text || '').join('') || '';
-        console.log(`[AiService] Raw AI Response: "${rawContent}"`);
+        console.log(`[AiService] Raw GROMIT Output: "${rawContent}"`);
 
-        // PRIORITY 1: Look for "MOVE: from to to"
-        const moveMatch = rawContent.match(/MOVE:\s*([a-h][1-8])\s*to\s*([a-h][1-8])/i);
+        // EXTRACT MOVE: Matches "MOVE: a2 to a4" or similar
+        const moveMatch = rawContent.match(/MOVE:\s*([a-h][1-8])\s*(?:to|-|->)\s*([a-h][1-8]|(?:[a-h]))/i);
+
         if (moveMatch) {
-            console.log(`[AiService] Text-Match extracted move: ${moveMatch[1]} -> ${moveMatch[2]}`);
-            return { from: moveMatch[1].toLowerCase(), to: moveMatch[2].toLowerCase() };
-        }
+            let from = moveMatch[1].toLowerCase();
+            let to = moveMatch[2].toLowerCase();
 
-        // PRIORITY 2: Look for JSON
-        const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            try {
-                const move = JSON.parse(jsonMatch[0]);
-                if (move.from && move.to) return move;
-            } catch (e) {
-                console.warn('[AiService] JSON block found but parse failed.');
+            // REPAIR LOGIC: If 'to' is truncated (e.g. only 'f' instead of 'f6')
+            if (to.length === 1 && params.allLegalMoves) {
+                console.warn(`[AiService] Truncated 'to' detected (${to}). Attempting repair with legal moves...`);
+                // Find legal moves starting from 'from' and ending on a square starting with 'to' letter
+                const candidates = params.allLegalMoves.filter(m => {
+                    const parts = m.split(/[- ]/);
+                    return parts[0] === from && parts[1].startsWith(to);
+                });
+
+                if (candidates.length === 1) {
+                    const repairedTo = candidates[0].split(/[- ]/)[1];
+                    console.log(`[AiService] Successfully repaired move: ${from} -> ${repairedTo}`);
+                    return { from, to: repairedTo };
+                } else {
+                    console.warn(`[AiService] Repair ambiguous or failed. Found candidates:`, candidates);
+                }
+            }
+
+            if (to.length === 2) {
+                return { from, to };
             }
         }
 
-        // PRIORITY 3: Fallback regex for any two coordinates
+        // FALLBACK: Regex for any two coordinates
         const coords = rawContent.match(/[a-h][1-8]/gi);
         if (coords && coords.length >= 2) {
-            console.log(`[AiService] Regex-Fallback extracted move: ${coords[0]} -> ${coords[1]}`);
             return { from: coords[0].toLowerCase(), to: coords[1].toLowerCase() };
         }
 
-        throw new Error(`AI non ha restituito una mossa valida. Raw: ${rawContent.substring(0, 100)}`);
+        throw new Error(`GROMIT ha fornito una mossa incompleta o illeggibile: "${rawContent.substring(0, 50)}..."`);
     }
 }

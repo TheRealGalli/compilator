@@ -348,17 +348,35 @@ export function MobileBlocker() {
             const handleAiMove = async (illegalAttempt?: any) => {
                 setIsAiProcessing(true);
                 try {
+                    // CALCULATE ALL LEGAL MOVES FOR REPAIR SAFETY NET
+                    const legalMoves: string[] = [];
+                    for (let r = 0; r < 8; r++) {
+                        for (let c = 0; c < 8; c++) {
+                            const p = board[r][c];
+                            if (p && p.type.startsWith('b')) {
+                                for (let tr = 0; tr < 8; tr++) {
+                                    for (let tc = 0; tc < 8; tc++) {
+                                        if (isValidMoveInternal(p, r, c, tr, tc, board, true)) {
+                                            legalMoves.push(`${toAlgebraic(r, c)}-${toAlgebraic(tr, tc)}`);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     const response = await apiRequest('POST', '/api/chess/move', {
                         boardJson: getBoardJson(board),
                         history: matchHistory,
-                        illegalMoveAttempt: illegalAttempt
+                        illegalMoveAttempt: illegalAttempt,
+                        allLegalMoves: legalMoves
                     });
                     const move = await response.json();
 
-                    // TRATTA L'ANIMAZIONE LOGO SOLO DOPO CHE LA MOSSA È ARRIVATA
+                    // TRIGGER PERFECT 1s LOGO SPIN
                     if (move.from && move.to) {
                         setIsLogoSpinning(true);
-                        setTimeout(() => setIsLogoSpinning(false), 1000); // Sincronizzato con 1s desktop
+                        setTimeout(() => setIsLogoSpinning(false), 1000);
                     }
 
                     if (move.from && move.to) {
@@ -458,7 +476,7 @@ export function MobileBlocker() {
                         <div className="flex items-center -space-x-3 shrink-0">
                             <motion.div
                                 animate={{
-                                    rotate: isLogoSpinning ? [360, 720, 360] : (isChessMode ? 360 : 0),
+                                    rotate: isLogoSpinning ? 720 : (isChessMode ? 360 : 0),
                                     filter: getFilter(isChessMode ? 1.0 : 1.5)
                                 }}
                                 transition={{
