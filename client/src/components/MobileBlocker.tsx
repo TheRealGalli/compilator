@@ -7,6 +7,30 @@ import {
 } from "react-icons/fa6";
 import chessBoardImage from "../assets/chess_board.png";
 
+const ChessPiece = ({ row, col }: { row: number, col: number }) => {
+    const isWhite = row >= 6;
+    const isBlue = row <= 1;
+
+    if (!isWhite && !isBlue) return null;
+
+    const colorClass = isWhite ? "text-white" : "text-blue-500";
+    const shadow = "drop-shadow-[0_2px_3px_rgba(0,0,0,0.5)]";
+    const size = 28;
+
+    // Initial position logic
+    if (row === 1 || row === 6) return <FaChessPawn className={`${colorClass} ${shadow}`} size={size} />;
+
+    if (row === 0 || row === 7) {
+        if (col === 0 || col === 7) return <FaChessRook className={`${colorClass} ${shadow}`} size={size} />;
+        if (col === 1 || col === 6) return <FaChessKnight className={`${colorClass} ${shadow}`} size={size} />;
+        if (col === 2 || col === 5) return <FaChessBishop className={`${colorClass} ${shadow}`} size={size} />;
+        if (col === 3) return <FaChessQueen className={`${colorClass} ${shadow}`} size={size} />;
+        if (col === 4) return <FaChessKing className={`${colorClass} ${shadow}`} size={size} />;
+    }
+
+    return null;
+};
+
 export function MobileBlocker() {
     const [isBlocked, setIsBlocked] = useState(false);
     const [isGromitSpinning, setIsGromitSpinning] = useState(false);
