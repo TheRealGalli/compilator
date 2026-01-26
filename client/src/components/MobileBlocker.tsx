@@ -8,17 +8,17 @@ import {
 import chessBoardImage from "../assets/chess_board.png";
 
 const INITIAL_BOARD = [
-    ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'].map(type => ({ type, hasMoved: false })),
-    ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'].map(type => ({ type, hasMoved: false })),
+    ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'].map((type, i) => ({ type, hasMoved: false, id: `b-${type}-${i}` })),
+    ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'].map((type, i) => ({ type, hasMoved: false, id: `b-P-${i}` })),
     Array(8).fill(null),
     Array(8).fill(null),
     Array(8).fill(null),
     Array(8).fill(null),
-    ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'].map(type => ({ type, hasMoved: false })),
-    ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR'].map(type => ({ type, hasMoved: false }))
+    ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'].map((type, i) => ({ type, hasMoved: false, id: `w-P-${i}` })),
+    ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR'].map((type, i) => ({ type, hasMoved: false, id: `w-${type}-${i}` }))
 ];
 
-type Piece = { type: string, hasMoved: boolean } | null;
+type Piece = { type: string, hasMoved: boolean, id: string } | null;
 
 const ChessPiece = ({ type }: { type: string }) => {
     const isWhite = type.startsWith('w');
@@ -240,7 +240,7 @@ export function MobileBlocker() {
     };
 
     const handleSquareClick = (r: number, c: number) => {
-        if (!isChessMode || gameStatus !== 'play') return;
+        if (!isChessMode || gameStatus !== 'play' || currentTurn === 'b') return;
 
         const piece = board[r][c];
 
@@ -270,8 +270,9 @@ export function MobileBlocker() {
 
                 // Pawn Promotion (to Queen)
                 if (pieceAtFrom.type.substring(1) === 'P') {
-                    if ((currentTurn === 'w' && r === 0) || (currentTurn === 'b' && r === 7)) {
-                        newBoard[r][c] = { type: `${currentTurn}Q`, hasMoved: true };
+                    const isPromotion = (currentTurn === 'w' && r === 0) || (currentTurn === 'b' && r === 7);
+                    if (isPromotion) {
+                        newBoard[r][c] = { ...pieceAtFrom, type: `${currentTurn}Q`, hasMoved: true };
                     }
                 }
 
@@ -526,14 +527,20 @@ export function MobileBlocker() {
                                     `}
                                     onClick={() => handleSquareClick(r, c)}
                                 >
-                                    <AnimatePresence>
+                                    <AnimatePresence mode="popLayout">
                                         {isChessMode && piece && (
                                             <motion.div
-                                                key={`${piece.type}-${r}-${c}`}
+                                                layoutId={piece.id}
+                                                key={piece.id}
                                                 initial={{ opacity: 0, scale: 0.8 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.8 }}
-                                                transition={{ duration: 0.4, ease: "easeOut" }}
+                                                transition={{
+                                                    type: "spring",
+                                                    stiffness: 300,
+                                                    damping: 30,
+                                                    duration: 0.4
+                                                }}
                                                 className="relative z-10"
                                                 style={{ willChange: "transform, opacity" }}
                                             >

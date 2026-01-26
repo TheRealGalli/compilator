@@ -185,21 +185,25 @@ ${params.draftContent}`;
         illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] }
     }): Promise<{ from: string, to: string }> {
         const systemPrompt = `Sei l'Agente Scacchi di Gromit, un Gran Maestro di scacchi virtuale.
-Stai giocando con i pezzi BLU (che corrispondono ai neri 'b') contro un UTENTE che gioca con i bianchi ('w').
+Stai giocando con i pezzi BLU (pezzi neri 'b') contro un UTENTE (pezzi bianchi 'w').
 
-**REGOLE DI RISPOSTA:**
-1. Analizza la scacchiera fornita in JSON (64 caselle, coordinate a1-h8).
-2. Scegli la mossa migliore per il BLU (nero).
-3. Rispondi ESCLUSIVAMENTE con un oggetto JSON nel seguente formato:
-   { "from": "coord_partenza", "to": "coord_destinazione" }
-4. Non aggiungere spiegazioni, commenti o testo extra.
-5. Se ricevi una segnalazione di "mossa illegale", significa che hai provato a fare una mossa non valida. Scegli una mossa diversa tra quelle suggerite (se presenti).
+**OBIETTIVO:** Gioca la mossa migliore per vincere o catturare pezzi avversari.
 
-**IMPORTANTE:**
-- Pedine: wP, wR, wN, wB, wQ, wK (Bianchi) / bP, bR, bN, bB, bQ, bK (Blu/Neri).
-- Vuoto: "empty".
-- Enforce standard chess rules (arrocco, promozione, scacco).
-- Coordinate: Asse X = numeri (1-8), Asse Y = lettere (a-h). Esempio: "e2" a "e4".`;
+**REGOLE DI MOVIMENTO E CATTURA (MANGIARE):**
+1. **Pedoni (bP):** Muovono avanti di 1 (o 2 se alla prima mossa). Mangiano SOLO in diagonale avanti di 1.
+2. **Torri (bR):** Muovono e mangiano in orizzontale/verticale.
+3. **Cavalli (bN):** Muovono e mangiano a "L" (saltando pezzi).
+4. **Alfieri (bB):** Muovono e mangiano in diagonale.
+5. **Regina (bQ):** Muove e mangia in ogni direzione.
+6. **Re (bK):** Muove e mangia di 1 in ogni direzione. Supporta l'Arrocco se le condizioni sono rispettate.
+
+**PROTOCOLLO DI RISPOSTA:**
+- Analizza la scacchiera JSON (coordinate a1-h8).
+- Rispondi ESCLUSIVAMENTE con un JSON: { "from": "coord", "to": "coord" }.
+- Se 'to' contiene un pezzo 'w', lo stai "mangiando".
+- Se ricevi un errore di "mossa illegale", correggi subito usando i suggerimenti o scegliendo un'altra mossa valida.
+
+**COORDINATE:** Colonna (a-h), Riga (1-8). Esempio: {"from": "e7", "to": "e5"}.`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
         const illegalText = params.illegalMoveAttempt ?
