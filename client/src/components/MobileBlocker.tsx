@@ -164,20 +164,16 @@ export function MobileBlocker() {
 
     if (!isBlocked) return null;
 
-    const s = isChessMode ? 1.0 : 1.5;
-    const boldOutlineStyle = {
-        filter: `
-            drop-shadow(${s}px ${s}px 0 black) 
-            drop-shadow(-${s}px -${s}px 0 black) 
-            drop-shadow(${s}px -${s}px 0 black) 
-            drop-shadow(-${s}px ${s}px 0 black)
-            drop-shadow(${s}px 0 0 black)
-            drop-shadow(-${s}px 0 0 black)
-            drop-shadow(0 ${s}px 0 black)
-            drop-shadow(0 -${s}px 0 black)
-        `,
-        transition: 'filter 1s ease-in-out'
-    };
+    const getFilter = (thickness: number) => `
+        drop-shadow(${thickness}px ${thickness}px 0 black) 
+        drop-shadow(-${thickness}px -${thickness}px 0 black) 
+        drop-shadow(${thickness}px -${thickness}px 0 black) 
+        drop-shadow(-${thickness}px ${thickness}px 0 black)
+        drop-shadow(${thickness}px 0 0 black)
+        drop-shadow(-${thickness}px 0 0 black)
+        drop-shadow(0 ${thickness}px 0 black)
+        drop-shadow(0 -${thickness}px 0 black)
+    `;
 
     return (
         <div className="fixed inset-0 z-[9999] bg-[#0055ff] flex items-center justify-center overflow-hidden touch-none select-none">
@@ -194,22 +190,28 @@ export function MobileBlocker() {
                     >
                         <div className="flex items-center -space-x-3">
                             <motion.div
-                                animate={{ rotate: isChessMode ? 360 : 0 }}
+                                animate={{
+                                    rotate: isChessMode ? 360 : 0,
+                                    filter: getFilter(isChessMode ? 1.0 : 1.5)
+                                }}
                                 transition={{ duration: 1, ease: "easeInOut" }}
                             >
                                 <Asterisk
                                     className="text-blue-600"
-                                    style={boldOutlineStyle}
                                     size={32}
                                 />
                             </motion.div>
-                            <div className="relative">
+                            <motion.div
+                                animate={{
+                                    filter: getFilter(isChessMode ? 1.0 : 1.5)
+                                }}
+                                transition={{ duration: 1, ease: "easeInOut" }}
+                            >
                                 <Asterisk
                                     className="text-blue-600"
-                                    style={boldOutlineStyle}
                                     size={32}
                                 />
-                            </div>
+                            </motion.div>
                         </div>
 
                         <AnimatePresence mode="wait">
