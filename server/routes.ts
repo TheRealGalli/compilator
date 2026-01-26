@@ -2407,6 +2407,18 @@ ${filesContext}
     }
   });
 
+  // --- CHESS AI ENDPOINT ---
+  app.post('/api/chess/move', async (req: Request, res: Response) => {
+    try {
+      const { boardJson, history, illegalMoveAttempt } = req.body;
+      const move = await aiService.getChessMove({ boardJson, history, illegalMoveAttempt });
+      res.json(move);
+    } catch (error: any) {
+      console.error('Error in Chess AI endpoint:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // --- MASTER ENDPOINT (Red Pin) ---
   app.post('/api/master', async (req: Request, res: Response) => {
     try {

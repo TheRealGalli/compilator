@@ -115,9 +115,6 @@ export class AiService {
         }
     }
 
-    /**
-     * Refines the formatting of a draft document using a secondary AI pass (Layout Agent).
-     */
     async refineFormatting(params: {
         draftContent: string,
         masterSource?: any,
@@ -178,4 +175,67 @@ ${params.draftContent}`;
             return params.draftContent;
         }
     }
+
+    /**
+     * Specialized method for Chess AI moves using Gemini 2.5 Flash.
+     */
+    async getChessMove(params: {
+        boardJson: any,
+        history: string[],
+        illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] }
+    }): Promise<{ from: string, to: string }> {
+        const systemPrompt = `Sei l'Agente Scacchi di Gromit, un Gran Maestro di scacchi virtuale.
+Stai giocando con i pezzi BLU (che corrispondono ai neri 'b') contro un UTENTE che gioca con i bianchi ('w').
+
+**REGOLE DI RISPOSTA:**
+1. Analizza la scacchiera fornita in JSON (64 caselle, coordinate a1-h8).
+2. Scegli la mossa migliore per il BLU (nero).
+3. Rispondi ESCLUSIVAMENTE con un oggetto JSON nel seguente formato:
+   { "from": "coord_partenza", "to": "coord_destinazione" }
+4. Non aggiungere spiegazioni, commenti o testo extra.
+5. Se ricevi una segnalazione di "mossa illegale", significa che hai provato a fare una mossa non valida. Scegli una mossa diversa tra quelle suggerite (se presenti).
+
+**IMPORTANTE:**
+- Pedine: wP, wR, wN, wB, wQ, wK (Bianchi) / bP, bR, bN, bB, bQ, bK (Blu/Neri).
+- Vuoto: "empty".
+- Enforce standard chess rules (arrocco, promozione, scacco).
+- Coordinate: Asse X = numeri (1-8), Asse Y = lettere (a-h). Esempio: "e2" a "e4".`;
+
+        const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
+        const illegalText = params.illegalMoveAttempt ?
+            `\nATTENZIONE: La tua mossa precedente (${params.illegalMoveAttempt.from} -> ${params.illegalMoveAttempt.to}) era ILLEGALE. Errore: ${params.illegalMoveAttempt.error}. Mosse valide per quel pezzo: ${params.illegalMoveAttempt.validMoves.join(', ')}.` : "";
+
+        const userPrompt = `Ecco la scacchiera attuale:
+${JSON.stringify(params.boardJson, null, 2)}
+
+${historyText}${illegalText}
+
+Qual è la tua prossima mossa? Rispondi solo in JSON.`;
+
+        const model = this.vertex_ai.getGenerativeModel({
+            model: this.modelId,
+            systemInstruction: {
+                role: 'system',
+                parts: [{ text: systemPrompt }]
+            }
+        });
+
+        const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+            generationConfig: {
+                maxOutputTokens: 100,
+                temperature: 0.7, // Some creativity for varied games
+                responseMimeType: 'application/json'
+            }
+        });
+
+        const content = result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '{}';
+        try {
+            return JSON.parse(content);
+        } catch (e) {
+            console.error('[AiService] Chess Move JSON parse error:', e, content);
+            throw new Error('AI non ha restituito un JSON valido per la mossa.');
+        }
+    }
 }
+

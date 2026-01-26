@@ -57,6 +57,8 @@ export function MobileBlocker() {
     const [timerActive, setTimerActive] = useState(false);
     const [currentTurn, setCurrentTurn] = useState<'w' | 'b'>('w');
     const [gameStatus, setGameStatus] = useState<'play' | 'checkmate' | 'stalemate'>('play');
+    const [matchHistory, setMatchHistory] = useState<string[]>([]);
+    const [isAiProcessing, setIsAiProcessing] = useState(false);
 
     useEffect(() => {
         let interval: any;
@@ -82,7 +84,32 @@ export function MobileBlocker() {
             setTimerActive(false);
             setCurrentTurn('w');
             setGameStatus('play');
+            setMatchHistory([]);
+            setIsAiProcessing(false);
         }
+    };
+
+    const toAlgebraic = (r: number, c: number) => {
+        const file = String.fromCharCode(97 + c);
+        const rank = 8 - r;
+        return `${file}${rank}`;
+    };
+
+    const fromAlgebraic = (coord: string) => {
+        const c = coord.charCodeAt(0) - 97;
+        const r = 8 - parseInt(coord[1]);
+        return { r, c };
+    };
+
+    const getBoardJson = (currentBoard: Piece[][]) => {
+        const json: Record<string, string> = {};
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = currentBoard[r][c];
+                json[toAlgebraic(r, c)] = p ? p.type : "empty";
+            }
+        }
+        return json;
     };
 
     const isSquareAttacked = (r: number, c: number, board: Piece[][], attackerColor: 'w' | 'b'): boolean => {
@@ -275,6 +302,7 @@ export function MobileBlocker() {
 
                 setBoard(newBoard);
                 setFeedback({ r, c, type: 'valid' });
+                setMatchHistory(prev => [...prev, `${toAlgebraic(selectedSquare.r, selectedSquare.c)}-${toAlgebraic(r, c)}`]);
                 setTimeout(() => setFeedback(null), 500);
                 setSelectedSquare(null);
                 setCurrentTurn(nextTurn);
@@ -295,6 +323,63 @@ export function MobileBlocker() {
             }
         }
     };
+
+    // AI Opponent Effect
+    useEffect(() => {
+        if (isChessMode && currentTurn === 'b' && gameStatus === 'play' && !isAiProcessing) {
+            const handleAiMove = async (illegalAttempt?: any) => {
+                setIsAiProcessing(true);
+                try {
+                    const response = await fetch('/api/chess/move', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            boardJson: getBoardJson(board),
+                            history: matchHistory,
+                            illegalMoveAttempt: illegalAttempt
+                        })
+                    });
+                    const move = await response.json();
+                    if (move.from && move.to) {
+                        const from = fromAlgebraic(move.from);
+                        const to = fromAlgebraic(move.to);
+                        const piece = board[from.r][from.c];
+
+                        if (piece && piece.type.startsWith('b') && isValidMove(piece, from.r, from.c, to.r, to.c)) {
+                            // Valid AI move, trigger the same logic as human click
+                            setSelectedSquare(from);
+                            setTimeout(() => handleSquareClick(to.r, to.c), 600);
+                        } else {
+                            // Illegal AI move, retry with feedback
+                            const validMovesForPiece: string[] = [];
+                            if (piece) {
+                                for (let tr = 0; tr < 8; tr++) {
+                                    for (let tc = 0; tc < 8; tc++) {
+                                        if (isValidMoveInternal(piece, from.r, from.c, tr, tc, board, true)) {
+                                            validMovesForPiece.push(toAlgebraic(tr, tc));
+                                        }
+                                    }
+                                }
+                            }
+                            handleAiMove({
+                                from: move.from,
+                                to: move.to,
+                                error: "Mossa illegale per le regole degli scacchi o pezzo sbagliato.",
+                                validMoves: validMovesForPiece
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error("AI Move failed:", error);
+                } finally {
+                    setIsAiProcessing(false);
+                }
+            };
+
+            // Small delay to make it feel natural
+            setTimeout(() => handleAiMove(), 1000);
+        }
+    }, [currentTurn, isChessMode, gameStatus]);
 
     const rotateX = useSpring(0, { stiffness: 60, damping: 20 });
     const rotateY = useSpring(0, { stiffness: 60, damping: 20 });
@@ -435,7 +520,7 @@ export function MobileBlocker() {
                             {board.map((row, r) => row.map((piece, c) => (
                                 <div
                                     key={`${r}-${c}`}
-                                    className={`w-full h-full relative flex items-center justify-center transition-all duration-300 cursor-pointer border border-white/5
+                                    className={`w-full h-full relative flex items-center justify-center cursor-pointer border border-white/5
                                         ${selectedSquare?.r === r && selectedSquare?.c === c ? 'bg-white/20' : ''}
                                         ${feedback?.r === r && feedback?.c === c ? (feedback.type === 'valid' ? 'bg-green-500/40' : 'bg-red-500/40') : 'hover:bg-white/10 active:bg-white/15'}
                                     `}
@@ -448,8 +533,9 @@ export function MobileBlocker() {
                                                 initial={{ opacity: 0, scale: 0.8 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.8 }}
-                                                transition={{ duration: 1.5, ease: "easeOut" }}
+                                                transition={{ duration: 0.4, ease: "easeOut" }}
                                                 className="relative z-10"
+                                                style={{ willChange: "transform, opacity" }}
                                             >
                                                 <ChessPiece type={piece.type} />
                                             </motion.div>
