@@ -229,16 +229,8 @@ Il tuo stile di gioco è aggressivo, preciso e psicologicamente dominante. Non s
 3. **Calcolo:** Prevedi le risposte dell'utente per almeno 3 semimoste.
 
 **PROTOCOLLO DI RISPOSTA (STRETTAMENTE SEGUITO):**
-1. Inizia con il blocco:
-   [RAGIONAMENTO TATTICO]
-   Qui scrivi la tua analisi profonda della posizione, minacce e obiettivi tattici basandoti sulla GRIGLIA VISIVA.
-2. Termina con la mossa racchiusa nel tag XML:
-   <move>[coord_origine]-[coord_destinazione]</move>
-
-- Esempio:
-  [RAGIONAMENTO TATTICO]
-  Analisi: L'utente ha lasciato indifeso il Re...
-  <move>e7-e5</move> ###`;
+2. [MOSSA] <move>coord-coord</move> (es. <move>e7-e5</move>)
+Mantieni il ragionamento brevissimo (max 10 parole) per la massima velocità.`;
 
         const historyText = params.history.length > 0 ? `Storico mosse: ${params.history.join(', ')}` : "Inizio partita.";
         const illegalText = params.illegalMoveAttempt ?
@@ -254,7 +246,7 @@ GROMIT, analizza la GRIGLIA VISIVA e colpisci.
 Segui ESATTAMENTE il protocollo:
 2. <move>[coord]-[coord]</move>
 Esempio: <move>e7-e5</move>
-Non aggiungere mossa nel ragionamento. Solo nel tag finale.`;
+Sia sintetico. La mossa nel tag è l'unica cosa che conta.`;
 
         const model = this.vertex_ai.getGenerativeModel({
             model: this.modelId,
@@ -288,34 +280,28 @@ Non aggiungere mossa nel ragionamento. Solo nel tag finale.`;
         const rawContent = result.response.candidates[0].content?.parts?.map((p: any) => p.text || '').join('') || '';
         console.log(`[AiService] Full GROMIT Thought Process:\n${rawContent}`);
 
-        // PRIORITY 1: XML Tag Extraction (<move>e2-e4</move>)
-        const tagMatch = rawContent.match(/<move>\s*([a-h][1-8])\s*(?:to|-|->|a)?\s*([a-h][1-8])\s*<\/move>/i);
+        // PRIORITY 1: XML Tag Extraction (<move>e2-e4</move>, <move>e2e4</move>, etc.)
+        const tagMatch = rawContent.match(/<move>\s*([a-h][1-8])\s*[- >to]*\s*([a-h][1-8])\s*<\/move>/i);
         if (tagMatch) {
-            let from = tagMatch[1].toLowerCase();
-            let to = tagMatch[2].toLowerCase();
-            console.log(`[AiService] Extracted Move (Tag): ${from} -> ${to}`);
-            return { from, to };
+            return { from: tagMatch[1].toLowerCase(), to: tagMatch[2].toLowerCase() };
         }
 
-        // FALLBACK 1: Flexible Text Extraction (MOVE: [coord] to/->/- [coord])
-        const blockMatch = rawContent.match(/MOVE:?\s*([a-h][1-8])\s*(?:to|-|->|a)?\s*([a-h][1-8])/i);
-        if (blockMatch) {
-            let from = blockMatch[1].toLowerCase();
-            let to = blockMatch[2].toLowerCase();
-            console.log(`[AiService] Extracted Move (Regex): ${from} -> ${to}`);
-            return { from, to };
-        }
+        // FALLBACK 1: Super Aggressive Search (any 4-char string representing a move)
+        // This looks for things like "e2-e4", "e2e4", "e2 to e4", "e2 -> e4" anywhere.
+        const aggressiveMatch = rawContent.match(/([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])/gi);
+        if (aggressiveMatch && aggressiveMatch.length > 0) {
+            // We find all candidates that look like moves
+            for (let i = aggressiveMatch.length - 1; i >= 0; i--) {
+                const subMatch = aggressiveMatch[i].match(/([a-h][1-8])/gi);
+                if (subMatch && subMatch.length === 2) {
+                    const from = subMatch[0].toLowerCase();
+                    const to = subMatch[1].toLowerCase();
 
-        // FALLBACK 2: Any coordinate pair in the text
-        const anyCoords = rawContent.match(/([a-h][1-8])\s*(?:to|-|->|a)?\s*([a-h][1-8])/gi);
-        if (anyCoords && anyCoords.length > 0) {
-            const lastMatch = anyCoords[anyCoords.length - 1];
-            const parts = lastMatch.match(/([a-h][1-8])/gi);
-            if (parts && parts.length === 2) {
-                const from = parts[0].toLowerCase();
-                const to = parts[1].toLowerCase();
-                console.warn(`[AiService] Falling back to generic coordinate match: ${from} -> ${to}`);
-                return { from, to };
+                    // Filter: We only want moves that involve Black pieces (b)
+                    // If we can't be sure, we just take the last coordinate pair found in the text.
+                    console.log(`[AiService] Aggressive match found: ${from} -> ${to}`);
+                    return { from, to };
+                }
             }
         }
 
