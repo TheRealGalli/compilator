@@ -241,10 +241,11 @@ ${tutorialContent ? `### 📖 MANUALE DEL MAESTRO (DA CONSULTARE SEMPRE):
 ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi strategici."}
 
 ### [PROTOCOLLO DI RISPOSTA]
-1. <thought>analisi strategica completa basata sul MANUALE SOPRA, sul materiale, sullo SCACCHIERA e sugli ALERT TATTICI.</thought>
-2. Sotto, <move>origine-destinazione</move> (es. <move>e7-e5</move>).
+1. <thought>analisi strategica coincisa ma completa basata sul MANUALE SOPRA, sul materiale, sulla SCACCHIERA e sugli ALERT TATTICI. (Massimo 2-3 paragrafi).</thought>
+2. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
 
 ### [GUIDE TATTICHE GROMIT]
+- **ORDINE**: Scrivi SEMPRE il pensiero prima della mossa.
 - **SICUREZZA RE**: L'Arrocco è una tua priorità assoluta nei primi 10-15 tratti. Se vedi un ALERT per l'ARROCCO, eseguilo quasi sempre.
 - **AGGRESSIVITÀ**: Se vedi un ALERT per una CATTURA di un pezzo pesante (Regina, Torre, Alfiere), analizzala con cura. Se il pezzo non è difeso, MANGIALO.
 - **VISTA TATTICA**: Gli ALERT TATTICI sono suggerimenti del tuo "secondo"; usali come guida primaria per vincere.`;
@@ -295,7 +296,7 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
                 generationConfig: {
-                    maxOutputTokens: 600,
+                    maxOutputTokens: 1200,
                     temperature: 0.1
                 }
             });
@@ -304,9 +305,12 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
             const rawContent = candidate?.content?.parts?.map((p: any) => p.text || '').join('') || '';
             console.log(`[AiService] Full Response:\n${rawContent}`);
 
-            // 1. EXTRACT THOUGHTS
-            const thoughtMatch = rawContent.match(/<thought>([\s\S]*?)<\/thought>/i);
-            const thought = thoughtMatch ? thoughtMatch[1].trim() : "Nessun ragionamento fornito.";
+            // 1. EXTRACT THOUGHTS (Handling potential truncation)
+            let thought = "Nessun ragionamento fornito.";
+            const thoughtMatch = rawContent.match(/<thought>([\s\S]*?)(?:<\/thought>|$)/i);
+            if (thoughtMatch) {
+                thought = thoughtMatch[1].trim();
+            }
 
             // 2. EXTRACT MOVE
             const moveTagMatch = rawContent.match(/<move>\s*([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])\s*<\/move>/i);
@@ -317,8 +321,9 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
                 return { from: move.from, to: move.to, thought };
             }
 
-            // 3. BACKUP EXTRACTION (Only if tag is missing but coords are there)
-            const coords = rawContent.match(/([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])/gi);
+            // 3. BACKUP EXTRACTION (Only if tag is missing but coords are there, outside thought)
+            const remainingContent = rawContent.replace(/<thought>[\s\S]*?<\/thought>/i, '');
+            const coords = remainingContent.match(/([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])/gi);
             if (coords && coords.length > 0) {
                 const parts = coords[0].match(/([a-h][1-8])/gi);
                 if (parts && parts.length === 2) {
