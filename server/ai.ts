@@ -216,8 +216,9 @@ ${params.draftContent}`;
         illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] },
         allLegalMoves?: string[],
         capturedWhite?: string[],
-        capturedBlack?: string[]
-    }, retryCount = 0): Promise<{ from: string, to: string }> {
+        capturedBlack?: string[],
+        capturedPieces?: any[] // Optional legacy field
+    }, retryCount = 0): Promise<{ from: string, to: string, thought: string }> {
         try {
             const boardText = this.renderBoardAsText(params.boardJson);
             const legalMoves = params.allLegalMoves || [];
@@ -277,21 +278,25 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
             const rawContent = candidate?.content?.parts?.map((p: any) => p.text || '').join('') || '';
             console.log(`[AiService] Full Response:\n${rawContent}`);
 
-            // 1. EXTRACT MOVE
+            // 1. EXTRACT THOUGHTS
+            const thoughtMatch = rawContent.match(/<thought>([\s\S]*?)<\/thought>/i);
+            const thought = thoughtMatch ? thoughtMatch[1].trim() : "Nessun ragionamento fornito.";
+
+            // 2. EXTRACT MOVE
             const moveTagMatch = rawContent.match(/<move>\s*([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])\s*<\/move>/i);
 
             if (moveTagMatch) {
                 const move = { from: moveTagMatch[1].toLowerCase(), to: moveTagMatch[2].toLowerCase() };
                 console.log(`[AiService] Extracted: ${move.from}-${move.to}`);
-                return move;
+                return { from: move.from, to: move.to, thought };
             }
 
-            // 2. BACKUP EXTRACTION (Only if tag is missing but coords are there)
+            // 3. BACKUP EXTRACTION (Only if tag is missing but coords are there)
             const coords = rawContent.match(/([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])/gi);
             if (coords && coords.length > 0) {
                 const parts = coords[0].match(/([a-h][1-8])/gi);
                 if (parts && parts.length === 2) {
-                    return { from: parts[0].toLowerCase(), to: parts[1].toLowerCase() };
+                    return { from: parts[0].toLowerCase(), to: parts[1].toLowerCase(), thought };
                 }
             }
 

@@ -441,6 +441,10 @@ export function MobileBlocker() {
                             if (response.ok) {
                                 move = await response.json();
                                 console.log("[Chess AI] Risposta ricevuta:", move);
+                                if (move.thought) {
+                                    console.log("%c[GROMIT REASONING]", "color: #3b82f6; font-weight: bold; background: #eff6ff; padding: 2px 4px; border-radius: 4px;");
+                                    console.log(move.thought);
+                                }
                                 success = true;
                                 break;
                             }
