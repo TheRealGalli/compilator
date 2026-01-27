@@ -52,6 +52,7 @@ export function MobileBlocker() {
     const [currentTurn, setCurrentTurn] = useState<'w' | 'b'>('w');
     const [gameStatus, setGameStatus] = useState<'play' | 'checkmate' | 'stalemate'>('play');
     const [matchHistory, setMatchHistory] = useState<string[]>([]);
+    const [thoughtHistory, setThoughtHistory] = useState<string[]>([]);
     const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [isLogoSpinning, setIsLogoSpinning] = useState(false);
     const [capturedWhite, setCapturedWhite] = useState<string[]>([]);
@@ -100,6 +101,7 @@ export function MobileBlocker() {
             setCurrentTurn('w');
             setGameStatus('play');
             setMatchHistory([]);
+            setThoughtHistory([]);
             setIsAiProcessing(false);
             setCapturedWhite([]);
             setCapturedBlack([]);
@@ -413,7 +415,7 @@ export function MobileBlocker() {
                     }
 
                     let response;
-                    let move;
+                    let move: { from: string, to: string, thought: string } | undefined;
                     let success = false;
                     const controller = new AbortController();
 
@@ -432,6 +434,7 @@ export function MobileBlocker() {
                             response = await apiRequest('POST', '/api/chess/move', {
                                 boardJson: getBoardJson(board),
                                 history: matchHistory,
+                                thoughtHistory: thoughtHistory,
                                 illegalMoveAttempt: illegalAttempt,
                                 allLegalMoves: legalMoves,
                                 capturedWhite: capturedWhite,
@@ -439,11 +442,14 @@ export function MobileBlocker() {
                             }, undefined, controller.signal);
 
                             if (response.ok) {
-                                move = await response.json();
+                                const data = await response.json();
+                                move = data;
                                 console.log("[Chess AI] Risposta ricevuta:", move);
-                                if (move.thought) {
+                                if (move && move.thought) {
                                     console.log("%c[GROMIT REASONING]", "color: #3b82f6; font-weight: bold; background: #eff6ff; padding: 2px 4px; border-radius: 4px;");
                                     console.log(move.thought);
+                                    // Append to thought history
+                                    setThoughtHistory(prev => [...prev, move!.thought]);
                                 }
                                 success = true;
                                 break;

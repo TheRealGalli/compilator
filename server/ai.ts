@@ -217,6 +217,7 @@ ${params.draftContent}`;
         allLegalMoves?: string[],
         capturedWhite?: string[],
         capturedBlack?: string[],
+        thoughtHistory?: string[],
         capturedPieces?: any[] // Optional legacy field
     }, retryCount = 0): Promise<{ from: string, to: string, thought: string }> {
         try {
@@ -282,7 +283,10 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
             const tacticalAlertsText = tacticalAlerts.length > 0 ?
                 `\n⚠️ ALERT TATTICI (PRIORITÀ ALTA):\n${tacticalAlerts.join('\n')}\n` : "";
 
-            const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}${tacticalAlertsText}\n\nMATERIALE:\n${capturedWhiteText}\n${capturedBlackText}\n\nMossa per b:`;
+            const thoughtHistoryText = (params.thoughtHistory && params.thoughtHistory.length > 0) ?
+                `\nSTORICO RAGIONAMENTI (Le tue riflessioni passate):\n${params.thoughtHistory.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n` : "";
+
+            const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}${tacticalAlertsText}${thoughtHistoryText}\n\nMATERIALE:\n${capturedWhiteText}\n${capturedBlackText}\n\nMossa per b:`;
 
             const model = this.vertex_ai.getGenerativeModel({
                 model: this.modelId,

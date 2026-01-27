@@ -2422,10 +2422,11 @@ ${filesContext}
   // --- CHESS AI ENDPOINT ---
   app.post('/api/chess/move', async (req: Request, res: Response) => {
     try {
-      const { boardJson, history, illegalMoveAttempt, allLegalMoves, capturedWhite, capturedBlack } = req.body;
+      const { boardJson, history, thoughtHistory, illegalMoveAttempt, allLegalMoves, capturedWhite, capturedBlack } = req.body;
       const move = await aiService.getChessMove({
         boardJson,
         history,
+        thoughtHistory,
         illegalMoveAttempt,
         allLegalMoves,
         capturedWhite,
