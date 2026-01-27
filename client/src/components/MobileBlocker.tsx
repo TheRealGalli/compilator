@@ -8,6 +8,7 @@ import {
 } from "react-icons/fa6";
 import chessBoardImage from "../assets/chess_board.png";
 import fourOhFourImage from "../assets/404_pixel_transparent.png";
+import { checkDeviceSync } from "@/utils/device";
 
 const INITIAL_BOARD = [
     ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'].map((type, i) => ({ type, hasMoved: false, id: `b-${type}-${i}` })),
@@ -38,15 +39,6 @@ const ChessPiece = ({ type, isCaptured }: { type: string, isCaptured?: boolean }
         case 'K': return <FaChessKing className={`${colorClass} ${shadow}`} size={size} />;
         default: return null;
     }
-};
-
-const checkDeviceSync = () => {
-    if (typeof window === "undefined") return false;
-    const ua = navigator.userAgent;
-    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-    const isIPad = (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || /iPad/.test(ua);
-    const hasMobileBypass = new URLSearchParams(window.location.search).get('mobile') === 'true';
-    return (isMobileUA || isIPad) && !hasMobileBypass;
 };
 
 export function MobileBlocker() {
