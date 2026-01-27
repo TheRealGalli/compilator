@@ -12,7 +12,8 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
-  extraHeaders?: Record<string, string>
+  extraHeaders?: Record<string, string>,
+  signal?: AbortSignal
 ): Promise<Response> {
   // Se l'URL è relativo, usa getApiUrl per costruire l'URL completo
   const fullUrl = url.startsWith('http') ? url : getApiUrl(url);
@@ -27,6 +28,7 @@ export async function apiRequest(
     headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
+    signal,
   });
 
   await throwIfResNotOk(res);

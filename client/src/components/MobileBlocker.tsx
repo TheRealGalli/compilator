@@ -415,10 +415,19 @@ export function MobileBlocker() {
                     let response;
                     let move;
                     let success = false;
+                    const controller = new AbortController();
+
+                    // FALLBACK TIMEOUT: Re-trigger after 20 seconds of no response
+                    const timeoutId = setTimeout(() => {
+                        console.warn("[Chess AI] Fallback: 20s senza risposta. Interruzione e nuovo tentativo...");
+                        controller.abort();
+                    }, 20000);
 
                     // FRONTEND RETRY LOOP (3 attempts)
                     for (let attempt = 1; attempt <= 3; attempt++) {
                         try {
+                            if (controller.signal.aborted) break;
+
                             console.log(`[Chess AI] Richiesta mossa... (Tentativo ${attempt}/3)`);
                             response = await apiRequest('POST', '/api/chess/move', {
                                 boardJson: getBoardJson(board),
@@ -427,7 +436,7 @@ export function MobileBlocker() {
                                 allLegalMoves: legalMoves,
                                 capturedWhite: capturedWhite,
                                 capturedBlack: capturedBlack
-                            });
+                            }, undefined, controller.signal);
 
                             if (response.ok) {
                                 move = await response.json();
@@ -435,10 +444,21 @@ export function MobileBlocker() {
                                 success = true;
                                 break;
                             }
-                        } catch (err) {
+                        } catch (err: any) {
+                            if (err.name === 'AbortError') {
+                                console.warn("[Chess AI] Richiesta interrotta per timeout.");
+                                break;
+                            }
                             console.warn(`[Chess AI] Tentativo ${attempt} fallito:`, err);
                             if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
                         }
+                    }
+
+                    clearTimeout(timeoutId);
+
+                    // Se interrotto per timeout (o fallimento totale), riavviamo il loop logico
+                    if (controller.signal.aborted) {
+                        return handleAiMove(illegalAttempt, logicRetries + 1);
                     }
 
                     if (!success || !move) {
