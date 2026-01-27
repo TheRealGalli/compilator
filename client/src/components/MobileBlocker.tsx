@@ -349,10 +349,11 @@ export function MobileBlocker() {
             const handleAiMove = async (illegalAttempt?: any, logicRetries = 0, networkRetries = 0) => {
                 setIsAiProcessing(true);
                 try {
-                    // Safety valve for logic loops
+                    // Safety valve for logic loops (illegal moves)
                     if (logicRetries > 5) {
-                        console.error("[Chess AI] Too many illegal moves. Skipping turn or resigning.");
-                        // Optional: Resign or force random move. For now just stop to avoid crash.
+                        console.error("[Chess AI] Too many illegal moves. Stopping.");
+                        setIsAiProcessing(false);
+                        setIsLogoSpinning(false);
                         return;
                     }
 
@@ -379,18 +380,7 @@ export function MobileBlocker() {
                         illegalMoveAttempt: illegalAttempt,
                         allLegalMoves: legalMoves
                     });
-
-                    if (!response.ok) {
-                        throw new Error(`Server returned ${response.status}`);
-                    }
-
                     const move = await response.json();
-
-                    // TRIGGER PERFECT 1s LOGO SPIN
-                    if (move.from && move.to) {
-                        setIsLogoSpinning(true);
-                        setTimeout(() => setIsLogoSpinning(false), 1000);
-                    }
 
                     if (move.from && move.to) {
                         const from = fromAlgebraic(move.from);
@@ -399,10 +389,17 @@ export function MobileBlocker() {
 
                         if (piece && piece.type.startsWith('b') && isValidMove(piece, from.r, from.c, to.r, to.c)) {
                             // Valid AI move, trigger movement
+                            setIsLogoSpinning(true);
                             setSelectedSquare(from);
-                            setTimeout(() => performMove(from.r, from.c, to.r, to.c), 600);
+
+                            setTimeout(() => {
+                                performMove(from.r, from.c, to.r, to.c);
+                                setIsAiProcessing(false);
+                                setIsLogoSpinning(false);
+                            }, 800);
                         } else {
                             // Illegal AI move, retry with feedback
+                            console.warn(`[Chess AI] Rejected Move: ${move.from} -> ${move.to}. Retrying...`);
                             const validMovesForPiece: string[] = [];
                             if (piece) {
                                 for (let tr = 0; tr < 8; tr++) {
@@ -413,38 +410,30 @@ export function MobileBlocker() {
                                     }
                                 }
                             }
-                            console.warn(`[Chess AI] Rejected Move: ${move.from} -> ${move.to}. Reason: Illegal move for piece or rule violation.`);
 
-                            // Retry with incremented logic count, reset network count
+                            // Recursive call with incremented logicRetries
                             handleAiMove({
                                 from: move.from,
                                 to: move.to,
-                                error: "Mossa illegale per le regole degli scacchi o pezzo sbagliato.",
+                                error: "Mossa illegale. Scegli una mossa valida.",
                                 validMoves: validMovesForPiece
-                            }, logicRetries + 1, 0);
+                            }, logicRetries + 1, networkRetries);
                         }
                     } else {
                         console.warn("[Chess AI] Server returned incomplete move object:", move);
-                        throw new Error("Incomplete move object");
+                        setIsAiProcessing(false);
+                        setIsLogoSpinning(false);
                     }
                 } catch (error) {
                     console.error("AI Move failed:", error);
-                    // Network/System Error Retry
+                    // Network Retry with backoff
                     if (networkRetries < 3) {
                         console.log(`[Chess AI] Retrying network error (${networkRetries + 1}/3)...`);
-                        setTimeout(() => handleAiMove(illegalAttempt, logicRetries, networkRetries + 1), 1500);
+                        setTimeout(() => handleAiMove(illegalAttempt, logicRetries, networkRetries + 1), 2000);
                     } else {
-                        console.error("[Chess AI] Deployment failed after 3 retries.");
+                        setIsAiProcessing(false);
+                        setIsLogoSpinning(false);
                     }
-                } finally {
-                    // Only release the lock if we are NOT recursing immediately?
-                    // Actually, since we don't await the recursion, this finally block WILL run.
-                    // This creates a potential race where isAiProcessing becomes false, 
-                    // but the recursive call hasn't set it to true yet (or is about to).
-                    // However, since handleAiMove sets isAiProcessing(true) at the TOP, it should be fine.
-                    // The only risk is if the component unmounts or something.
-                    setIsAiProcessing(false);
-                    setIsLogoSpinning(false);
                 }
             };
 
