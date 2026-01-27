@@ -64,6 +64,7 @@ export function MobileBlocker() {
     const [isLogoSpinning, setIsLogoSpinning] = useState(false);
     const [capturedWhite, setCapturedWhite] = useState<string[]>([]);
     const [capturedBlack, setCapturedBlack] = useState<string[]>([]);
+    const [lastMove, setLastMove] = useState<{ piece: Piece, from: { r: number, c: number }, to: { r: number, c: number } } | null>(null);
 
     useEffect(() => {
         let interval: any;
@@ -110,6 +111,7 @@ export function MobileBlocker() {
             setIsAiProcessing(false);
             setCapturedWhite([]);
             setCapturedBlack([]);
+            setLastMove(null);
         }
     };
 
@@ -185,15 +187,31 @@ export function MobileBlocker() {
         switch (pType) {
             case 'P':
                 if (isWhite) {
+                    // Normal move (strictly forward)
                     if (fromC === toC && fromR - toR === 1 && !currentBoard[toR][toC]) valid = true;
-                    // Pawn double move: only if hasMoved is false
+                    // Pawn double move: only if hasMoved is false and path is clear
                     else if (fromC === toC && !piece.hasMoved && fromR - toR === 2 && !currentBoard[toR][toC] && !currentBoard[5][toC]) valid = true;
-                    else if (dr === 1 && dc === 1 && currentBoard[toR][toC]?.type.startsWith('b')) valid = true;
+                    // Normal capture (diagonal forward)
+                    else if (dr === 1 && dc === 1 && fromR - toR === 1 && currentBoard[toR][toC]?.type.startsWith('b')) valid = true;
+                    // En Passant capture
+                    else if (checkCastling && dr === 1 && dc === 1 && fromR - toR === 1 && !currentBoard[toR][toC] && fromR === 3) {
+                        if (lastMove && lastMove.piece?.type === 'bP' && lastMove.to.r === fromR && lastMove.to.c === toC && Math.abs(lastMove.from.r - lastMove.to.r) === 2) {
+                            valid = true;
+                        }
+                    }
                 } else {
+                    // Normal move (strictly forward)
                     if (fromC === toC && toR - fromR === 1 && !currentBoard[toR][toC]) valid = true;
-                    // Pawn double move: only if hasMoved is false
+                    // Pawn double move: only if hasMoved is false and path is clear
                     else if (fromC === toC && !piece.hasMoved && toR - fromR === 2 && !currentBoard[toR][toC] && !currentBoard[2][toC]) valid = true;
-                    else if (dr === 1 && dc === 1 && currentBoard[toR][toC]?.type.startsWith('w')) valid = true;
+                    // Normal capture (diagonal forward)
+                    else if (dr === 1 && dc === 1 && toR - fromR === 1 && currentBoard[toR][toC]?.type.startsWith('w')) valid = true;
+                    // En Passant capture
+                    else if (checkCastling && dr === 1 && dc === 1 && toR - fromR === 1 && !currentBoard[toR][toC] && fromR === 4) {
+                        if (lastMove && lastMove.piece?.type === 'wP' && lastMove.to.r === fromR && lastMove.to.c === toC && Math.abs(lastMove.from.r - lastMove.to.r) === 2) {
+                            valid = true;
+                        }
+                    }
                 }
                 break;
             case 'R':
@@ -275,6 +293,16 @@ export function MobileBlocker() {
         if (captured) {
             if (captured.type.startsWith('w')) setCapturedWhite(prev => [...prev, captured.type]);
             else setCapturedBlack(prev => [...prev, captured.type]);
+        } else if (pieceAtFrom.type.substring(1) === 'P' && Math.abs(fromC - toC) === 1 && !newBoard[toR][toC]) {
+            // En Passant execution: remove the pawn behind the capture square
+            const capturedPawnR = fromR;
+            const capturedPawnC = toC;
+            const extraCapture = newBoard[capturedPawnR][capturedPawnC];
+            if (extraCapture) {
+                if (extraCapture.type.startsWith('w')) setCapturedWhite(prev => [...prev, extraCapture.type]);
+                else setCapturedBlack(prev => [...prev, extraCapture.type]);
+                newBoard[capturedPawnR][capturedPawnC] = null;
+            }
         }
 
         // Execute piece movement
@@ -327,6 +355,7 @@ export function MobileBlocker() {
         }
 
         setBoard(newBoard);
+        setLastMove({ piece: { ...pieceAtFrom, hasMoved: true }, from: { r: fromR, c: fromC }, to: { r: toR, c: toC } });
         setFeedback({ r: toR, c: toC, type: 'valid' });
         setMatchHistory(prev => [...prev, `${toAlgebraic(fromR, fromC)}-${toAlgebraic(toR, toC)}`]);
         setTimeout(() => setFeedback(null), 500);

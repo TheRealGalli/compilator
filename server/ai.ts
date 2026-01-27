@@ -219,17 +219,17 @@ ${params.draftContent}`;
             const legalMoves = params.allLegalMoves || [];
 
             // MOVE-FIRST PROTOCOL for debugging: Move tag at the top to avoid truncation
-            const systemPrompt = `Sei GROMIT, un Grande Maestro di scacchi (Giocatore Blu - b).
-IL TUO OBIETTIVO: Vincere la partita.
+            const systemPrompt = `Sei GROMIT, un Grande Maestro di scacchi. Giochi con il colore BLU (b).
+REGOLE DEL CAMPO (MOLTO IMPORTANTE):
+- SCACCHIERA: Row 0/1 = Blu (tu), Row 6/7 = Bianco (nemico). Tu sei in alto, il Bianco in basso.
+- PEDONI (P): Si muovono solo avanti (verso Row 7). Doppio passo solo dalla riga di partenza (Row 1). Catturano solo in diagonale avanti.
+- EN PASSANT: Se un pedone nemico fa un doppio passo e atterra di fianco al tuo, puoi catturarlo muovendo in diagonale dietro di lui nel turno IMMEDIATAMENTE successivo.
+- ARROCCO: Possibile solo se Re e Torre non si sono mai mossi e le caselle tra loro sono libere.
+- PROMOZIONE: Se un tuo pedone raggiunge Row 7, diventa una Regina (Q).
 
-REGOLE DI OUTPUT:
-1. Scrivi subito la mossa: <move>origine-destinazione</move> (es. <move>e7-e5</move>).
-2. Sotto, puoi scrivere <thought> la tua analisi strategica.
-
-IMPORTANTE: 
-- Muovi solo i pezzi 'b' (Blu). 
-- Le tue mosse devono essere legali rispetto alla scacchiera fornita.
-- Sii preciso con le coordinate [a-h][1-8].`;
+PROTOCOLLO:
+1. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
+2. Sotto, <thought>analisi breve.</thought>`;
 
             const historyText = params.history.length > 0 ? `Storico Partita: ${params.history.join(', ')}` : "Inizio partita.";
             const legalMovesText = legalMoves.length > 0 ?
