@@ -2422,8 +2422,15 @@ ${filesContext}
   // --- CHESS AI ENDPOINT ---
   app.post('/api/chess/move', async (req: Request, res: Response) => {
     try {
-      const { boardJson, history, illegalMoveAttempt, allLegalMoves } = req.body;
-      const move = await aiService.getChessMove({ boardJson, history, illegalMoveAttempt, allLegalMoves });
+      const { boardJson, history, illegalMoveAttempt, allLegalMoves, capturedWhite, capturedBlack } = req.body;
+      const move = await aiService.getChessMove({
+        boardJson,
+        history,
+        illegalMoveAttempt,
+        allLegalMoves,
+        capturedWhite,
+        capturedBlack
+      });
       res.json(move);
     } catch (error: any) {
       console.error('Error in Chess AI endpoint:', error);

@@ -212,7 +212,9 @@ ${params.draftContent}`;
         boardJson: any,
         history: string[],
         illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] },
-        allLegalMoves?: string[]
+        allLegalMoves?: string[],
+        capturedWhite?: string[],
+        capturedBlack?: string[]
     }, retryCount = 0): Promise<{ from: string, to: string }> {
         try {
             const boardText = this.renderBoardAsText(params.boardJson);
@@ -263,14 +265,17 @@ Il tuo obiettivo è giocare in modo impeccabile, seguendo questi 20 PRINCIPI FON
 
 ### [PARTE 3: PROTOCOLLO DI RISPOSTA]
 1. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
-2. Sotto, <thought>analisi breve basata sui principi sopra.</thought>`;
+2. Sotto, <thought>analisi strategica breve basata sui principi sopra e sul materiale (pezzi mangiati).</thought>`;
 
             const historyText = params.history.length > 0 ? `Storico Partita: ${params.history.join(', ')}` : "Inizio partita.";
             const legalMovesText = legalMoves.length > 0 ?
                 `\nMOSSE LEGALI PER TE (b): ${legalMoves.join(', ')}` : "";
             const illegalText = params.illegalMoveAttempt ? `\nERRORE PRECEDENTE: ${params.illegalMoveAttempt.from}-${params.illegalMoveAttempt.to} era illegale!` : "";
 
-            const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}\n\nMossa per b:`;
+            const capturedWhiteText = params.capturedWhite && params.capturedWhite.length > 0 ? `BIANCHE MANGIATE: ${params.capturedWhite.join(', ')}` : "Nessuna pedina bianca mangiata.";
+            const capturedBlackText = params.capturedBlack && params.capturedBlack.length > 0 ? `BLU (TUE) MANGIATE: ${params.capturedBlack.join(', ')}` : "Nessuna tua pedina mangiata.";
+
+            const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}\n\nMATERIALE:\n${capturedWhiteText}\n${capturedBlackText}\n\nMossa per b:`;
 
             const model = this.vertex_ai.getGenerativeModel({
                 model: this.modelId,

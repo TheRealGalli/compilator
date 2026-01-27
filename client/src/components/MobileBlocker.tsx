@@ -416,7 +416,9 @@ export function MobileBlocker() {
                         boardJson: getBoardJson(board),
                         history: matchHistory,
                         illegalMoveAttempt: illegalAttempt,
-                        allLegalMoves: legalMoves
+                        allLegalMoves: legalMoves,
+                        capturedWhite: capturedWhite,
+                        capturedBlack: capturedBlack
                     });
                     const move = await response.json();
 
