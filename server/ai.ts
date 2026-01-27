@@ -222,30 +222,26 @@ ${params.draftContent}`;
             const boardText = this.renderBoardAsText(params.boardJson);
             const legalMoves = params.allLegalMoves || [];
 
-            // 📖 CARICAMENTO CONDIZIONALE DEL MANUALE (Solo prima mossa o errore)
+            // 📖 CARICAMENTO DEL COMPENDIO DEL MAESTRO (Reference Manual)
             let tutorialContent = "";
-            const isFirstMove = params.history.length === 0;
-            const isErrorRecovery = !!params.illegalMoveAttempt;
-
-            if (isFirstMove || isErrorRecovery) {
-                try {
-                    const memoryPath = path.join(process.cwd(), 'GromitChess-Memory.md');
-                    if (fs.existsSync(memoryPath)) {
-                        tutorialContent = fs.readFileSync(memoryPath, 'utf8');
-                    }
-                } catch (err) {
-                    console.error("[AiService] Failed to load GromitChess-Memory.md:", err);
+            try {
+                const memoryPath = path.join(process.cwd(), 'GromitChess-Memory.md');
+                if (fs.existsSync(memoryPath)) {
+                    tutorialContent = fs.readFileSync(memoryPath, 'utf8');
                 }
+            } catch (err) {
+                console.error("[AiService] Failed to load GromitChess-Memory.md:", err);
             }
 
-            // SYSTEM PROMPT: Conditional Reference Manual
+            // SYSTEM PROMPT: Persistent Reference Manual
             const systemPrompt = `Sei GROMIT, un Grande Maestro di scacchi e "Chess Coach". Giochi con il BLU (b).
 
-${tutorialContent ? `### 📖 MANUALE DEL MAESTRO (CONSULTA ORA):\n${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi strategici."}
+${tutorialContent ? `### 📖 MANUALE DEL MAESTRO (DA CONSULTARE SEMPRE):
+${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi strategici."}
 
 ### [PROTOCOLLO DI RISPOSTA]
 1. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
-2. Sotto, <thought>analisi strategica breve${tutorialContent ? " basata sul MANUALE SOPRA" : ""} e sul materiale.</thought>`;
+2. Sotto, <thought>analisi strategica breve basata sul MANUALE SOPRA e sul materiale.</thought>`;
 
             const historyText = params.history.length > 0 ? `Storico Partita: ${params.history.join(', ')}` : "Inizio partita.";
             const legalMovesText = legalMoves.length > 0 ?
