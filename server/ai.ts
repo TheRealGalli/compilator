@@ -242,7 +242,12 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
 
 ### [PROTOCOLLO DI RISPOSTA]
 1. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
-2. Sotto, <thought>analisi strategica breve basata sul MANUALE SOPRA e sul materiale.</thought>`;
+2. Sotto, <thought>analisi strategica breve basata sul MANUALE SOPRA, sul materiale e sugli ALERT TATTICI.</thought>
+
+### [GUIDE TATTICHE GROMIT]
+- **SICUREZZA RE**: L'Arrocco è una tua priorità assoluta nei primi 10-15 tratti. Se vedi un ALERT per l'ARROCCO, eseguilo quasi sempre.
+- **AGGRESSIVITÀ**: Se vedi un ALERT per una CATTURA di un pezzo pesante (Regina, Torre, Alfiere), analizzala con cura. Se il pezzo non è difeso, MANGIALO.
+- **VISTA TATTICA**: Gli ALERT TATTICI sono suggerimenti del tuo "secondo"; usali come guida primaria per vincere.`;
 
             const historyText = params.history.length > 0 ? `Storico Partita: ${params.history.join(', ')}` : "Inizio partita.";
             const legalMovesText = legalMoves.length > 0 ?
@@ -254,7 +259,28 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
             const capturedWhiteText = params.capturedWhite && params.capturedWhite.length > 0 ? `BIANCHE MANGIATE: ${params.capturedWhite.join(', ')}` : "Nessuna pedina bianca mangiata.";
             const capturedBlackText = params.capturedBlack && params.capturedBlack.length > 0 ? `BLU (TUE) MANGIATE: ${params.capturedBlack.join(', ')}` : "Nessuna tua pedina mangiata.";
 
-            const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}\n\nMATERIALE:\n${capturedWhiteText}\n${capturedBlackText}\n\nMossa per b:`;
+            // 🎯 RILEVAMENTO TATTICO: Catture e Arrocco
+            const tacticalAlerts: string[] = [];
+            legalMoves.forEach(m => {
+                const parts = m.split('-');
+                if (parts.length === 2) {
+                    const to = parts[1];
+                    const targetPiece = params.boardJson[to];
+                    // Se la casa di destinazione contiene un pezzo bianco (W)
+                    if (targetPiece && targetPiece !== "empty" && targetPiece.startsWith('w')) {
+                        tacticalAlerts.push(`PUOI MANGIARE ${targetPiece.toUpperCase()} in ${to} con la mossa ${m}`);
+                    }
+
+                    // Rilevamento Arrocco (Re blu e8 muove in g8 o c8)
+                    if (m === "e8-g8") tacticalAlerts.push(`PUOI FARE ARROCCO CORTO (O-O) per mettere al sicuro il Re!`);
+                    if (m === "e8-c8") tacticalAlerts.push(`PUOI FARE ARROCCO LUNGO (O-O-O) per mettere al sicuro il Re!`);
+                }
+            });
+
+            const tacticalAlertsText = tacticalAlerts.length > 0 ?
+                `\n⚠️ ALERT TATTICI (PRIORITÀ ALTA):\n${tacticalAlerts.join('\n')}\n` : "";
+
+            const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}${tacticalAlertsText}\n\nMATERIALE:\n${capturedWhiteText}\n${capturedBlackText}\n\nMossa per b:`;
 
             const model = this.vertex_ai.getGenerativeModel({
                 model: this.modelId,
