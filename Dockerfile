@@ -10,6 +10,7 @@ COPY tsconfig.json ./
 # Copia il codice sorgente necessario per il build
 COPY shared ./shared
 COPY server ./server
+COPY GromitChess-Memory.md ./GromitChess-Memory.md
 
 # Installa le dipendenze (incluse dev per il build)
 RUN npm install --legacy-peer-deps
@@ -30,6 +31,7 @@ RUN npm install --omit=dev --legacy-peer-deps
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/server ./server
+COPY --from=builder /app/GromitChess-Memory.md ./GromitChess-Memory.md
 
 # Esponi la porta (Cloud Run usa la variabile PORT)
 EXPOSE 8080
