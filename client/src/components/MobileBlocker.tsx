@@ -80,6 +80,23 @@ export function MobileBlocker() {
     };
 
     const handleGromitClick = () => {
+        // If game is over, logo click resets everything and starts a new game
+        if (gameStatus !== 'play') {
+            setBoard(INITIAL_BOARD.map(row => row.map(p => p ? { ...p } : null)));
+            setSelectedSquare(null);
+            setFeedback(null);
+            setTime(0);
+            setTimerActive(false);
+            setCurrentTurn('w');
+            setGameStatus('play');
+            setMatchHistory([]);
+            setIsAiProcessing(false);
+            setCapturedWhite([]);
+            setCapturedBlack([]);
+            setIsChessMode(true);
+            return;
+        }
+
         setIsChessMode(prev => !prev);
         if (!isChessMode) {
             setBoard(INITIAL_BOARD.map(row => row.map(p => p ? { ...p } : null)));
@@ -546,7 +563,7 @@ export function MobileBlocker() {
                                     transition={{ duration: 0.5, ease: "easeOut" }}
                                     className="absolute left-[56px] text-white text-xl font-bold tracking-tight drop-shadow-md whitespace-nowrap"
                                 >
-                                    Gioca premendo il logo
+                                    Gioca premendo il logo **
                                 </motion.span>
                             )}
                         </AnimatePresence>
