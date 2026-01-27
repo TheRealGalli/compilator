@@ -241,8 +241,8 @@ ${tutorialContent ? `### 📖 MANUALE DEL MAESTRO (DA CONSULTARE SEMPRE):
 ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi strategici."}
 
 ### [PROTOCOLLO DI RISPOSTA]
-1. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
-2. Sotto, <thought>analisi strategica breve basata sul MANUALE SOPRA, sul materiale e sugli ALERT TATTICI.</thought>
+1. <thought>analisi strategica completa basata sul MANUALE SOPRA, sul materiale, sullo SCACCHIERA e sugli ALERT TATTICI.</thought>
+2. Sotto, <move>origine-destinazione</move> (es. <move>e7-e5</move>).
 
 ### [GUIDE TATTICHE GROMIT]
 - **SICUREZZA RE**: L'Arrocco è una tua priorità assoluta nei primi 10-15 tratti. Se vedi un ALERT per l'ARROCCO, eseguilo quasi sempre.
