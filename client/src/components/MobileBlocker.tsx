@@ -384,7 +384,7 @@ export function MobileBlocker() {
     // AI Opponent Effect
     useEffect(() => {
         if (isChessMode && currentTurn === 'b' && gameStatus === 'play' && !isAiProcessing) {
-            const handleAiMove = async (illegalAttempt?: any, logicRetries = 0, networkRetries = 0) => {
+            const handleAiMove = async (illegalAttempt?: any, logicRetries = 0) => {
                 setIsAiProcessing(true);
                 try {
                     // Safety valve for logic loops (illegal moves)
@@ -412,15 +412,41 @@ export function MobileBlocker() {
                         }
                     }
 
-                    const response = await apiRequest('POST', '/api/chess/move', {
-                        boardJson: getBoardJson(board),
-                        history: matchHistory,
-                        illegalMoveAttempt: illegalAttempt,
-                        allLegalMoves: legalMoves,
-                        capturedWhite: capturedWhite,
-                        capturedBlack: capturedBlack
-                    });
-                    const move = await response.json();
+                    let response;
+                    let move;
+                    let success = false;
+
+                    // FRONTEND RETRY LOOP (3 attempts)
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        try {
+                            console.log(`[Chess AI] Richiesta mossa... (Tentativo ${attempt}/3)`);
+                            response = await apiRequest('POST', '/api/chess/move', {
+                                boardJson: getBoardJson(board),
+                                history: matchHistory,
+                                illegalMoveAttempt: illegalAttempt,
+                                allLegalMoves: legalMoves,
+                                capturedWhite: capturedWhite,
+                                capturedBlack: capturedBlack
+                            });
+
+                            if (response.ok) {
+                                move = await response.json();
+                                console.log("[Chess AI] Risposta ricevuta:", move);
+                                success = true;
+                                break;
+                            }
+                        } catch (err) {
+                            console.warn(`[Chess AI] Tentativo ${attempt} fallito:`, err);
+                            if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
+                        }
+                    }
+
+                    if (!success || !move) {
+                        console.error("[Chess AI] Impossibile recuperare la mossa dopo 3 tentativi.");
+                        setIsAiProcessing(false);
+                        setIsLogoSpinning(false);
+                        return;
+                    }
 
                     if (move.from && move.to) {
                         const from = fromAlgebraic(move.from);
@@ -439,7 +465,7 @@ export function MobileBlocker() {
                             }, 800);
                         } else {
                             // Illegal AI move, retry with feedback
-                            console.warn(`[Chess AI] Rejected Move: ${move.from} -> ${move.to}. Retrying...`);
+                            console.warn(`[Chess AI] Mossa Rifiutata: ${move.from} -> ${move.to}. Riprovo con feedback...`);
                             const validMovesForPiece: string[] = [];
                             if (piece) {
                                 for (let tr = 0; tr < 8; tr++) {
@@ -451,29 +477,23 @@ export function MobileBlocker() {
                                 }
                             }
 
-                            // Recursive call with incremented logicRetries
+                            // Recursive call for logic (new thought)
                             handleAiMove({
                                 from: move.from,
                                 to: move.to,
                                 error: "Mossa illegale. Scegli una mossa valida.",
                                 validMoves: validMovesForPiece
-                            }, logicRetries + 1, networkRetries);
+                            }, logicRetries + 1);
                         }
                     } else {
-                        console.warn("[Chess AI] Server returned incomplete move object:", move);
+                        console.warn("[Chess AI] Il server ha restituito un oggetto mossa incompleto:", move);
                         setIsAiProcessing(false);
                         setIsLogoSpinning(false);
                     }
                 } catch (error) {
-                    console.error("AI Move failed:", error);
-                    // Network Retry with backoff
-                    if (networkRetries < 3) {
-                        console.log(`[Chess AI] Retrying network error (${networkRetries + 1}/3)...`);
-                        setTimeout(() => handleAiMove(illegalAttempt, logicRetries, networkRetries + 1), 2000);
-                    } else {
-                        setIsAiProcessing(false);
-                        setIsLogoSpinning(false);
-                    }
+                    console.error("[Chess AI] Errore critico nel frontend:", error);
+                    setIsAiProcessing(false);
+                    setIsLogoSpinning(false);
                 }
             };
 
