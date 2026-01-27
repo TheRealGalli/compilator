@@ -216,95 +216,100 @@ ${params.draftContent}`;
     }, retryCount = 0): Promise<{ from: string, to: string }> {
         try {
             const boardText = this.renderBoardAsText(params.boardJson);
+            const legalMoves = params.allLegalMoves || [];
 
-            // STRUCTURED PROMPT FOR STABILITY
-            const systemPrompt = `Sei GROMIT, un Grande Maestro di scacchi. Giochi con il colore BLU (b).
-Il tuo obiettivo è vincere fornendo una mossa legale.
+            // MOVE-FIRST PROTOCOL: Move tag at the top to prevent truncation issues
+            const systemPrompt = `Sei GROMIT, un Grande Maestro di scacchi. Giochi come BLU (b).
+Il tuo obiettivo è vincere.
 
-PROTOCOLLO DI RISPOSTA:
-1. <thought>Analisi sintetica.</thought>
-2. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
+REGOLE DI RISPOSTA (MOLTO RIGIDE):
+1. Inizia SEMPRE con il tag <move>origine-destinazione</move> (es. <move>e7-e5</move>).
+2. Dopo il tag, puoi aggiungere un tag <thought> con la tua analisi.
 
-IMPORTANTE:
-- La mossa deve essere per le pedine BLU (b).
-- Il tag <move> è OBBLIGATORIO alla fine.`;
+COORDINATE:
+- Tu (Blu/b) occupi le righe 8 e 7 all'inizio.
+- Il Bianco (White/w) occupa le righe 1 e 2.
+- NON muovere pezzi b (Bianco). Muovi solo 'b' (Blu).
+
+FALLBACK:
+Se non sei sicuro, scegli una mossa tra queste: ${legalMoves.slice(0, 10).join(', ')}`;
 
             const historyText = params.history.length > 0 ? `Storico Partita: ${params.history.join(', ')}` : "Inizio partita.";
-            const legalMovesText = (params.allLegalMoves && params.allLegalMoves.length > 0) ?
-                `\nMOSSE LEGALI PER TE (b): ${params.allLegalMoves.join(', ')}` : "";
-            const illegalText = params.illegalMoveAttempt ? `\nERRORE: La mossa ${params.illegalMoveAttempt.from}-${params.illegalMoveAttempt.to} è ILLEGALE. Riprova tra queste: ${params.illegalMoveAttempt.validMoves.join(', ')}` : "";
+            const legalMovesText = legalMoves.length > 0 ?
+                `\nMOSSE LEGALI PER TE (b): ${legalMoves.join(', ')}` : "";
+            const illegalText = params.illegalMoveAttempt ? `\nERRORE: ${params.illegalMoveAttempt.from}-${params.illegalMoveAttempt.to} era illegale. SCEGLI UNA TRA: ${params.illegalMoveAttempt.validMoves.join(', ')}` : "";
 
-            const userPrompt = `SCACCHIERA ATTUALE:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}\n\nRispondi con <thought>...</thought> e la mossa finale <move>...</move> per il giocatore b:`;
+            const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}\n\nProtocollo: <move>...</move><thought>...</thought>. Prossima mossa per b:`;
 
             const model = this.vertex_ai.getGenerativeModel({
                 model: this.modelId,
                 systemInstruction: {
                     role: 'system',
                     parts: [{ text: systemPrompt }]
-                },
-                safetySettings: [
-                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                ]
+                }
             });
 
-            console.log(`[AiService] GROMIT (b) is calculating next move (Attempt ${retryCount + 1})...`);
+            console.log(`[AiService] GROMIT (b) is thinking... (Attempt ${retryCount + 1})`);
 
             const result = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: (retryCount > 0 ? "URGENTE: Fornisci la mossa nel formato <move>origine-destinazione</move>.\n" : "") + userPrompt }] }],
+                contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
                 generationConfig: {
-                    maxOutputTokens: 800,
-                    temperature: 0.2
+                    maxOutputTokens: 1000,
+                    temperature: 0.1 // Maximum precision for coordinates
                 }
             });
 
             const candidate = result.response.candidates?.[0];
-            if (!candidate) {
-                console.error('[AiService] No candidates in result:', JSON.stringify(result.response, null, 2));
-                throw new Error('GROMIT non ha risposto.');
-            }
+            const rawContent = candidate?.content?.parts?.map((p: any) => p.text || '').join('') || '';
+            console.log(`[AiService] Response: ${rawContent.substring(0, 100)}${rawContent.length > 100 ? '...' : ''}`);
 
-            const finishReason = candidate.finishReason;
-            const rawContent = candidate.content?.parts?.map((p: any) => p.text || '').join('') || '';
+            // 1. EXTRACT MOVE
+            let move: { from: string, to: string } | null = null;
+            const moveTagMatch = rawContent.match(/<move>\s*([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])\s*<\/move>/i)
+                || rawContent.match(/<move>\s*([a-h][1-8])\s*([a-h][1-8])\s*<\/move>/i);
 
-            console.log(`[AiService] Result diagnostics: finishReason=${finishReason}`);
-            if (candidate.safetyRatings) {
-                console.log(`[AiService] Safety flags:`, candidate.safetyRatings.filter((r: any) => r.blocked).map((r: any) => r.category));
-            }
-
-            console.log(`[AiService] Raw Response:\n${rawContent}`);
-
-            // PARSING LOGIC
-            // 1. Precise match for <move> tag
-            const moveTagMatch = rawContent.match(/<move>\s*([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])\s*<\/move>/i);
             if (moveTagMatch) {
-                return { from: moveTagMatch[1].toLowerCase(), to: moveTagMatch[2].toLowerCase() };
-            }
-
-            // 2. Fallback: Search for coordinates OUTSIDE of <thought> tags
-            const contentWithoutThought = rawContent.replace(/<thought>[\s\S]*?<\/thought>/gi, '');
-            const coordsMatch = contentWithoutThought.match(/([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])/gi);
-
-            if (coordsMatch && coordsMatch.length > 0) {
-                const lastPair = coordsMatch[coordsMatch.length - 1];
-                const parts = lastPair.match(/([a-h][1-8])/gi);
-                if (parts && parts.length === 2) {
-                    return { from: parts[0].toLowerCase(), to: parts[1].toLowerCase() };
+                move = { from: moveTagMatch[1].toLowerCase(), to: moveTagMatch[2].toLowerCase() };
+            } else {
+                // Secondary extraction from text if tag is broken
+                const coords = rawContent.match(/([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])/gi);
+                if (coords && coords.length > 0) {
+                    const finalPair = coords[0].match(/([a-h][1-8])/gi);
+                    if (finalPair && finalPair.length === 2) {
+                        move = { from: finalPair[0].toLowerCase(), to: finalPair[1].toLowerCase() };
+                    }
                 }
             }
 
-            // AUTO-RETRY ON SERVER SIDE IF TRUNCATED OR MALFORMED
-            if (retryCount < 1) {
-                console.warn(`[AiService] Response truncated or missing move. Retrying once...`);
-                return this.getChessMove(params, retryCount + 1);
+            // 2. SAFETY NET VALIDATION
+            if (move && legalMoves.length > 0) {
+                const moveStr = `${move.from}-${move.to}`;
+                if (legalMoves.includes(moveStr)) {
+                    console.log(`[AiService] GROMIT move validated: ${moveStr}`);
+                    return move;
+                } else {
+                    console.warn(`[AiService] GROMIT suggested ILLEGAL move: ${moveStr}. Repairing...`);
+                    // Try to find a legal move for the same piece
+                    const pieceLegalMoves = legalMoves.filter(m => m.startsWith(move!.from));
+                    if (pieceLegalMoves.length > 0) {
+                        const repaired = pieceLegalMoves[0].split('-');
+                        console.log(`[AiService] Repaired to same-piece move: ${pieceLegalMoves[0]}`);
+                        return { from: repaired[0], to: repaired[1] };
+                    }
+                }
             }
 
-            throw new Error(`GROMIT ha risposto senza una mossa chiara dopo retry: "${rawContent.substring(0, 50)}..."`);
+            // 3. FINAL RECOVERY: If move is missing or illegal, pick the first legal move
+            if (legalMoves.length > 0) {
+                const fallback = legalMoves[0].split('-');
+                console.warn(`[AiService] Final fallback triggered. Using: ${legalMoves[0]}`);
+                return { from: fallback[0], to: fallback[1] };
+            }
+
+            throw new Error(`GROMIT non riesce a trovare una mossa legale. Resa.`);
 
         } catch (error: any) {
-            console.error('[AiService] Chess Move Error:', error);
+            console.error('[AiService] Chess Error:', error);
             throw error;
         }
     }
