@@ -22,10 +22,10 @@ const INITIAL_BOARD = [
 
 type Piece = { type: string, hasMoved: boolean, id: string } | null;
 
-const ChessPiece = ({ type }: { type: string }) => {
+const ChessPiece = ({ type, isCaptured }: { type: string, isCaptured?: boolean }) => {
     const isWhite = type.startsWith('w');
-    const colorClass = isWhite ? "text-white" : "text-blue-500";
-    const shadow = "drop-shadow-[0_2px_3px_rgba(0,0,0,0.5)]";
+    const colorClass = isWhite ? "text-white" : (isCaptured ? "text-blue-300" : "text-blue-500");
+    const shadow = isCaptured ? "" : "drop-shadow-[0_2px_3px_rgba(0,0,0,0.5)]";
     const size = 28;
 
     const piece = type.substring(1);
@@ -724,8 +724,9 @@ export function MobileBlocker() {
                                             initial={{ opacity: 0, scale: 0.5, y: -20 }}
                                             animate={{ opacity: 1, scale: 0.7, y: 0 }}
                                             transition={{ duration: 0.3 }}
+                                            className="flex items-center justify-center"
                                         >
-                                            <ChessPiece type={type} />
+                                            <ChessPiece type={type} isCaptured />
                                         </motion.div>
                                     ))
                                 )}
@@ -733,14 +734,15 @@ export function MobileBlocker() {
                         </div>
                         <div className="flex flex-wrap items-center justify-center gap-1 min-h-[32px]">
                             <AnimatePresence>
-                                {capturedWhite.map((type, i) => (
+                                {isChessMode && capturedWhite.map((type, i) => (
                                     <motion.div
                                         key={`cap-w-${i}`}
                                         initial={{ opacity: 0, scale: 0.5, y: 20 }}
                                         animate={{ opacity: 1, scale: 0.7, y: 0 }}
                                         transition={{ duration: 0.3 }}
+                                        className="flex items-center justify-center"
                                     >
-                                        <ChessPiece type={type} />
+                                        <ChessPiece type={type} isCaptured />
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
