@@ -1,5 +1,7 @@
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import mammoth from 'mammoth';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class AiService {
     private vertex_ai: VertexAI;
@@ -220,57 +222,37 @@ ${params.draftContent}`;
             const boardText = this.renderBoardAsText(params.boardJson);
             const legalMoves = params.allLegalMoves || [];
 
-            // MOVE-FIRST PROTOCOL for debugging: Move tag at the top to avoid truncation
-            const systemPrompt = `Sei GROMIT, un Grande Maestro di scacchi e "Chess Coach". Giochi con il colore BLU (b).
-Il tuo obiettivo è giocare in modo impeccabile, seguendo questi 20 PRINCIPI FONDAMENTALI per evitare di essere "meccanico" e assumere una mentalità strategica superiore.
+            // 📖 CARICAMENTO CONDIZIONALE DEL MANUALE (Solo prima mossa o errore)
+            let tutorialContent = "";
+            const isFirstMove = params.history.length === 0;
+            const isErrorRecovery = !!params.illegalMoveAttempt;
 
-### [PARTE 1: REGOLE DEL CAMPO]
-- SCACCHIERA: Row 0/1 = Tu (b), Row 6/7 = Bianco (nemico). Tu sei in alto, il Bianco in basso.
-- PEDONI (P): Avanti verso Row 7. Doppio passo solo da Row 1. Cattura diagonale.
-- EN PASSANT: Se un pedone nemico fa doppio passo e atterra di fianco al tuo, puoi catturarlo muovendo in diagonale DIETRO di lui (solo nel turno successivo).
-- ARROCCO: Possibile se Re e Torre non si sono mai mossi e il percorso è libero.
-- PROMOZIONE: Se un tuo pedone raggiunge Row 7, diventa una Regina (Q).
+            if (isFirstMove || isErrorRecovery) {
+                try {
+                    const memoryPath = path.join(process.cwd(), 'GromitChess-Memory.md');
+                    if (fs.existsSync(memoryPath)) {
+                        tutorialContent = fs.readFileSync(memoryPath, 'utf8');
+                    }
+                } catch (err) {
+                    console.error("[AiService] Failed to load GromitChess-Memory.md:", err);
+                }
+            }
 
-### [PARTE 2: I 20 PRINCIPI DEL COACH GROMIT]
+            // SYSTEM PROMPT: Conditional Reference Manual
+            const systemPrompt = `Sei GROMIT, un Grande Maestro di scacchi e "Chess Coach". Giochi con il BLU (b).
 
-#### APERTURA E SVILUPPO
-01. CONTROLLARE IL CENTRO: Le case centrali sono vitali. Usa i pedoni per occuparle.
-02. SVILUPPARE VELOCEMENTE: Fai uscire i pezzi leggeri (Cavalli e Alfieri) subito.
-03. NON MUOVERE TROPPE VOLTE LO STESSO PEZZO: Non perdere tempi in apertura.
-04. NON SVILUPPARE LA DONNA TROPPO PRESTO: Non esporla ad attacchi inutili.
-05. ARROCCARE ENTRO LA DECIMA MOSSA: La sicurezza del Re è prioritaria.
-06. CONNETTERE LE TORRI: Completa lo sviluppo per far comunicare le torri.
+${tutorialContent ? `### 📖 MANUALE DEL MAESTRO (CONSULTA ORA):\n${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi strategici."}
 
-#### STRUTTURA PEDONALE E SICUREZZA
-07. NON MUOVERE I PEDONI DAVANTI AL RE ARROCCATO: Non indebolire la tua difesa.
-08. EVITARE I PEDONI DOPPIATI: Sono deboli perché non si difendono a vicenda.
-09. EVITARE I PEDONI ARRETRATI: Sono bersagli facili per l'avversario.
-10. NON APRIRE LA POSIZIONE CON IL RE AL CENTRO: Se non hai arroccato, tieni chiuso il centro.
-
-#### STRATEGIA DI MEDIOGIOCO
-11. CONTROLLARE LE COLONNE APERTE: Usa le Torri per penetrare nelle linee nemiche.
-12. CONTROLLARE LA SETTIMA TRAVERSA: Le Torri in 7ª (o 2ª per il nero) sono devastanti.
-13. ALFIERI VS CAVALLI: Alfieri in posizioni aperte, Cavalli in posizioni chiuse.
-15. REAZIONE AGLI ATTACCHI LATERALI: Se l'avversario attacca un lato, contrattacca al CENTRO.
-19. GESTIONE DELLO SPAZIO: Se hai poco spazio, scambia i pezzi per liberarti.
-
-#### TECNICA DEI FINALI
-14. FINALI DI ALFIERI CONTRARI: Tendono alla patta; usa questo a tuo favore o cautela.
-16. RE ATTIVO NEL FINALE: Il Re è un pezzo d'attacco forte nel finale.
-17. TORRE DIETRO AL PEDONE PASSATO: Regola d'oro per attacco e difesa.
-18. PEDONI UNITI IN SESTA TRAVERSA: Sono inarrestabili, cerca di crearli o fermarli.
-
-#### MINDSET GENERALE
-20. PIANO E INIZIATIVA: Avere sempre un piano, rispettare l'avversario e cercare l'iniziativa.
-
-### [PARTE 3: PROTOCOLLO DI RISPOSTA]
+### [PROTOCOLLO DI RISPOSTA]
 1. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
-2. Sotto, <thought>analisi strategica breve basata sui principi sopra e sul materiale (pezzi mangiati).</thought>`;
+2. Sotto, <thought>analisi strategica breve${tutorialContent ? " basata sul MANUALE SOPRA" : ""} e sul materiale.</thought>`;
 
             const historyText = params.history.length > 0 ? `Storico Partita: ${params.history.join(', ')}` : "Inizio partita.";
             const legalMovesText = legalMoves.length > 0 ?
                 `\nMOSSE LEGALI PER TE (b): ${legalMoves.join(', ')}` : "";
-            const illegalText = params.illegalMoveAttempt ? `\nERRORE PRECEDENTE: ${params.illegalMoveAttempt.from}-${params.illegalMoveAttempt.to} era illegale!` : "";
+            const illegalText = params.illegalMoveAttempt ? `\n❌ ERRORE PRECEDENTE: ${params.illegalMoveAttempt.from}-${params.illegalMoveAttempt.to} era ILLEGALE.
+⚠️ ATTENZIONE: Hai violato la fisica del pezzo o le regole di scacco. 
+👉 RI-CONSULTA IL "MANUALE DEL MAESTRO" SOPRA, analizza le mappe visive dei movimenti e riprova.` : "";
 
             const capturedWhiteText = params.capturedWhite && params.capturedWhite.length > 0 ? `BIANCHE MANGIATE: ${params.capturedWhite.join(', ')}` : "Nessuna pedina bianca mangiata.";
             const capturedBlackText = params.capturedBlack && params.capturedBlack.length > 0 ? `BLU (TUE) MANGIATE: ${params.capturedBlack.join(', ')}` : "Nessuna tua pedina mangiata.";
