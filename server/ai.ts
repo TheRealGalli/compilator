@@ -213,7 +213,7 @@ ${params.draftContent}`;
         history: string[],
         illegalMoveAttempt?: { from: string, to: string, error: string, validMoves: string[] },
         allLegalMoves?: string[]
-    }): Promise<{ from: string, to: string }> {
+    }, retryCount = 0): Promise<{ from: string, to: string }> {
         try {
             const boardText = this.renderBoardAsText(params.boardJson);
 
@@ -222,12 +222,11 @@ ${params.draftContent}`;
 Il tuo obiettivo è vincere fornendo una mossa legale.
 
 PROTOCOLLO DI RISPOSTA:
-1. <thought>Breve analisi della posizione e strategia per il Blu (b).</thought>
+1. <thought>Analisi sintetica.</thought>
 2. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
 
 IMPORTANTE:
 - La mossa deve essere per le pedine BLU (b).
-- Non ripetere la mossa del Bianco nello spazio <move>.
 - Il tag <move> è OBBLIGATORIO alla fine.`;
 
             const historyText = params.history.length > 0 ? `Storico Partita: ${params.history.join(', ')}` : "Inizio partita.";
@@ -251,21 +250,30 @@ IMPORTANTE:
                 ]
             });
 
-            console.log(`[AiService] GROMIT (b) is calculating next move...`);
+            console.log(`[AiService] GROMIT (b) is calculating next move (Attempt ${retryCount + 1})...`);
 
             const result = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+                contents: [{ role: 'user', parts: [{ text: (retryCount > 0 ? "URGENTE: Fornisci la mossa nel formato <move>origine-destinazione</move>.\n" : "") + userPrompt }] }],
                 generationConfig: {
-                    maxOutputTokens: 500,
+                    maxOutputTokens: 800,
                     temperature: 0.2
                 }
             });
 
-            if (!result.response.candidates || result.response.candidates.length === 0) {
+            const candidate = result.response.candidates?.[0];
+            if (!candidate) {
+                console.error('[AiService] No candidates in result:', JSON.stringify(result.response, null, 2));
                 throw new Error('GROMIT non ha risposto.');
             }
 
-            const rawContent = result.response.candidates[0].content?.parts?.map((p: any) => p.text || '').join('') || '';
+            const finishReason = candidate.finishReason;
+            const rawContent = candidate.content?.parts?.map((p: any) => p.text || '').join('') || '';
+
+            console.log(`[AiService] Result diagnostics: finishReason=${finishReason}`);
+            if (candidate.safetyRatings) {
+                console.log(`[AiService] Safety flags:`, candidate.safetyRatings.filter((r: any) => r.blocked).map((r: any) => r.category));
+            }
+
             console.log(`[AiService] Raw Response:\n${rawContent}`);
 
             // PARSING LOGIC
@@ -275,7 +283,7 @@ IMPORTANTE:
                 return { from: moveTagMatch[1].toLowerCase(), to: moveTagMatch[2].toLowerCase() };
             }
 
-            // 2. Fallback: Search for coordinates OUTSIDE of <thought> tags to avoid picking up White's move analysis
+            // 2. Fallback: Search for coordinates OUTSIDE of <thought> tags
             const contentWithoutThought = rawContent.replace(/<thought>[\s\S]*?<\/thought>/gi, '');
             const coordsMatch = contentWithoutThought.match(/([a-h][1-8])\s*[- >toa]*\s*([a-h][1-8])/gi);
 
@@ -287,13 +295,13 @@ IMPORTANTE:
                 }
             }
 
-            // 3. Super desperate: last two coordinates in the whole text (might be wrong but better than crash)
-            const allCoords = rawContent.match(/([a-h][1-8])/gi);
-            if (allCoords && allCoords.length >= 2) {
-                return { from: allCoords[allCoords.length - 2].toLowerCase(), to: allCoords[allCoords.length - 1].toLowerCase() };
+            // AUTO-RETRY ON SERVER SIDE IF TRUNCATED OR MALFORMED
+            if (retryCount < 1) {
+                console.warn(`[AiService] Response truncated or missing move. Retrying once...`);
+                return this.getChessMove(params, retryCount + 1);
             }
 
-            throw new Error(`GROMIT ha risposto senza una mossa chiara: "${rawContent.substring(0, 50)}..."`);
+            throw new Error(`GROMIT ha risposto senza una mossa chiara dopo retry: "${rawContent.substring(0, 50)}..."`);
 
         } catch (error: any) {
             console.error('[AiService] Chess Move Error:', error);
