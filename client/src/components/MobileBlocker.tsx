@@ -748,25 +748,8 @@ export function MobileBlocker() {
 
                 <div className="mt-8 landscape:mt-0 w-full landscape:w-auto flex flex-col items-center landscape:absolute landscape:-right-24 landscape:top-1/2 landscape:-translate-y-1/2 gap-4">
                     {/* Captured Pieces Display */}
-                    <div className="flex flex-col landscape:flex-col-reverse gap-2 w-full landscape:w-12 px-4 landscape:px-0">
-                        {/* Container per le bianche (White pieces) */}
-                        <div className="flex flex-wrap landscape:flex-col items-center justify-center gap-1 min-h-[32px]">
-                            <AnimatePresence>
-                                {isChessMode && capturedWhite.map((type, i) => (
-                                    <motion.div
-                                        key={`cap-w-${i}`}
-                                        initial={{ opacity: 0, scale: 0.5, y: 20 }}
-                                        animate={{ opacity: 1, scale: 0.7, y: 0 }}
-                                        transition={{ duration: 0.3 }}
-                                        className="flex items-center justify-center"
-                                    >
-                                        <ChessPiece type={type} isCaptured />
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
-                        </div>
-
-                        {/* Container per le blu (Black pieces) */}
+                    <div className="flex flex-col landscape:flex-row gap-2 landscape:gap-4 w-full landscape:w-auto px-4 landscape:px-0">
+                        {/* Container per le blu (Black pieces) - PRIMA FILA */}
                         <div className="flex flex-wrap landscape:flex-col items-center justify-center gap-1 min-h-[32px] relative">
                             <AnimatePresence mode="wait">
                                 {!isChessMode ? (
@@ -792,6 +775,23 @@ export function MobileBlocker() {
                                         </motion.div>
                                     ))
                                 )}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* Container per le bianche (White pieces) - SECONDA FILA ACCANTO */}
+                        <div className="flex flex-wrap landscape:flex-col items-center justify-center gap-1 min-h-[32px]">
+                            <AnimatePresence>
+                                {isChessMode && capturedWhite.map((type, i) => (
+                                    <motion.div
+                                        key={`cap-w-${i}`}
+                                        initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                                        animate={{ opacity: 1, scale: 0.7, y: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="flex items-center justify-center"
+                                    >
+                                        <ChessPiece type={type} isCaptured />
+                                    </motion.div>
+                                ))}
                             </AnimatePresence>
                         </div>
                     </div>
