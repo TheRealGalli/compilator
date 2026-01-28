@@ -207,6 +207,69 @@ ${params.draftContent}`;
         return rows.join("\n");
     }
 
+    private getAttackersForSquare(targetCoord: string, attackerColor: 'w' | 'b', boardJson: any): string[] {
+        const attackers: string[] = [];
+        const to = this.fromAlgebraic(targetCoord);
+        for (const [coord, piece] of Object.entries(boardJson)) {
+            if (piece === "empty" || !piece) continue;
+            if (typeof piece === 'string' && piece.startsWith(attackerColor)) {
+                const from = this.fromAlgebraic(coord);
+                if (this.canPieceAttack(piece, from, to, boardJson)) attackers.push(piece);
+            }
+        }
+        return attackers;
+    }
+
+    private fromAlgebraic(coord: string) {
+        const c = coord.charCodeAt(0) - 97;
+        const r = 8 - parseInt(coord[1]);
+        return { r, c };
+    }
+
+    private canPieceAttack(piece: string, from: { r: number, c: number }, to: { r: number, c: number }, board: any): boolean {
+        if (from.r === to.r && from.c === to.c) return false;
+        const type = piece.substring(1);
+        const dr = to.r - from.r;
+        const dc = to.c - from.c;
+        const absDr = Math.abs(dr);
+        const absDc = Math.abs(dc);
+        switch (type) {
+            case 'P':
+                const direction = piece.startsWith('w') ? -1 : 1;
+                return dr === direction && absDc === 1;
+            case 'N':
+                return (absDr === 2 && absDc === 1) || (absDr === 1 && absDc === 2);
+            case 'R':
+                if (from.r !== to.r && from.c !== to.c) return false;
+                return !this.isLineBlocked(from, to, board);
+            case 'B':
+                if (absDr !== absDc) return false;
+                return !this.isLineBlocked(from, to, board);
+            case 'Q':
+                if (from.r !== to.r && from.c !== to.c && absDr !== absDc) return false;
+                return !this.isLineBlocked(from, to, board);
+            case 'K':
+                return absDr <= 1 && absDc <= 1;
+        }
+        return false;
+    }
+
+    private isLineBlocked(from: { r: number, c: number }, to: { r: number, c: number }, board: any): boolean {
+        const dr = Math.sign(to.r - from.r);
+        const dc = Math.sign(to.c - from.c);
+        let r = from.r + dr;
+        let c = from.c + dc;
+        while (r !== to.r || c !== to.c) {
+            const file = String.fromCharCode(97 + c);
+            const rank = 8 - r;
+            const coord = `${file}${rank}`;
+            if (board[coord] && board[coord] !== "empty") return true;
+            r += dr;
+            c += dc;
+        }
+        return false;
+    }
+
     /**
      * Specialized method for Chess AI moves using Gemini 2.5 Flash.
      */
@@ -242,15 +305,21 @@ ${tutorialContent ? `### 📖 MANUALE DEL MAESTRO (DA CONSULTARE SEMPRE):
 ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi strategici."}
 
 ### [PROTOCOLLO DI RISPOSTA]
-⚠️ **MOLTO IMPORTANTE**: Prima di scrivere qualsiasi cosa, analizza mentalmente la SCACCHIERA, consulta il MANUALE DEL MAESTRO e valuta gli ALERT TATTICI. Solo dopo procedi con:
+⚠️ **MOLTO IMPORTANTE**: Prima di scrivere qualsiasi cosa, analizza mentalmente la SCACCHIERA, consulta il MANUALE DEL MAESTRO e valuta con estrema attenzione gli ALERT TATTICI. Solo dopo procedi con:
 1. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
-2. <thought>analisi strategica coincisa ma completa che spieghi PERCHÉ hai scelto quella mossa basandoti sui dati sopra.</thought>
+2. <thought>analisi strategica coincisa ma completa che spieghi PERCHÉ hai scelto quella mossa basandoti sui dati sopra, sui rischi evidenziati e sulla tua strategia a lungo termine.</thought>
+
+### ⚠️ MESSAGGIO IMPORTANTE DA MAESTRO GALLO
+"Gromit, ascoltami bene:
+1. **APERTURA**: Sviluppa TUTTI i tuoi pezzi. Non lasciare pezzi pigri nelle case iniziali.
+2. **COORDINAZIONE**: Fai molta attenzione ad Alfieri e Regina dopo aver mosso i Cavalli. Devono avere spazio per agire.
+3. **RISPETTO DEL MATERIALE**: NON regalare mai pezzi all'avversario. Ogni mossa deve essere sicura. Se il nemico ti tende una trappola, non caderci."
 
 ### [GUIDE TATTICHE GROMIT]
 - **ORDINE**: Scrivi SEMPRE la mossa prima del pensiero, ma pensa PRIMA di scrivere.
 - **SICUREZZA RE**: L'Arrocco è una tua priorità assoluta nei primi 10-15 tratti. Se vedi un ALERT per l'ARROCCO, eseguilo quasi sempre.
-- **AGGRESSIVITÀ**: Se vedi un ALERT per una CATTURA di un pezzo pesante (Regina, Torre, Alfiere), analizzala con cura. Se il pezzo non è difeso, MANGIALO.
-- **VISTA TATTICA**: Gli ALERT TATTICI sono suggerimenti del tuo "secondo"; usali come guida primaria per vincere.`;
+- **AGGRESSIVITÀ**: Se vedi un ALERT per una CATTURA, valuta se il pezzo è difeso (guarda i rischi nell'alert). Se è sicuro o il cambio ti favorisce, MANGIALO.
+- **VISTA TATTICA**: Gli ALERT TATTICI sono suggerimenti precisi del tuo secondo basati sulla fisica del campo; usali come guida primaria."`;
 
             const historyText = params.history.length > 0 ? `Storico Partita: ${params.history.join(', ')}` : "Inizio partita.";
             const legalMovesText = legalMoves.length > 0 ?
@@ -262,19 +331,25 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
             const capturedWhiteText = params.capturedWhite && params.capturedWhite.length > 0 ? `BIANCHE MANGIATE: ${params.capturedWhite.join(', ')}` : "Nessuna pedina bianca mangiata.";
             const capturedBlackText = params.capturedBlack && params.capturedBlack.length > 0 ? `BLU (TUE) MANGIATE: ${params.capturedBlack.join(', ')}` : "Nessuna tua pedina mangiata.";
 
-            // 🎯 RILEVAMENTO TATTICO: Catture e Arrocco
+            // 🎯 RILEVAMENTO TATTICO: Catture, Rischi e Arrocco
             const tacticalAlerts: string[] = [];
             legalMoves.forEach(m => {
                 const parts = m.split('-');
                 if (parts.length === 2) {
                     const to = parts[1];
                     const targetPiece = params.boardJson[to];
-                    // Se la casa di destinazione contiene un pezzo bianco (W)
+
                     if (targetPiece && targetPiece !== "empty" && targetPiece.startsWith('w')) {
-                        tacticalAlerts.push(`PUOI MANGIARE ${targetPiece.toUpperCase()} in ${to} con la mossa ${m}`);
+                        let alert = `PUOI MANGIARE ${targetPiece.toUpperCase()} in ${to} con la mossa ${m}`;
+                        const defenders = this.getAttackersForSquare(to, 'w', params.boardJson);
+                        if (defenders.length > 0) {
+                            alert += ` ⚠️ (ATTENZIONE: ${to} è difesa da: ${defenders.join(', ')})`;
+                        } else {
+                            alert += ` ✅ (CATTURA SICURA: il pezzo non sembra difeso)`;
+                        }
+                        tacticalAlerts.push(alert);
                     }
 
-                    // Rilevamento Arrocco (Re blu e8 muove in g8 o c8)
                     if (m === "e8-g8") tacticalAlerts.push(`PUOI FARE ARROCCO CORTO (O-O) per mettere al sicuro il Re!`);
                     if (m === "e8-c8") tacticalAlerts.push(`PUOI FARE ARROCCO LUNGO (O-O-O) per mettere al sicuro il Re!`);
                 }
@@ -284,7 +359,7 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
                 `\n⚠️ ALERT TATTICI (PRIORITÀ ALTA):\n${tacticalAlerts.join('\n')}\n` : "";
 
             const thoughtHistoryText = (params.thoughtHistory && params.thoughtHistory.length > 0) ?
-                `\nSTORICO RAGIONAMENTI (Le tue riflessioni passate):\n${params.thoughtHistory.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n` : "";
+                `\nSTORICO RAGIONAMENTI (Pensieri delle tue MOSSE PRECEDENTI - NON di quella attuale):\n${params.thoughtHistory.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n` : "";
 
             const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}${tacticalAlertsText}${thoughtHistoryText}\n\nMATERIALE:\n${capturedWhiteText}\n${capturedBlackText}\n\nMossa per b:`;
 
