@@ -305,22 +305,27 @@ ${tutorialContent ? `### 📖 MANUALE DEL MAESTRO (DA CONSULTARE SEMPRE):
 ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi strategici."}
 
 ### [PROTOCOLLO DI RISPOSTA]
-⚠️ **MOLTO IMPORTANTE**: Prima di scrivere qualsiasi cosa, analizza mentalmente la SCACCHIERA, consulta il MANUALE DEL MAESTRO e valuta con estrema attenzione gli ALERT TATTICI. Solo dopo procedi con:
+⚠️ **MOLTO IMPORTANTE**: Prima di scrivere qualsiasi cosa, analizza mentalmente la SCACCHIERA, consulta il MANUALE DEL MAESTRO e valuta con estrema attenzione gli ALERT TATTICI e di DIFESA. Solo dopo procedi con:
 1. <move>origine-destinazione</move> (es. <move>e7-e5</move>).
-2. <thought>analisi strategica coincisa ma completa che spieghi PERCHÉ hai scelto quella mossa basandoti sui dati sopra, sui rischi evidenziati e sulla tua strategia a lungo termine.</thought>
+2. <thought>analisi strategica coincisa ma completa che spieghi PERCHÉ hai scelto quella mossa basandoti sui dati sopra, sui rischi evidenziati, sulla difesa dei tuoi pezzi e sulla tua strategia a lungo termine.</thought>
 
 ### ⚠️ MESSAGGIO IMPORTANTE DA MAESTRO GALLO
 "Gromit, ascoltami bene:
 1. **APERTURA**: Sviluppa TUTTI i tuoi pezzi. Non lasciare pezzi pigri nelle case iniziali.
 2. **COORDINAZIONE**: Fai molta attenzione ad Alfieri e Regina dopo aver mosso i Cavalli. Devono avere spazio per agire.
 3. **RISPETTO DEL MATERIALE**: NON regalare mai pezzi all'avversario. Ogni mossa deve essere sicura. Se il nemico ti tende una trappola, non caderci.
-4. **ATTENZIONE TATTICA**: Non allucinare movimenti in posizioni sotto attacco. È molto meglio muoversi una casella in meno piuttosto che atterrare nella diagonale pulita di un Alfiere nemico o sotto il tiro di un pezzo avversario."
+4. **ATTENZIONE TATTICA**: Non allucinare movimenti in posizioni sotto attacco. È molto meglio muoversi una casella in meno piuttosto che atterrare nella diagonale pulita di un Alfiere nemico o sotto il tiro di un pezzo avversario.
+5. **DIFESA**: Riconosci subito quando i tuoi pezzi sono già sotto attacco e valuta se è il momento di spostarli o difenderli meglio.
+
+Gromit, ricordati anche di divertirti! Buona fortuna."
 
 ### [GUIDE TATTICHE GROMIT]
 - **ORDINE**: Scrivi SEMPRE la mossa prima del pensiero, ma pensa PRIMA di scrivere.
 - **SICUREZZA RE**: L'Arrocco è una tua priorità assoluta nei primi 10-15 tratti. Se vedi un ALERT per l'ARROCCO, eseguilo quasi sempre.
 - **AGGRESSIVITÀ**: Se vedi un ALERT per una CATTURA, valuta se il pezzo è difeso (guarda i rischi nell'alert). Se è sicuro o il cambio ti favorisce, MANGIALO.
-- **VISTA TATTICA**: Gli ALERT TATTICI sono suggerimenti precisi del tuo secondo basati sulla fisica del campo; usali come guida primaria."`;
+- **DIFESA ATTIVA**: Se un tuo pezzo è segnalato come SOTTO ATTACCCO, valuta la mossa migliore per salvarlo o contrattaccare.
+- **VISTA TATTICA**: Gli ALERT TATTICI sono suggerimenti precisi del tuo secondo basati sulla fisica del campo; usali come guida primaria."
+`;
 
             const historyText = params.history.length > 0 ? `Storico Partita: ${params.history.join(', ')}` : "Inizio partita.";
             const legalMovesText = legalMoves.length > 0 ?
@@ -359,10 +364,23 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
             const tacticalAlertsText = tacticalAlerts.length > 0 ?
                 `\n⚠️ ALERT TATTICI (PRIORITÀ ALTA):\n${tacticalAlerts.join('\n')}\n` : "";
 
+            // 🛡️ ALERT DI DIFESA: Pezzi di GROMIT attualmente sotto attacco
+            const defenseAlerts: string[] = [];
+            for (const [coord, piece] of Object.entries(params.boardJson)) {
+                if (piece && typeof piece === 'string' && piece.startsWith('b')) {
+                    const attackers = this.getAttackersForSquare(coord, 'w', params.boardJson);
+                    if (attackers.length > 0) {
+                        defenseAlerts.push(`⚠️ IL TUO PEZZO ${piece.toUpperCase()} in ${coord} è SOTTO ATTACCO da: ${attackers.join(', ')}`);
+                    }
+                }
+            }
+            const defenseAlertsText = defenseAlerts.length > 0 ?
+                `\n🛡️ ALERT DI DIFESA (ATTENZIONE):\n${defenseAlerts.join('\n')}\n` : "";
+
             const thoughtHistoryText = (params.thoughtHistory && params.thoughtHistory.length > 0) ?
                 `\nSTORICO RAGIONAMENTI (Pensieri delle tue MOSSE PRECEDENTI - NON di quella attuale):\n${params.thoughtHistory.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n` : "";
 
-            const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}${tacticalAlertsText}${thoughtHistoryText}\n\nMATERIALE:\n${capturedWhiteText}\n${capturedBlackText}\n\nMossa per b:`;
+            const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}${tacticalAlertsText}${defenseAlertsText}${thoughtHistoryText}\n\nMATERIALE:\n${capturedWhiteText}\n${capturedBlackText}\n\nMossa per b:`;
 
             const model = this.vertex_ai.getGenerativeModel({
                 model: this.modelId,
@@ -377,7 +395,7 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
                 generationConfig: {
-                    maxOutputTokens: 1200,
+                    maxOutputTokens: 2000,
                     temperature: 0.1
                 }
             });
