@@ -691,10 +691,10 @@ export function MobileBlocker() {
                                 >
                                     <div className="bg-white/90 px-6 py-4 rounded-2xl shadow-2xl flex flex-col items-center gap-2">
                                         <span className="text-black text-2xl font-bold tracking-tight">
-                                            {gameStatus === 'checkmate' ? 'CHECKMATE' : 'STALEMATE'}
+                                            {gameStatus === 'checkmate' ? 'SCACCO MATTO' : 'PATTA'}
                                         </span>
                                         <span className="text-blue-600 font-semibold uppercase tracking-widest text-sm">
-                                            {gameStatus === 'checkmate' ? (currentTurn === 'w' ? 'Blue wins' : 'White wins') : 'Draw'}
+                                            {gameStatus === 'checkmate' ? (currentTurn === 'w' ? 'vinta dai blu' : 'vinta dai bianchi') : 'Pari'}
                                         </span>
                                     </div>
                                 </motion.div>
@@ -746,10 +746,28 @@ export function MobileBlocker() {
                     <div className="absolute inset-[4px] rounded-[22px] border border-white/25 pointer-events-none shadow-[inset_0_0_30px_rgba(255,255,255,0.1)]" />
                 </div>
 
-                <div className="mt-8 w-full flex flex-col items-center gap-4">
+                <div className="mt-8 landscape:mt-0 w-full landscape:w-auto flex flex-col items-center landscape:absolute landscape:-right-24 landscape:top-1/2 landscape:-translate-y-1/2 gap-4">
                     {/* Captured Pieces Display */}
-                    <div className="flex flex-col gap-2 w-full px-4">
-                        <div className="flex flex-wrap items-center justify-center gap-1 min-h-[32px] relative">
+                    <div className="flex flex-col landscape:flex-col-reverse gap-2 w-full landscape:w-12 px-4 landscape:px-0">
+                        {/* Container per le bianche (White pieces) */}
+                        <div className="flex flex-wrap landscape:flex-col items-center justify-center gap-1 min-h-[32px]">
+                            <AnimatePresence>
+                                {isChessMode && capturedWhite.map((type, i) => (
+                                    <motion.div
+                                        key={`cap-w-${i}`}
+                                        initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                                        animate={{ opacity: 1, scale: 0.7, y: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="flex items-center justify-center"
+                                    >
+                                        <ChessPiece type={type} isCaptured />
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* Container per le blu (Black pieces) */}
+                        <div className="flex flex-wrap landscape:flex-col items-center justify-center gap-1 min-h-[32px] relative">
                             <AnimatePresence mode="wait">
                                 {!isChessMode ? (
                                     <motion.span
@@ -757,7 +775,7 @@ export function MobileBlocker() {
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: 10 }}
-                                        className="text-white text-xl font-bold tracking-tight drop-shadow-md text-center"
+                                        className="text-white text-xl font-bold tracking-tight drop-shadow-md text-center landscape:hidden"
                                     >
                                         Gromit non disponibile su Mobile
                                     </motion.span>
@@ -774,21 +792,6 @@ export function MobileBlocker() {
                                         </motion.div>
                                     ))
                                 )}
-                            </AnimatePresence>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-center gap-1 min-h-[32px]">
-                            <AnimatePresence>
-                                {isChessMode && capturedWhite.map((type, i) => (
-                                    <motion.div
-                                        key={`cap-w-${i}`}
-                                        initial={{ opacity: 0, scale: 0.5, y: 20 }}
-                                        animate={{ opacity: 1, scale: 0.7, y: 0 }}
-                                        transition={{ duration: 0.3 }}
-                                        className="flex items-center justify-center"
-                                    >
-                                        <ChessPiece type={type} isCaptured />
-                                    </motion.div>
-                                ))}
                             </AnimatePresence>
                         </div>
                     </div>

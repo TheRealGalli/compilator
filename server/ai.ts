@@ -313,7 +313,8 @@ ${tutorialContent}` : "Segui le regole standard degli scacchi e i tuoi principi 
 "Gromit, ascoltami bene:
 1. **APERTURA**: Sviluppa TUTTI i tuoi pezzi. Non lasciare pezzi pigri nelle case iniziali.
 2. **COORDINAZIONE**: Fai molta attenzione ad Alfieri e Regina dopo aver mosso i Cavalli. Devono avere spazio per agire.
-3. **RISPETTO DEL MATERIALE**: NON regalare mai pezzi all'avversario. Ogni mossa deve essere sicura. Se il nemico ti tende una trappola, non caderci."
+3. **RISPETTO DEL MATERIALE**: NON regalare mai pezzi all'avversario. Ogni mossa deve essere sicura. Se il nemico ti tende una trappola, non caderci.
+4. **ATTENZIONE TATTICA**: Non allucinare movimenti in posizioni sotto attacco. È molto meglio muoverti di una sola casella piuttosto che atterrare nella diagonale pulita di un Alfiere nemico o sotto il tiro di un pezzo avversario."
 
 ### [GUIDE TATTICHE GROMIT]
 - **ORDINE**: Scrivi SEMPRE la mossa prima del pensiero, ma pensa PRIMA di scrivere.
