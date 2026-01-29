@@ -55,12 +55,9 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
 
     return (
         <Card className="flex flex-col h-full border rounded-lg bg-background shadow-none">
-            <div className="p-4 border-b flex items-center justify-between bg-muted/30">
-                <div className="flex flex-col">
-                    <h3 className="font-semibold text-gray-900">{title}</h3>
-                    <p className="text-[11px] text-muted-foreground">Controlla e approva i dati proposti dall'intelligenza documentale.</p>
-                </div>
-                <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+            <div className="p-2 py-1.5 border-b flex items-center justify-between bg-muted/30 flex-shrink-0">
+                <h3 className="text-sm font-medium">{title}</h3>
+                <Badge variant="outline" className="bg-blue-100/50 text-blue-700 border-blue-200 text-[10px] h-5">
                     {proposals.filter(p => p.status === 'approved').length} / {proposals.length} Approvati
                 </Badge>
             </div>
@@ -150,7 +147,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                 </div>
             </ScrollArea>
 
-            <div className="p-4 bg-white border-t border-blue-100">
+            <div className="p-4 bg-muted/20 border-t">
                 <Button
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
                     onClick={onFinalize}
@@ -158,7 +155,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                 >
                     {isFinalizing ? "Generazione PDF..." : "Finalizza Compilazione"}
                 </Button>
-                <p className="text-[10px] text-center text-gray-400 mt-2 italic">
+                <p className="text-[10px] text-center text-muted-foreground mt-2 italic">
                     I valori approvati verranno inseriti nei campi originali del modulo PDF.
                 </p>
             </div>

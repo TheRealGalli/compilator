@@ -243,16 +243,18 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
     console.log(`[DEBUG extractText] Processing ${mimeType}, buffer size: ${buffer.length}`);
     if (mimeType === 'application/pdf') {
       // Use dynamic import for pdf-parse (ESM module)
-      const pdfParseModule = await import('pdf-parse');
-      // Fix for "pdfParse is not a function" - handle both default and direct export
       let pdfParse: any;
-      if (typeof pdfParseModule === 'function') {
-        pdfParse = pdfParseModule;
-      } else if (pdfParseModule && typeof (pdfParseModule as any).default === 'function') {
-        pdfParse = (pdfParseModule as any).default;
-      } else {
-        // Fallback for some Node environments
-        pdfParse = (pdfParseModule as any);
+      try {
+        const pdfParseModule = await import('pdf-parse');
+        pdfParse = pdfParseModule.default || pdfParseModule;
+        // Verify it's a function
+        if (typeof pdfParse !== 'function') {
+          console.error('[DEBUG extractText] pdfParse is still not a function, trying secondary access');
+          pdfParse = (pdfParseModule as any).default || (pdfParseModule as any);
+        }
+      } catch (e) {
+        console.error('[DEBUG extractText] Error importing pdf-parse:', e);
+        throw new Error('PDF parsing library missing');
       }
 
       console.log('[DEBUG extractText] Calling pdfParse...');
@@ -1150,7 +1152,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         model: 'gemini-2.0-flash-exp'
       });
 
-      const proposals = await proposePdfFieldValues(fields, context, notes, model);
+      // Propose values with retries and better context handling
+      let proposals: any[] = [];
+      let attempts = 0;
+      const MAX_ATTEMPTS = 3;
+
+      while (attempts < MAX_ATTEMPTS) {
+        try {
+          console.log(`[SERVER] Generating field proposals for ${fields.length} fields (Attempt ${attempts + 1})...`);
+          proposals = await proposePdfFieldValues(fields, context, notes || "", model);
+          if (proposals && proposals.length > 0) {
+            console.log(`[SERVER] Successfully generated ${proposals.length} proposals.`);
+            break;
+          }
+          console.warn(`[SERVER] No proposals generated on attempt ${attempts + 1}.`);
+        } catch (err: any) {
+          const errMsg = err.message || String(err);
+          if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED')) {
+            console.warn(`[SERVER] 429 Rate Limit hit for PDF proposals. Waiting before retry...`);
+            // Exponential backoff: 2s, 4s...
+            await new Promise(resolve => setTimeout(resolve, 2000 * (attempts + 1)));
+          } else {
+            console.error(`[SERVER] PDF Proposal error:`, err);
+            break;
+          }
+        }
+        attempts++;
+      }
+
+      console.log(`[SERVER] Sending ${proposals.length} proposals back to client.`);
       res.json({ proposals });
     } catch (error: any) {
       console.error('[API propose-values] Error:', error);
