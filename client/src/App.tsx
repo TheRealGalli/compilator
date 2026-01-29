@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 import { MobileBlocker } from "@/components/MobileBlocker";
 import { GmailProvider } from "@/contexts/GmailContext";
 import { GoogleDriveProvider } from "@/contexts/GoogleDriveContext";
+import { ChatProvider } from "@/contexts/ChatContext";
 import { checkDeviceSync } from "@/utils/device";
 
 // Ottieni il base path da import.meta.env.BASE_URL (impostato da Vite)
@@ -31,15 +32,17 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <GmailProvider>
         <SourcesProvider>
-          <GoogleDriveProvider>
-            <TooltipProvider>
-              <ThemeProvider>
-                <Toaster />
-                <MobileBlocker />
-                {!checkDeviceSync() && <Router />}
-              </ThemeProvider>
-            </TooltipProvider>
-          </GoogleDriveProvider>
+          <ChatProvider>
+            <GoogleDriveProvider>
+              <TooltipProvider>
+                <ThemeProvider>
+                  <Toaster />
+                  <MobileBlocker />
+                  {!checkDeviceSync() && <Router />}
+                </ThemeProvider>
+              </TooltipProvider>
+            </GoogleDriveProvider>
+          </ChatProvider>
         </SourcesProvider>
       </GmailProvider>
     </QueryClientProvider>

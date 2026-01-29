@@ -15,68 +15,17 @@ import { apiRequest } from "@/lib/queryClient";
 import { getApiUrl } from "@/lib/api-config";
 import { useSources } from "@/contexts/SourcesContext";
 import { useGoogleDrive } from "@/contexts/GoogleDriveContext";
+import { useChat, type Message } from "@/contexts/ChatContext";
 import { DriveLogo } from "./ConnectorsSection";
 
-interface Message {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: string;
-  sources?: string[];
-  audioUrl?: string;
-  groundingMetadata?: any;
-  searchEntryPoint?: string;
-  shortTitle?: string;
-}
+// { id, role, content, timestamp, sources, audioUrl, groundingMetadata, searchEntryPoint, shortTitle }
 
 interface ChatInterfaceProps {
   modelProvider?: 'openai' | 'gemini';
 }
 
 export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isGreetingLoading, setIsGreetingLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchGreeting = async () => {
-      try {
-        const url = new URL(getApiUrl('/api/greeting'), window.location.origin);
-        if (selectedSources && selectedSources.length > 0) {
-          url.searchParams.append('sources', JSON.stringify(selectedSources.map(s => ({
-            id: s.id,
-            name: s.name,
-            type: s.type,
-            base64: s.base64,
-            isMemory: s.isMemory,
-            driveId: s.driveId
-          }))));
-        }
-
-        const res = await fetch(url.toString());
-        if (!res.ok) throw new Error('Failed to fetch greeting');
-        const data = await res.json();
-
-        setMessages([{
-          id: "greeting",
-          role: "assistant",
-          content: data.text,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }]);
-      } catch (error) {
-        console.error('Error fetching greeting:', error);
-        setMessages([{
-          id: "greeting-fallback",
-          role: "assistant",
-          content: "Ciao! Sono Gromit, il tuo assistente per l'analisi documentale. Come posso aiutarti oggi?",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }]);
-      } finally {
-        setIsGreetingLoading(false);
-      }
-    };
-
-    fetchGreeting();
-  }, []);
+  const { messages, setMessages, isGreetingLoading } = useChat();
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [webResearch, setWebResearch] = useState(false);
