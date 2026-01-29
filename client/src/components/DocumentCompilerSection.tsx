@@ -795,65 +795,32 @@ export function DocumentCompilerSection({
           </div>
 
           <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
-            {/* NORMAL MODE - Show Template + Output */}
+            {/* Left Column: Template or PDF Review */}
             <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {isPdfMode ? (
-                <PdfFieldReview
-                  proposals={pdfProposals}
-                  onUpdate={setPdfProposals}
-                  onFinalize={handleFinalizePdf}
-                  isFinalizing={isFinalizingPdf}
-                  title="Template in Compilazione"
-                />
-              ) : (
-                <TemplateEditor
-                  value={templateContent}
-                  onChange={setTemplateContent}
-                />
-              )}
-
               <div className="h-full">
                 {isPdfMode ? (
-                  <div className="h-full flex flex-col border rounded-lg overflow-hidden bg-background">
-                    <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex items-center justify-between">
-                      <h3 className="text-sm font-medium">Documento Compilato</h3>
-                    </div>
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-                      {finalizedPdfUrl ? (
-                        <div className="space-y-4">
-                          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <FileText className="w-8 h-8" />
-                          </div>
-                          <h4 className="text-lg font-semibold text-foreground">PDF Pronto per il download</h4>
-                          <p className="text-sm max-w-[200px]">Il modulo è stato compilato e finalizzato con successo.</p>
-                          <Button
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = finalizedPdfUrl;
-                              link.download = `filled-${masterSource?.name || 'document'}.pdf`;
-                              link.click();
-                            }}
-                            className="bg-blue-600 hover:bg-blue-700"
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Scarica PDF
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <Wand2 className="w-12 h-12 mb-4 opacity-20" />
-                          <p className="text-sm">Approva i campi e clicca su "Finalizza Compilazione" per generare il PDF.</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                  <PdfFieldReview
+                    proposals={pdfProposals}
+                    onUpdate={setPdfProposals}
+                    onFinalize={handleFinalizePdf}
+                    isFinalizing={isFinalizingPdf}
+                    title="Template in Compilazione"
+                  />
                 ) : (
-                  <CompiledOutput
-                    content={compiledContent}
-                    onCopy={handleCopy}
-                    onDownload={handleDownload}
+                  <TemplateEditor
+                    value={templateContent}
+                    onChange={setTemplateContent}
                   />
                 )}
+              </div>
+
+              {/* Right Column: Compiled Output */}
+              <div className="h-full">
+                <CompiledOutput
+                  content={compiledContent}
+                  onCopy={handleCopy}
+                  onDownload={handleDownload}
+                />
               </div>
             </div>
           </div>

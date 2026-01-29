@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Check, X, Info, Edit2, Save } from "lucide-react";
+import { Check, X, Info, Edit2, Save, Square } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -78,8 +78,8 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-xs font-mono font-bold text-gray-500 truncate">
-                                            {proposal.name}
+                                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+                                            Rilevazione Campo
                                         </span>
                                         <TooltipProvider>
                                             <Tooltip>
@@ -93,8 +93,12 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                         </TooltipProvider>
                                     </div>
 
+                                    <div className="text-sm text-gray-700 leading-relaxed">
+                                        Compilazione del campo <span className="font-mono font-bold text-gray-900">"{proposal.name}"</span> con:
+                                    </div>
+
                                     {editingIdx === idx ? (
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 mt-1">
                                             <Input
                                                 value={editValue}
                                                 onChange={(e) => setEditValue(e.target.value)}
@@ -106,8 +110,8 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                             </Button>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-medium text-sm text-gray-900">
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="font-bold text-sm text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                                                 {proposal.type === 'checkbox' ? (proposal.value ? "Selezionato" : "Deselezionato") : String(proposal.value) || "[Vuoto]"}
                                             </span>
                                             <Button variant="ghost" size="icon" className="h-6 w-6 opacity-40 hover:opacity-100" onClick={() => startEditing(idx)}>
@@ -117,23 +121,25 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                     )}
                                 </div>
 
-                                <div className="flex gap-1">
-                                    <Button
-                                        size="icon"
-                                        variant={proposal.status === 'approved' ? 'default' : 'outline'}
-                                        className={`h-8 w-8 ${proposal.status === 'approved' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                                <div className="flex gap-2">
+                                    <button
                                         onClick={() => updateStatus(idx, 'approved')}
+                                        className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${proposal.status === 'approved'
+                                            ? 'bg-green-600 border-green-600 text-white shadow-sm'
+                                            : 'border-blue-200 bg-white hover:border-green-400 text-transparent'
+                                            }`}
                                     >
-                                        <Check className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                        size="icon"
-                                        variant={proposal.status === 'rejected' ? 'destructive' : 'outline'}
-                                        className="h-8 w-8"
+                                        <Check className={`w-4 h-4 ${proposal.status === 'approved' ? 'opacity-100' : 'opacity-0'}`} />
+                                    </button>
+                                    <button
                                         onClick={() => updateStatus(idx, 'rejected')}
+                                        className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${proposal.status === 'rejected'
+                                            ? 'bg-red-600 border-red-600 text-white shadow-sm'
+                                            : 'border-blue-200 bg-white hover:border-red-400 text-transparent'
+                                            }`}
                                     >
-                                        <X className="w-4 h-4" />
-                                    </Button>
+                                        <X className={`w-4 h-4 ${proposal.status === 'rejected' ? 'opacity-100' : 'opacity-0'}`} />
+                                    </button>
                                 </div>
                             </div>
                         </div>
