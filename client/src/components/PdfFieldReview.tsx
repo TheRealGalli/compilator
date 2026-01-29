@@ -79,9 +79,9 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                         .map((proposal, idx) => (
                             <div
                                 key={proposal.name}
-                                className={`p-3 rounded-lg border transition-all ${proposal.status === 'approved' ? 'bg-green-50/30 border-green-200' :
-                                    proposal.status === 'rejected' ? 'bg-red-50/30 border-red-200 opacity-60' :
-                                        'bg-transparent border-blue-200/50'
+                                className={`p-3 rounded-lg border transition-all ${proposal.status === 'approved' ? 'bg-green-500/10 border-green-500/20' :
+                                    proposal.status === 'rejected' ? 'bg-red-500/10 border-red-500/20 opacity-60' :
+                                        'bg-muted/5 border-border/50'
                                     }`}
                             >
                                 <div className="flex items-start justify-between gap-3">
@@ -102,7 +102,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                             </TooltipProvider>
                                         </div>
 
-                                        <div className="text-sm text-gray-700 leading-relaxed mb-1">
+                                        <div className="text-sm text-foreground/80 leading-relaxed mb-1">
                                             <span className="font-bold text-foreground">{proposal.label || proposal.name}</span>
                                         </div>
                                         <div className="text-[11px] text-muted-foreground mb-2 flex items-center gap-1">
@@ -124,8 +124,8 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                         ) : (
                                             <div className="flex items-center gap-2">
                                                 <span className={`font-bold text-sm px-2 py-0.5 rounded border ${proposal.value === "[FONTE MANCANTE]"
-                                                    ? "text-amber-700 bg-amber-500/10 border-amber-200/50"
-                                                    : "text-blue-700 bg-blue-500/10 border-blue-200/50"
+                                                    ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
+                                                    : "text-blue-500 bg-blue-500/10 border-blue-500/20"
                                                     }`}>
                                                     {proposal.type === 'checkbox' ? (proposal.value === 'true' || proposal.value === true ? "Selezionato" : "Deselezionato") : String(proposal.value) || "[Vuoto]"}
                                                 </span>
@@ -176,8 +176,8 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                     ) : (proposals.length > 0 ? "Finalizza Compilazione" : "Caricamento Campi...")}
                 </Button>
                 <div className="flex items-center justify-center gap-1.5 opacity-60">
-                    <Info className="w-2.5 h-2.5 text-blue-600" />
-                    <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tighter">
+                    <Info className="w-2.5 h-2.5 text-blue-500" />
+                    <p className="text-[9px] font-medium text-muted-foreground uppercase tracking-tighter">
                         I valori approvati verranno inseriti nel modulo PDF originale
                     </p>
                 </div>
