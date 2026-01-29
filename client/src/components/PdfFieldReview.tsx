@@ -55,15 +55,24 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
 
     return (
         <Card className="flex flex-col h-full border rounded-lg bg-background shadow-none">
-            <div className="p-2 py-1.5 border-b flex items-center justify-between bg-muted/30 flex-shrink-0">
-                <h3 className="text-sm font-medium">{title}</h3>
-                <Badge variant="outline" className="bg-blue-100/50 text-blue-700 border-blue-200 text-[10px] h-5">
-                    {proposals.filter(p => p.status === 'approved').length} / {proposals.length} Approvati
+            <div className="p-3 border-b flex items-center justify-between bg-muted/30 flex-shrink-0">
+                <div className="flex flex-col">
+                    <h3 className="text-sm font-semibold text-gray-900 tracking-tight">{title}</h3>
+                    <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Revisione intelligente dei campi mappati</p>
+                </div>
+                <Badge variant="outline" className="bg-blue-600/10 text-blue-700 border-blue-200/50 text-[10px] h-5 font-bold px-2">
+                    {proposals.filter(p => p.status === 'approved').length} / {proposals.length}
                 </Badge>
             </div>
 
             <ScrollArea className="flex-1 p-4">
                 <div className="space-y-3">
+                    {proposals.length === 0 && !isFinalizing && (
+                        <div className="flex flex-col items-center justify-center h-40 opacity-40">
+                            <Square className="w-8 h-8 mb-2 animate-pulse text-blue-400" />
+                            <p className="text-xs font-medium">L'AI sta analizzando i 143 campi...</p>
+                        </div>
+                    )}
                     {proposals.map((proposal, idx) => (
                         <div
                             key={proposal.name}
@@ -147,17 +156,25 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                 </div>
             </ScrollArea>
 
-            <div className="p-4 bg-muted/20 border-t">
+            <div className="p-3 bg-muted/10 border-t flex flex-col gap-2">
                 <Button
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 shadow-sm transition-all active:scale-[0.98]"
                     onClick={onFinalize}
                     disabled={isFinalizing || proposals.length === 0}
                 >
-                    {isFinalizing ? "Generazione PDF..." : "Finalizza Compilazione"}
+                    {isFinalizing ? (
+                        <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Generazione...
+                        </div>
+                    ) : (proposals.length > 0 ? "Finalizza Compilazione" : "Caricamento Campi...")}
                 </Button>
-                <p className="text-[10px] text-center text-muted-foreground mt-2 italic">
-                    I valori approvati verranno inseriti nei campi originali del modulo PDF.
-                </p>
+                <div className="flex items-center justify-center gap-1.5 opacity-60">
+                    <Info className="w-2.5 h-2.5 text-blue-600" />
+                    <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tighter">
+                        I valori approvati verranno inseriti nel modulo PDF originale
+                    </p>
+                </div>
             </div>
         </Card>
     );

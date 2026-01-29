@@ -245,12 +245,12 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
       // Use dynamic import for pdf-parse (ESM module)
       let pdfParse: any;
       try {
-        const pdfParseModule = await import('pdf-parse');
+        const pdfParseModule = await import('pdf-parse') as any;
         pdfParse = pdfParseModule.default || pdfParseModule;
         // Verify it's a function
         if (typeof pdfParse !== 'function') {
           console.error('[DEBUG extractText] pdfParse is still not a function, trying secondary access');
-          pdfParse = (pdfParseModule as any).default || (pdfParseModule as any);
+          pdfParse = pdfParseModule.default || pdfParseModule;
         }
       } catch (e) {
         console.error('[DEBUG extractText] Error importing pdf-parse:', e);
@@ -1149,39 +1149,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const vertexAIInstance = new VertexAI({ project: projectId, location: 'us-central1' });
       const model = vertexAIInstance.getGenerativeModel({
-        model: 'gemini-2.0-flash-exp'
+        model: ANALYZER_MODEL_ID
       });
 
-      // Propose values with retries and better context handling
-      let proposals: any[] = [];
-      let attempts = 0;
-      const MAX_ATTEMPTS = 3;
-
-      while (attempts < MAX_ATTEMPTS) {
-        try {
-          console.log(`[SERVER] Generating field proposals for ${fields.length} fields (Attempt ${attempts + 1})...`);
-          proposals = await proposePdfFieldValues(fields, context, notes || "", model);
-          if (proposals && proposals.length > 0) {
-            console.log(`[SERVER] Successfully generated ${proposals.length} proposals.`);
-            break;
-          }
-          console.warn(`[SERVER] No proposals generated on attempt ${attempts + 1}.`);
-        } catch (err: any) {
-          const errMsg = err.message || String(err);
-          if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED')) {
-            console.warn(`[SERVER] 429 Rate Limit hit for PDF proposals. Waiting before retry...`);
-            // Exponential backoff: 2s, 4s...
-            await new Promise(resolve => setTimeout(resolve, 2000 * (attempts + 1)));
-          } else {
-            console.error(`[SERVER] PDF Proposal error:`, err);
-            break;
-          }
-        }
-        attempts++;
+      // Split fields into batches to avoid 429/quota limits
+      const BATCH_SIZE = 30;
+      const fieldBatches = [];
+      for (let i = 0; i < fields.length; i += BATCH_SIZE) {
+        fieldBatches.push(fields.slice(i, i + BATCH_SIZE));
       }
 
-      console.log(`[SERVER] Sending ${proposals.length} proposals back to client.`);
-      res.json({ proposals });
+      console.log(`[SERVER] Processing ${fields.length} fields in ${fieldBatches.length} batches...`);
+      let allProposals: any[] = [];
+
+      for (let i = 0; i < fieldBatches.length; i++) {
+        const batch = fieldBatches[i];
+        let attempts = 0;
+        const MAX_ATTEMPTS = 3;
+        let batchProposals: any[] = [];
+
+        while (attempts < MAX_ATTEMPTS) {
+          try {
+            console.log(`[SERVER] Batch ${i + 1}/${fieldBatches.length} (Attempt ${attempts + 1}). Fields: ${batch.length}`);
+            batchProposals = await proposePdfFieldValues(batch, context, notes || "", model);
+
+            if (batchProposals && batchProposals.length > 0) {
+              allProposals = [...allProposals, ...batchProposals];
+              break;
+            }
+
+            console.warn(`[SERVER] Empty response for batch ${i + 1}.`);
+          } catch (err: any) {
+            const errMsg = err.message || String(err);
+            if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED')) {
+              console.warn(`[SERVER] 429 hit on Batch ${i + 1}. Backing off...`);
+              await new Promise(r => setTimeout(r, 3000 * (attempts + 1)));
+            } else {
+              console.error(`[SERVER] Batch ${i + 1} Error:`, err);
+              break;
+            }
+          }
+          attempts++;
+        }
+
+        // Small delay between batches to stay under RPM
+        if (i < fieldBatches.length - 1) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+
+      console.log(`[SERVER] PDF compilation completed. Total proposals: ${allProposals.length}`);
+      res.json({ proposals: allProposals });
     } catch (error: any) {
       console.error('[API propose-values] Error:', error);
       res.status(500).json({ error: error.message });
