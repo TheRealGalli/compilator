@@ -2,6 +2,7 @@ import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup } fr
 
 export interface PdfFormField {
     name: string;
+    label?: string; // Human readable label (e.g. "Name of Reporting Corporation")
     type: 'text' | 'checkbox' | 'dropdown' | 'radio' | 'unknown';
     value?: string | boolean;
 }
@@ -41,14 +42,16 @@ export async function proposePdfFieldValues(
     sourceContext: string,
     notes: string,
     geminiModel: any
-): Promise<Array<{ name: string; value: string | boolean; reasoning: string }>> {
+): Promise<Array<{ name: string; label: string; value: string | boolean; reasoning: string }>> {
     try {
         const prompt = `Sei un esperto di Document Intelligence. 
-Abbiamo rilevato i seguenti campi in un PDF ufficiale. 
-Il tuo compito è mappare le informazioni dalle FONTI e dalle NOTE ai nomi tecnici dei campi del PDF.
+Abbiamo rilevato i seguenti campi tecnici in un PDF ufficiale. 
+Il tuo compito è:
+1. Mappare le informazioni dalle FONTI e dalle NOTE ai campi del PDF (se pertinenti).
+2. Per OGNI campo tecnico, dedurre l'ETICHETTA UMANA (Label) leggendo il nome tecnico o immaginando il testo che lo precede (es. "f1_1[0]" -> "1a. Name of Reporting Corporation").
 
 CAMPI RILEVATI:
-${fields.map(f => `- Nome: "${f.name}", Tipo: ${f.type}`).join('\n')}
+${fields.map(f => `- Nome Tecnico: "${f.name}", Tipo: ${f.type}`).join('\n')}
 
 FONTI E CONTESTO:
 ${sourceContext}
@@ -56,15 +59,18 @@ ${sourceContext}
 NOTE UTENTE:
 ${notes}
 
-REGOLE:
-1. Per ogni campo, fornisci una suggestione di valore (stringa per testo, booleano per checkbox).
-2. Spiega BREVEMENTE (max 15 parole) il PERCHÉ di quel valore citando la fonte.
-3. Se un dato non è presente, proponi un valore vuoto o "false".
+REGOLE CRITICHE:
+1. Restituisci suggerimenti SOLO per i campi che riesci a compilare con certezza dalle fonti.
+2. Per ogni suggerimento, fornisci:
+   - "name": Il nome tecnico rilevato.
+   - "label": L'etichetta umana (es. "1a Name", "Total Assets").
+   - "value": Il valore proposto (stringa per testo, booleano per checkbox).
+   - "reasoning": Spiegazione breve (max 10 parole).
 
 Restituisci un JSON con questa struttura:
 {
   "proposals": [
-    { "name": "NomeCampo", "value": "ValoreProposto", "reasoning": "Spiegazione..." }
+    { "name": "f1_1[0]", "label": "1a Name of Corporation", "value": "CyberSpace Station", "reasoning": "Trovato nel Master." }
   ]
 }
 `;

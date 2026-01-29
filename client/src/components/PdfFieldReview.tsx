@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 export interface FieldProposal {
     name: string;
+    label?: string; // New: human readable label
     type: 'text' | 'checkbox' | 'dropdown' | 'radio' | 'unknown';
     value: string | boolean;
     reasoning: string;
@@ -57,11 +58,11 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
         <Card className="flex flex-col h-full border rounded-lg bg-background shadow-none">
             <div className="p-3 border-b flex items-center justify-between bg-muted/30 flex-shrink-0">
                 <div className="flex flex-col">
-                    <h3 className="text-sm font-semibold text-gray-900 tracking-tight">{title}</h3>
+                    <h3 className="text-sm font-semibold text-foreground tracking-tight">{title}</h3>
                     <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Revisione intelligente dei campi mappati</p>
                 </div>
                 <Badge variant="outline" className="bg-blue-600/10 text-blue-700 border-blue-200/50 text-[10px] h-5 font-bold px-2">
-                    {proposals.filter(p => p.status === 'approved').length} / {proposals.length}
+                    {proposals.filter(p => p.status === 'approved').length} / {proposals.filter(p => p.value !== undefined && p.value !== "" && p.value !== "[Vuoto]" && p.value !== "[FONTE MANCANTE]").length}
                 </Badge>
             </div>
 
@@ -70,89 +71,94 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                     {proposals.length === 0 && !isFinalizing && (
                         <div className="flex flex-col items-center justify-center h-40 opacity-40">
                             <Square className="w-8 h-8 mb-2 animate-pulse text-blue-400" />
-                            <p className="text-xs font-medium">L'AI sta analizzando i 143 campi...</p>
+                            <p className="text-xs font-medium text-center px-4">L'AI sta analizzando il documento per compilare i campi del PDF...</p>
                         </div>
                     )}
-                    {proposals.map((proposal, idx) => (
-                        <div
-                            key={proposal.name}
-                            className={`p-3 rounded-lg border transition-all ${proposal.status === 'approved' ? 'bg-green-50 border-green-200' :
-                                proposal.status === 'rejected' ? 'bg-red-50 border-red-200 opacity-60' :
-                                    'bg-white border-blue-100'
-                                }`}
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
-                                            Rilevazione Campo
-                                        </span>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger>
-                                                    <Info className="w-3 h-3 text-blue-400" />
-                                                </TooltipTrigger>
-                                                <TooltipContent className="max-w-[200px]">
-                                                    <p className="text-xs">{proposal.reasoning}</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    </div>
-
-                                    <div className="text-sm text-gray-700 leading-relaxed mb-2">
-                                        Compilazione del campo <span className="font-mono font-bold text-gray-900 break-all">"{proposal.name.split('.').pop() || proposal.name}"</span> con:
-                                    </div>
-
-                                    {editingIdx === idx ? (
-                                        <div className="flex gap-2">
-                                            <Input
-                                                value={editValue}
-                                                onChange={(e) => setEditValue(e.target.value)}
-                                                className="h-8 text-sm"
-                                                autoFocus
-                                            />
-                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => saveEdit(idx)}>
-                                                <Save className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <span className={`font-bold text-sm px-2 py-0.5 rounded border ${proposal.value === "[FONTE MANCANTE]"
-                                                ? "text-amber-700 bg-amber-50 border-amber-100"
-                                                : "text-blue-700 bg-blue-50 border-blue-100"
-                                                }`}>
-                                                {proposal.type === 'checkbox' ? (proposal.value === 'true' || proposal.value === true ? "Selezionato" : "Deselezionato") : String(proposal.value) || "[Vuoto]"}
+                    {proposals
+                        .filter(p => p.value !== undefined && p.value !== "" && p.value !== "[Vuoto]" && p.value !== "[FONTE MANCANTE]")
+                        .map((proposal, idx) => (
+                            <div
+                                key={proposal.name}
+                                className={`p-3 rounded-lg border transition-all ${proposal.status === 'approved' ? 'bg-green-50 border-green-200' :
+                                    proposal.status === 'rejected' ? 'bg-red-50 border-red-200 opacity-60' :
+                                        'bg-white border-blue-100'
+                                    }`}
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-transparent p-0 border-none">
+                                                Rilevazione Campo
                                             </span>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-40 hover:opacity-100" onClick={() => startEditing(idx)}>
-                                                <Edit2 className="w-3 h-3" />
-                                            </Button>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger>
+                                                        <Info className="w-3 h-3 text-blue-400" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-[200px]">
+                                                        <p className="text-xs">{proposal.reasoning}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
                                         </div>
-                                    )}
-                                </div>
 
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => updateStatus(idx, 'approved')}
-                                        className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${proposal.status === 'approved'
-                                            ? 'bg-green-600 border-green-600 text-white shadow-sm'
-                                            : 'border-blue-200 bg-white hover:border-green-400 text-transparent'
-                                            }`}
-                                    >
-                                        <Check className={`w-4 h-4 ${proposal.status === 'approved' ? 'opacity-100' : 'opacity-0'}`} />
-                                    </button>
-                                    <button
-                                        onClick={() => updateStatus(idx, 'rejected')}
-                                        className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${proposal.status === 'rejected'
-                                            ? 'bg-red-600 border-red-600 text-white shadow-sm'
-                                            : 'border-blue-200 bg-white hover:border-red-400 text-transparent'
-                                            }`}
-                                    >
-                                        <X className={`w-4 h-4 ${proposal.status === 'rejected' ? 'opacity-100' : 'opacity-0'}`} />
-                                    </button>
+                                        <div className="text-sm text-gray-700 leading-relaxed mb-1">
+                                            <span className="font-bold text-foreground">{proposal.label || proposal.name}</span>
+                                        </div>
+                                        <div className="text-[11px] text-muted-foreground mb-2 flex items-center gap-1">
+                                            compilo con:
+                                        </div>
+
+                                        {editingIdx === idx ? (
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    value={editValue}
+                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                    className="h-8 text-sm"
+                                                    autoFocus
+                                                />
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => saveEdit(idx)}>
+                                                    <Save className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <span className={`font-bold text-sm px-2 py-0.5 rounded border ${proposal.value === "[FONTE MANCANTE]"
+                                                    ? "text-amber-700 bg-amber-50 border-amber-100"
+                                                    : "text-blue-700 bg-blue-50 border-blue-100"
+                                                    }`}>
+                                                    {proposal.type === 'checkbox' ? (proposal.value === 'true' || proposal.value === true ? "Selezionato" : "Deselezionato") : String(proposal.value) || "[Vuoto]"}
+                                                </span>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-40 hover:opacity-100" onClick={() => startEditing(idx)}>
+                                                    <Edit2 className="w-3 h-3" />
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => updateStatus(idx, 'approved')}
+                                            className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${proposal.status === 'approved'
+                                                ? 'bg-green-600 border-green-600 text-white shadow-sm'
+                                                : 'border-blue-200 bg-white hover:border-green-400 text-transparent'
+                                                }`}
+                                        >
+                                            <Check className={`w-4 h-4 ${proposal.status === 'approved' ? 'opacity-100' : 'opacity-0'}`} />
+                                        </button>
+                                        <button
+                                            onClick={() => updateStatus(idx, 'rejected')}
+                                            className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${proposal.status === 'rejected'
+                                                ? 'bg-red-600 border-red-600 text-white shadow-sm'
+                                                : 'border-blue-200 bg-white hover:border-red-400 text-transparent'
+                                                }`}
+                                        >
+                                            <X className={`w-4 h-4 ${proposal.status === 'rejected' ? 'opacity-100' : 'opacity-0'}`} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
                 </div>
             </ScrollArea>
 
