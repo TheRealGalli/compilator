@@ -60,17 +60,20 @@ NOTE UTENTE:
 ${notes}
 
 REGOLE CRITICHE:
-1. Restituisci suggerimenti SOLO per i campi che riesci a compilare con certezza dalle fonti.
-2. Per ogni suggerimento, fornisci:
+1. Restituisci suggerimenti per il maggior numero possibile di campi. 
+2. Anche se non trovi un valore nelle fonti, DEDUCIsempre l' "label" umana (es. "f1_1" -> "Name") basandoti sul nome tecnico o sul contesto del documento.
+3. Per i campi senza valore nelle fonti, restituisci value: "" e reasoning: "Label dedotta, dato mancante".
+4. Per ogni suggerimento, fornisci:
    - "name": Il nome tecnico rilevato.
    - "label": L'etichetta umana (es. "1a Name", "Total Assets").
-   - "value": Il valore proposto (stringa per testo, booleano per checkbox).
+   - "value": Il valore proposto (stringa per testo, booleano per checkbox, o stringa vuota se non trovato).
    - "reasoning": Spiegazione breve (max 10 parole).
 
 Restituisci un JSON con questa struttura:
 {
   "proposals": [
-    { "name": "f1_1[0]", "label": "1a Name of Corporation", "value": "CyberSpace Station", "reasoning": "Trovato nel Master." }
+    { "name": "f1_1[0]", "label": "1a Name of Corporation", "value": "CyberSpace Station", "reasoning": "Trovato nel Master." },
+    { "name": "f1_2[0]", "label": "Street Address", "value": "", "reasoning": "Campo identificato, valore non presente." }
   ]
 }
 `;
