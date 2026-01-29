@@ -79,9 +79,9 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                         .map((proposal, idx) => (
                             <div
                                 key={proposal.name}
-                                className={`p-3 rounded-lg border transition-all ${proposal.status === 'approved' ? 'bg-green-50 border-green-200' :
-                                    proposal.status === 'rejected' ? 'bg-red-50 border-red-200 opacity-60' :
-                                        'bg-white border-blue-100'
+                                className={`p-3 rounded-lg border transition-all ${proposal.status === 'approved' ? 'bg-green-50/30 border-green-200' :
+                                    proposal.status === 'rejected' ? 'bg-red-50/30 border-red-200 opacity-60' :
+                                        'bg-transparent border-blue-200/50'
                                     }`}
                             >
                                 <div className="flex items-start justify-between gap-3">
@@ -124,8 +124,8 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                         ) : (
                                             <div className="flex items-center gap-2">
                                                 <span className={`font-bold text-sm px-2 py-0.5 rounded border ${proposal.value === "[FONTE MANCANTE]"
-                                                    ? "text-amber-700 bg-amber-50 border-amber-100"
-                                                    : "text-blue-700 bg-blue-50 border-blue-100"
+                                                    ? "text-amber-700 bg-amber-500/10 border-amber-200/50"
+                                                    : "text-blue-700 bg-blue-500/10 border-blue-200/50"
                                                     }`}>
                                                     {proposal.type === 'checkbox' ? (proposal.value === 'true' || proposal.value === true ? "Selezionato" : "Deselezionato") : String(proposal.value) || "[Vuoto]"}
                                                 </span>
@@ -141,7 +141,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                             onClick={() => updateStatus(idx, 'approved')}
                                             className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${proposal.status === 'approved'
                                                 ? 'bg-green-600 border-green-600 text-white shadow-sm'
-                                                : 'border-blue-200 bg-white hover:border-green-400 text-transparent'
+                                                : 'border-blue-200/50 bg-transparent hover:border-green-400 text-transparent'
                                                 }`}
                                         >
                                             <Check className={`w-4 h-4 ${proposal.status === 'approved' ? 'opacity-100' : 'opacity-0'}`} />
@@ -150,7 +150,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                             onClick={() => updateStatus(idx, 'rejected')}
                                             className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${proposal.status === 'rejected'
                                                 ? 'bg-red-600 border-red-600 text-white shadow-sm'
-                                                : 'border-blue-200 bg-white hover:border-red-400 text-transparent'
+                                                : 'border-blue-200/50 bg-transparent hover:border-red-400 text-transparent'
                                                 }`}
                                         >
                                             <X className={`w-4 h-4 ${proposal.status === 'rejected' ? 'opacity-100' : 'opacity-0'}`} />
@@ -160,7 +160,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                             </div>
                         ))}
                 </div>
-            </ScrollArea>
+            </ScrollArea >
 
             <div className="p-3 bg-muted/10 border-t flex flex-col gap-2">
                 <Button
@@ -182,6 +182,6 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                     </p>
                 </div>
             </div>
-        </Card>
+        </Card >
     );
 }
