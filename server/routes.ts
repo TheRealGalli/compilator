@@ -247,12 +247,24 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
       // Use dynamic import for pdf-parse (ESM module)
       let pdfParse: any;
       try {
-        pdfParse = require("pdf-parse");
-        if (typeof pdfParse !== "function" && pdfParse && (pdfParse as any).default) {
+        const mod = require("pdf-parse");
+        pdfParse = (typeof mod === 'function') ? mod : (mod.default || mod.pdf || mod);
+
+        // Handle double-wrapped defaults often seen in ESM-to-CJS bundling
+        if (typeof pdfParse !== 'function' && pdfParse && (pdfParse as any).default) {
           pdfParse = (pdfParse as any).default;
         }
+
+        if (typeof pdfParse !== 'function') {
+          console.warn("[DEBUG extractText] require failed to resolve function, trying dynamic import...");
+          const dMod = await import("pdf-parse") as any;
+          pdfParse = dMod.default || dMod;
+          if (typeof pdfParse !== 'function' && pdfParse && (pdfParse as any).default) {
+            pdfParse = (pdfParse as any).default;
+          }
+        }
       } catch (e) {
-        console.warn("[DEBUG extractText] require fallback failed, trying dynamic...");
+        console.warn("[DEBUG extractText] require/import failed, checking for dynamic as fallback...");
         try {
           const mod = await import("pdf-parse") as any;
           pdfParse = mod.default || mod;
@@ -261,8 +273,9 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
           throw new Error("Libreria per il parsing dei PDF non caricata correttamente.");
         }
       }
+
       if (typeof pdfParse !== "function") {
-        throw new Error("pdf-parse non è una funzione valida.");
+        throw new Error(`pdf-parse non è una funzione valida (trovato: ${typeof pdfParse}).`);
       }
 
       console.log('[DEBUG extractText] Calling pdfParse...');
