@@ -248,11 +248,22 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
       let pdfParse: any;
       try {
         const mod = require("pdf-parse");
+        console.log(`[DEBUG extractText] pdf-parse required. type: ${typeof mod}, keys: ${Object.keys(mod || {}).join(', ')}`);
+
         pdfParse = (typeof mod === 'function') ? mod : (mod.default || mod.pdf || mod);
 
         // Handle double-wrapped defaults often seen in ESM-to-CJS bundling
         if (typeof pdfParse !== 'function' && pdfParse && (pdfParse as any).default) {
           pdfParse = (pdfParse as any).default;
+        }
+
+        // Greedy search: if still not a function, find ANY function in the object
+        if (typeof pdfParse !== 'function' && mod && typeof mod === 'object') {
+          const funcKey = Object.keys(mod).find(k => typeof (mod as any)[k] === 'function');
+          if (funcKey) {
+            console.log(`[DEBUG extractText] Found potential parsing function at key: ${funcKey}`);
+            pdfParse = (mod as any)[funcKey];
+          }
         }
 
         if (typeof pdfParse !== 'function') {
@@ -275,7 +286,8 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
       }
 
       if (typeof pdfParse !== "function") {
-        throw new Error(`pdf-parse non è una funzione valida (trovato: ${typeof pdfParse}).`);
+        const mod = require("pdf-parse");
+        throw new Error(`pdf-parse non è una funzione valida (trovato: ${typeof pdfParse}). Keys: ${Object.keys(mod || {}).join(', ')}`);
       }
 
       console.log('[DEBUG extractText] Calling pdfParse...');
