@@ -24,6 +24,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PdfFieldReview, type FieldProposal } from "./PdfFieldReview";
+import { getApiUrl } from "@/lib/api-config";
+import { apiRequest } from "@/lib/queryClient";
 
 import {
   Dialog,
@@ -235,11 +238,20 @@ export function DocumentCompilerSection({
   const [extractedFields, setExtractedFields] = useState<Array<{ fieldName: string; fieldType: string }>>([]);
   const [studioFontSize, setStudioFontSize] = useState<number>(14);
 
+  // PDF Interactive Mode State
+  const [isPdfMode, setIsPdfMode] = useState(false);
+  const [pdfProposals, setPdfProposals] = useState<FieldProposal[]>([]);
+  const [isFinalizingPdf, setIsFinalizingPdf] = useState(false);
+  const [finalizedPdfUrl, setFinalizedPdfUrl] = useState<string | null>(null);
+
 
 
   useEffect(() => {
     // We are temporarily disabling field extraction based on pinned source
     setExtractedFields([]);
+    setIsPdfMode(false);
+    setPdfProposals([]);
+    setFinalizedPdfUrl(null);
   }, [masterSource?.id]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
@@ -327,6 +339,49 @@ export function DocumentCompilerSection({
 
     setIsCompiling(true);
     try {
+      // Check if we should use the new PDF Interactive Flow
+      const isFillablePdf = masterSource && masterSource.isFillable;
+
+      if (isFillablePdf) {
+        // Step 1: Discover native fields
+        const discoveryRes = await fetch(getApiUrl('/api/pdf/discover-fields'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ masterSource })
+        });
+        const { fields } = await discoveryRes.json();
+
+        if (fields && fields.length > 0) {
+          // Step 2: Get AI proposals
+          const proposalRes = await fetch(getApiUrl('/api/pdf/propose-values'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields,
+              sources: selectedSources,
+              notes,
+              masterSource
+            })
+          });
+          const { proposals } = await proposalRes.json();
+
+          setPdfProposals(proposals.map((p: any) => ({
+            ...p,
+            type: fields.find((f: any) => f.name === p.name)?.type || 'text',
+            status: 'pending'
+          })));
+          setIsPdfMode(true);
+
+          toast({
+            title: "Modalità PDF Interattivo",
+            description: `Rilevati ${fields.length} campi. Analisi AI completata.`,
+          });
+          setIsCompiling(false);
+          return;
+        }
+      }
+
+      // Standard Fallback to Text-based Compilation
       const { apiRequest } = await import("@/lib/queryClient");
 
       console.log('[DEBUG Frontend] selectedSources:', selectedSources);
@@ -387,6 +442,55 @@ export function DocumentCompilerSection({
       });
     } finally {
       setIsCompiling(false);
+    }
+  };
+
+  const handleFinalizePdf = async () => {
+    if (!masterSource) return;
+
+    setIsFinalizingPdf(true);
+    try {
+      const values: Record<string, string | boolean> = {};
+      pdfProposals.forEach(p => {
+        if (p.status === 'approved') {
+          values[p.name] = p.value;
+        }
+      });
+
+      const res = await fetch(getApiUrl('/api/pdf/finalize'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ masterSource, values })
+      });
+
+      const data = await res.json();
+      if (data.base64) {
+        const { saveAs } = await import("file-saver");
+        const byteCharacters = atob(data.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        setFinalizedPdfUrl(url);
+        saveAs(blob, data.name || 'documento-compilato.pdf');
+
+        toast({
+          title: "PDF Generato",
+          description: "Il modulo originale è stato compilato con successo.",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error finalizing PDF:', error);
+      toast({
+        title: "Errore finalizzazione",
+        description: error.message || "Impossibile generare il PDF finale.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFinalizingPdf(false);
     }
   };
 
@@ -693,15 +797,64 @@ export function DocumentCompilerSection({
           <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
             {/* NORMAL MODE - Show Template + Output */}
             <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <TemplateEditor
-                value={templateContent}
-                onChange={setTemplateContent}
-              />
-              <CompiledOutput
-                content={compiledContent}
-                onCopy={handleCopy}
-                onDownload={handleDownload}
-              />
+              {isPdfMode ? (
+                <PdfFieldReview
+                  proposals={pdfProposals}
+                  onUpdate={setPdfProposals}
+                  onFinalize={handleFinalizePdf}
+                  isFinalizing={isFinalizingPdf}
+                  title="Template in Compilazione"
+                />
+              ) : (
+                <TemplateEditor
+                  value={templateContent}
+                  onChange={setTemplateContent}
+                />
+              )}
+
+              <div className="h-full">
+                {isPdfMode ? (
+                  <div className="h-full flex flex-col border rounded-lg overflow-hidden bg-background">
+                    <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Documento Compilato</h3>
+                    </div>
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                      {finalizedPdfUrl ? (
+                        <div className="space-y-4">
+                          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <FileText className="w-8 h-8" />
+                          </div>
+                          <h4 className="text-lg font-semibold text-foreground">PDF Pronto per il download</h4>
+                          <p className="text-sm max-w-[200px]">Il modulo è stato compilato e finalizzato con successo.</p>
+                          <Button
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = finalizedPdfUrl;
+                              link.download = `filled-${masterSource?.name || 'document'}.pdf`;
+                              link.click();
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Scarica PDF
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <Wand2 className="w-12 h-12 mb-4 opacity-20" />
+                          <p className="text-sm">Approva i campi e clicca su "Finalizza Compilazione" per generare il PDF.</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <CompiledOutput
+                    content={compiledContent}
+                    onCopy={handleCopy}
+                    onDownload={handleDownload}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </div>

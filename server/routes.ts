@@ -13,6 +13,7 @@ import * as cheerio from 'cheerio';
 import { chunkText, type ChunkedDocument, selectRelevantChunks, formatContextWithCitations, type DocumentChunk } from './rag-utils';
 import { google } from 'googleapis';
 import crypto from 'crypto';
+import { getPdfFormFields, proposePdfFieldValues, fillNativePdf } from './form-compiler-pro';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { getSecret } from './gcp-secrets';
 import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType } from "docx";
@@ -1102,6 +1103,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per compilare documenti con AI
   // NEW: Layout analysis for Document Studio (Gemini-Native via AiService)
 
+  // Endpoint per scoprire campi nativi (AcroForm) in un PDF
+  app.post('/api/pdf/discover-fields', async (req: Request, res: Response) => {
+    try {
+      const { masterSource } = req.body;
+      if (!masterSource || !masterSource.base64) {
+        return res.status(400).json({ error: 'Master source mancante' });
+      }
+
+      const buffer = Buffer.from(masterSource.base64, 'base64');
+      const fields = await getPdfFormFields(buffer);
+
+      res.json({ fields });
+    } catch (error: any) {
+      console.error('[API discover-fields] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Endpoint per generare proposte di valori per i campi PDF
+  app.post('/api/pdf/propose-values', async (req: Request, res: Response) => {
+    try {
+      const { fields, sources, notes, masterSource } = req.body;
+
+      let context = '';
+      if (sources && Array.isArray(sources)) {
+        for (const source of sources) {
+          const buffer = Buffer.from(source.base64, 'base64');
+          const text = await extractText(buffer, source.type, source.id);
+          context += `\n--- FONTE: ${source.name} ---\n${text}\n`;
+        }
+      }
+
+      if (masterSource) {
+        const buffer = Buffer.from(masterSource.base64, 'base64');
+        const text = await extractText(buffer, masterSource.type, masterSource.id);
+        context += `\n--- FONTE MASTER: ${masterSource.name} ---\n${text}\n`;
+      }
+
+      const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
+      const apiKey = await getModelApiKey('gemini');
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+
+      const vertexAIInstance = new VertexAI({ project: projectId, location: 'us-central1' });
+      const model = vertexAIInstance.getGenerativeModel({
+        model: 'gemini-2.0-flash-exp'
+      });
+
+      const proposals = await proposePdfFieldValues(fields, context, notes, model);
+      res.json({ proposals });
+    } catch (error: any) {
+      console.error('[API propose-values] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Endpoint per finalizzare il PDF compilato
+  app.post('/api/pdf/finalize', async (req: Request, res: Response) => {
+    try {
+      const { masterSource, values } = req.body;
+      if (!masterSource || !masterSource.base64) {
+        return res.status(400).json({ error: 'Master source mancante' });
+      }
+
+      const buffer = Buffer.from(masterSource.base64, 'base64');
+      const filledBuffer = await fillNativePdf(buffer, values);
+
+      res.json({
+        base64: filledBuffer.toString('base64'),
+        name: `filled-${masterSource.name}`
+      });
+    } catch (error: any) {
+      console.error('[API finalize-pdf] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
 
   app.post('/api/compile', async (req: Request, res: Response) => {
@@ -1548,6 +1624,60 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
     }
   });
 
+  // Endpoint per generare un saluto dinamico al caricamento della chat
+  app.get('/api/greeting', async (req, res) => {
+    try {
+      const sourcesParam = req.query.sources as string;
+      const sources = sourcesParam ? JSON.parse(sourcesParam) : [];
+
+      let memoryContext = '';
+      if (sources && Array.isArray(sources)) {
+        const memorySource = sources.find((s: any) => s.isMemory);
+        if (memorySource && memorySource.base64) {
+          const buffer = Buffer.from(memorySource.base64, 'base64');
+          memoryContext = await extractText(buffer, memorySource.type, memorySource.driveId || memorySource.id);
+        }
+      }
+
+      const project = process.env.GCP_PROJECT_ID;
+      const location = 'europe-west1';
+      const { VertexAI } = await import("@google-cloud/vertexai");
+
+      let vertex_ai;
+      if (vertexAICache && vertexAICache.project === project && vertexAICache.location === location) {
+        vertex_ai = vertexAICache.client;
+      } else {
+        vertex_ai = new VertexAI({ project, location });
+        vertexAICache = { client: vertex_ai, project: project!, location };
+      }
+
+      const model = vertex_ai.getGenerativeModel({
+        model: ANALYZER_MODEL_ID,
+        systemInstruction: {
+          role: 'system',
+          parts: [{
+            text: `Sei Gromit, un assistente AI esperto in Document Intelligence sviluppato da CSD Station LLC. 
+          Genera un saluto iniziale accogliente e professionale (massimo 40 parole).
+          ${memoryContext ? `Usa queste informazioni sulla memoria dell'utente per personalizzare il saluto in modo discreto (l'utente è Carlo Galli): ${memoryContext}` : "Sii accogliente e pronto ad aiutare."}
+          Chiedi esplicitamente come puoi supportare l'utente oggi nell'analisi dei suoi documenti.` }]
+        }
+      });
+
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: 'Genera il messaggio di saluto iniziale per la chat.' }] }],
+        generationConfig: { maxOutputTokens: 100, temperature: 0.8 }
+      });
+
+      const response = await result.response;
+      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "Ciao! Sono Gromit, il tuo assistente per l'analisi documentale. Come posso aiutarti oggi?";
+
+      res.json({ text });
+    } catch (error: any) {
+      console.error('Error generating greeting:', error);
+      res.json({ text: "Ciao! Sono Gromit, un assistente AI specializzato in intelligenza documentale. Come posso aiutarti oggi?" });
+    }
+  });
+
   // Endpoint per chat con AI (con streaming e file support)
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
@@ -1732,8 +1862,14 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       let systemInstruction = `Sei Gromit, un assistente AI esperto e professionale specializzato nell'estrazione di dati da fonti e nell'elaborazione di documenti (Document Intelligence Engine). 
 
 **PROTOCOLLO DI SALUTO E IDENTITÀ (CRITICO):**
-1. **Saluto Iniziale**: Se l'utente ti saluta in modo semplice (es. "ciao", "buongiorno"), rispondi SEMPRE e SOLTANTO così: "Ciao! Sono Gromit, un assistente AI specializzato in intelligenza documentale, Come posso aiutarti oggi?". 
+1. **Saluto Naturale**: Rispondi sempre in modo cordiale. Se l'utente ti saluta, rispondi naturalmente. Se l'utente ha già iniziato la conversazione dopo il tuo saluto iniziale, evita di ripetere "Ciao! Sono Gromit" in ogni risposta; sii diretto.
 2. **Divieto di Dettagli Proattivi**: NON menzionare CSD Station LLC, il fondatore o dettagli sullo sviluppo nel saluto iniziale o in risposte standard, a meno che non ti venga chiesto EPISCITAMENTE "Chi ti ha creato?", "Chi ti ha sviluppato?", "Chi è il tuo fondatore?" o domande simili sull'identità societaria e tecnica.
+
+**FORMATTAZIONE LINK (TASSATIVO):**
+1. **Link Cliccabili**: Ogni volta che fornisci un URL, un sito web o un link a un modulo (es. IRS, siti governativi), DEVI SEMPRE usare la sintassi markdown: [Etichetta Descrittiva](URL). 
+   - Esempio: [Modulo IRS 1120](https://www.irs.gov/pub/irs-pdf/f1120.pdf)
+   - NON scrivere mai URL nudi o non cliccabili.
+2. **Precisione**: Verifica che il link sia esattamente quello richiesto o il più pertinente trovato tramite Web Research.
 
 **CHI SEI E CHI TI HA SVILUPPATO (SOLO SU RICHIESTA ESPLICITA):**
 1. **Identità**: Sei Gromit, un Large Language Model basato su tecnologia di Google.

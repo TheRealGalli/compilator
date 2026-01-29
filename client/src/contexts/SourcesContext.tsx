@@ -10,6 +10,7 @@ export interface Source {
     base64?: string;
     isMemory?: boolean;
     isMaster?: boolean; // Master source for formatting (Blue Check)
+    isFillable?: boolean; // Native PDF Form Fields detected
     driveId?: string; // Original Google Drive ID
 }
 
@@ -62,6 +63,20 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
             return 'invalid_format';
         }
 
+        let isFillable = false;
+        if (extension === 'pdf') {
+            try {
+                const { PDFDocument } = await import('pdf-lib');
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfDoc = await PDFDocument.load(arrayBuffer);
+                const form = pdfDoc.getForm();
+                const fields = form.getFields();
+                isFillable = fields.length > 0;
+            } catch (error) {
+                console.warn('[SourcesContext] Error checking if PDF is fillable:', error);
+            }
+        }
+
         try {
             const base64 = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
@@ -82,6 +97,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 size: file.size,
                 base64: base64,
                 isMemory: options?.isMemory,
+                isFillable: isFillable,
                 driveId: options?.driveId
             };
 

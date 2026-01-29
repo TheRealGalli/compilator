@@ -34,14 +34,49 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content: "Ciao! Sono il tuo assistente di ricerca AI. Posso aiutarti ad analizzare i tuoi documenti, rispondere a domande e generare approfondimenti. Come posso aiutarti?",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isGreetingLoading, setIsGreetingLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchGreeting = async () => {
+      try {
+        const url = new URL(getApiUrl('/api/greeting'), window.location.origin);
+        if (selectedSources && selectedSources.length > 0) {
+          url.searchParams.append('sources', JSON.stringify(selectedSources.map(s => ({
+            id: s.id,
+            name: s.name,
+            type: s.type,
+            base64: s.base64,
+            isMemory: s.isMemory,
+            driveId: s.driveId
+          }))));
+        }
+
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error('Failed to fetch greeting');
+        const data = await res.json();
+
+        setMessages([{
+          id: "greeting",
+          role: "assistant",
+          content: data.text,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }]);
+      } catch (error) {
+        console.error('Error fetching greeting:', error);
+        setMessages([{
+          id: "greeting-fallback",
+          role: "assistant",
+          content: "Ciao! Sono Gromit, il tuo assistente per l'analisi documentale. Come posso aiutarti oggi?",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }]);
+      } finally {
+        setIsGreetingLoading(false);
+      }
+    };
+
+    fetchGreeting();
+  }, []);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [webResearch, setWebResearch] = useState(false);
@@ -335,7 +370,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           {messages.map((message) => (
             <ChatMessage key={message.id} {...message} userInitial={userIdentity?.initial} />
           ))}
-          {isLoading && (
+          {(isLoading || isGreetingLoading) && (
             <div className="flex gap-3 justify-start">
               <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
                 <Asterisk

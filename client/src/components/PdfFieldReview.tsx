@@ -1,0 +1,158 @@
+import { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Check, X, Info, Edit2, Save } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+export interface FieldProposal {
+    name: string;
+    type: 'text' | 'checkbox' | 'dropdown' | 'radio' | 'unknown';
+    value: string | boolean;
+    reasoning: string;
+    status: 'pending' | 'approved' | 'rejected';
+}
+
+interface PdfFieldReviewProps {
+    proposals: FieldProposal[];
+    onUpdate: (updated: FieldProposal[]) => void;
+    onFinalize: () => void;
+    isFinalizing: boolean;
+    title?: string;
+}
+
+export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, title = "Revisione Campi PDF" }: PdfFieldReviewProps) {
+    const [editingIdx, setEditingIdx] = useState<number | null>(null);
+    const [editValue, setEditValue] = useState<string>("");
+
+    const updateStatus = (index: number, status: FieldProposal['status']) => {
+        const next = [...proposals];
+        next[index].status = status;
+        onUpdate(next);
+    };
+
+    const startEditing = (index: number) => {
+        setEditingIdx(index);
+        setEditValue(String(proposals[index].value));
+    };
+
+    const saveEdit = (index: number) => {
+        const next = [...proposals];
+        const type = next[index].type;
+
+        if (type === 'checkbox') {
+            next[index].value = editValue.toLowerCase() === 'true';
+        } else {
+            next[index].value = editValue;
+        }
+
+        next[index].status = 'approved';
+        onUpdate(next);
+        setEditingIdx(null);
+    };
+
+    return (
+        <Card className="flex flex-col h-full border-blue-200 bg-blue-50/30">
+            <div className="p-4 border-b flex items-center justify-between bg-muted/30">
+                <div>
+                    <h3 className="font-semibold text-blue-900">{title}</h3>
+                    <p className="text-xs text-blue-700">Controlla e approva i dati proposti dall'intelligenza documentale.</p>
+                </div>
+                <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                    {proposals.filter(p => p.status === 'approved').length} / {proposals.length} Approvati
+                </Badge>
+            </div>
+
+            <ScrollArea className="flex-1 p-4">
+                <div className="space-y-3">
+                    {proposals.map((proposal, idx) => (
+                        <div
+                            key={proposal.name}
+                            className={`p-3 rounded-lg border transition-all ${proposal.status === 'approved' ? 'bg-green-50 border-green-200' :
+                                proposal.status === 'rejected' ? 'bg-red-50 border-red-200 opacity-60' :
+                                    'bg-white border-blue-100'
+                                }`}
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-xs font-mono font-bold text-gray-500 truncate">
+                                            {proposal.name}
+                                        </span>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger>
+                                                    <Info className="w-3 h-3 text-blue-400" />
+                                                </TooltipTrigger>
+                                                <TooltipContent className="max-w-[200px]">
+                                                    <p className="text-xs">{proposal.reasoning}</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
+
+                                    {editingIdx === idx ? (
+                                        <div className="flex gap-2">
+                                            <Input
+                                                value={editValue}
+                                                onChange={(e) => setEditValue(e.target.value)}
+                                                className="h-8 text-sm"
+                                                autoFocus
+                                            />
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => saveEdit(idx)}>
+                                                <Save className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium text-sm text-gray-900">
+                                                {proposal.type === 'checkbox' ? (proposal.value ? "Selezionato" : "Deselezionato") : String(proposal.value) || "[Vuoto]"}
+                                            </span>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-40 hover:opacity-100" onClick={() => startEditing(idx)}>
+                                                <Edit2 className="w-3 h-3" />
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-1">
+                                    <Button
+                                        size="icon"
+                                        variant={proposal.status === 'approved' ? 'default' : 'outline'}
+                                        className={`h-8 w-8 ${proposal.status === 'approved' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                                        onClick={() => updateStatus(idx, 'approved')}
+                                    >
+                                        <Check className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                        size="icon"
+                                        variant={proposal.status === 'rejected' ? 'destructive' : 'outline'}
+                                        className="h-8 w-8"
+                                        onClick={() => updateStatus(idx, 'rejected')}
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
+
+            <div className="p-4 bg-white border-t border-blue-100">
+                <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                    onClick={onFinalize}
+                    disabled={isFinalizing || proposals.length === 0}
+                >
+                    {isFinalizing ? "Generazione PDF..." : "Finalizza Compilazione"}
+                </Button>
+                <p className="text-[10px] text-center text-gray-400 mt-2 italic">
+                    I valori approvati verranno inseriti nei campi originali del modulo PDF.
+                </p>
+            </div>
+        </Card>
+    );
+}
