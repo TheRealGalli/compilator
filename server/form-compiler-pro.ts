@@ -33,34 +33,43 @@ export async function getPdfFormFields(buffer: Buffer): Promise<PdfFormField[]> 
     }
 }
 
+export interface MultimodalFile {
+    base64: string;
+    mimeType: string;
+    name: string;
+}
+
 /**
  * Proposes values for detected fields using Gemini.
- * Maps field names visually or by name to source context.
+ * Uses Multimodal capabilities to "see" the PDF instead of relying on broken text extraction.
  */
 export async function proposePdfFieldValues(
     fields: PdfFormField[],
-    sourceContext: string,
+    masterFile: MultimodalFile,
+    sourceFiles: MultimodalFile[],
+    sourceContext: string, // Text-based context (MD, DOCX, etc.)
     notes: string,
     geminiModel: any
 ): Promise<Array<{ name: string; label: string; value: string | boolean; reasoning: string }>> {
     try {
         const prompt = `Sei un esperto di Document Intelligence. 
-Abbiamo rilevato i seguenti campi tecnici in un PDF ufficiale. 
+Abbiamo rilevato i seguenti campi tecnici in un PDF ufficiale (FILE MASTER allegato). 
 Il tuo compito è:
-1. Mappare le informazioni dalle FONTI e dalle NOTE ai campi del PDF (se pertinenti).
-2. Per OGNI campo tecnico, dedurre l'ETICHETTA UMANA (Label) leggendo il nome tecnico o immaginando il testo che lo precede (es. "f1_1[0]" -> "1a. Name of Reporting Corporation").
+1. Analizzare il FILE MASTER per capire visivamente a cosa corrispondono i campi tecnici.
+2. Mappare le informazioni dai DOCUMENTI FONTE allegati e dalle NOTE ai campi del PDF.
+3. Per OGNI campo tecnico, dedurre l'ETICHETTA UMANA (Label) leggendo il nome tecnico o guardando il documento (es. "f1_1[0]" -> "1a. Name of Reporting Corporation").
 
-CAMPI RILEVATI:
+CAMPI RILEVATI DA COMPILARE:
 ${fields.map(f => `- Nome Tecnico: "${f.name}", Tipo: ${f.type}`).join('\n')}
 
-FONTI E CONTESTO:
+TESTO ESTRATTO DALLE FONTI:
 ${sourceContext}
 
 NOTE UTENTE:
 ${notes}
 
 REGOLE CRITICHE:
-1. Restituisci suggerimenti SOLO per i campi che riesci a compilare con certezza dalle fonti.
+1. Restituisci suggerimenti SOLO per i campi che riesci a compilare con ragionevole certezza.
 2. Per ogni suggerimento, fornisci:
    - "name": Il nome tecnico rilevato.
    - "label": L'etichetta umana (es. "1a Name", "Total Assets").
@@ -75,8 +84,29 @@ Restituisci un JSON con questa struttura:
 }
 `;
 
+        // Prepare multimodal parts
+        const parts: any[] = [{ text: prompt }];
+
+        // Add Master PDF
+        parts.push({
+            inlineData: {
+                data: masterFile.base64,
+                mimeType: masterFile.mimeType
+            }
+        });
+
+        // Add Source Files (limit to avoid token/quota issues if many)
+        for (const source of sourceFiles.slice(0, 5)) {
+            parts.push({
+                inlineData: {
+                    data: source.base64,
+                    mimeType: source.mimeType
+                }
+            });
+        }
+
         const result = await geminiModel.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+            contents: [{ role: 'user', parts }]
         });
 
         const response = await result.response;

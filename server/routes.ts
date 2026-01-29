@@ -1156,19 +1156,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { fields, sources, notes, masterSource } = req.body;
 
-      let context = '';
+      // Prepara contesto multimodale
+      const masterFile = {
+        base64: masterSource.base64,
+        mimeType: masterSource.type,
+        name: masterSource.name || 'Master.pdf'
+      };
+
+      const sourceFiles: any[] = [];
+      let textContext = '';
+
       if (sources && Array.isArray(sources)) {
         for (const source of sources) {
-          const buffer = Buffer.from(source.base64, 'base64');
-          const text = await extractText(buffer, source.type, source.id);
-          context += `\n--- FONTE: ${source.name} ---\n${text}\n`;
-        }
-      }
+          // Passiamo PDF e immagini come multimodali
+          if (source.type === 'application/pdf' || source.type.startsWith('image/')) {
+            sourceFiles.push({
+              base64: source.base64,
+              mimeType: source.type,
+              name: source.name
+            });
+          }
 
-      if (masterSource) {
-        const buffer = Buffer.from(masterSource.base64, 'base64');
-        const text = await extractText(buffer, masterSource.type, masterSource.id);
-        context += `\n--- FONTE MASTER: ${masterSource.name} ---\n${text}\n`;
+          // Proviamo comunque l'estrazione testo per il contesto (funziona bene per DOCX)
+          try {
+            const buffer = Buffer.from(source.base64, 'base64');
+            const text = await extractText(buffer, source.type, source.id);
+            if (text) {
+              textContext += `\n--- FONTE: ${source.name} ---\n${text}\n`;
+            }
+          } catch (e) {
+            console.warn(`[SERVER] Estrazione testo fallita per ${source.name}, ignorata (verrà usato multimodale se PDF)`);
+          }
+        }
       }
 
       const projectId = process.env.GCP_PROJECT_ID || 'compilator-479214';
@@ -1196,8 +1215,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const MAX_ATTEMPTS = 3;
         let batchProposals: any[] = [];
 
-        // Skip batch if context is error
-        if (context.includes('ERRORE SISTEMA: Impossibile estrarre testo')) {
+        // Skip batch if textContext suggests critical error
+        if (textContext.includes('ERRORE SISTEMA: Impossibile estrarre testo')) {
           console.error(`[SERVER] Skipping batch ${i + 1}/${fieldBatches.length} due to context error.`);
           continue;
         }
@@ -1205,7 +1224,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         while (attempts < MAX_ATTEMPTS) {
           try {
             console.log(`[SERVER] Batch ${i + 1}/${fieldBatches.length} (Attempt ${attempts + 1}). Fields: ${batch.length}`);
-            batchProposals = await proposePdfFieldValues(batch, context, notes || "", model);
+            batchProposals = await proposePdfFieldValues(
+              batch,
+              masterFile,
+              sourceFiles,
+              textContext,
+              notes || "",
+              model
+            );
 
             // SUCCESS: Move to next batch
             allProposals = [...allProposals, ...(batchProposals || [])];
