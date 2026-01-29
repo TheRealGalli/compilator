@@ -1,5 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 import fs from 'fs';
 import path from 'path';
 import multer from "multer";
@@ -245,16 +247,22 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
       // Use dynamic import for pdf-parse (ESM module)
       let pdfParse: any;
       try {
-        const pdfParseModule = await import('pdf-parse') as any;
-        pdfParse = pdfParseModule.default || pdfParseModule;
-        // Verify it's a function
-        if (typeof pdfParse !== 'function') {
-          console.error('[DEBUG extractText] pdfParse is still not a function, trying secondary access');
-          pdfParse = pdfParseModule.default || pdfParseModule;
+        pdfParse = require("pdf-parse");
+        if (typeof pdfParse !== "function" && pdfParse && (pdfParse as any).default) {
+          pdfParse = (pdfParse as any).default;
         }
       } catch (e) {
-        console.error('[DEBUG extractText] Error importing pdf-parse:', e);
-        throw new Error('PDF parsing library missing');
+        console.warn("[DEBUG extractText] require fallback failed, trying dynamic...");
+        try {
+          const mod = await import("pdf-parse") as any;
+          pdfParse = mod.default || mod;
+        } catch (innerE) {
+          console.error("[ERROR extractText] All pdf-parse import attempts failed:", innerE);
+          throw new Error("Libreria per il parsing dei PDF non caricata correttamente.");
+        }
+      }
+      if (typeof pdfParse !== "function") {
+        throw new Error("pdf-parse non è una funzione valida.");
       }
 
       console.log('[DEBUG extractText] Calling pdfParse...');
@@ -1168,17 +1176,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const MAX_ATTEMPTS = 3;
         let batchProposals: any[] = [];
 
+        // Skip batch if context is error
+        if (context.includes('ERRORE SISTEMA: Impossibile estrarre testo')) {
+          console.error(`[SERVER] Skipping batch ${i + 1}/${fieldBatches.length} due to context error.`);
+          continue;
+        }
+
         while (attempts < MAX_ATTEMPTS) {
           try {
             console.log(`[SERVER] Batch ${i + 1}/${fieldBatches.length} (Attempt ${attempts + 1}). Fields: ${batch.length}`);
             batchProposals = await proposePdfFieldValues(batch, context, notes || "", model);
 
-            if (batchProposals && batchProposals.length > 0) {
-              allProposals = [...allProposals, ...batchProposals];
-              break;
-            }
-
-            console.warn(`[SERVER] Empty response for batch ${i + 1}.`);
+            // SUCCESS: Move to next batch
+            allProposals = [...allProposals, ...(batchProposals || [])];
+            break;
           } catch (err: any) {
             const errMsg = err.message || String(err);
             if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED')) {
