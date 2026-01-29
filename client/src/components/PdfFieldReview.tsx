@@ -54,11 +54,11 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
     };
 
     return (
-        <Card className="flex flex-col h-full border-blue-200 bg-blue-50/30">
+        <Card className="flex flex-col h-full border rounded-lg bg-background shadow-none">
             <div className="p-4 border-b flex items-center justify-between bg-muted/30">
-                <div>
-                    <h3 className="font-semibold text-blue-900">{title}</h3>
-                    <p className="text-xs text-blue-700">Controlla e approva i dati proposti dall'intelligenza documentale.</p>
+                <div className="flex flex-col">
+                    <h3 className="font-semibold text-gray-900">{title}</h3>
+                    <p className="text-[11px] text-muted-foreground">Controlla e approva i dati proposti dall'intelligenza documentale.</p>
                 </div>
                 <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
                     {proposals.filter(p => p.status === 'approved').length} / {proposals.length} Approvati
@@ -93,12 +93,12 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                         </TooltipProvider>
                                     </div>
 
-                                    <div className="text-sm text-gray-700 leading-relaxed">
-                                        Compilazione del campo <span className="font-mono font-bold text-gray-900">"{proposal.name}"</span> con:
+                                    <div className="text-sm text-gray-700 leading-relaxed mb-2">
+                                        Compilazione del campo <span className="font-mono font-bold text-gray-900 break-all">"{proposal.name.split('.').pop() || proposal.name}"</span> con:
                                     </div>
 
                                     {editingIdx === idx ? (
-                                        <div className="flex gap-2 mt-1">
+                                        <div className="flex gap-2">
                                             <Input
                                                 value={editValue}
                                                 onChange={(e) => setEditValue(e.target.value)}
@@ -110,9 +110,12 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                             </Button>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="font-bold text-sm text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                                                {proposal.type === 'checkbox' ? (proposal.value ? "Selezionato" : "Deselezionato") : String(proposal.value) || "[Vuoto]"}
+                                        <div className="flex items-center gap-2">
+                                            <span className={`font-bold text-sm px-2 py-0.5 rounded border ${proposal.value === "[FONTE MANCANTE]"
+                                                ? "text-amber-700 bg-amber-50 border-amber-100"
+                                                : "text-blue-700 bg-blue-50 border-blue-100"
+                                                }`}>
+                                                {proposal.type === 'checkbox' ? (proposal.value === 'true' || proposal.value === true ? "Selezionato" : "Deselezionato") : String(proposal.value) || "[Vuoto]"}
                                             </span>
                                             <Button variant="ghost" size="icon" className="h-6 w-6 opacity-40 hover:opacity-100" onClick={() => startEditing(idx)}>
                                                 <Edit2 className="w-3 h-3" />

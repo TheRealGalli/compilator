@@ -1657,19 +1657,26 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
           role: 'system',
           parts: [{
             text: `Sei Gromit, un assistente AI esperto in Document Intelligence sviluppato da CSD Station LLC. 
-          Genera un saluto iniziale accogliente e professionale (massimo 40 parole).
+          Genera un saluto iniziale accogliente e professionale. 
           ${memoryContext ? `Usa queste informazioni sulla memoria dell'utente per personalizzare il saluto in modo discreto (l'utente è Carlo Galli): ${memoryContext}` : "Sii accogliente e pronto ad aiutare."}
-          Chiedi esplicitamente come puoi supportare l'utente oggi nell'analisi dei suoi documenti.` }]
+          Chiedi esplicitamente come puoi supportare l'utente oggi nell'analisi dei suoi documenti.
+          IMPORTANTE: Assicurati che il messaggio sia COMPLETO, non troncato e che termini con una domanda di supporto.` }]
         }
       });
 
       const result = await model.generateContent({
         contents: [{ role: 'user', parts: [{ text: 'Genera il messaggio di saluto iniziale per la chat.' }] }],
-        generationConfig: { maxOutputTokens: 100, temperature: 0.8 }
+        generationConfig: { maxOutputTokens: 250, temperature: 0.8 }
       });
 
       const response = await result.response;
-      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "Ciao! Sono Gromit, il tuo assistente per l'analisi documentale. Come posso aiutarti oggi?";
+      let text = response.candidates?.[0]?.content?.parts?.[0]?.text || "Ciao! Sono Gromit, il tuo assistente per l'analisi documentale. Come posso aiutarti oggi?";
+
+      // Safety check: if text is too short or doesn't end with proper punctuation, it might be truncated
+      if (text.length < 20 || !/[.?!]$/.test(text.trim())) {
+        console.warn('[SERVER] Greeting seems truncated, using fallback.');
+        text = "Ciao! Sono Gromit, l'intelligenza documentale di CSD Station LLC. Come posso assisterti oggi con l'analisi o la compilazione dei tuoi documenti?";
+      }
 
       res.json({ text });
     } catch (error: any) {

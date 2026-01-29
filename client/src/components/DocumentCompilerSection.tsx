@@ -473,8 +473,8 @@ export function DocumentCompilerSection({
         }
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        setFinalizedPdfUrl(url);
+
+        // Direct download using file-saver
         saveAs(blob, data.name || 'documento-compilato.pdf');
 
         toast({
@@ -795,9 +795,9 @@ export function DocumentCompilerSection({
           </div>
 
           <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
-            {/* Left Column: Template or PDF Review */}
             <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="h-full">
+              {/* Left Column: Template or PDF Review */}
+              <div className="min-h-[400px] lg:min-h-0 h-full">
                 {isPdfMode ? (
                   <PdfFieldReview
                     proposals={pdfProposals}
@@ -814,8 +814,8 @@ export function DocumentCompilerSection({
                 )}
               </div>
 
-              {/* Right Column: Compiled Output */}
-              <div className="h-full">
+              {/* Right Column: Compiled Output (Stable Placeholder) */}
+              <div className="min-h-[300px] lg:min-h-0 h-full">
                 <CompiledOutput
                   content={compiledContent}
                   onCopy={handleCopy}
