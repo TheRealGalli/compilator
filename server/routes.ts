@@ -248,25 +248,19 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
       let pdfParse: any;
       try {
         const mod = require("pdf-parse");
-        console.log(`[DEBUG extractText] pdf-parse required. type: ${typeof mod}, keys: ${Object.keys(mod || {}).join(', ')}`);
+        console.log(`[DEBUG extractText] pdf-parse required. Keys: ${Object.keys(mod || {}).join(', ')}`);
 
-        pdfParse = (typeof mod === 'function') ? mod : (mod.default || mod.pdf || mod);
-
-        // Handle double-wrapped defaults often seen in ESM-to-CJS bundling
-        if (typeof pdfParse !== 'function' && pdfParse && (pdfParse as any).default) {
-          pdfParse = (pdfParse as any).default;
+        if (typeof mod === 'function') {
+          pdfParse = mod;
+        } else if (mod && typeof mod.default === 'function') {
+          pdfParse = mod.default;
+        } else if (mod && typeof mod.pdf === 'function') {
+          pdfParse = mod.pdf;
+        } else if (mod && mod.default && typeof mod.default.default === 'function') {
+          pdfParse = mod.default.default;
         }
 
-        // Greedy search: if still not a function, find ANY function in the object
-        if (typeof pdfParse !== 'function' && mod && typeof mod === 'object') {
-          const funcKey = Object.keys(mod).find(k => typeof (mod as any)[k] === 'function');
-          if (funcKey) {
-            console.log(`[DEBUG extractText] Found potential parsing function at key: ${funcKey}`);
-            pdfParse = (mod as any)[funcKey];
-          }
-        }
-
-        if (typeof pdfParse !== 'function') {
+        if (!pdfParse) {
           console.warn("[DEBUG extractText] require failed to resolve function, trying dynamic import...");
           const dMod = await import("pdf-parse") as any;
           pdfParse = dMod.default || dMod;
@@ -286,14 +280,15 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
       }
 
       if (typeof pdfParse !== "function") {
-        const mod = require("pdf-parse");
-        throw new Error(`pdf-parse non è una funzione valida (trovato: ${typeof pdfParse}). Keys: ${Object.keys(mod || {}).join(', ')}`);
+        throw new Error(`pdf-parse non è una funzione valida (trovato: ${typeof pdfParse}).`);
       }
 
-      console.log('[DEBUG extractText] Calling pdfParse...');
+      console.log('[DEBUG extractText] Calling pdfParse function...');
       const data = await pdfParse(buffer);
-      console.log(`[DEBUG extractText] PDF parsed, text length: ${data.text.length}, pages: ${data.numpages}`);
-      return data.text;
+      const textContent = data && typeof data.text === 'string' ? data.text : "";
+      const pageCount = data && data.numpages ? data.numpages : 0;
+      console.log(`[DEBUG extractText] PDF parsed, text length: ${textContent.length}, pages: ${pageCount}`);
+      return textContent;
     } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       const result = await mammoth.extractRawText({ buffer });
       console.log(`[DEBUG extractText] DOCX parsed, text length: ${result.value.length}`);
