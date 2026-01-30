@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
     RotateCw,
     MoreVertical,
     Loader2,
-    Eye,
+    Asterisk,
     AlertCircle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
+    const [isEyeSpinning, setIsEyeSpinning] = useState(false);
 
     useEffect(() => {
         if (!fileBase64) return;
@@ -69,6 +70,11 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
             setIsLoading(false);
         }
     }, [fileBase64]);
+
+    const handleEyeClick = () => {
+        setIsEyeSpinning(true);
+        setTimeout(() => setIsEyeSpinning(false), 1000);
+    };
 
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
         setNumPages(numPages);
@@ -182,10 +188,17 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-blue-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                        className="h-7 w-7 p-0 flex items-center justify-center group/eye"
+                        onClick={handleEyeClick}
                         title="Gromit Assist"
                     >
-                        <Eye className="h-4 h-4" />
+                        <div className="relative flex items-center justify-center">
+                            <Asterisk
+                                className={`text-blue-500 transition-transform duration-1000 ${isEyeSpinning ? 'rotate-[360deg]' : ''}`}
+                                size={26}
+                                strokeWidth={3}
+                            />
+                        </div>
                     </Button>
                 </div>
             </div>
@@ -230,6 +243,11 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                             file={blobUrl}
                             onLoadSuccess={onDocumentLoadSuccess}
                             onLoadError={onDocumentLoadError}
+                            options={{
+                                cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+                                cMapPacked: true,
+                                standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+                            }}
                             loading={null}
                             className="max-w-full"
                         >
