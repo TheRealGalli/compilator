@@ -28,7 +28,7 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick
         <div className="flex items-center gap-2 cursor-pointer" onClick={handleLogoClick}>
           <ThreeStars className="w-8 h-8 text-blue-500" />
           <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-            Gromit <span className="text-[10px] align-top text-red-500 opacity-50 font-mono">v3.0-TEST</span>
+            Gromit
           </h1>
         </div>
         {/* The notebook title is removed as per the provided edit, assuming the new h1 replaces it */}

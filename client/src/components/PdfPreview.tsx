@@ -2,14 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-    Download, 
-    Printer, 
-    ZoomIn, 
-    ZoomOut, 
-    ChevronLeft, 
-    ChevronRight, 
-    RotateCw, 
+import {
+    Download,
+    Printer,
+    ZoomIn,
+    ZoomOut,
+    ChevronLeft,
+    ChevronRight,
+    RotateCw,
     MoreVertical,
     Loader2,
     Eye
@@ -26,8 +26,8 @@ import {
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
 // Necessary styles for react-pdf
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 
 interface PdfPreviewProps {
     fileBase64: string;
@@ -100,7 +100,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                     </span>
                     <div className="h-4 w-[1px] bg-slate-600 hidden sm:block" />
                     <div className="flex items-center gap-1 bg-slate-900/50 rounded px-2">
-                        <Input 
+                        <Input
                             value={pageNumber}
                             onChange={(e) => {
                                 const val = parseInt(e.target.value);
@@ -133,7 +133,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-100 hover:bg-slate-700" onClick={handlePrint}>
                         <Printer className="h-4 w-4" />
                     </Button>
-                    
+
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-100 hover:bg-slate-700">
@@ -149,11 +149,11 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    
+
                     <div className="h-4 w-[1px] bg-slate-600 mx-1" />
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-blue-400 hover:bg-blue-400/10 hover:text-blue-300 transition-colors"
                         title="Gromit Assist"
                     >
@@ -190,9 +190,9 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                             loading={null}
                             className="max-w-full"
                         >
-                            <Page 
-                                pageNumber={pageNumber} 
-                                scale={scale} 
+                            <Page
+                                pageNumber={pageNumber}
+                                scale={scale}
                                 rotate={rotation}
                                 renderAnnotationLayer={true}
                                 renderTextLayer={true}
@@ -207,8 +207,9 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                     )}
                 </div>
             </div>
-            
-            <style dangerouslySetInnerHTML={{ __html: `
+
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 .react-pdf__Page__canvas {
                     margin: 0 auto;
                     max-width: 100%;
