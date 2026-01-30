@@ -58,9 +58,23 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                     <h3 className="text-sm font-semibold text-foreground tracking-tight">{title}</h3>
                     <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Revisione intelligente dei campi mappati</p>
                 </div>
-                <Badge variant="outline" className="bg-blue-600/10 text-blue-700 border-blue-200/50 text-[10px] h-5 font-bold px-2">
-                    {compilableSorted.length} / {proposals.length}
-                </Badge>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 border border-blue-100"
+                        onClick={() => {
+                            const next = proposals.map(p => ({ ...p, status: 'approved' as const }));
+                            onUpdate(next);
+                        }}
+                        disabled={compilableSorted.length === 0}
+                    >
+                        Accetta Tutti
+                    </Button>
+                    <Badge variant="outline" className="bg-blue-600/10 text-blue-700 border-blue-200/50 text-[10px] h-5 font-bold px-2">
+                        {compilableSorted.filter(p => p.status === 'approved').length} / {proposals.length}
+                    </Badge>
+                </div>
             </div>
 
             <ScrollArea className="flex-1 p-4">

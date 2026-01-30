@@ -131,12 +131,17 @@ export async function fillNativePdf(buffer: Buffer, values: Record<string, strin
     try {
         const pdfDoc = await PDFDocument.load(buffer);
         const form = pdfDoc.getForm();
+        const availableFields = form.getFields().map(f => f.getName());
+        console.log(`[fillNativePdf] Form loaded. Available fields count: ${availableFields.length}`);
+        // console.log(`[fillNativePdf] Fields:`, availableFields);
 
         for (const [name, value] of Object.entries(values)) {
             try {
+                process.stdout.write(`[fillNativePdf] Filling "${name}" with "${value}"... `);
                 const field = form.getField(name);
                 if (field instanceof PDFTextField) {
                     field.setText(String(value));
+                    console.log("Success (Text)");
                 } else if (field instanceof PDFCheckBox) {
                     if (value === true || value === 'true' || value === 'on') {
                         field.check();
