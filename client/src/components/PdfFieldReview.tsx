@@ -21,15 +21,22 @@ interface PdfFieldReviewProps {
     onUpdate: (updated: FieldProposal[]) => void;
     onFinalize: () => void;
     isFinalizing: boolean;
+    isCompiling?: boolean;
     title?: string;
 }
 
-export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, title = "Revisione Campi PDF" }: PdfFieldReviewProps) {
+export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, isCompiling, title = "Revisione Campi PDF" }: PdfFieldReviewProps) {
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editValue, setEditValue] = useState<string>("");
 
     const updateStatus = (name: string, status: FieldProposal['status']) => {
         const next = proposals.map(p => p.name === name ? { ...p, status } : p);
+        onUpdate(next);
+    };
+
+    const handleAcceptAll = () => {
+        if (isCompiling || proposals.length === 0) return;
+        const next = proposals.map(p => ({ ...p, status: 'approved' as const }));
         onUpdate(next);
     };
 
@@ -51,6 +58,9 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
     const compilableSorted = proposals
         .filter(p => p.value !== undefined && p.value !== "" && p.value !== "[Vuoto]" && p.value !== "[FONTE MANCANTE]");
 
+    const approvedCount = compilableSorted.filter(p => p.status === 'approved').length;
+    const allApproved = approvedCount === proposals.length && proposals.length > 0;
+
     return (
         <Card className="flex flex-col h-full border rounded-lg bg-background shadow-none">
             <div className="p-3 border-b flex items-center justify-between bg-muted/30 flex-shrink-0">
@@ -59,21 +69,32 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                     <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Revisione intelligente dei campi mappati</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 border border-blue-100"
-                        onClick={() => {
-                            const next = proposals.map(p => ({ ...p, status: 'approved' as const }));
-                            onUpdate(next);
-                        }}
-                        disabled={compilableSorted.length === 0}
-                    >
-                        Accetta Tutti
-                    </Button>
-                    <Badge variant="outline" className="bg-blue-600/10 text-blue-700 border-blue-200/50 text-[10px] h-5 font-bold px-2">
-                        {compilableSorted.filter(p => p.status === 'approved').length} / {proposals.length}
-                    </Badge>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    onClick={handleAcceptAll}
+                                    disabled={isCompiling || proposals.length === 0 || allApproved}
+                                    className={`
+                                        flex items-center h-6 px-2.5 rounded-full border text-[10px] font-bold transition-all
+                                        ${allApproved
+                                            ? 'bg-green-600/20 text-green-700 border-green-300'
+                                            : isCompiling
+                                                ? 'bg-muted text-muted-foreground border-border opacity-50 cursor-not-allowed'
+                                                : 'bg-blue-600/10 text-blue-700 border-blue-200/50 hover:bg-blue-600/20 active:scale-95 cursor-pointer'
+                                        }
+                                    `}
+                                >
+                                    {approvedCount} / {proposals.length}
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left">
+                                <p className="text-[10px]">
+                                    {allApproved ? "Tutti i campi approvati" : isCompiling ? "Analisi in corso..." : "Clicca per approvare tutti"}
+                                </p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 </div>
             </div>
 

@@ -840,6 +840,7 @@ export function DocumentCompilerSection({
                     onUpdate={setPdfProposals}
                     onFinalize={handleFinalizePdf}
                     isFinalizing={isFinalizingPdf}
+                    isCompiling={isCompiling}
                     title="Template in Compilazione"
                   />
                 ) : (
