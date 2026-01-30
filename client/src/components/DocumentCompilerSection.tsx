@@ -364,10 +364,11 @@ export function DocumentCompilerSection({
           })));
 
           // Step 2: Incremental AI proposals in batches
-          const BATCH_SIZE = 5; // Ridotto da 40 a 5 per dare un effetto "real-time" progressivo
-          // Smaller batches for faster UI responsiveness
-          for (let i = 0; i < fields.length; i += BATCH_SIZE) {
-            const batch = fields.slice(i, i + BATCH_SIZE);
+          let processedCount = 0;
+          let currentBatchSize = 5; // Start with 5 for immediate "item-by-item" effect
+
+          while (processedCount < fields.length) {
+            const batch = fields.slice(processedCount, processedCount + currentBatchSize);
 
             try {
               const proposalRes = await fetch(getApiUrl('/api/pdf/propose-values'), {
@@ -377,14 +378,14 @@ export function DocumentCompilerSection({
                   fields: batch,
                   sources: selectedSources,
                   notes,
-                  webResearch, // Pass the webResearch flag
-                  cacheKey, // Use server-side cache for speed
-                  masterSource: i === 0 ? masterSource : undefined // Optional fallback
+                  webResearch,
+                  cacheKey,
+                  masterSource: processedCount === 0 ? masterSource : undefined
                 })
               });
 
               const { proposals } = await proposalRes.json();
-              console.log(`[DEBUG PDF] Batch ${i / BATCH_SIZE + 1} Received:`, proposals);
+              console.log(`[DEBUG PDF] Batch (${processedCount}-${processedCount + batch.length}) Received:`, proposals);
 
               // Update existing proposals with new values
               setPdfProposals(current => {
@@ -402,8 +403,14 @@ export function DocumentCompilerSection({
                 });
                 return next;
               });
+
+              processedCount += batch.length;
+              // Exponentially increase batch size up to a max of 20
+              currentBatchSize = Math.min(20, currentBatchSize * 2);
+
             } catch (err) {
-              console.error(`[PDF Batch Error] Failed on batch ${i}:`, err);
+              console.error(`[PDF Batch Error] Failed on index ${processedCount}:`, err);
+              processedCount += currentBatchSize; // Skip ahead on error to prevent infinite loop
             }
           }
 

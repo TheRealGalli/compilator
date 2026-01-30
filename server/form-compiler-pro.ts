@@ -71,38 +71,45 @@ export async function proposePdfFieldValues(
     try {
         const tools: any[] = [];
         if (webResearch) {
-            tools.push({ googleSearchRetrieval: {} });
+            tools.push({ googleSearch: {} });
         }
 
-        const prompt = `Sei un esperto di Document Intelligence. 
+        const prompt = `Sei un esperto di Document Intelligence e Precision Mapping. 
 Abbiamo rilevato i seguenti campi tecnici in un PDF ufficiale (FILE MASTER allegato). 
-Il tuo compito è:
-1. Analizzare il FILE MASTER per capire visivamente a cosa corrispondono i campi tecnici.
-2. Mappare le informazioni dai DOCUMENTI FONTE allegati e dalle NOTE ai campi del PDF.
-3. Per OGNI campo tecnico, dedurre l'ETICHETTA UMANA (Label) leggendo il nome tecnico (es. "f1_1[0]") e GUARDARE il FILE MASTER per capire cosa c'è scritto accanto o sopra al campo (es. "1a. Name of Reporting Corporation"). È fondamentale che il "label" sia leggibile e utile per un umano.
-${webResearch ? `4. **RICERCA WEB ATTIVA**: Cerca online le ISTRUZIONI UFFICIALI (es. "IRS Form 5472 instructions") per questo tipo di documento. Usa le regole ufficiali per compilare correttamente i campi tecnici se i documenti fonte non sono chiari.` : ''}
 
-CAMPI RILEVATI DA COMPILARE:
-${fields.map(f => `- Nome Tecnico: "${f.name}", Etichetta: "${f.label || 'N/A'}"`).join('\n')}
+IL TUO OBIETTIVO: 
+Mappare con precisione ogni informazione dalle FONTI ai campi del PDF originale.
 
-TESTO ESTRATTO DALLE FONTI:
+PROCESSO DI ANALISI:
+1. **Analisi Visiva Master**: Guarda attentamente il FILE MASTER (immagine PDF). Identifica la posizione visiva di ogni campo tecnico (es. "f1_1[0]").
+2. **Lettura Etichette**: Leggi il testo stampato immediatamente sopra, sotto o accanto al box del campo nel FILE MASTER (es. "1a Name of reporting corporation", "City or town"). 
+3. **Sostituzione Label**: Ignora il nome tecnico (es. "f1_1") e usa come "label" l'etichetta umana che hai letto visivamente.
+4. **Mappatura Dati**: Cerca nelle FONTI e nelle NOTE UTENTE l'informazione che corrisponde a quell'etichetta visiva.
+${webResearch ? `5. **Ricerca Web**: Se un campo è ambiguo (es. "Box 12 code"), cerca le istruzioni ufficiali del modulo per capire cosa inserire.` : ''}
+
+REGOLE DI RISPOSTA:
+- Sii estremamente preciso: se il campo chiede solo la città, non mettere l'indirizzo intero.
+- Per le checkbox, rispondi true o false.
+- Se l'informazione manca, scrivi "[FONTE MANCANTE]".
+
+CAMPI DA ANALIZZARE:
+${fields.map(f => `- ID: "${f.name}", Label Attuale: "${f.label || 'N/A'}"`).join('\n')}
+
+TESTO FONTI:
 ${sourceContext}
 
 NOTE UTENTE:
 ${notes}
 
-REGOLE CRITICHE:
-1. Restituisci suggerimenti SOLO per i campi che riesci a compilare con ragionevole certezza.
-2. Per ogni suggerimento, fornisci:
-   - "name": Il nome tecnico rilevato.
-   - "label": L'etichetta umana (es. "1a Name", "Total Assets").
-   - "value": Il valore proposto (stringa per testo, booleano per checkbox).
-   - "reasoning": Spiegazione breve (max 10 parole).
-
-Restituisci un JSON con questa struttura:
+Restituisci JSON:
 {
   "proposals": [
-    { "name": "f1_1[0]", "label": "1a Name of Corporation", "value": "CyberSpace Station", "reasoning": "Trovato nel Master." }
+    { 
+      "name": "ID originale", 
+      "label": "Etichetta Umana Leggibile", 
+      "value": "Valore Proposto", 
+      "reasoning": "Logica usata (es: Trovata nel box 1a del Master)" 
+    }
   ]
 }
 `;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Check, X, Info, Edit2, Save, Square } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -29,6 +29,52 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editValue, setEditValue] = useState<string>("");
 
+    // Animation/Progression State: revealedNames tracks which items are visible to the user
+    const [revealedNames, setRevealedNames] = useState<Set<string>>(new Set());
+    const revealTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Effect to drip-feed proposals into the visible list
+    useEffect(() => {
+        // Find proposals that have a value/reasoning but aren't revealed yet
+        const pendingReveal = proposals.filter(p =>
+            p.value !== "" &&
+            p.value !== undefined &&
+            !revealedNames.has(p.name)
+        );
+
+        if (pendingReveal.length > 0 && !revealTimerRef.current) {
+            // "Drip feed" - reveal one every 3 seconds
+            revealTimerRef.current = setInterval(() => {
+                setRevealedNames(prev => {
+                    // Get the next item to reveal from the latest proposals
+                    const currentProposals = proposals; // capture current scale
+                    const nextToReveal = currentProposals.find(p =>
+                        p.value !== "" &&
+                        p.value !== undefined &&
+                        !prev.has(p.name)
+                    );
+
+                    if (!nextToReveal) {
+                        if (revealTimerRef.current) clearInterval(revealTimerRef.current);
+                        revealTimerRef.current = null;
+                        return prev;
+                    }
+
+                    const next = new Set(prev);
+                    next.add(nextToReveal.name);
+                    return next;
+                });
+            }, 3000); // 3 seconds interval as requested
+        }
+
+        return () => {
+            if (revealTimerRef.current) {
+                clearInterval(revealTimerRef.current);
+                revealTimerRef.current = null;
+            }
+        };
+    }, [proposals, revealedNames]);
+
     const updateStatus = (name: string, status: FieldProposal['status']) => {
         const next = proposals.map(p => p.name === name ? { ...p, status } : p);
         onUpdate(next);
@@ -55,8 +101,10 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
         setEditingName(null);
     };
 
+    // Filter which items to show based on animation state
     const compilableSorted = proposals
-        .filter(p => p.value !== undefined && p.value !== "" && p.value !== "[Vuoto]" && p.value !== "[FONTE MANCANTE]");
+        .filter(p => p.value !== undefined && p.value !== "" && p.value !== "[Vuoto]" && p.value !== "[FONTE MANCANTE]")
+        .filter(p => revealedNames.has(p.name));
 
     const approvedCount = compilableSorted.filter(p => p.status === 'approved').length;
     const allApproved = approvedCount === proposals.length && proposals.length > 0;
@@ -100,7 +148,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
 
             <ScrollArea className="flex-1 p-4">
                 <div className="space-y-3">
-                    {compilableSorted.length === 0 && (
+                    {(compilableSorted.length === 0) && (
                         <div className="flex flex-col items-center justify-center h-40 opacity-40">
                             <Square className="w-8 h-8 mb-2 animate-pulse text-blue-400" />
                             <p className="text-xs font-medium text-center px-4 tracking-tight">Sto analizzando il documento...<br />I campi compilati appariranno qui.</p>
@@ -110,7 +158,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                         .map((proposal) => (
                             <div
                                 key={proposal.name}
-                                className={`p-3 rounded-lg border transition-all ${proposal.status === 'approved' ? 'bg-green-500/10 border-green-500/20' :
+                                className={`p-3 rounded-lg border transition-all animate-in fade-in slide-in-from-bottom-2 duration-500 ${proposal.status === 'approved' ? 'bg-green-500/10 border-green-500/20' :
                                     proposal.status === 'rejected' ? 'bg-red-500/10 border-red-500/20 opacity-60' :
                                         'bg-muted/5 border-border/50'
                                     }`}
