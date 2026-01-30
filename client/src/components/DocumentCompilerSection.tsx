@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TemplateEditor } from "./TemplateEditor";
 import { CompiledOutput } from "./CompiledOutput";
+import { PdfFieldReview, type FieldProposal } from "./PdfFieldReview";
+import { PdfPreview } from "./PdfPreview";
 import { ModelSettings } from "./ModelSettings";
 import { Card } from "@/components/ui/card";
 
@@ -16,15 +18,14 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSources } from "@/contexts/SourcesContext";
 import { Slider } from "@/components/ui/slider";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-// import { PdfFieldReview, type FieldProposal } from "./PdfFieldReview"; // Rimossa per revert UI
+// import {
+//   DropdownMenu,
+//   DropdownMenuContent,
+//   DropdownMenuItem,
+//   DropdownMenuLabel,
+//   DropdownMenuSeparator,
+//   DropdownMenuTrigger,
+// } from "@/components/ui/dropdown-menu";
 
 import { getApiUrl } from "@/lib/api-config";
 import { apiRequest } from "@/lib/queryClient";
@@ -239,7 +240,11 @@ export function DocumentCompilerSection({
   const [extractedFields, setExtractedFields] = useState<Array<{ fieldName: string; fieldType: string }>>([]);
   const [studioFontSize, setStudioFontSize] = useState<number>(14);
 
-  // PDF Mode rimosso per revert UI
+  // PDF Mode & Field Review
+  const [isPdfMode, setIsPdfMode] = useState(false);
+  const [pdfProposals, setPdfProposals] = useState<FieldProposal[]>([]);
+  const [isFinalizingPdf, setIsFinalizingPdf] = useState(false);
+  const [finalizedPdfUrl, setFinalizedPdfUrl] = useState<string | null>(null);
 
 
 
@@ -321,7 +326,9 @@ export function DocumentCompilerSection({
   const handleCompile = async () => {
     if (isCompiling) return;
 
-    if (!templateContent.trim() && selectedSources.length === 0) {
+    const isFillablePdf = masterSource && masterSource.isFillable;
+
+    if (!isFillablePdf && !templateContent.trim() && selectedSources.length === 0) {
       toast({
         title: "Errore",
         description: "Seleziona un template o aggiungi delle fonti per procedere.",
@@ -332,56 +339,116 @@ export function DocumentCompilerSection({
 
     setIsCompiling(true);
     try {
-      const { getApiUrl } = await import("@/lib/api-config");
-
-      console.log('[DEBUG Frontend] selectedSources:', selectedSources);
-
-      // Pass sources with base64 content directly
-      const sourcesForCompiler = selectedSources.map((source) => ({
-        name: source.name,
-        type: source.type,
-        base64: source.base64,
-      }));
-
-      console.log('[DEBUG Frontend] Sources for compiler:', sourcesForCompiler.length);
-
-      const response = await apiRequest('POST', '/api/compile', {
-        template: templateContent,
-        notes,
-        temperature,
-        webResearch,
-        detailedAnalysis,
-        formalTone,
-        modelProvider,
-        sources: selectedSources.map(s => ({
-          name: s.name,
-          type: s.type,
-          base64: s.base64
-        })),
-        masterSource: masterSource ? {
-          name: masterSource.name,
-          type: masterSource.type,
-          base64: masterSource.base64
-        } : null,
-        extractedFields: extractedFields.length > 0 ? extractedFields : undefined
-      });
-
-
-
-      const data = await response.json();
-      if (data.compiledContent) {
-        setCompiledContent(data.compiledContent);
-
-        const settingsInfo = [];
-        if (webResearch) settingsInfo.push('Web Research');
-        if (detailedAnalysis) settingsInfo.push('Analisi Dettagliata');
-        if (formalTone) settingsInfo.push('Tono Formale');
-        if (selectedSources.length > 0) settingsInfo.push(`${selectedSources.length} docs`);
-
-        toast({
-          title: "Documento compilato con successo",
-          description: `Temperatura: ${temperature.toFixed(1)} | Strumenti attivi: ${settingsInfo.join(', ')}`,
+      if (isFillablePdf) {
+        // Step 1: Discover native fields
+        const discoveryRes = await fetch(getApiUrl('/api/pdf/discover-fields'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ masterSource })
         });
+        const { fields, cacheKey } = await discoveryRes.json();
+
+        if (fields && fields.length > 0) {
+          // IMMEDIATE UI FEEDBACK: Show the review panel and initialize placeholders
+          setIsPdfMode(true);
+          setPdfProposals(fields.map((f: any) => ({
+            name: f.name,
+            label: f.label || f.name,
+            type: f.type,
+            value: "",
+            reasoning: "In attesa di analisi AI...",
+            status: 'pending'
+          })));
+
+          // Step 2: Incremental AI proposals in batches
+          const BATCH_SIZE = 25;
+          let allProposals: any[] = [];
+
+          for (let i = 0; i < fields.length; i += BATCH_SIZE) {
+            const batch = fields.slice(i, i + BATCH_SIZE);
+
+            try {
+              const proposalRes = await fetch(getApiUrl('/api/pdf/propose-values'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  fields: batch,
+                  sources: selectedSources,
+                  notes,
+                  webResearch,
+                  cacheKey,
+                  // Inviamo il master in OGNI batch per garantire coerenza visiva e precisione di mappatura
+                  masterSource: masterSource
+                })
+              });
+
+              const { proposals } = await proposalRes.json();
+              console.log(`[DEBUG PDF] Batch (${i}-${i + batch.length}) Received:`, proposals);
+              allProposals = [...allProposals, ...proposals];
+
+              // Aggiorniamo la UI incrementalmente per feedback istantaneo
+              setPdfProposals(current => {
+                const next = [...current];
+                proposals.forEach((p: any) => {
+                  const idx = next.findIndex(item => item.name === p.name);
+                  if (idx !== -1) {
+                    next[idx] = {
+                      ...next[idx],
+                      value: p.value,
+                      label: p.label,
+                      reasoning: p.reasoning,
+                      status: 'pending' // Still needs human approval
+                    };
+                  }
+                });
+                return next;
+              });
+
+            } catch (err) {
+              console.error(`[PDF Batch Error] Failed on batch ${i}:`, err);
+            }
+          }
+        } else {
+          toast({
+            title: "Nessun campo rilevato",
+            description: "Il PDF master non sembra contenere campi modulo compilabili.",
+            variant: "destructive"
+          });
+        }
+      } else {
+        // Standard template compilation
+        console.log('[DEBUG Frontend] selectedSources:', selectedSources);
+
+        const response = await apiRequest('POST', '/api/compile', {
+          template: templateContent,
+          notes,
+          temperature,
+          webResearch,
+          detailedAnalysis,
+          formalTone,
+          modelProvider,
+          sources: selectedSources.map(s => ({
+            name: s.name,
+            type: s.type,
+            base64: s.base64
+          })),
+          masterSource: masterSource ? {
+            name: masterSource.name,
+            type: masterSource.type,
+            base64: masterSource.base64
+          } : null
+        });
+
+        const data = await response.json();
+        if (data.compiledContent) {
+          setCompiledContent(data.compiledContent);
+          setIsPdfMode(false); // Back to standard mode if we compile a template
+
+          toast({
+            title: "Documento compilato con successo",
+            description: `Modello: ${modelProvider} | Docs: ${selectedSources.length}`,
+          });
+        }
       }
     } catch (error: any) {
       console.error('Errore compilazione:', error);
@@ -392,6 +459,57 @@ export function DocumentCompilerSection({
       });
     } finally {
       setIsCompiling(false);
+    }
+  };
+
+  const handleFinalizePdf = async () => {
+    if (isFinalizingPdf || pdfProposals.length === 0) return;
+
+    setIsFinalizingPdf(true);
+    try {
+      // Filter only approved values
+      const approvedValues: Record<string, string | boolean> = {};
+      pdfProposals.forEach(p => {
+        if (p.status === 'approved') {
+          approvedValues[p.name] = p.value;
+        }
+      });
+
+      const response = await fetch(getApiUrl('/api/pdf/finalize'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          masterSource,
+          values: approvedValues
+        })
+      });
+
+      if (!response.ok) throw new Error("Errore durante la finalizzazione PDF");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setFinalizedPdfUrl(url);
+
+      // Trigger automatic download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `compilato-${masterSource?.name || 'documento'}.pdf`;
+      a.click();
+
+      toast({
+        title: "PDF Finalizzato",
+        description: "Il documento è stato generato e il download è iniziato.",
+      });
+
+    } catch (err: any) {
+      console.error("[Finalize PDF Error]", err);
+      toast({
+        title: "Errore",
+        description: "Impossibile generare il PDF finale.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsFinalizingPdf(false);
     }
   };
 
@@ -693,23 +811,48 @@ export function DocumentCompilerSection({
             />
           </div>
 
-          <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
-            <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="min-h-[400px] lg:min-h-0 h-full">
-                <TemplateEditor
-                  value={templateContent}
-                  onChange={setTemplateContent}
-                />
+          <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
+            {isPdfMode ? (
+              /* PDF STUDIO UNIFIED VIEW */
+              <div className="h-full flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-500">
+                <Card className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
+                  <div className="flex-1 min-h-[400px] lg:min-h-0 border-r border-border/50">
+                    <PdfPreview
+                      fileBase64={masterSource?.base64 || ""}
+                      className="rounded-none border-none h-full"
+                    />
+                  </div>
+                  <div className="w-full lg:w-[400px] shrink-0 h-[400px] lg:h-full bg-muted/5">
+                    <PdfFieldReview
+                      proposals={pdfProposals}
+                      onUpdate={setPdfProposals}
+                      onFinalize={handleFinalizePdf}
+                      isFinalizing={isFinalizingPdf}
+                      isCompiling={isCompiling}
+                      title="Studio Compilazione PDF"
+                    />
+                  </div>
+                </Card>
               </div>
+            ) : (
+              /* STANDARD COMPILER VIEW */
+              <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="min-h-[400px] lg:min-h-0 h-full">
+                  <TemplateEditor
+                    value={templateContent}
+                    onChange={setTemplateContent}
+                  />
+                </div>
 
-              <div className="min-h-[300px] lg:min-h-0 h-full">
-                <CompiledOutput
-                  content={compiledContent}
-                  onCopy={handleCopy}
-                  onDownload={handleDownload}
-                />
+                <div className="min-h-[300px] lg:min-h-0 h-full">
+                  <CompiledOutput
+                    content={compiledContent}
+                    onCopy={handleCopy}
+                    onDownload={handleDownload}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
