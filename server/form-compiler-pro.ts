@@ -65,15 +65,22 @@ export async function proposePdfFieldValues(
     sourceFiles: MultimodalFile[],
     sourceContext: string, // Text-based context (MD, DOCX, etc.)
     notes: string,
-    geminiModel: any
+    geminiModel: any,
+    webResearch: boolean = false
 ): Promise<Array<{ name: string; label: string; value: string | boolean; reasoning: string }>> {
     try {
+        const tools: any[] = [];
+        if (webResearch) {
+            tools.push({ googleSearchRetrieval: {} });
+        }
+
         const prompt = `Sei un esperto di Document Intelligence. 
 Abbiamo rilevato i seguenti campi tecnici in un PDF ufficiale (FILE MASTER allegato). 
 Il tuo compito è:
 1. Analizzare il FILE MASTER per capire visivamente a cosa corrispondono i campi tecnici.
 2. Mappare le informazioni dai DOCUMENTI FONTE allegati e dalle NOTE ai campi del PDF.
 3. Per OGNI campo tecnico, dedurre l'ETICHETTA UMANA (Label) leggendo il nome tecnico (es. "f1_1[0]") e GUARDARE il FILE MASTER per capire cosa c'è scritto accanto o sopra al campo (es. "1a. Name of Reporting Corporation"). È fondamentale che il "label" sia leggibile e utile per un umano.
+${webResearch ? `4. **RICERCA WEB ATTIVA**: Cerca online le ISTRUZIONI UFFICIALI (es. "IRS Form 5472 instructions") per questo tipo di documento. Usa le regole ufficiali per compilare correttamente i campi tecnici se i documenti fonte non sono chiari.` : ''}
 
 CAMPI RILEVATI DA COMPILARE:
 ${fields.map(f => `- Nome Tecnico: "${f.name}", Etichetta: "${f.label || 'N/A'}"`).join('\n')}

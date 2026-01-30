@@ -376,6 +376,7 @@ export function DocumentCompilerSection({
                   fields: batch,
                   sources: selectedSources,
                   notes,
+                  webResearch, // Pass the webResearch flag
                   cacheKey, // Use server-side cache for speed
                   masterSource: i === 0 ? masterSource : undefined // Optional fallback
                 })
@@ -784,26 +785,28 @@ export function DocumentCompilerSection({
             </SelectContent>
           </Select>
 
-          <Button
-            onClick={handleCompile}
-            disabled={(!templateContent && !masterSource) || isCompiling}
-            data-testid="button-compile"
-            className="w-full sm:w-auto"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`w-6 h-6 mr-2 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
+          {!isPdfMode && (
+            <Button
+              onClick={handleCompile}
+              disabled={(!templateContent && !masterSource) || isCompiling}
+              data-testid="button-compile"
+              className="w-full sm:w-auto"
             >
-              <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
-            </svg>
-            {isCompiling ? "Processando..." : "Compila con AI"}
-          </Button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`w-6 h-6 mr-2 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
+              >
+                <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
+              </svg>
+              {isCompiling ? "Processando..." : "Compila con AI"}
+            </Button>
+          )}
         </div>
       </div>
 

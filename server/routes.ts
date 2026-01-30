@@ -1166,7 +1166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint per generare proposte di valori per i campi PDF
   app.post('/api/pdf/propose-values', async (req: Request, res: Response) => {
-    const { fields, sources, notes, masterSource, cacheKey } = req.body;
+    const { fields, sources, notes, masterSource, cacheKey, webResearch } = req.body;
 
     // Validate either masterSource OR cacheKey
     if (!fields || (!masterSource && !cacheKey)) {
@@ -1226,11 +1226,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
       const vertexAIInstance = new VertexAI({ project: projectId, location: ANALYZER_LOCATION });
-      const model = vertexAIInstance.getGenerativeModel({
-        model: ANALYZER_MODEL_ID
-      });
 
-      console.log(`[SERVER] Proposing values for ${fields.length} fields (Incremental)...`);
+      const modelConfig: any = {
+        model: ANALYZER_MODEL_ID
+      };
+
+      if (webResearch) {
+        modelConfig.tools = [{ googleSearchRetrieval: {} }];
+      }
+
+      const model = vertexAIInstance.getGenerativeModel(modelConfig);
+
+      console.log(`[SERVER] Proposing values for ${fields.length} fields (Incremental, WebSearch: ${!!webResearch})...`);
 
       const proposals = await proposePdfFieldValues(
         fields,
@@ -1238,7 +1245,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sourceFiles,
         textContext,
         notes || "",
-        model
+        model,
+        webResearch
       );
 
       res.json({ proposals: proposals || [] });
