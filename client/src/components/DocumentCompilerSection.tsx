@@ -352,17 +352,7 @@ export function DocumentCompilerSection({
         const { fields, cacheKey } = await discoveryRes.json();
 
         if (fields && fields.length > 0) {
-          // IMMEDIATE UI FEEDBACK: Show the review panel and initialize placeholders
-          setIsPdfMode(true);
-          setPdfProposals(fields.map((f: any) => ({
-            name: f.name,
-            label: f.label || f.name,
-            type: f.type,
-            value: "",
-            reasoning: "In attesa di analisi AI...",
-            status: 'pending'
-          })));
-
+          // NO setPdfProposals placeholder immediately - keep UI in placeholder state
           // Step 2: Incremental AI proposals in batches
           const BATCH_SIZE = 25;
           let allProposals: any[] = [];
@@ -394,22 +384,20 @@ export function DocumentCompilerSection({
             }
           }
 
-          // Aggiorniamo la UI una volta sola alla fine per un effetto "solido" e istantaneo
-          setPdfProposals(current => {
-            const next = [...current];
-            allProposals.forEach((p: any) => {
-              const idx = next.findIndex(item => item.name === p.name);
-              if (idx !== -1) {
-                next[idx] = {
-                  ...next[idx],
-                  label: p.label || next[idx].label,
-                  value: p.value,
-                  reasoning: p.reasoning
-                };
-              }
-            });
-            return next;
-          });
+          // Aggiorniamo la UI una volta sola alla fine per un effetto "solido" e entriamo in isPdfMode
+          setPdfProposals(fields.map((f: any) => {
+            const prop = allProposals.find(p => p.name === f.name);
+            return {
+              name: f.name,
+              label: prop?.label || f.label || f.name,
+              type: f.type,
+              value: prop?.value || "",
+              reasoning: prop?.reasoning || "Informazione non individuata nelle fonti.",
+              status: prop?.value ? 'approved' : 'pending'
+            };
+          }));
+
+          setIsPdfMode(true); // MOSTRIAMO LA LISTA SOLO ORA!
 
           toast({
             title: "Analisi Completata",
