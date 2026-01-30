@@ -1,5 +1,5 @@
 import { Asterisk, FileText, ChevronUp, Wand2, Menu, Type, ChevronDown, Printer, Download } from "lucide-react";
-import { ThreeStars } from "@/components/ui/three-stars";
+import { ThreeStars } from "@/components/ui/three-stars"; // Gromit Core Branding
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TemplateEditor } from "./TemplateEditor";
