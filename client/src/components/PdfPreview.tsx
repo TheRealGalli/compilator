@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import {
     RotateCw,
     MoreVertical,
     Loader2,
-    Eye
+    Eye,
+    AlertCircle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,8 +23,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Set up worker for PDF.js
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+// Use a more reliable worker source
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 // Necessary styles for react-pdf
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -40,25 +41,44 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
     const [scale, setScale] = useState<number>(1.2);
     const [rotation, setRotation] = useState<number>(0);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
-    const fileData = useMemo(() => {
-        if (!fileBase64) return null;
+    useEffect(() => {
+        if (!fileBase64) return;
+        setIsLoading(true);
+        setError(null);
+
         try {
             const base64Data = fileBase64.includes(',') ? fileBase64.split(',')[1] : fileBase64;
             const byteCharacters = atob(base64Data);
-            const byteNumbers = new Array(byteCharacters.length);
+            const byteNumbers = new Uint8Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) {
                 byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
-            return new Uint8Array(byteNumbers);
+            const blob = new Blob([byteNumbers], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            setBlobUrl(url);
+
+            return () => {
+                URL.revokeObjectURL(url);
+            };
         } catch (e) {
-            console.error("Error decoding base64 PDF:", e);
-            return null;
+            console.error("Error creating PDF blob:", e);
+            setError("Errore nella decodifica del PDF.");
+            setIsLoading(false);
         }
     }, [fileBase64]);
 
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
         setNumPages(numPages);
+        setIsLoading(false);
+        setError(null);
+    }
+
+    function onDocumentLoadError(err: Error) {
+        console.error("Error loading PDF document:", err);
+        setError("Impossibile caricare il PDF. Il file potrebbe essere corrotto o non supportato.");
         setIsLoading(false);
     }
 
@@ -67,126 +87,149 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
     };
 
     const handleDownload = () => {
-        if (!fileBase64) return;
-        const link = document.createElement('a');
-        link.href = fileBase64.startsWith('data:') ? fileBase64 : `data:application/pdf;base64,${fileBase64}`;
-        link.download = "document.pdf";
-        link.click();
+        if (blobUrl) {
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = "document.pdf";
+            link.click();
+        } else if (fileBase64) {
+            const link = document.createElement('a');
+            link.href = fileBase64.startsWith('data:') ? fileBase64 : `data:application/pdf;base64,${fileBase64}`;
+            link.download = "document.pdf";
+            link.click();
+        }
     };
 
     const handlePrint = () => {
         const printWindow = window.open('', '_blank');
-        if (printWindow && fileBase64) {
-            const base64Data = fileBase64.includes(',') ? fileBase64.split(',')[1] : fileBase64;
-            printWindow.document.write(`
-                <html>
-                    <body style="margin:0;">
-                        <embed width="100%" height="100%" src="data:application/pdf;base64,${base64Data}" type="application/pdf" />
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
-            setTimeout(() => printWindow.print(), 500);
+        if (printWindow) {
+            const printSrc = blobUrl || (fileBase64.startsWith('data:') ? fileBase64 : `data:application/pdf;base64,${fileBase64}`);
+            if (printSrc) {
+                printWindow.document.write(`
+                    <html>
+                        <body style="margin:0;">
+                            <embed width="100%" height="100%" src="${printSrc}" type="application/pdf" />
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                setTimeout(() => printWindow.print(), 500);
+            }
         }
     };
 
     return (
         <Card className={`relative flex flex-col h-full overflow-hidden border-none shadow-none bg-slate-900/5 ${className}`}>
-            {/* Custom Chrome-style Toolbar */}
-            <div className="flex items-center justify-between px-4 py-2 bg-slate-800 text-slate-100 border-b border-slate-700 select-none z-10 shadow-md">
+            {/* Custom Toolbar - Matching ModeSettings style */}
+            <div className="flex items-center justify-between px-4 py-1.5 bg-muted/30 border-b select-none z-10 shadow-sm">
                 <div className="flex items-center gap-4">
-                    <span className="text-sm font-medium opacity-90 truncate max-w-[200px]">
+                    <span className="text-sm font-medium truncate max-w-[200px]">
                         Documento PDF
                     </span>
-                    <div className="h-4 w-[1px] bg-slate-600 hidden sm:block" />
-                    <div className="flex items-center gap-1 bg-slate-900/50 rounded px-2">
+                    <div className="h-4 w-[1px] bg-border hidden sm:block" />
+                    <div className="flex items-center gap-1 bg-background/50 rounded px-2">
                         <Input
                             value={pageNumber}
                             onChange={(e) => {
                                 const val = parseInt(e.target.value);
                                 if (!isNaN(val) && val >= 1 && val <= numPages) setPageNumber(val);
                             }}
-                            className="w-10 h-7 bg-transparent border-none text-center p-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
+                            className="w-10 h-7 bg-transparent border-none text-center p-0 text-xs focus-visible:ring-0 focus-visible:ring-offset-0"
                         />
-                        <span className="text-xs opacity-60">/ {numPages}</span>
+                        <span className="text-[10px] opacity-60">/ {numPages}</span>
                     </div>
                 </div>
 
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 hidden md:flex">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-100 hover:bg-slate-700" onClick={() => setScale(s => Math.max(0.5, s - 0.1))}>
-                        <ZoomOut className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setScale(s => Math.max(0.5, s - 0.1))}>
+                        <ZoomOut className="h-3.5 w-3.5" />
                     </Button>
-                    <span className="text-xs font-mono w-12 text-center">{Math.round(scale * 100)}%</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-100 hover:bg-slate-700" onClick={() => setScale(s => Math.min(3, s + 0.1))}>
-                        <ZoomIn className="h-4 w-4" />
+                    <span className="text-[10px] font-medium w-12 text-center">{Math.round(scale * 100)}%</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setScale(s => Math.min(3, s + 0.1))}>
+                        <ZoomIn className="h-3.5 w-3.5" />
                     </Button>
                 </div>
 
                 <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-100 hover:bg-slate-700 sm:flex hidden" onClick={() => setRotation(r => (r + 90) % 360)}>
-                        <RotateCw className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 hidden sm:flex" onClick={() => setRotation(r => (r + 90) % 360)}>
+                        <RotateCw className="h-3.5 w-3.5" />
                     </Button>
-                    <div className="h-4 w-[1px] bg-slate-600 mx-1 hidden sm:block" />
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-100 hover:bg-slate-700" onClick={handleDownload}>
-                        <Download className="h-4 w-4" />
+                    <div className="h-4 w-[1px] bg-border mx-1 hidden sm:block" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload}>
+                        <Download className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-100 hover:bg-slate-700" onClick={handlePrint}>
-                        <Printer className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrint}>
+                        <Printer className="h-3.5 w-3.5" />
                     </Button>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-100 hover:bg-slate-700">
-                                <MoreVertical className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <MoreVertical className="h-3.5 w-3.5" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-slate-800 border-slate-700 text-slate-100">
-                            <DropdownMenuItem className="focus:bg-slate-700 cursor-pointer" onClick={() => setScale(1.0)}>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => setScale(1.0)}>
                                 Adatta alla pagina
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="focus:bg-slate-700 cursor-pointer" onClick={() => setRotation(r => (r + 180) % 360)}>
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => setRotation(r => (r + 180) % 360)}>
                                 Capovolgi
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <div className="h-4 w-[1px] bg-slate-600 mx-1" />
+                    <div className="h-4 w-[1px] bg-border mx-1" />
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-blue-400 hover:bg-blue-400/10 hover:text-blue-300 transition-colors"
+                        className="h-7 w-7 text-blue-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                         title="Gromit Assist"
                     >
-                        <Eye className="h-5 w-5" />
+                        <Eye className="h-4 h-4" />
                     </Button>
                 </div>
             </div>
 
             {/* Pagination Controls Floating */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-800/90 backdrop-blur text-slate-100 rounded-full px-3 py-1.5 shadow-2xl z-20 border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity hover:opacity-100">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-slate-700" onClick={() => changePage(-1)} disabled={pageNumber <= 1}>
-                    <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <span className="text-xs font-medium px-2 min-w-[60px] text-center">
-                    Pagina {pageNumber} di {numPages}
-                </span>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-slate-700" onClick={() => changePage(1)} disabled={pageNumber >= numPages}>
-                    <ChevronRight className="h-5 w-5" />
-                </Button>
-            </div>
+            {!error && !isLoading && numPages > 1 && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-background/90 backdrop-blur rounded-full px-3 py-1 shadow-lg z-20 border opacity-90 hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full" onClick={() => changePage(-1)} disabled={pageNumber <= 1}>
+                        <ChevronLeft className="h-4 h-4" />
+                    </Button>
+                    <span className="text-[10px] font-medium px-2 min-w-[60px] text-center">
+                        {pageNumber} / {numPages}
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full" onClick={() => changePage(1)} disabled={pageNumber >= numPages}>
+                        <ChevronRight className="h-4 h-4" />
+                    </Button>
+                </div>
+            )}
 
             {/* PDF Viewport */}
-            <div className="flex-1 overflow-auto bg-slate-900/50 flex justify-center p-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent group">
-                <div className="shadow-2xl h-fit ring-1 ring-slate-700/50">
+            <div className="flex-1 overflow-auto bg-slate-900/5 flex justify-center p-4 scrollbar-thin group relative">
+                <div className="shadow-xl h-fit border">
                     {isLoading && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm z-10">
-                            <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                            <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-2" />
+                            <p className="text-xs text-muted-foreground">Caricamento PDF...</p>
                         </div>
                     )}
-                    {fileData && (
+
+                    {error && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10 p-6 text-center">
+                            <AlertCircle className="w-10 h-10 text-destructive mb-3" />
+                            <p className="text-sm font-medium mb-1">{error}</p>
+                            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                                Ricarica Pagina
+                            </Button>
+                        </div>
+                    )}
+
+                    {blobUrl && (
                         <Document
-                            file={{ data: fileData }}
+                            file={blobUrl}
                             onLoadSuccess={onDocumentLoadSuccess}
+                            onLoadError={onDocumentLoadError}
                             loading={null}
                             className="max-w-full"
                         >
@@ -197,11 +240,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                                 renderAnnotationLayer={true}
                                 renderTextLayer={true}
                                 className="transition-transform duration-200"
-                                loading={
-                                    <div className="flex items-center justify-center min-w-[300px] min-h-[400px]">
-                                        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                                    </div>
-                                }
+                                loading={null}
                             />
                         </Document>
                     )}
@@ -218,20 +257,20 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                 .react-pdf__Page__annotations.annotationLayer {
                     padding: 0;
                 }
-                /* Custom scrollbar for premium feel */
+                /* Hide secondary toolbars from browsers if any */
                 ::-webkit-scrollbar {
-                    width: 8px;
-                    height: 8px;
+                    width: 6px;
+                    height: 6px;
                 }
                 ::-webkit-scrollbar-track {
                     background: transparent;
                 }
                 ::-webkit-scrollbar-thumb {
-                    background: rgba(255, 255, 255, 0.1);
+                    background: rgba(0, 0, 0, 0.1);
                     border-radius: 10px;
                 }
-                ::-webkit-scrollbar-thumb:hover {
-                    background: rgba(255, 255, 255, 0.2);
+                .dark ::-webkit-scrollbar-thumb {
+                    background: rgba(255, 255, 255, 0.1);
                 }
             ` }} />
         </Card>
