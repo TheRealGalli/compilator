@@ -78,22 +78,22 @@ export async function proposePdfFieldValues(
 Abbiamo rilevato i seguenti campi tecnici in un PDF ufficiale (FILE MASTER allegato). 
 
 IL TUO OBIETTIVO: 
-Mappare con precisione ogni informazione dalle FONTI ai campi del PDF originale.
+Mappare con precisione chirurgica ogni informazione dalle FONTI ai campi del PDF originale.
 
-PROCESSO DI ANALISI:
-1. **Analisi Visiva Master**: Guarda attentamente il FILE MASTER (immagine PDF). Identifica la posizione visiva di ogni campo tecnico (es. "f1_1[0]").
-2. **Lettura Etichette**: Leggi il testo stampato immediatamente sopra, sotto o accanto al box del campo nel FILE MASTER (es. "1a Name of reporting corporation", "City or town"). 
-3. **Sostituzione Label**: Ignora il nome tecnico (es. "f1_1") e usa come "label" l'etichetta umana che hai letto visivamente.
-4. **Mappatura Dati**: Cerca nelle FONTI e nelle NOTE UTENTE l'informazione che corrisponde a quell'etichetta visiva.
-${webResearch ? `5. **Ricerca Web**: Se un campo è ambiguo (es. "Box 12 code"), cerca le istruzioni ufficiali del modulo per capire cosa inserire.` : ''}
+PROCESSO DI ANALISI (TASSATIVO):
+1. **Analisi Visiva Master**: Guarda il FILE MASTER (immagine/PDF). Trova la posizione esatta di ogni ID (es: "f1_1[0]").
+2. **Lettura Etichetta**: Leggi l'etichetta umana stampata proprio sopra o accanto a quel campo (es: "1a Name of Corporation").
+3. **Verifica Incrociata**: NON basarti sul nome tecnico per dedurre il contenuto. Usa SOLO l'etichetta visiva che hai letto. Se l'ID "f1_1" è vicino a "Tax Year", allora quel campo è il Tax Year.
+4. **Mappatura Dati**: Cerca nelle FONTI l'informazione che risponde a quell'etichetta.
+${webResearch ? `5. **Ricerca Web**: Se l'etichetta è ambigua (es: "Box 13 code"), cerca le istruzioni ufficiali del modulo per capire cosa inserire.` : ''}
 
-REGOLE DI RISPOSTA:
-- Sii estremamente preciso: se il campo chiede solo la città, non mettere l'indirizzo intero.
-- Per le checkbox, rispondi true o false.
-- Se l'informazione manca, scrivi "[FONTE MANCANTE]".
+REGOLE PER I VALORI:
+- **Testo**: Inserisci il valore pulito. Se un campo chiede "Anno", scrivi "2025", non "L'anno è 2025".
+- **Checkbox**: Rispondi SOLO true o false.
+- **Dati Mancanti**: Se non trovi nulla, scrivi "[FONTE MANCANTE]".
 
 CAMPI DA ANALIZZARE:
-${fields.map(f => `- ID: "${f.name}", Label Attuale: "${f.label || 'N/A'}"`).join('\n')}
+${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label Attuale: "${f.label || 'N/A'}"`).join('\n')}
 
 TESTO FONTI:
 ${sourceContext}
@@ -105,10 +105,10 @@ Restituisci JSON:
 {
   "proposals": [
     { 
-      "name": "ID originale", 
-      "label": "Etichetta Umana Leggibile", 
+      "name": "ID tecnico originale (es: f1_1[0])", 
+      "label": "Etichetta Umana leggibile (es: 1a Name)", 
       "value": "Valore Proposto", 
-      "reasoning": "Logica usata (es: Trovata nel box 1a del Master)" 
+      "reasoning": "Breve logica (es: Trovato nel box 1a del Master)" 
     }
   ]
 }

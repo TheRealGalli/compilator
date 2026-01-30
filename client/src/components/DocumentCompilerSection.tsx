@@ -364,7 +364,9 @@ export function DocumentCompilerSection({
           })));
 
           // Step 2: Incremental AI proposals in batches
-          const BATCH_SIZE = 25; // Aumentato a 25 per massimizzare la velocità su documenti lunghi
+          const BATCH_SIZE = 25;
+          let allProposals: any[] = [];
+
           for (let i = 0; i < fields.length; i += BATCH_SIZE) {
             const batch = fields.slice(i, i + BATCH_SIZE);
 
@@ -378,34 +380,36 @@ export function DocumentCompilerSection({
                   notes,
                   webResearch,
                   cacheKey,
-                  masterSource: i === 0 ? masterSource : undefined
+                  // Inviamo il master in OGNI batch per garantire coerenza visiva e precisione di mappatura
+                  masterSource: masterSource
                 })
               });
 
               const { proposals } = await proposalRes.json();
               console.log(`[DEBUG PDF] Batch (${i}-${i + batch.length}) Received:`, proposals);
-
-              // Update existing proposals with new values
-              setPdfProposals(current => {
-                const next = [...current];
-                proposals.forEach((p: any) => {
-                  const idx = next.findIndex(item => item.name === p.name);
-                  if (idx !== -1) {
-                    next[idx] = {
-                      ...next[idx],
-                      label: p.label || next[idx].label,
-                      value: p.value,
-                      reasoning: p.reasoning
-                    };
-                  }
-                });
-                return next;
-              });
+              allProposals = [...allProposals, ...proposals];
 
             } catch (err) {
               console.error(`[PDF Batch Error] Failed on batch ${i}:`, err);
             }
           }
+
+          // Aggiorniamo la UI una volta sola alla fine per un effetto "solido" e istantaneo
+          setPdfProposals(current => {
+            const next = [...current];
+            allProposals.forEach((p: any) => {
+              const idx = next.findIndex(item => item.name === p.name);
+              if (idx !== -1) {
+                next[idx] = {
+                  ...next[idx],
+                  label: p.label || next[idx].label,
+                  value: p.value,
+                  reasoning: p.reasoning
+                };
+              }
+            });
+            return next;
+          });
 
           toast({
             title: "Analisi Completata",
