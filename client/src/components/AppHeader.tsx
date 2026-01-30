@@ -24,14 +24,17 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick
 
   return (
     <header className="h-14 border-b bg-background flex items-center justify-between px-4 sticky top-0 z-50">
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={handleLogoClick}>
-          <ThreeStars className="w-8 h-8 text-blue-500" />
-          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-            Gromit
-          </h1>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center -space-x-3 mr-2 cursor-pointer group" onClick={handleLogoClick}>
+          <Asterisk
+            className={`text-blue-600 transition-transform duration-1000 ${isSpinning ? 'rotate-[360deg]' : ''}`}
+            width={32}
+            height={32}
+            strokeWidth={3}
+          />
+          <Asterisk className="text-blue-600" width={32} height={32} strokeWidth={3} />
         </div>
-        {/* The notebook title is removed as per the provided edit, assuming the new h1 replaces it */}
+        <h1 className="text-lg font-semibold" data-testid="text-notebook-title">{notebookTitle}</h1>
       </div>
 
       <div className="flex items-center gap-2">
