@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TemplateEditor } from "./TemplateEditor";
 import { CompiledOutput } from "./CompiledOutput";
-import { PdfFieldReview, type FieldProposal } from "./PdfFieldReview";
 import { PdfPreview } from "./PdfPreview";
 import { ModelSettings } from "./ModelSettings";
 import { Card } from "@/components/ui/card";
@@ -237,26 +236,18 @@ export function DocumentCompilerSection({
   const [detailedAnalysis, setDetailedAnalysis] = useState(true);
   const [formalTone, setFormalTone] = useState(true);
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
-  const [extractedFields, setExtractedFields] = useState<Array<{ fieldName: string; fieldType: string }>>([]);
   const [studioFontSize, setStudioFontSize] = useState<number>(14);
 
-  // PDF Mode & Field Review
+  // PDF Mode
   const [isPdfMode, setIsPdfMode] = useState(false);
-  const [pdfProposals, setPdfProposals] = useState<FieldProposal[]>([]);
-  const [isFinalizingPdf, setIsFinalizingPdf] = useState(false);
-  const [finalizedPdfUrl, setFinalizedPdfUrl] = useState<string | null>(null);
 
 
 
   useEffect(() => {
-    setExtractedFields([]);
-
     // AUTO-ACTIVATE PDF STUDIO if master is fillable
     if (masterSource?.isFillable) {
       if (!isPdfMode) {
         setIsPdfMode(true);
-        // Automatically trigger field discovery when entering PDF mode
-        handleDiscoverFields();
       }
     } else {
       setIsPdfMode(false);
@@ -334,35 +325,7 @@ export function DocumentCompilerSection({
     }
   };
 
-  const handleDiscoverFields = async () => {
-    if (!masterSource) return;
-
-    setIsCompiling(true);
-    try {
-      const { getApiUrl } = await import("@/lib/api-config");
-      const discoveryRes = await fetch(getApiUrl('/api/pdf/discover-fields'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ masterSource })
-      });
-      const { fields } = await discoveryRes.json();
-
-      if (fields && fields.length > 0) {
-        setPdfProposals(fields.map((f: any) => ({
-          name: f.name,
-          label: f.label || f.name,
-          type: f.type,
-          value: "",
-          reasoning: "In attesa di analisi...",
-          status: 'pending'
-        })));
-      }
-    } catch (err) {
-      console.error('[PDF Discovery Error]', err);
-    } finally {
-      setIsCompiling(false);
-    }
-  };
+  // handleDiscoverFields removed as AI panel is gone
 
   const handleCompile = async () => {
     if (isCompiling || isPdfMode) return;
@@ -423,56 +386,6 @@ export function DocumentCompilerSection({
     }
   };
 
-  const handleFinalizePdf = async () => {
-    if (isFinalizingPdf || pdfProposals.length === 0) return;
-
-    setIsFinalizingPdf(true);
-    try {
-      // Filter only approved values
-      const approvedValues: Record<string, string | boolean> = {};
-      pdfProposals.forEach(p => {
-        if (p.status === 'approved') {
-          approvedValues[p.name] = p.value;
-        }
-      });
-
-      const response = await fetch(getApiUrl('/api/pdf/finalize'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          masterSource,
-          values: approvedValues
-        })
-      });
-
-      if (!response.ok) throw new Error("Errore durante la finalizzazione PDF");
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setFinalizedPdfUrl(url);
-
-      // Trigger automatic download
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `compilato-${masterSource?.name || 'documento'}.pdf`;
-      a.click();
-
-      toast({
-        title: "PDF Finalizzato",
-        description: "Il documento è stato generato e il download è iniziato.",
-      });
-
-    } catch (err: any) {
-      console.error("[Finalize PDF Error]", err);
-      toast({
-        title: "Errore",
-        description: "Impossibile generare il PDF finale.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsFinalizingPdf(false);
-    }
-  };
 
   const handleCopy = () => {
     if (!compiledContent) return;
@@ -779,23 +692,11 @@ export function DocumentCompilerSection({
             {isPdfMode ? (
               /* PDF STUDIO UNIFIED VIEW */
               <div className="h-full flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-500">
-                <Card className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
-                  <div className="flex-1 min-h-[400px] lg:min-h-0 border-r border-border/50">
-                    <PdfPreview
-                      fileBase64={masterSource?.base64 || ""}
-                      className="rounded-none border-none h-full"
-                    />
-                  </div>
-                  <div className="w-full lg:w-[400px] shrink-0 h-[400px] lg:h-full bg-muted/5">
-                    <PdfFieldReview
-                      proposals={pdfProposals}
-                      onUpdate={setPdfProposals}
-                      onFinalize={handleFinalizePdf}
-                      isFinalizing={isFinalizingPdf}
-                      isCompiling={isCompiling}
-                      title="Studio Compilazione PDF"
-                    />
-                  </div>
+                <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
+                  <PdfPreview
+                    fileBase64={masterSource?.base64 || ""}
+                    className="rounded-none border-none h-full"
+                  />
                 </Card>
               </div>
             ) : (
