@@ -24,7 +24,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PdfFieldReview, type FieldProposal } from "./PdfFieldReview";
+// import { PdfFieldReview, type FieldProposal } from "./PdfFieldReview"; // Rimossa per revert UI
+
 import { getApiUrl } from "@/lib/api-config";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -238,20 +239,12 @@ export function DocumentCompilerSection({
   const [extractedFields, setExtractedFields] = useState<Array<{ fieldName: string; fieldType: string }>>([]);
   const [studioFontSize, setStudioFontSize] = useState<number>(14);
 
-  // PDF Interactive Mode State
-  const [isPdfMode, setIsPdfMode] = useState(false);
-  const [pdfProposals, setPdfProposals] = useState<FieldProposal[]>([]);
-  const [isFinalizingPdf, setIsFinalizingPdf] = useState(false);
-  const [finalizedPdfUrl, setFinalizedPdfUrl] = useState<string | null>(null);
+  // PDF Mode rimosso per revert UI
 
 
 
   useEffect(() => {
-    // We are temporarily disabling field extraction based on pinned source
     setExtractedFields([]);
-    setIsPdfMode(false);
-    setPdfProposals([]);
-    setFinalizedPdfUrl(null);
   }, [masterSource?.id]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
@@ -339,77 +332,7 @@ export function DocumentCompilerSection({
 
     setIsCompiling(true);
     try {
-      // Check if we should use the new PDF Interactive Flow
-      const isFillablePdf = masterSource && masterSource.isFillable;
-
-      if (isFillablePdf) {
-        // Step 1: Discover native fields
-        const discoveryRes = await fetch(getApiUrl('/api/pdf/discover-fields'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ masterSource })
-        });
-        const { fields, cacheKey } = await discoveryRes.json();
-
-        if (fields && fields.length > 0) {
-          // NO setPdfProposals placeholder immediately - keep UI in placeholder state
-          // Step 2: Incremental AI proposals in batches
-          const BATCH_SIZE = 25;
-          let allProposals: any[] = [];
-
-          for (let i = 0; i < fields.length; i += BATCH_SIZE) {
-            const batch = fields.slice(i, i + BATCH_SIZE);
-
-            try {
-              const proposalRes = await fetch(getApiUrl('/api/pdf/propose-values'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  fields: batch,
-                  sources: selectedSources,
-                  notes,
-                  webResearch,
-                  cacheKey,
-                  // Inviamo il master in OGNI batch per garantire coerenza visiva e precisione di mappatura
-                  masterSource: masterSource
-                })
-              });
-
-              const { proposals } = await proposalRes.json();
-              console.log(`[DEBUG PDF] Batch (${i}-${i + batch.length}) Received:`, proposals);
-              allProposals = [...allProposals, ...proposals];
-
-            } catch (err) {
-              console.error(`[PDF Batch Error] Failed on batch ${i}:`, err);
-            }
-          }
-
-          // Aggiorniamo la UI una volta sola alla fine per un effetto "solido" e entriamo in isPdfMode
-          setPdfProposals(fields.map((f: any) => {
-            const prop = allProposals.find(p => p.name === f.name);
-            return {
-              name: f.name,
-              label: prop?.label || f.label || f.name,
-              type: f.type,
-              value: prop?.value || "",
-              reasoning: prop?.reasoning || "Informazione non individuata nelle fonti.",
-              status: prop?.value ? 'approved' : 'pending'
-            };
-          }));
-
-          setIsPdfMode(true); // MOSTRIAMO LA LISTA SOLO ORA!
-
-          toast({
-            title: "Analisi Completata",
-            description: `Rilevati ${fields.length} campi. Elaborazione incrementale terminata.`,
-          });
-          setIsCompiling(false);
-          return;
-        }
-      }
-
-      // Standard Fallback to Text-based Compilation
-      const { apiRequest } = await import("@/lib/queryClient");
+      const { getApiUrl } = await import("@/lib/api-config");
 
       console.log('[DEBUG Frontend] selectedSources:', selectedSources);
 
@@ -471,56 +394,6 @@ export function DocumentCompilerSection({
       setIsCompiling(false);
     }
   };
-
-  const handleFinalizePdf = async () => {
-    if (!masterSource) return;
-
-    setIsFinalizingPdf(true);
-    try {
-      const values: Record<string, string | boolean> = {};
-      pdfProposals.forEach(p => {
-        if (p.status === 'approved') {
-          values[p.name] = p.value;
-        }
-      });
-
-      const res = await fetch(getApiUrl('/api/pdf/finalize'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ masterSource, values })
-      });
-
-      const data = await res.json();
-      if (data.base64) {
-        const { saveAs } = await import("file-saver");
-        const byteCharacters = atob(data.base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'application/pdf' });
-
-        // Direct download using file-saver
-        saveAs(blob, data.name || 'documento-compilato.pdf');
-
-        toast({
-          title: "PDF Generato",
-          description: "Il modulo originale è stato compilato con successo.",
-        });
-      }
-    } catch (error: any) {
-      console.error('Error finalizing PDF:', error);
-      toast({
-        title: "Errore finalizzazione",
-        description: error.message || "Impossibile generare il PDF finale.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsFinalizingPdf(false);
-    }
-  };
-
 
   const handleCopy = () => {
     if (!compiledContent) return;
@@ -778,35 +651,32 @@ export function DocumentCompilerSection({
             </SelectContent>
           </Select>
 
-          {!isPdfMode && (
-            <Button
-              onClick={handleCompile}
-              disabled={(!templateContent && !masterSource) || isCompiling}
-              data-testid="button-compile"
-              className="w-full sm:w-auto"
+          <Button
+            onClick={handleCompile}
+            disabled={(!templateContent && !masterSource) || isCompiling}
+            data-testid="button-compile"
+            className="w-full sm:w-auto"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`w-6 h-6 mr-2 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`w-6 h-6 mr-2 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
-              >
-                <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
-              </svg>
-              {isCompiling ? "Processando..." : "Compila con AI"}
-            </Button>
-          )}
+              <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
+            </svg>
+            {isCompiling ? "Processando..." : "Compila con AI"}
+          </Button>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full overflow-auto">
-            {/* Conditional Rendering: ModelSettings vs StudioChat */}
             <ModelSettings
               notes={notes}
               temperature={temperature}
@@ -825,26 +695,13 @@ export function DocumentCompilerSection({
 
           <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-auto">
             <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Left Column: Template or PDF Review */}
               <div className="min-h-[400px] lg:min-h-0 h-full">
-                {isPdfMode ? (
-                  <PdfFieldReview
-                    proposals={pdfProposals}
-                    onUpdate={setPdfProposals}
-                    onFinalize={handleFinalizePdf}
-                    isFinalizing={isFinalizingPdf}
-                    isCompiling={isCompiling}
-                    title="Template in Compilazione"
-                  />
-                ) : (
-                  <TemplateEditor
-                    value={templateContent}
-                    onChange={setTemplateContent}
-                  />
-                )}
+                <TemplateEditor
+                  value={templateContent}
+                  onChange={setTemplateContent}
+                />
               </div>
 
-              {/* Right Column: Compiled Output (Stable Placeholder) */}
               <div className="min-h-[300px] lg:min-h-0 h-full">
                 <CompiledOutput
                   content={compiledContent}
