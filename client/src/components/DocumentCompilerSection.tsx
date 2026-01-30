@@ -364,6 +364,8 @@ export function DocumentCompilerSection({
             })
           });
           const { proposals } = await proposalRes.json();
+          console.log('[DEBUG PDF] Discovery Fields:', fields);
+          console.log('[DEBUG PDF] AI Proposals Received:', proposals);
 
           setPdfProposals(proposals.map((p: any) => ({
             ...p,

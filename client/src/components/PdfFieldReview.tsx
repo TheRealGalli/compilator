@@ -62,7 +62,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                     <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Revisione intelligente dei campi mappati</p>
                 </div>
                 <Badge variant="outline" className="bg-blue-600/10 text-blue-700 border-blue-200/50 text-[10px] h-5 font-bold px-2">
-                    {proposals.filter(p => p.status === 'approved').length} / {proposals.filter(p => p.value !== undefined && p.value !== "" && p.value !== "[Vuoto]" && p.value !== "[FONTE MANCANTE]").length}
+                    {proposals.filter(p => p.status === 'approved').length} / {proposals.length}
                 </Badge>
             </div>
 
@@ -75,7 +75,6 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                         </div>
                     )}
                     {proposals
-                        .filter(p => p.value !== undefined && p.value !== "" && p.value !== "[Vuoto]" && p.value !== "[FONTE MANCANTE]")
                         .map((proposal, idx) => (
                             <div
                                 key={proposal.name}
