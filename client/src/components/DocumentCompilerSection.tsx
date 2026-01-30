@@ -364,7 +364,8 @@ export function DocumentCompilerSection({
           })));
 
           // Step 2: Incremental AI proposals in batches
-          const BATCH_SIZE = 40; // Smaller batches for faster UI responsiveness
+          const BATCH_SIZE = 5; // Ridotto da 40 a 5 per dare un effetto "real-time" progressivo
+          // Smaller batches for faster UI responsiveness
           for (let i = 0; i < fields.length; i += BATCH_SIZE) {
             const batch = fields.slice(i, i + BATCH_SIZE);
 

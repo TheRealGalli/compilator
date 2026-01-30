@@ -1232,7 +1232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       if (webResearch) {
-        modelConfig.tools = [{ googleSearchRetrieval: {} }];
+        modelConfig.tools = [{ googleSearch: {} }];
       }
 
       const model = vertexAIInstance.getGenerativeModel(modelConfig);
