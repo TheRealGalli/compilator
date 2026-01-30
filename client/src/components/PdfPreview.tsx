@@ -26,9 +26,7 @@ import {
 // Use a more reliable worker source
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-// Necessary styles for react-pdf
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+// Global styles are imported in main.tsx
 
 interface PdfPreviewProps {
     fileBase64: string;
@@ -247,6 +245,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                                 cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
                                 cMapPacked: true,
                                 standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+                                enableXfa: false, // Priority to AcroForms (Chrome-like hybrid behavior)
                             }}
                             loading={null}
                             className="max-w-full"
@@ -257,6 +256,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                                 rotate={rotation}
                                 renderAnnotationLayer={true}
                                 renderTextLayer={true}
+                                canvasBackground="transparent"
                                 className="transition-transform duration-200"
                                 loading={null}
                             />

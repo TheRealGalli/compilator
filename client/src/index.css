@@ -336,6 +336,49 @@
   @apply flex flex-wrap gap-2 mt-2 !important;
 }
 
+/* PDF Annotation Layer Fixes */
+.react-pdf__Page__annotations.annotationLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.annotationLayer section {
+  pointer-events: auto;
+}
+
+.annotationLayer input,
+.annotationLayer textarea,
+.annotationLayer select {
+  background-color: rgba(0, 100, 255, 0.05) !important;
+  border: 1px solid rgba(0, 100, 255, 0.1) !important;
+  appearance: none;
+  cursor: text;
+  transition: background-color 0.2s;
+}
+
+.annotationLayer input:hover,
+.annotationLayer textarea:hover {
+  background-color: rgba(0, 100, 255, 0.1) !important;
+}
+
+.annotationLayer input:focus,
+.annotationLayer textarea:focus {
+  background-color: rgba(0, 100, 255, 0.15) !important;
+  border-color: rgba(0, 100, 255, 0.4) !important;
+  outline: none !important;
+}
+
+/* Ensure checkbox/radio look clickable */
+.annotationLayer input[type="checkbox"],
+.annotationLayer input[type="radio"] {
+  cursor: pointer;
+}
+
 .google-search-entry-point div[role="listitem"],
 .google-search-entry-point .suggestion-chip {
   @apply inline-flex items-center px-3 py-1.5 rounded-full border border-border bg-background text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer shadow-sm !important;
