@@ -1197,19 +1197,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiKey = await getModelApiKey('gemini');
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
-      const vertexAIInstance = new VertexAI({ project: projectId, location: 'us-central1' });
+      const vertexAIInstance = new VertexAI({ project: projectId, location: ANALYZER_LOCATION });
       const model = vertexAIInstance.getGenerativeModel({
         model: ANALYZER_MODEL_ID
       });
 
       // Split fields into batches to avoid 429/quota limits
-      const BATCH_SIZE = 30;
+      // Optimization: Increase batch size to 75 to reduce redundant file uploads
+      const BATCH_SIZE = 75;
       const fieldBatches = [];
       for (let i = 0; i < fields.length; i += BATCH_SIZE) {
         fieldBatches.push(fields.slice(i, i + BATCH_SIZE));
       }
 
-      console.log(`[SERVER] Processing ${fields.length} fields in ${fieldBatches.length} batches...`);
+      console.log(`[SERVER] Processing ${fields.length} fields in ${fieldBatches.length} batches (BATCH_SIZE: ${BATCH_SIZE})...`);
       let allProposals: any[] = [];
 
       for (let i = 0; i < fieldBatches.length; i++) {
