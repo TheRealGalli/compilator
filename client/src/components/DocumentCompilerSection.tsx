@@ -250,7 +250,18 @@ export function DocumentCompilerSection({
 
   useEffect(() => {
     setExtractedFields([]);
-  }, [masterSource?.id]);
+
+    // AUTO-ACTIVATE PDF STUDIO if master is fillable
+    if (masterSource?.isFillable) {
+      if (!isPdfMode) {
+        setIsPdfMode(true);
+        // Automatically trigger field discovery when entering PDF mode
+        handleDiscoverFields();
+      }
+    } else {
+      setIsPdfMode(false);
+    }
+  }, [masterSource?.id, masterSource?.isFillable]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
   //   try {
@@ -323,12 +334,40 @@ export function DocumentCompilerSection({
     }
   };
 
+  const handleDiscoverFields = async () => {
+    if (!masterSource) return;
+
+    setIsCompiling(true);
+    try {
+      const { getApiUrl } = await import("@/lib/api-config");
+      const discoveryRes = await fetch(getApiUrl('/api/pdf/discover-fields'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ masterSource })
+      });
+      const { fields } = await discoveryRes.json();
+
+      if (fields && fields.length > 0) {
+        setPdfProposals(fields.map((f: any) => ({
+          name: f.name,
+          label: f.label || f.name,
+          type: f.type,
+          value: "",
+          reasoning: "In attesa di analisi...",
+          status: 'pending'
+        })));
+      }
+    } catch (err) {
+      console.error('[PDF Discovery Error]', err);
+    } finally {
+      setIsCompiling(false);
+    }
+  };
+
   const handleCompile = async () => {
-    if (isCompiling) return;
+    if (isCompiling || isPdfMode) return;
 
-    const isFillablePdf = masterSource && masterSource.isFillable;
-
-    if (!isFillablePdf && !templateContent.trim() && selectedSources.length === 0) {
+    if (!templateContent.trim() && selectedSources.length === 0) {
       toast({
         title: "Errore",
         description: "Seleziona un template o aggiungi delle fonti per procedere.",
@@ -339,116 +378,38 @@ export function DocumentCompilerSection({
 
     setIsCompiling(true);
     try {
-      if (isFillablePdf) {
-        // Step 1: Discover native fields
-        const discoveryRes = await fetch(getApiUrl('/api/pdf/discover-fields'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ masterSource })
+      const { apiRequest } = await import("@/lib/queryClient");
+      const { getApiUrl } = await import("@/lib/api-config");
+
+      const response = await apiRequest('POST', '/api/compile', {
+        template: templateContent,
+        notes,
+        temperature,
+        webResearch,
+        detailedAnalysis,
+        formalTone,
+        modelProvider,
+        sources: selectedSources.map(s => ({
+          name: s.name,
+          type: s.type,
+          base64: s.base64
+        })),
+        masterSource: masterSource ? {
+          name: masterSource.name,
+          type: masterSource.type,
+          base64: masterSource.base64
+        } : null
+      });
+
+      const data = await response.json();
+      if (data.compiledContent) {
+        setCompiledContent(data.compiledContent);
+        setIsPdfMode(false);
+
+        toast({
+          title: "Documento compilato con successo",
+          description: `Modello: ${modelProvider} | Docs: ${selectedSources.length}`,
         });
-        const { fields, cacheKey } = await discoveryRes.json();
-
-        if (fields && fields.length > 0) {
-          // IMMEDIATE UI FEEDBACK: Show the review panel and initialize placeholders
-          setIsPdfMode(true);
-          setPdfProposals(fields.map((f: any) => ({
-            name: f.name,
-            label: f.label || f.name,
-            type: f.type,
-            value: "",
-            reasoning: "In attesa di analisi AI...",
-            status: 'pending'
-          })));
-
-          // Step 2: Incremental AI proposals in batches
-          const BATCH_SIZE = 25;
-          let allProposals: any[] = [];
-
-          for (let i = 0; i < fields.length; i += BATCH_SIZE) {
-            const batch = fields.slice(i, i + BATCH_SIZE);
-
-            try {
-              const proposalRes = await fetch(getApiUrl('/api/pdf/propose-values'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  fields: batch,
-                  sources: selectedSources,
-                  notes,
-                  webResearch,
-                  cacheKey,
-                  // Inviamo il master in OGNI batch per garantire coerenza visiva e precisione di mappatura
-                  masterSource: masterSource
-                })
-              });
-
-              const { proposals } = await proposalRes.json();
-              console.log(`[DEBUG PDF] Batch (${i}-${i + batch.length}) Received:`, proposals);
-              allProposals = [...allProposals, ...proposals];
-
-              // Aggiorniamo la UI incrementalmente per feedback istantaneo
-              setPdfProposals(current => {
-                const next = [...current];
-                proposals.forEach((p: any) => {
-                  const idx = next.findIndex(item => item.name === p.name);
-                  if (idx !== -1) {
-                    next[idx] = {
-                      ...next[idx],
-                      value: p.value,
-                      label: p.label,
-                      reasoning: p.reasoning,
-                      status: 'pending' // Still needs human approval
-                    };
-                  }
-                });
-                return next;
-              });
-
-            } catch (err) {
-              console.error(`[PDF Batch Error] Failed on batch ${i}:`, err);
-            }
-          }
-        } else {
-          toast({
-            title: "Nessun campo rilevato",
-            description: "Il PDF master non sembra contenere campi modulo compilabili.",
-            variant: "destructive"
-          });
-        }
-      } else {
-        // Standard template compilation
-        console.log('[DEBUG Frontend] selectedSources:', selectedSources);
-
-        const response = await apiRequest('POST', '/api/compile', {
-          template: templateContent,
-          notes,
-          temperature,
-          webResearch,
-          detailedAnalysis,
-          formalTone,
-          modelProvider,
-          sources: selectedSources.map(s => ({
-            name: s.name,
-            type: s.type,
-            base64: s.base64
-          })),
-          masterSource: masterSource ? {
-            name: masterSource.name,
-            type: masterSource.type,
-            base64: masterSource.base64
-          } : null
-        });
-
-        const data = await response.json();
-        if (data.compiledContent) {
-          setCompiledContent(data.compiledContent);
-          setIsPdfMode(false); // Back to standard mode if we compile a template
-
-          toast({
-            title: "Documento compilato con successo",
-            description: `Modello: ${modelProvider} | Docs: ${selectedSources.length}`,
-          });
-        }
       }
     } catch (error: any) {
       console.error('Errore compilazione:', error);
@@ -710,85 +671,88 @@ export function DocumentCompilerSection({
           <h2 className="text-xl font-semibold">Compilatore Documenti AI</h2>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {/* Always show template selector */}
-          <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-            <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
-              <SelectValue placeholder="Seleziona template" />
-            </SelectTrigger>
-            <SelectContent>
-              <div className="p-2 border-b space-y-1">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    document.getElementById('template-upload')?.click();
-                  }}
-                  data-testid="button-upload-template"
-                >
-                  <span className="mr-2">📄</span>
-                  Upload Template
-                </Button>
-                <input
-                  id="template-upload"
-                  type="file"
-                  accept=".txt,.md,.rtf"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        setTemplateContent(event.target?.result as string);
-                        setSelectedTemplate("");
-                        toast({
-                          title: "Template caricato",
-                          description: `${file.name} è stato caricato con successo.`,
-                        });
-                      };
-                      reader.readAsText(file);
-                    }
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setIsGenerateModalOpen(true);
-                  }}
-                  data-testid="button-generate-template"
-                >
-                  <span className="mr-2">✏️</span>
-                  Genera Template
-                </Button>
-              </div>
-              <SelectItem value="privacy">Privacy Policy</SelectItem>
-              <SelectItem value="relazione">Relazione Tecnica</SelectItem>
-              <SelectItem value="contratto">Contratto di Servizio</SelectItem>
-            </SelectContent>
-          </Select>
+          {!isPdfMode && (
+            <>
+              <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
+                <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
+                  <SelectValue placeholder="Seleziona template" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="p-2 border-b space-y-1">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document.getElementById('template-upload')?.click();
+                      }}
+                      data-testid="button-upload-template"
+                    >
+                      <span className="mr-2">📄</span>
+                      Upload Template
+                    </Button>
+                    <input
+                      id="template-upload"
+                      type="file"
+                      accept=".txt,.md,.rtf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setTemplateContent(event.target?.result as string);
+                            setSelectedTemplate("");
+                            toast({
+                              title: "Template caricato",
+                              description: `${file.name} è stato caricato con successo.`,
+                            });
+                          };
+                          reader.readAsText(file);
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setIsGenerateModalOpen(true);
+                      }}
+                      data-testid="button-generate-template"
+                    >
+                      <span className="mr-2">✏️</span>
+                      Genera Template
+                    </Button>
+                  </div>
+                  <SelectItem value="privacy">Privacy Policy</SelectItem>
+                  <SelectItem value="relazione">Relazione Tecnica</SelectItem>
+                  <SelectItem value="contratto">Contratto di Servizio</SelectItem>
+                </SelectContent>
+              </Select>
 
-          <Button
-            onClick={handleCompile}
-            disabled={(!templateContent && !masterSource) || isCompiling}
-            data-testid="button-compile"
-            className="w-full sm:w-auto"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`w-6 h-6 mr-2 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
-            >
-              <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
-            </svg>
-            {isCompiling ? "Processando..." : "Compila con AI"}
-          </Button>
+              <Button
+                onClick={handleCompile}
+                disabled={(!templateContent && !masterSource) || isCompiling}
+                data-testid="button-compile"
+                className="w-full sm:w-auto"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`w-6 h-6 mr-2 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
+                >
+                  <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
+                </svg>
+                {isCompiling ? "Processando..." : "Compila con AI"}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
