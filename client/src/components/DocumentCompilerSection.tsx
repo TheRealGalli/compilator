@@ -349,12 +349,12 @@ export function DocumentCompilerSection({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ masterSource })
         });
-        const { fields } = await discoveryRes.json();
+        const { fields, cacheKey } = await discoveryRes.json();
 
         if (fields && fields.length > 0) {
           // IMMEDIATE UI FEEDBACK: Show the review panel and initialize placeholders
           setIsPdfMode(true);
-          setPdfProposals(fields.map(f => ({
+          setPdfProposals(fields.map((f: any) => ({
             name: f.name,
             label: f.name,
             type: f.type,
@@ -376,7 +376,8 @@ export function DocumentCompilerSection({
                   fields: batch,
                   sources: selectedSources,
                   notes,
-                  masterSource
+                  cacheKey, // Use server-side cache for speed
+                  masterSource: i === 0 ? masterSource : undefined // Optional fallback
                 })
               });
 

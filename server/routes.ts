@@ -47,8 +47,16 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
 const MAX_FILE_SIZE_MB = 250;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-// Cache for Document AI layout results (Key: base64 hash, Value: discovered fields)
-// [Removed legacy layout cache]
+// Cache for PDF buffers to allow incremental frontend loops without re-uploading
+const pdfCache = new Map<string, { buffer: Buffer, mimeType: string, timestamp: number }>();
+
+// Cleanup cache every 30 mins
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of pdfCache.entries()) {
+    if (now - val.timestamp > 30 * 60 * 1000) pdfCache.delete(key);
+  }
+}, 5 * 60 * 1000);
 
 // --- TUNED MODEL CONFIGURATION (ANALYZER ONLY) ---
 const ANALYZER_LOCATION = 'europe-west1';
@@ -1135,18 +1143,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per compilare documenti con AI
   // NEW: Layout analysis for Document Studio (Gemini-Native via AiService)
 
-  // Endpoint per scoprire campi nativi (AcroForm) in un PDF
   app.post('/api/pdf/discover-fields', async (req: Request, res: Response) => {
     try {
       const { masterSource } = req.body;
       if (!masterSource || !masterSource.base64) {
-        return res.status(400).json({ error: 'Master source mancante' });
+        return res.status(400).json({ error: "Master source missing" });
       }
 
       const buffer = Buffer.from(masterSource.base64, 'base64');
       const fields = await getPdfFormFields(buffer);
 
-      res.json({ fields });
+      // Store in cache for subsequent incremental proposal calls
+      const cacheKey = crypto.createHash('md5').update(masterSource.base64).digest('hex');
+      pdfCache.set(cacheKey, { buffer, mimeType: masterSource.type, timestamp: Date.now() });
+
+      res.json({ fields, cacheKey });
     } catch (error: any) {
       console.error('[API discover-fields] Error:', error);
       res.status(500).json({ error: error.message });
@@ -1155,15 +1166,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint per generare proposte di valori per i campi PDF
   app.post('/api/pdf/propose-values', async (req: Request, res: Response) => {
-    try {
-      const { fields, sources, notes, masterSource } = req.body;
+    const { fields, sources, notes, masterSource, cacheKey } = req.body;
 
-      // Prepara contesto multimodale
-      const masterFile = {
-        base64: masterSource.base64,
-        mimeType: masterSource.type,
-        name: masterSource.name || 'Master.pdf'
-      };
+    // Validate either masterSource OR cacheKey
+    if (!fields || (!masterSource && !cacheKey)) {
+      return res.status(400).json({ error: "Missing fields, masterSource or cacheKey" });
+    }
+
+    try {
+      let masterFile;
+
+      if (cacheKey && pdfCache.has(cacheKey)) {
+        const cached = pdfCache.get(cacheKey)!;
+        masterFile = {
+          base64: cached.buffer.toString('base64'),
+          mimeType: cached.mimeType,
+          name: 'Master.pdf'
+        };
+      } else if (masterSource) {
+        masterFile = {
+          base64: masterSource.base64,
+          mimeType: masterSource.type,
+          name: masterSource.name || 'Master.pdf'
+        };
+      } else {
+        return res.status(404).json({ error: "PDF Cache expired or key invalid. Per favore ricarica il documento." });
+      }
 
       const sourceFiles: any[] = [];
       let textContext = '';
