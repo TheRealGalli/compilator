@@ -1202,61 +1202,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         model: ANALYZER_MODEL_ID
       });
 
-      // Split fields into batches to avoid 429/quota limits
-      // Optimization: Increase batch size to 75 to reduce redundant file uploads
-      const BATCH_SIZE = 75;
-      const fieldBatches = [];
-      for (let i = 0; i < fields.length; i += BATCH_SIZE) {
-        fieldBatches.push(fields.slice(i, i + BATCH_SIZE));
-      }
+      console.log(`[SERVER] Proposing values for ${fields.length} fields (Incremental)...`);
 
-      console.log(`[SERVER] Processing ${fields.length} fields in ${fieldBatches.length} batches (BATCH_SIZE: ${BATCH_SIZE})...`);
-      let allProposals: any[] = [];
+      const proposals = await proposePdfFieldValues(
+        fields,
+        masterFile,
+        sourceFiles,
+        textContext,
+        notes || "",
+        model
+      );
 
-      for (let i = 0; i < fieldBatches.length; i++) {
-        const batch = fieldBatches[i];
-        let attempts = 0;
-        const MAX_ATTEMPTS = 3;
-        let batchProposals: any[] = [];
-
-        // Bypass skip logic: Gemini Multimodal will work even if text extraction failed
-
-        while (attempts < MAX_ATTEMPTS) {
-          try {
-            console.log(`[SERVER] Batch ${i + 1}/${fieldBatches.length} (Attempt ${attempts + 1}). Fields: ${batch.length}`);
-            batchProposals = await proposePdfFieldValues(
-              batch,
-              masterFile,
-              sourceFiles,
-              textContext,
-              notes || "",
-              model
-            );
-
-            // SUCCESS: Move to next batch
-            allProposals = [...allProposals, ...(batchProposals || [])];
-            break;
-          } catch (err: any) {
-            const errMsg = err.message || String(err);
-            if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED')) {
-              console.warn(`[SERVER] 429 hit on Batch ${i + 1}. Backing off...`);
-              await new Promise(r => setTimeout(r, 3000 * (attempts + 1)));
-            } else {
-              console.error(`[SERVER] Batch ${i + 1} Error:`, err);
-              break;
-            }
-          }
-          attempts++;
-        }
-
-        // Small delay between batches to stay under RPM
-        if (i < fieldBatches.length - 1) {
-          await new Promise(r => setTimeout(r, 1000));
-        }
-      }
-
-      console.log(`[SERVER] PDF compilation completed. Total proposals: ${allProposals.length}`);
-      res.json({ proposals: allProposals });
+      res.json({ proposals: proposals || [] });
     } catch (error: any) {
       console.error('[API propose-values] Error:', error);
       res.status(500).json({ error: error.message });

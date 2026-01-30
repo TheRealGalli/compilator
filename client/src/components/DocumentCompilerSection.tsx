@@ -352,31 +352,61 @@ export function DocumentCompilerSection({
         const { fields } = await discoveryRes.json();
 
         if (fields && fields.length > 0) {
-          // Step 2: Get AI proposals
-          const proposalRes = await fetch(getApiUrl('/api/pdf/propose-values'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fields,
-              sources: selectedSources,
-              notes,
-              masterSource
-            })
-          });
-          const { proposals } = await proposalRes.json();
-          console.log('[DEBUG PDF] Discovery Fields:', fields);
-          console.log('[DEBUG PDF] AI Proposals Received:', proposals);
-
-          setPdfProposals(proposals.map((p: any) => ({
-            ...p,
-            type: fields.find((f: any) => f.name === p.name)?.type || 'text',
+          // IMMEDIATE UI FEEDBACK: Show the review panel and initialize placeholders
+          setIsPdfMode(true);
+          setPdfProposals(fields.map(f => ({
+            name: f.name,
+            label: f.name,
+            type: f.type,
+            value: "",
+            reasoning: "In attesa di analisi AI...",
             status: 'pending'
           })));
-          setIsPdfMode(true);
+
+          // Step 2: Incremental AI proposals in batches
+          const BATCH_SIZE = 40; // Smaller batches for faster UI responsiveness
+          for (let i = 0; i < fields.length; i += BATCH_SIZE) {
+            const batch = fields.slice(i, i + BATCH_SIZE);
+
+            try {
+              const proposalRes = await fetch(getApiUrl('/api/pdf/propose-values'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  fields: batch,
+                  sources: selectedSources,
+                  notes,
+                  masterSource
+                })
+              });
+
+              const { proposals } = await proposalRes.json();
+              console.log(`[DEBUG PDF] Batch ${i / BATCH_SIZE + 1} Received:`, proposals);
+
+              // Update existing proposals with new values
+              setPdfProposals(current => {
+                const next = [...current];
+                proposals.forEach((p: any) => {
+                  const idx = next.findIndex(item => item.name === p.name);
+                  if (idx !== -1) {
+                    next[idx] = {
+                      ...next[idx],
+                      label: p.label || next[idx].label,
+                      value: p.value,
+                      reasoning: p.reasoning
+                    };
+                  }
+                });
+                return next;
+              });
+            } catch (err) {
+              console.error(`[PDF Batch Error] Failed on batch ${i}:`, err);
+            }
+          }
 
           toast({
-            title: "Modalità PDF Interattivo",
-            description: `Rilevati ${fields.length} campi. Analisi AI completata.`,
+            title: "Analisi Completata",
+            description: `Rilevati ${fields.length} campi. Elaborazione incrementale terminata.`,
           });
           setIsCompiling(false);
           return;
