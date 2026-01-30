@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Check, X, Info, Edit2, Save, Square } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -29,52 +29,6 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editValue, setEditValue] = useState<string>("");
 
-    // Animation/Progression State: revealedNames tracks which items are visible to the user
-    const [revealedNames, setRevealedNames] = useState<Set<string>>(new Set());
-    const revealTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-    // Effect to drip-feed proposals into the visible list
-    useEffect(() => {
-        // Find proposals that have a value/reasoning but aren't revealed yet
-        const pendingReveal = proposals.filter(p =>
-            p.value !== "" &&
-            p.value !== undefined &&
-            !revealedNames.has(p.name)
-        );
-
-        if (pendingReveal.length > 0 && !revealTimerRef.current) {
-            // "Drip feed" - reveal one every 3 seconds
-            revealTimerRef.current = setInterval(() => {
-                setRevealedNames(prev => {
-                    // Get the next item to reveal from the latest proposals
-                    const currentProposals = proposals; // capture current scale
-                    const nextToReveal = currentProposals.find(p =>
-                        p.value !== "" &&
-                        p.value !== undefined &&
-                        !prev.has(p.name)
-                    );
-
-                    if (!nextToReveal) {
-                        if (revealTimerRef.current) clearInterval(revealTimerRef.current);
-                        revealTimerRef.current = null;
-                        return prev;
-                    }
-
-                    const next = new Set(prev);
-                    next.add(nextToReveal.name);
-                    return next;
-                });
-            }, 3000); // 3 seconds interval as requested
-        }
-
-        return () => {
-            if (revealTimerRef.current) {
-                clearInterval(revealTimerRef.current);
-                revealTimerRef.current = null;
-            }
-        };
-    }, [proposals, revealedNames]);
-
     const updateStatus = (name: string, status: FieldProposal['status']) => {
         const next = proposals.map(p => p.name === name ? { ...p, status } : p);
         onUpdate(next);
@@ -101,10 +55,9 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
         setEditingName(null);
     };
 
-    // Filter which items to show based on animation state
+    // Filter which items to show: show if it has a value and is not empty
     const compilableSorted = proposals
-        .filter(p => p.value !== undefined && p.value !== "" && p.value !== "[Vuoto]" && p.value !== "[FONTE MANCANTE]")
-        .filter(p => revealedNames.has(p.name));
+        .filter(p => p.value !== undefined && p.value !== "" && p.value !== "[Vuoto]" && p.value !== "[FONTE MANCANTE]");
 
     const approvedCount = compilableSorted.filter(p => p.status === 'approved').length;
     const allApproved = approvedCount === proposals.length && proposals.length > 0;
@@ -245,12 +198,17 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                 <Button
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 shadow-sm transition-all active:scale-[0.98]"
                     onClick={onFinalize}
-                    disabled={isFinalizing || proposals.length === 0}
+                    disabled={isFinalizing || proposals.length === 0 || isCompiling}
                 >
                     {isFinalizing ? (
                         <div className="flex items-center gap-2">
                             <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             Generazione...
+                        </div>
+                    ) : isCompiling ? (
+                        <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Analisi in corso...
                         </div>
                     ) : (proposals.length > 0 ? "Finalizza Compilazione" : "Caricamento Campi...")}
                 </Button>

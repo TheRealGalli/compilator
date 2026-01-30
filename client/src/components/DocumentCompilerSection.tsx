@@ -364,11 +364,9 @@ export function DocumentCompilerSection({
           })));
 
           // Step 2: Incremental AI proposals in batches
-          let processedCount = 0;
-          let currentBatchSize = 5; // Start with 5 for immediate "item-by-item" effect
-
-          while (processedCount < fields.length) {
-            const batch = fields.slice(processedCount, processedCount + currentBatchSize);
+          const BATCH_SIZE = 25; // Aumentato a 25 per massimizzare la velocità su documenti lunghi
+          for (let i = 0; i < fields.length; i += BATCH_SIZE) {
+            const batch = fields.slice(i, i + BATCH_SIZE);
 
             try {
               const proposalRes = await fetch(getApiUrl('/api/pdf/propose-values'), {
@@ -380,12 +378,12 @@ export function DocumentCompilerSection({
                   notes,
                   webResearch,
                   cacheKey,
-                  masterSource: processedCount === 0 ? masterSource : undefined
+                  masterSource: i === 0 ? masterSource : undefined
                 })
               });
 
               const { proposals } = await proposalRes.json();
-              console.log(`[DEBUG PDF] Batch (${processedCount}-${processedCount + batch.length}) Received:`, proposals);
+              console.log(`[DEBUG PDF] Batch (${i}-${i + batch.length}) Received:`, proposals);
 
               // Update existing proposals with new values
               setPdfProposals(current => {
@@ -404,13 +402,8 @@ export function DocumentCompilerSection({
                 return next;
               });
 
-              processedCount += batch.length;
-              // Exponentially increase batch size up to a max of 20
-              currentBatchSize = Math.min(20, currentBatchSize * 2);
-
             } catch (err) {
-              console.error(`[PDF Batch Error] Failed on index ${processedCount}:`, err);
-              processedCount += currentBatchSize; // Skip ahead on error to prevent infinite loop
+              console.error(`[PDF Batch Error] Failed on batch ${i}:`, err);
             }
           }
 
