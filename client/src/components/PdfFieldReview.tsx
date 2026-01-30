@@ -25,34 +25,31 @@ interface PdfFieldReviewProps {
 }
 
 export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, title = "Revisione Campi PDF" }: PdfFieldReviewProps) {
-    const [editingIdx, setEditingIdx] = useState<number | null>(null);
+    const [editingName, setEditingName] = useState<string | null>(null);
     const [editValue, setEditValue] = useState<string>("");
 
-    const updateStatus = (index: number, status: FieldProposal['status']) => {
-        const next = [...proposals];
-        next[index].status = status;
+    const updateStatus = (name: string, status: FieldProposal['status']) => {
+        const next = proposals.map(p => p.name === name ? { ...p, status } : p);
         onUpdate(next);
     };
 
-    const startEditing = (index: number) => {
-        setEditingIdx(index);
-        setEditValue(String(proposals[index].value));
+    const startEditing = (proposal: FieldProposal) => {
+        setEditingName(proposal.name);
+        setEditValue(String(proposal.value));
     };
 
-    const saveEdit = (index: number) => {
-        const next = [...proposals];
-        const type = next[index].type;
-
-        if (type === 'checkbox') {
-            next[index].value = editValue.toLowerCase() === 'true';
-        } else {
-            next[index].value = editValue;
-        }
-
-        next[index].status = 'approved';
+    const saveEdit = (name: string) => {
+        const next = proposals.map(p => {
+            if (p.name !== name) return p;
+            const updatedValue = p.type === 'checkbox' ? (editValue.toLowerCase() === 'true' || editValue === 'Selezionato') : editValue;
+            return { ...p, value: updatedValue, status: 'approved' as const };
+        });
         onUpdate(next);
-        setEditingIdx(null);
+        setEditingName(null);
     };
+
+    const compilableSorted = proposals
+        .filter(p => p.value !== undefined && p.value !== "" && p.value !== "[Vuoto]" && p.value !== "[FONTE MANCANTE]");
 
     return (
         <Card className="flex flex-col h-full border rounded-lg bg-background shadow-none">
@@ -62,20 +59,20 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                     <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Revisione intelligente dei campi mappati</p>
                 </div>
                 <Badge variant="outline" className="bg-blue-600/10 text-blue-700 border-blue-200/50 text-[10px] h-5 font-bold px-2">
-                    {proposals.filter(p => p.status === 'approved').length} / {proposals.length}
+                    {compilableSorted.length} / {proposals.length}
                 </Badge>
             </div>
 
             <ScrollArea className="flex-1 p-4">
                 <div className="space-y-3">
-                    {proposals.length === 0 && !isFinalizing && (
+                    {compilableSorted.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-40 opacity-40">
                             <Square className="w-8 h-8 mb-2 animate-pulse text-blue-400" />
-                            <p className="text-xs font-medium text-center px-4">L'AI sta analizzando il documento per compilare i campi del PDF...</p>
+                            <p className="text-xs font-medium text-center px-4 tracking-tight">Sto analizzando il documento...<br />I campi compilati appariranno qui.</p>
                         </div>
                     )}
-                    {proposals
-                        .map((proposal, idx) => (
+                    {compilableSorted
+                        .map((proposal) => (
                             <div
                                 key={proposal.name}
                                 className={`p-3 rounded-lg border transition-all ${proposal.status === 'approved' ? 'bg-green-500/10 border-green-500/20' :
@@ -86,13 +83,13 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-transparent p-0 border-none">
-                                                Rilevazione Campo
+                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                                RILEVAZIONE CAMPO
                                             </span>
                                             <TooltipProvider>
                                                 <Tooltip>
-                                                    <TooltipTrigger>
-                                                        <Info className="w-3 h-3 text-blue-400" />
+                                                    <TooltipTrigger asChild>
+                                                        <Info className="w-3 h-3 text-blue-400 cursor-help" />
                                                     </TooltipTrigger>
                                                     <TooltipContent className="max-w-[200px]">
                                                         <p className="text-xs">{proposal.reasoning}</p>
@@ -104,11 +101,11 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                         <div className="text-sm text-foreground/80 leading-relaxed mb-1">
                                             <span className="font-bold text-foreground">{proposal.label || proposal.name}</span>
                                         </div>
-                                        <div className="text-[11px] text-muted-foreground mb-2 flex items-center gap-1">
+                                        <div className="text-[11px] text-muted-foreground mb-2">
                                             compilo con:
                                         </div>
 
-                                        {editingIdx === idx ? (
+                                        {editingName === proposal.name ? (
                                             <div className="flex gap-2">
                                                 <Input
                                                     value={editValue}
@@ -116,7 +113,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                                     className="h-8 text-sm"
                                                     autoFocus
                                                 />
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => saveEdit(idx)}>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => saveEdit(proposal.name)}>
                                                     <Save className="w-4 h-4" />
                                                 </Button>
                                             </div>
@@ -128,7 +125,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                                     }`}>
                                                     {proposal.type === 'checkbox' ? (proposal.value === 'true' || proposal.value === true ? "Selezionato" : "Deselezionato") : String(proposal.value) || "[Vuoto]"}
                                                 </span>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-40 hover:opacity-100" onClick={() => startEditing(idx)}>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-40 hover:opacity-100" onClick={() => startEditing(proposal)}>
                                                     <Edit2 className="w-3 h-3" />
                                                 </Button>
                                             </div>
@@ -137,7 +134,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
 
                                     <div className="flex gap-2">
                                         <button
-                                            onClick={() => updateStatus(idx, 'approved')}
+                                            onClick={() => updateStatus(proposal.name, 'approved')}
                                             className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${proposal.status === 'approved'
                                                 ? 'bg-green-600 border-green-600 text-white shadow-sm'
                                                 : 'border-blue-200/50 bg-transparent hover:border-green-400 text-transparent'
@@ -146,7 +143,7 @@ export function PdfFieldReview({ proposals, onUpdate, onFinalize, isFinalizing, 
                                             <Check className={`w-4 h-4 ${proposal.status === 'approved' ? 'opacity-100' : 'opacity-0'}`} />
                                         </button>
                                         <button
-                                            onClick={() => updateStatus(idx, 'rejected')}
+                                            onClick={() => updateStatus(proposal.name, 'rejected')}
                                             className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${proposal.status === 'rejected'
                                                 ? 'bg-red-600 border-red-600 text-white shadow-sm'
                                                 : 'border-blue-200/50 bg-transparent hover:border-red-400 text-transparent'

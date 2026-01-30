@@ -57,10 +57,10 @@ Abbiamo rilevato i seguenti campi tecnici in un PDF ufficiale (FILE MASTER alleg
 Il tuo compito è:
 1. Analizzare il FILE MASTER per capire visivamente a cosa corrispondono i campi tecnici.
 2. Mappare le informazioni dai DOCUMENTI FONTE allegati e dalle NOTE ai campi del PDF.
-3. Per OGNI campo tecnico, dedurre l'ETICHETTA UMANA (Label) leggendo il nome tecnico o guardando il documento (es. "f1_1[0]" -> "1a. Name of Reporting Corporation").
+3. Per OGNI campo tecnico, dedurre l'ETICHETTA UMANA (Label) leggendo il nome tecnico (es. "f1_1[0]") e GUARDARE il FILE MASTER per capire cosa c'è scritto accanto o sopra al campo (es. "1a. Name of Reporting Corporation"). È fondamentale che il "label" sia leggibile e utile per un umano.
 
 CAMPI RILEVATI DA COMPILARE:
-${fields.map(f => `- Nome Tecnico: "${f.name}", Tipo: ${f.type}`).join('\n')}
+${fields.map(f => `- Nome Tecnico: "${f.name}"`).join('\n')}
 
 TESTO ESTRATTO DALLE FONTI:
 ${sourceContext}
