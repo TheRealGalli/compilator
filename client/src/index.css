@@ -336,47 +336,64 @@
   @apply flex flex-wrap gap-2 mt-2 !important;
 }
 
-/* PDF Annotation Layer Fixes */
-.react-pdf__Page__annotations.annotationLayer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
-  pointer-events: auto;
+/* PDF Visual Fixes */
+.react-pdf__Document {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  background-color: #f0f0f0 !important;
+  /* Contrasting background for the document container */
+  padding: 20px 0 !important;
+  min-height: 100% !important;
 }
 
-.annotationLayer section {
-  pointer-events: auto;
+.react-pdf__Page {
+  background-color: white !important;
+  margin-bottom: 20px !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+  position: relative !important;
+}
+
+/* Force the canvas to be visible and correct size */
+.react-pdf__Page__canvas {
+  display: block !important;
+  margin: 0 auto !important;
+  background-color: white !important;
+}
+
+/* Force text layer to be black regardless of app theme */
+.react-pdf__Page__textLayer {
+  color: black !important;
+}
+
+.react-pdf__Page__textLayer span {
+  color: black !important;
+  opacity: 1 !important;
+}
+
+/* Annotation Layer (Forms) */
+.react-pdf__Page__annotations.annotationLayer {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 10 !important;
+  pointer-events: auto !important;
 }
 
 .annotationLayer input,
 .annotationLayer textarea,
 .annotationLayer select {
   background-color: rgba(0, 100, 255, 0.05) !important;
-  border: 1px solid rgba(0, 100, 255, 0.1) !important;
-  appearance: none;
-  cursor: text;
-  transition: background-color 0.2s;
-}
-
-.annotationLayer input:hover,
-.annotationLayer textarea:hover {
-  background-color: rgba(0, 100, 255, 0.1) !important;
+  border: 1px solid rgba(0, 100, 255, 0.2) !important;
+  color: black !important;
 }
 
 .annotationLayer input:focus,
 .annotationLayer textarea:focus {
-  background-color: rgba(0, 100, 255, 0.15) !important;
-  border-color: rgba(0, 100, 255, 0.4) !important;
-  outline: none !important;
-}
-
-/* Ensure checkbox/radio look clickable */
-.annotationLayer input[type="checkbox"],
-.annotationLayer input[type="radio"] {
-  cursor: pointer;
+  background-color: rgba(0, 100, 255, 0.1) !important;
+  border-color: rgba(0, 100, 255, 0.5) !important;
 }
 
 .google-search-entry-point div[role="listitem"],

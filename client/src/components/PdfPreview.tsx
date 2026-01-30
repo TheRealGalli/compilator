@@ -217,8 +217,8 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
             )}
 
             {/* PDF Viewport */}
-            <div className="flex-1 overflow-auto bg-slate-900/5 flex justify-center p-4 scrollbar-thin group relative">
-                <div className="shadow-xl h-fit border">
+            <div className="flex-1 overflow-auto bg-slate-100 flex justify-center p-4 scrollbar-thin group relative">
+                <div className="h-fit">
                     {isLoading && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm z-10">
                             <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-2" />
@@ -245,7 +245,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                                 cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
                                 cMapPacked: true,
                                 standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
-                                enableXfa: false, // Priority to AcroForms (Chrome-like hybrid behavior)
+                                enableXfa: false,
                             }}
                             loading={null}
                             className="max-w-full"
@@ -256,7 +256,6 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                                 rotate={rotation}
                                 renderAnnotationLayer={true}
                                 renderTextLayer={true}
-                                canvasBackground="transparent"
                                 className="transition-transform duration-200"
                                 loading={null}
                             />
@@ -267,15 +266,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
 
             <style dangerouslySetInnerHTML={{
                 __html: `
-                .react-pdf__Page__canvas {
-                    margin: 0 auto;
-                    max-width: 100%;
-                    height: auto !important;
-                }
-                .react-pdf__Page__annotations.annotationLayer {
-                    padding: 0;
-                }
-                /* Hide secondary toolbars from browsers if any */
+                /* Scoped styles relocated to index.css */
                 ::-webkit-scrollbar {
                     width: 6px;
                     height: 6px;
