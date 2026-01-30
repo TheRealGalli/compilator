@@ -1,4 +1,4 @@
-import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup } from 'pdf-lib';
+import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, PDFName, PDFString, PDFHexString } from 'pdf-lib';
 
 export interface PdfFormField {
     name: string;
@@ -18,14 +18,30 @@ export async function getPdfFormFields(buffer: Buffer): Promise<PdfFormField[]> 
 
         return fields.map(field => {
             const name = field.getName();
-            let type: PdfFormField['type'] = 'unknown';
+            let label = "";
 
+            // Try to extract a useful label from the native field properties (Alternate Name / TU)
+            try {
+                // @ts-ignore - access internal acroField for advanced properties
+                const acroField = (field as any).acroField;
+                if (acroField) {
+                    const dict = acroField.dict;
+                    const tu = dict.get(PDFName.of('TU'));
+                    if (tu instanceof PDFString || tu instanceof PDFHexString) {
+                        label = tu.decodeText();
+                    }
+                }
+            } catch (e) {
+                console.warn(`[getPdfFormFields] Could not get alternate name for ${name}`);
+            }
+
+            let type: PdfFormField['type'] = 'unknown';
             if (field instanceof PDFTextField) type = 'text';
             else if (field instanceof PDFCheckBox) type = 'checkbox';
             else if (field instanceof PDFDropdown) type = 'dropdown';
             else if (field instanceof PDFRadioGroup) type = 'radio';
 
-            return { name, type };
+            return { name, label: label || name, type };
         });
     } catch (error) {
         console.error('[getPdfFormFields] Error:', error);
@@ -60,7 +76,7 @@ Il tuo compito è:
 3. Per OGNI campo tecnico, dedurre l'ETICHETTA UMANA (Label) leggendo il nome tecnico (es. "f1_1[0]") e GUARDARE il FILE MASTER per capire cosa c'è scritto accanto o sopra al campo (es. "1a. Name of Reporting Corporation"). È fondamentale che il "label" sia leggibile e utile per un umano.
 
 CAMPI RILEVATI DA COMPILARE:
-${fields.map(f => `- Nome Tecnico: "${f.name}"`).join('\n')}
+${fields.map(f => `- Nome Tecnico: "${f.name}", Etichetta: "${f.label || 'N/A'}"`).join('\n')}
 
 TESTO ESTRATTO DALLE FONTI:
 ${sourceContext}
@@ -131,17 +147,12 @@ export async function fillNativePdf(buffer: Buffer, values: Record<string, strin
     try {
         const pdfDoc = await PDFDocument.load(buffer);
         const form = pdfDoc.getForm();
-        const availableFields = form.getFields().map(f => f.getName());
-        console.log(`[fillNativePdf] Form loaded. Available fields count: ${availableFields.length}`);
-        // console.log(`[fillNativePdf] Fields:`, availableFields);
 
         for (const [name, value] of Object.entries(values)) {
             try {
-                process.stdout.write(`[fillNativePdf] Filling "${name}" with "${value}"... `);
                 const field = form.getField(name);
                 if (field instanceof PDFTextField) {
                     field.setText(String(value));
-                    console.log("Success (Text)");
                 } else if (field instanceof PDFCheckBox) {
                     if (value === true || value === 'true' || value === 'on') {
                         field.check();

@@ -356,7 +356,7 @@ export function DocumentCompilerSection({
           setIsPdfMode(true);
           setPdfProposals(fields.map((f: any) => ({
             name: f.name,
-            label: f.name,
+            label: f.label || f.name,
             type: f.type,
             value: "",
             reasoning: "In attesa di analisi AI...",
