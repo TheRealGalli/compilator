@@ -255,7 +255,8 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                                 scale={scale}
                                 rotate={rotation}
                                 renderAnnotationLayer={true}
-                                renderTextLayer={true}
+                                renderForms={true} // Crucial for interactivity
+                                renderTextLayer={false} // Disable to avoid contrast bugs on top of canvas
                                 className="transition-transform duration-200"
                                 loading={null}
                             />

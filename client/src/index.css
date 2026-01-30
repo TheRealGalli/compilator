@@ -361,14 +361,9 @@
   background-color: white !important;
 }
 
-/* Force text layer to be black regardless of app theme */
+/* Force text layer to be hidden to avoid white-on-white artifacts */
 .react-pdf__Page__textLayer {
-  color: black !important;
-}
-
-.react-pdf__Page__textLayer span {
-  color: black !important;
-  opacity: 1 !important;
+  display: none !important;
 }
 
 /* Annotation Layer (Forms) */
