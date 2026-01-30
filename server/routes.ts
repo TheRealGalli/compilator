@@ -396,10 +396,12 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
       }
     }
 
-    return '[ERRORE SISTEMA: Formato file non supportato o tipo MIME errato]';
+    return ''; // Return empty string instead of error block for unsupported types
   } catch (error) {
-    console.error('[ERROR extractText] Failed:', error);
-    return `[ERRORE SISTEMA: Impossibile estrarre testo dal file. Dettagli: ${error instanceof Error ? error.message : String(error)}]`;
+    console.warn(`[DEBUG extractText] Failed for ${mimeType}:`, error instanceof Error ? error.message : String(error));
+    // For PDFs, we silently return empty string as we now have Multimodal fallback
+    if (mimeType === 'application/pdf') return "";
+    return ""; // Silent failure to avoid polluting context with system error strings
   }
 }
 
@@ -1175,9 +1177,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               mimeType: source.type,
               name: source.name
             });
+            continue; // BYPASS local extractText for multimodal files to avoid "ERRORE SISTEMA" logs
           }
 
-          // Proviamo comunque l'estrazione testo per il contesto (funziona bene per DOCX)
+          // Proviamo l'estrazione testo per altri formati (DOCX, TXT, etc.)
           try {
             const buffer = Buffer.from(source.base64, 'base64');
             const text = await extractText(buffer, source.type, source.id);
@@ -1185,7 +1188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               textContext += `\n--- FONTE: ${source.name} ---\n${text}\n`;
             }
           } catch (e) {
-            console.warn(`[SERVER] Estrazione testo fallita per ${source.name}, ignorata (verrà usato multimodale se PDF)`);
+            console.warn(`[SERVER] Estrazione testo fallita per ${source.name}`);
           }
         }
       }
@@ -1215,11 +1218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const MAX_ATTEMPTS = 3;
         let batchProposals: any[] = [];
 
-        // Skip batch if textContext suggests critical error
-        if (textContext.includes('ERRORE SISTEMA: Impossibile estrarre testo')) {
-          console.error(`[SERVER] Skipping batch ${i + 1}/${fieldBatches.length} due to context error.`);
-          continue;
-        }
+        // Bypass skip logic: Gemini Multimodal will work even if text extraction failed
 
         while (attempts < MAX_ATTEMPTS) {
           try {
