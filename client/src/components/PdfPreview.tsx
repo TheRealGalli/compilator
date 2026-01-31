@@ -60,6 +60,8 @@ export function PdfPreview({
     const [isCompiling, setIsCompiling] = useState(false);
     const [proposals, setProposals] = useState<any[]>([]);
     const [cacheKey, setCacheKey] = useState<string | null>(null);
+    const [isAlreadyFilledWarningVisible, setIsAlreadyFilledWarningVisible] = useState(false);
+    const [isFlxAdobe, setIsFlxAdobe] = useState(false);
 
     useEffect(() => {
         if (!fileBase64) return;
@@ -133,6 +135,26 @@ export function PdfPreview({
         console.log(`[PdfPreview] Local Page Fill: Success for ${fillCount} fields.`);
     };
 
+    const checkForPreFilledFields = () => {
+        const annotationLayer = document.querySelector('.annotationLayer');
+        if (!annotationLayer) return;
+
+        const inputs = annotationLayer.querySelectorAll('input, textarea, select');
+        let filledCount = 0;
+        inputs.forEach((el: any) => {
+            if (el.type === 'checkbox' || el.type === 'radio') {
+                if (el.checked) filledCount++;
+            } else if (el.value && el.value.trim().length > 0) {
+                filledCount++;
+            }
+        });
+
+        if (filledCount > 5) { // Threshold for "already filled"
+            console.log(`[PdfPreview] Detected ${filledCount} pre-filled fields. Showing warning.`);
+            setIsAlreadyFilledWarningVisible(true);
+        }
+    };
+
     const handleEyeClick = async () => {
         if (isCompiling || !fileBase64) return;
 
@@ -200,8 +222,9 @@ export function PdfPreview({
         setNumPages(numPages);
         setError(null);
         setIsDocumentLoading(false);
+        setIsAlreadyFilledWarningVisible(false); // Reset warning for new document
         // Fallback for Page rendering
-        setTimeout(() => setIsLoading(false), 1000);
+        setTimeout(() => setIsLoading(false), 800);
     }
 
     function onDocumentLoadError(err: Error) {
@@ -364,13 +387,28 @@ export function PdfPreview({
                         </div>
                     )}
 
-                    {error && (
+                    {error && !isDocumentLoading && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10 p-6 text-center">
                             <AlertCircle className="w-10 h-10 text-destructive mb-3" />
                             <p className="text-sm font-medium mb-1">{error}</p>
                             <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
                                 Ricarica Pagina
                             </Button>
+                        </div>
+                    )}
+
+                    {isAlreadyFilledWarningVisible && (
+                        <div
+                            className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px] z-[30] cursor-pointer animate-in fade-in duration-300"
+                            onClick={() => setIsAlreadyFilledWarningVisible(false)}
+                        >
+                            <Card className="p-8 bg-white shadow-2xl border-none flex flex-col items-center gap-4 max-w-[300px] text-center transform hover:scale-105 transition-transform">
+                                <AlertCircle className="w-12 h-12 text-blue-600" />
+                                <h3 className="text-blue-600 font-bold text-lg leading-tight">
+                                    Documento già compilato, impossibile ricompilare
+                                </h3>
+                                <p className="text-xs text-slate-400">Clicca ovunque per visualizzare comunque il file</p>
+                            </Card>
                         </div>
                     )}
 
@@ -398,6 +436,9 @@ export function PdfPreview({
                                 onRenderSuccess={() => {
                                     console.log(`[PdfPreview] Page ${pageNumber} rendered. Applying proposals...`);
                                     applyProposalsToDom(proposals);
+                                    if (pageNumber === 1 && proposals.length === 0) {
+                                        checkForPreFilledFields();
+                                    }
                                     setIsLoading(false);
                                 }}
                                 className={`shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
