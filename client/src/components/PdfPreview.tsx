@@ -145,7 +145,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                         />
                         <span className="text-[10px] opacity-60">/ {numPages}</span>
                     </div>
-                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v2.0-pixel-perfect</span>
+                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v2.1-bulletproof</span>
                 </div>
 
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 hidden md:flex">
@@ -263,7 +263,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                                 renderForms={true}
                                 renderTextLayer={false}
                                 onRenderSuccess={() => setIsLoading(false)}
-                                className={`shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                                className="shadow-2xl"
                                 loading={null}
                             />
                         </Document>

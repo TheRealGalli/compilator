@@ -336,7 +336,7 @@
   @apply flex flex-wrap gap-2 mt-2 !important;
 }
 
-/* PDF Visual Fixes - Extreme Layout v2.0 */
+/* PDF Visual Fixes - Bulletproof Alignment v2.1 */
 .react-pdf__Document {
   display: flex !important;
   flex-direction: column !important;
@@ -353,14 +353,10 @@
   box-shadow: 0 20px 25px -5px rgb(0 0% 0% / 0.1), 0 8px 10px -6px rgb(0 0% 0% / 0.1) !important;
   position: relative !important;
   /* 
-     CRITICAL: display: table forces the container to SHRINK 
-     to the widest child (the canvas). 
-     This ensures absolute-positioned annotations are anchored 
-     exactly to the PDF borders.
+     REVERT TO STABLE: inline-block ensures the container hugs the canvas.
+     This is the most reliable anchor for position: relative + absolute children.
   */
-  display: table !important;
-  width: auto !important;
-  margin: 0 auto !important;
+  display: inline-block !important;
   border-radius: 4px !important;
 }
 
@@ -370,15 +366,20 @@
 }
 
 /* 
-   TRUST THE LIBRARY AGAIN: 
-   Removing explicit 100% width/height. 
-   If Page is a 'table' and 'auto', the library's internal positioning 
-   will naturally align with the canvas.
+   STRICT OVERLAY: 
+   Explicitly force the annotation layer to cover the entire page area.
+   This prevents fields from "clustering" on the left if the container stretches.
 */
 .react-pdf__Page__annotations.annotationLayer {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
   background: transparent !important;
   z-index: 10 !important;
   pointer-events: auto !important;
+  transform-origin: top left !important;
 }
 
 /* Ensure text artifacts remain hidden */
