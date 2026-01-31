@@ -58,6 +58,7 @@ export function PdfPreview({
     const { toast } = useToast();
     const [isEyeSpinning, setIsEyeSpinning] = useState(false);
     const [isCompiling, setIsCompiling] = useState(false);
+    const [proposals, setProposals] = useState<any[]>([]);
     const [cacheKey, setCacheKey] = useState<string | null>(null);
 
     useEffect(() => {
@@ -86,13 +87,59 @@ export function PdfPreview({
         }
     }, [fileBase64]);
 
+    const applyProposalsToDom = (propsList: any[]) => {
+        if (!propsList || propsList.length === 0) return;
+
+        console.log(`[PdfPreview] Applying ${propsList.length} proposals to DOM for page ${pageNumber}...`);
+
+        let fillCount = 0;
+        propsList.forEach((p: any) => {
+            const elements = document.getElementsByName(p.name);
+
+            if (elements && elements.length > 0) {
+                try {
+                    const el = elements[0] as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+
+                    if (el.type === 'checkbox') {
+                        const shouldBeChecked = p.value === true || String(p.value).toLowerCase() === 'true' || p.value === '1';
+                        if ((el as HTMLInputElement).checked !== shouldBeChecked) {
+                            (el as HTMLInputElement).checked = shouldBeChecked;
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    } else if (el.type === 'radio') {
+                        const radioGroup = document.getElementsByName(p.name);
+                        for (let i = 0; i < radioGroup.length; i++) {
+                            const radio = radioGroup[i] as HTMLInputElement;
+                            if (radio.value === String(p.value)) {
+                                radio.checked = true;
+                                radio.dispatchEvent(new Event('change', { bubbles: true }));
+                                break;
+                            }
+                        }
+                    } else {
+                        if (el.value !== String(p.value)) {
+                            el.value = String(p.value);
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
+                    fillCount++;
+                } catch (e) {
+                    console.warn(`[PdfPreview] Error filling field ${p.name}:`, e);
+                }
+            }
+        });
+
+        console.log(`[PdfPreview] Local Page Fill: Success for ${fillCount} fields.`);
+    };
+
     const handleEyeClick = async () => {
         if (isCompiling || !fileBase64) return;
 
         setIsCompiling(true);
-        setIsEyeSpinning(true);
 
         try {
+            console.log("[PdfPreview] Starting discovery...");
             // 1. Discover Fields
             const discoverRes = await apiRequest('POST', '/api/pdf/discover-fields', {
                 masterSource: {
@@ -113,6 +160,8 @@ export function PdfPreview({
                 return;
             }
 
+            console.log(`[PdfPreview] Fields discovered: ${fields.length}. Requesting proposals...`);
+
             // 2. Propose Values
             const proposeRes = await apiRequest('POST', '/api/pdf/propose-values', {
                 fields,
@@ -122,40 +171,17 @@ export function PdfPreview({
                 webResearch,
                 modelProvider
             });
-            const { proposals } = await proposeRes.json();
+            const { proposals: newProposals } = await proposeRes.json();
 
-            // 3. Apply Values to DOM
-            let fillCount = 0;
-            proposals.forEach((p: any) => {
-                const elements = document.getElementsByName(p.name);
-                if (elements && elements.length > 0) {
-                    const el = elements[0] as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-                    if (el.type === 'checkbox') {
-                        (el as HTMLInputElement).checked = p.value === true || p.value === 'true';
-                        // Trigger change event for react-pdf/library listeners
-                        el.dispatchEvent(new Event('change', { bubbles: true }));
-                    } else if (el.type === 'radio') {
-                        const radioGroup = document.getElementsByName(p.name);
-                        for (let i = 0; i < radioGroup.length; i++) {
-                            const radio = radioGroup[i] as HTMLInputElement;
-                            if (radio.value === String(p.value)) {
-                                radio.checked = true;
-                                radio.dispatchEvent(new Event('change', { bubbles: true }));
-                                break;
-                            }
-                        }
-                    } else {
-                        el.value = String(p.value);
-                        el.dispatchEvent(new Event('input', { bubbles: true }));
-                        el.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                    fillCount++;
-                }
-            });
+            console.log(`[PdfPreview] Proposals received: ${newProposals?.length}`);
+            setProposals(newProposals || []);
+
+            // Immediate apply for the current page
+            applyProposalsToDom(newProposals || []);
 
             toast({
                 title: "Compilazione completata",
-                description: `Gromit ha compilato ${fillCount} campi del documento.`,
+                description: `Gromit ha generato ${newProposals?.length || 0} proposte. Naviga tra le pagine per vederle applicate.`,
             });
 
         } catch (err: any) {
@@ -167,7 +193,6 @@ export function PdfPreview({
             });
         } finally {
             setIsCompiling(false);
-            setIsEyeSpinning(false);
         }
     };
 
@@ -304,15 +329,11 @@ export function PdfPreview({
                         title="Gromit Assist"
                     >
                         <div className="relative flex items-center justify-center">
-                            {isCompiling ? (
-                                <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                            ) : (
-                                <Asterisk
-                                    className={`text-blue-500 transition-transform duration-[2000ms] ease-in-out ${isEyeSpinning ? 'rotate-[720deg]' : ''}`}
-                                    size={26}
-                                    strokeWidth={3}
-                                />
-                            )}
+                            <Asterisk
+                                className={`text-blue-500 transition-transform ${isCompiling ? 'animate-spin' : isEyeSpinning ? 'rotate-[720deg] duration-[2000ms] ease-in-out' : ''}`}
+                                size={26}
+                                strokeWidth={3}
+                            />
                         </div>
                     </Button>
                 </div>
@@ -374,7 +395,11 @@ export function PdfPreview({
                                 renderAnnotationLayer={true}
                                 renderForms={true}
                                 renderTextLayer={false}
-                                onRenderSuccess={() => setIsLoading(false)}
+                                onRenderSuccess={() => {
+                                    console.log(`[PdfPreview] Page ${pageNumber} rendered. Applying proposals...`);
+                                    applyProposalsToDom(proposals);
+                                    setIsLoading(false);
+                                }}
                                 className={`shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                                 loading={null}
                             />
