@@ -336,7 +336,7 @@
   @apply flex flex-wrap gap-2 mt-2 !important;
 }
 
-/* PDF Visual Fixes - Bulletproof Alignment v2.1 */
+/* PDF Visual Fixes - Vanilla Absolute v3.0 */
 .react-pdf__Document {
   display: flex !important;
   flex-direction: column !important;
@@ -349,37 +349,32 @@
 
 .react-pdf__Page {
   background-color: white !important;
-  margin-bottom: 3.5rem !important;
+  margin: 0 auto 3.5rem !important;
+  /* Standard centering */
   box-shadow: 0 20px 25px -5px rgb(0 0% 0% / 0.1), 0 8px 10px -6px rgb(0 0% 0% / 0.1) !important;
   position: relative !important;
-  /* 
-     REVERT TO STABLE: inline-block ensures the container hugs the canvas.
-     This is the most reliable anchor for position: relative + absolute children.
-  */
-  display: inline-block !important;
   border-radius: 4px !important;
+  /* Remove display: inline-block/table to avoid anchor issues */
+  display: block !important;
 }
 
 .react-pdf__Page__canvas {
   display: block !important;
-  margin: 0 !important;
+  margin: 0 auto !important;
 }
 
 /* 
-   STRICT OVERLAY: 
-   Explicitly force the annotation layer to cover the entire page area.
-   This prevents fields from "clustering" on the left if the container stretches.
+   VANILLA OVERLAY:
+   We ONLY force position and z-index. 
+   We DO NOT override width/height/top/left. 
+   React-PDF sets these via inline styles and CSS variables 
+   based on the scale and viewport.
 */
 .react-pdf__Page__annotations.annotationLayer {
   position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  background: transparent !important;
   z-index: 10 !important;
+  background: transparent !important;
   pointer-events: auto !important;
-  transform-origin: top left !important;
 }
 
 /* Ensure text artifacts remain hidden */
