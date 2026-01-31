@@ -265,24 +265,6 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                 </div>
             </div>
 
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                /* Scoped styles relocated to index.css */
-                ::-webkit-scrollbar {
-                    width: 6px;
-                    height: 6px;
-                }
-                ::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                ::-webkit-scrollbar-thumb {
-                    background: rgba(0, 0, 0, 0.1);
-                    border-radius: 10px;
-                }
-                .dark ::-webkit-scrollbar-thumb {
-                    background: rgba(255, 255, 255, 0.1);
-                }
-            ` }} />
         </Card>
     );
 }
