@@ -42,7 +42,6 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
     const [error, setError] = useState<string | null>(null);
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
     const [isEyeSpinning, setIsEyeSpinning] = useState(false);
-    const [isReady, setIsReady] = useState(false); // To prevent jumpy rendering
 
     useEffect(() => {
         if (!fileBase64) return;
@@ -78,11 +77,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
         setNumPages(numPages);
         setError(null);
-        // Delay setting isReady slightly to ensure layers are initialized
-        setTimeout(() => {
-            setIsLoading(false);
-            setIsReady(true);
-        }, 150);
+        setIsLoading(false);
     }
 
     function onDocumentLoadError(err: Error) {
@@ -147,7 +142,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                         />
                         <span className="text-[10px] opacity-60">/ {numPages}</span>
                     </div>
-                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v1.5-native-scaling</span>
+                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v1.6-vanilla-minimal</span>
                 </div>
 
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 hidden md:flex">
@@ -243,32 +238,30 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                     )}
 
                     {blobUrl && (
-                        <div className={`transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}>
-                            <Document
-                                file={blobUrl}
-                                onLoadSuccess={onDocumentLoadSuccess}
-                                onLoadError={onDocumentLoadError}
-                                options={{
-                                    cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
-                                    cMapPacked: true,
-                                    standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
-                                    enableXfa: false,
-                                }}
+                        <Document
+                            file={blobUrl}
+                            onLoadSuccess={onDocumentLoadSuccess}
+                            onLoadError={onDocumentLoadError}
+                            options={{
+                                cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+                                cMapPacked: true,
+                                standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+                                enableXfa: false,
+                            }}
+                            loading={null}
+                            className="max-w-full"
+                        >
+                            <Page
+                                pageNumber={pageNumber}
+                                scale={scale}
+                                rotate={rotation}
+                                renderAnnotationLayer={true}
+                                renderForms={true}
+                                renderTextLayer={false}
+                                className="shadow-2xl"
                                 loading={null}
-                                className="max-w-full"
-                            >
-                                <Page
-                                    pageNumber={pageNumber}
-                                    scale={scale}
-                                    rotate={rotation}
-                                    renderAnnotationLayer={true}
-                                    renderForms={true}
-                                    renderTextLayer={false} // Disabled again: causes visual artifacts and misalignment
-                                    className="shadow-2xl"
-                                    loading={null}
-                                />
-                            </Document>
-                        </div>
+                            />
+                        </Document>
                     )}
                 </div>
             </div>
