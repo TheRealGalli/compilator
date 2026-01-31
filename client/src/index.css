@@ -336,7 +336,7 @@
   @apply flex flex-wrap gap-2 mt-2 !important;
 }
 
-/* PDF Visual Fixes - Embedded Standard v3.1 */
+/* PDF Visual Fixes - Sub-pixel Precision v3.2 */
 .react-pdf__Document {
   display: flex !important;
   flex-direction: column !important;
@@ -359,17 +359,26 @@
   display: inline-block !important;
   vertical-align: top !important;
   border-radius: 4px !important;
+  /* 
+     CRITICAL: ZERO BASELINE
+     Eliminates the "ghost space" below the canvas that shifts fields down.
+  */
+  line-height: 0 !important;
+  font-size: 0 !important;
 }
 
 .react-pdf__Page__canvas {
   display: block !important;
   margin: 0 !important;
+  /* Ensure maximum sharpness for form lines */
+  image-rendering: -webkit-optimize-contrast !important;
+  image-rendering: crisp-edges !important;
 }
 
 /* 
-   CRITICAL: EMBED LIBRARY CSS
-   If the clustered-left bug persists, it's because the library's absolute rules 
-   are missing. We define them here to be bulletproof.
+   STRICT OVERLAY & BOXING:
+   Force the layer and its descendants to use border-box to prevent 
+   border-width from adding to the calculated width/height.
 */
 .react-pdf__Page__annotations.annotationLayer {
   position: absolute !important;
@@ -381,21 +390,34 @@
   background: transparent !important;
   pointer-events: auto !important;
   transform-origin: top left !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
-/* Ensure individual form elements are absolute */
+/* Ensure individual form elements are absolute and correctly sized */
 .annotationLayer section {
   position: absolute !important;
   pointer-events: auto !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
 }
 
 .annotationLayer input,
 .annotationLayer textarea,
 .annotationLayer select {
+  position: absolute !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
   background-color: rgba(59, 130, 246, 0.08) !important;
-  border: 1px solid rgba(59, 130, 246, 0.15) !important;
   color: black !important;
   box-sizing: border-box !important;
+  pointer-events: auto !important;
+  line-height: normal !important;
+  /* Reset from Page's 0 */
+  font-size: 12px !important;
+  /* Reasonable default for interactive fields */
 }
 
 .annotationLayer input:focus,
