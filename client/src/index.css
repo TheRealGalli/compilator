@@ -368,15 +368,14 @@
 
 /* 
    ANNOTATION LAYER:
-   Force dimensions to match the page width/height using lib variables 
-   to ensure the viewport anchor is perfect.
+   Restored v3.5: We remove the manual width/height overrides that caused 
+   the layer to collapse. We let the library calculate dimensions, 
+   while keeping position: absolute for anchoring.
 */
 .react-pdf__Page__annotations.annotationLayer {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
-  width: var(--react-pdf-page-width) !important;
-  height: var(--react-pdf-page-height) !important;
   z-index: 10 !important;
   background: transparent !important;
   pointer-events: auto !important;

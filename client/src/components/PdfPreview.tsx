@@ -145,7 +145,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                         />
                         <span className="text-[10px] opacity-60">/ {numPages}</span>
                     </div>
-                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v3.4-input-stretch</span>
+                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v3.5-resurrection-fix</span>
                 </div>
 
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 hidden md:flex">
