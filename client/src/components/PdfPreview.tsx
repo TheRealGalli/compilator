@@ -65,6 +65,7 @@ export function PdfPreview({
     useEffect(() => {
         if (!fileBase64) return;
         setIsLoading(true);
+        setIsDocumentLoading(true); // Reset document loading state to avoid error flashes
         setError(null);
         // Stop any active compilation when switching documents
         setIsCompiling(false);
@@ -226,8 +227,10 @@ export function PdfPreview({
         setNumPages(numPages);
         setError(null);
         setIsDocumentLoading(false);
-        // Fallback for Page rendering
-        setTimeout(() => setIsLoading(false), 800);
+        // The setIsLoading(false) will be handled by onRenderSuccess
+        // to ensure the page is actually visible before hiding the loader.
+        // We keep a longer fallback here just in case.
+        setTimeout(() => setIsLoading(false), 1500);
     }
 
     function onDocumentLoadError(err: Error) {
@@ -382,7 +385,13 @@ export function PdfPreview({
 
             {/* PDF Viewport */}
             <div className="flex-1 overflow-auto bg-slate-100 flex justify-center p-4 scrollbar-thin group relative">
-                <div className="h-fit">
+                <div className="h-fit relative min-w-[300px] min-h-[400px] flex items-center justify-center">
+                    {(isDocumentLoading || isLoading) && !error && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+                            <Loader2 className="w-8 h-8 animate-spin text-blue-500/20" />
+                        </div>
+                    )}
+
                     {error && !isDocumentLoading && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10 p-6 text-center">
                             <AlertCircle className="w-10 h-10 text-destructive mb-3" />
@@ -417,7 +426,8 @@ export function PdfPreview({
                                 onRenderSuccess={() => {
                                     console.log(`[PdfPreview] Page ${pageNumber} rendered. Applying proposals...`);
                                     applyProposalsToDom(proposals);
-                                    setIsLoading(false);
+                                    // Small delay to ensure browser layout is stable
+                                    setTimeout(() => setIsLoading(false), 50);
                                 }}
                                 className={`shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                                 loading={null}

@@ -11,6 +11,7 @@ export interface Source {
     isMemory?: boolean;
     isMaster?: boolean; // Master source for formatting (Blue Check)
     isFillable?: boolean; // Native PDF Form Fields detected
+    isAlreadyFilled?: boolean; // Threshold of filled fields detected
     driveId?: string; // Original Google Drive ID
 }
 
@@ -64,6 +65,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         }
 
         let isFillable = false;
+        let isAlreadyFilled = false;
         if (extension === 'pdf') {
             try {
                 const { PDFDocument } = await import('pdf-lib');
@@ -72,6 +74,28 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 const form = pdfDoc.getForm();
                 const fields = form.getFields();
                 isFillable = fields.length > 0;
+
+                if (isFillable) {
+                    let filledCount = 0;
+                    fields.forEach(field => {
+                        try {
+                            const type = field.constructor.name;
+                            // Checking values based on field type names from pdf-lib
+                            if (type === 'PDFTextField') {
+                                if ((field as any).getText()?.trim().length > 0) filledCount++;
+                            } else if (type === 'PDFCheckBox') {
+                                if ((field as any).isChecked()) filledCount++;
+                            } else if (type === 'PDFRadioGroup') {
+                                if ((field as any).getSelected()) filledCount++;
+                            } else if (type === 'PDFDropdown' || type === 'PDFOptionList') {
+                                if ((field as any).getSelected()?.length > 0) filledCount++;
+                            }
+                        } catch (e) {
+                            // Ignore errors for specific field types
+                        }
+                    });
+                    if (filledCount > 5) isAlreadyFilled = true;
+                }
             } catch (error) {
                 console.warn('[SourcesContext] Error checking if PDF is fillable:', error);
             }
@@ -98,6 +122,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 base64: base64,
                 isMemory: options?.isMemory,
                 isFillable: isFillable,
+                isAlreadyFilled: isAlreadyFilled,
                 driveId: options?.driveId
             };
 

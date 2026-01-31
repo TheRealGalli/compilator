@@ -16,6 +16,7 @@ interface Source {
   isMemory?: boolean;
   isMaster?: boolean;
   isFillable?: boolean;
+  isAlreadyFilled?: boolean;
 }
 
 interface SourceSelectorProps {
@@ -66,7 +67,12 @@ export function SourceSelector({ sources, onToggle, onToggleMaster }: SourceSele
                   data-testid={`checkbox-source-${source.id}`}
                   className="w-3.5 h-3.5"
                 />
-                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${source.isFillable ? 'text-green-500 fill-green-500/20' : 'text-muted-foreground'}`} />
+                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${source.isAlreadyFilled
+                  ? 'text-orange-500 fill-orange-500/20'
+                  : source.isFillable
+                    ? 'text-green-500 fill-green-500/20'
+                    : 'text-muted-foreground'
+                  }`} />
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>
                     <span className="text-xs flex-1 cursor-default min-w-0 whitespace-nowrap">
