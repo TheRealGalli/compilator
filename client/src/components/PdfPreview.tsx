@@ -22,6 +22,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 // Use a more reliable worker source
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -31,9 +33,20 @@ pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.vers
 interface PdfPreviewProps {
     fileBase64: string;
     className?: string;
+    selectedSources?: any[];
+    notes?: string;
+    webResearch?: boolean;
+    modelProvider?: string;
 }
 
-export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
+export function PdfPreview({
+    fileBase64,
+    className,
+    selectedSources = [],
+    notes = "",
+    webResearch = false,
+    modelProvider = 'gemini'
+}: PdfPreviewProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [pageNumber, setPageNumber] = useState<number>(1);
     const [scale, setScale] = useState<number>(1.2);
@@ -42,7 +55,10 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
     const [isDocumentLoading, setIsDocumentLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
+    const { toast } = useToast();
     const [isEyeSpinning, setIsEyeSpinning] = useState(false);
+    const [isCompiling, setIsCompiling] = useState(false);
+    const [cacheKey, setCacheKey] = useState<string | null>(null);
 
     useEffect(() => {
         if (!fileBase64) return;
@@ -70,9 +86,89 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
         }
     }, [fileBase64]);
 
-    const handleEyeClick = () => {
+    const handleEyeClick = async () => {
+        if (isCompiling || !fileBase64) return;
+
+        setIsCompiling(true);
         setIsEyeSpinning(true);
-        setTimeout(() => setIsEyeSpinning(false), 1000);
+
+        try {
+            // 1. Discover Fields
+            const discoverRes = await apiRequest('POST', '/api/pdf/discover-fields', {
+                masterSource: {
+                    base64: fileBase64.includes(',') ? fileBase64.split(',')[1] : fileBase64,
+                    type: 'application/pdf',
+                    name: 'Master.pdf'
+                }
+            });
+            const { fields, cacheKey: newCacheKey } = await discoverRes.json();
+            setCacheKey(newCacheKey);
+
+            if (!fields || fields.length === 0) {
+                toast({
+                    title: "Nessun campo rilevato",
+                    description: "Il PDF non sembra contenere campi compilabili (AcroForms).",
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            // 2. Propose Values
+            const proposeRes = await apiRequest('POST', '/api/pdf/propose-values', {
+                fields,
+                cacheKey: newCacheKey,
+                sources: selectedSources,
+                notes,
+                webResearch,
+                modelProvider
+            });
+            const { proposals } = await proposeRes.json();
+
+            // 3. Apply Values to DOM
+            let fillCount = 0;
+            proposals.forEach((p: any) => {
+                const elements = document.getElementsByName(p.name);
+                if (elements && elements.length > 0) {
+                    const el = elements[0] as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+                    if (el.type === 'checkbox') {
+                        (el as HTMLInputElement).checked = p.value === true || p.value === 'true';
+                        // Trigger change event for react-pdf/library listeners
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    } else if (el.type === 'radio') {
+                        const radioGroup = document.getElementsByName(p.name);
+                        for (let i = 0; i < radioGroup.length; i++) {
+                            const radio = radioGroup[i] as HTMLInputElement;
+                            if (radio.value === String(p.value)) {
+                                radio.checked = true;
+                                radio.dispatchEvent(new Event('change', { bubbles: true }));
+                                break;
+                            }
+                        }
+                    } else {
+                        el.value = String(p.value);
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    fillCount++;
+                }
+            });
+
+            toast({
+                title: "Compilazione completata",
+                description: `Gromit ha compilato ${fillCount} campi del documento.`,
+            });
+
+        } catch (err: any) {
+            console.error("Gromit Assist Error:", err);
+            toast({
+                title: "Errore Gromit",
+                description: err.message || "Impossibile completare la compilazione automatica.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsCompiling(false);
+            setIsEyeSpinning(false);
+        }
     };
 
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
@@ -93,17 +189,60 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
         setPageNumber(prevPageNumber => Math.min(Math.max(1, prevPageNumber + offset), numPages));
     };
 
-    const handleDownload = () => {
-        if (blobUrl) {
+    const handleDownload = async () => {
+        if (!fileBase64) return;
+
+        setIsLoading(true);
+        try {
+            // 1. Collect all current form values from the DOM
+            const fields: Record<string, string | boolean> = {};
+            const annotationLayer = document.querySelector('.annotationLayer');
+            if (annotationLayer) {
+                const inputs = annotationLayer.querySelectorAll('input, textarea, select');
+                inputs.forEach((el: any) => {
+                    if (el.name) {
+                        if (el.type === 'checkbox') {
+                            fields[el.name] = el.checked;
+                        } else if (el.type === 'radio') {
+                            if (el.checked) fields[el.name] = el.value;
+                        } else {
+                            fields[el.name] = el.value;
+                        }
+                    }
+                });
+            }
+
+            // 2. Finalize on server
+            const base64Clean = fileBase64.includes(',') ? fileBase64.split(',')[1] : fileBase64;
+            const res = await apiRequest('POST', '/api/pdf/finalize', {
+                masterSource: {
+                    base64: base64Clean,
+                    type: 'application/pdf',
+                    name: 'documento.pdf'
+                },
+                values: fields
+            });
+            const { base64: filledBase64, name } = await res.json();
+
+            // 3. Trigger download
             const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = "document.pdf";
+            link.href = `data:application/pdf;base64,${filledBase64}`;
+            link.download = name || "documento_compilato.pdf";
             link.click();
-        } else if (fileBase64) {
-            const link = document.createElement('a');
-            link.href = fileBase64.startsWith('data:') ? fileBase64 : `data:application/pdf;base64,${fileBase64}`;
-            link.download = "document.pdf";
-            link.click();
+
+            toast({
+                title: "Download completato",
+                description: "Il PDF compilato è pronto.",
+            });
+        } catch (err: any) {
+            console.error("Download Error:", err);
+            toast({
+                title: "Errore Download",
+                description: err.message || "Impossibile generare il PDF compilato.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -154,25 +293,6 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload}>
                         <Download className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrint}>
-                        <Printer className="h-3.5 w-3.5" />
-                    </Button>
-
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <MoreVertical className="h-3.5 w-3.5" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="cursor-pointer" onClick={() => setScale(1.0)}>
-                                Adatta alla pagina
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer" onClick={() => setRotation(r => (r + 180) % 360)}>
-                                Capovolgi
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
 
                     <div className="h-4 w-[1px] bg-border mx-1" />
                     <Button
@@ -180,14 +300,19 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                         size="icon"
                         className="h-7 w-7 p-0 flex items-center justify-center group/eye"
                         onClick={handleEyeClick}
+                        disabled={isCompiling}
                         title="Gromit Assist"
                     >
                         <div className="relative flex items-center justify-center">
-                            <Asterisk
-                                className={`text-blue-500 transition-transform duration-1000 ${isEyeSpinning ? 'rotate-[360deg]' : ''}`}
-                                size={26}
-                                strokeWidth={3}
-                            />
+                            {isCompiling ? (
+                                <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                            ) : (
+                                <Asterisk
+                                    className={`text-blue-500 transition-transform duration-[2000ms] ease-in-out ${isEyeSpinning ? 'rotate-[720deg]' : ''}`}
+                                    size={26}
+                                    strokeWidth={3}
+                                />
+                            )}
                         </div>
                     </Button>
                 </div>

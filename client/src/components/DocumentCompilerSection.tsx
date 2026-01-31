@@ -696,6 +696,14 @@ export function DocumentCompilerSection({
                   <PdfPreview
                     fileBase64={masterSource?.base64 || ""}
                     className="rounded-none border-none h-full"
+                    selectedSources={selectedSources.map(s => ({
+                      name: s.name,
+                      type: s.type,
+                      base64: s.base64
+                    }))}
+                    notes={notes}
+                    webResearch={webResearch}
+                    modelProvider={modelProvider}
                   />
                 </Card>
               </div>
