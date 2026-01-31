@@ -351,34 +351,30 @@
   margin-bottom: 4rem !important;
   box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.2) !important;
   position: relative !important;
-  display: block !important;
+  display: inline-block !important;
+  /* CRITICAL: Hug the canvas dimensions */
   border-radius: 4px !important;
+  overflow: hidden !important;
 }
 
-/* Let the library handle Canvas sizing precisely */
 .react-pdf__Page__canvas {
   display: block !important;
   background-color: white !important;
 }
 
-/* Standard Absolute Positioning for Layers (Required by pdf.js) */
+/* Let the library set Width/Height, only force position */
 .react-pdf__Page__annotations.annotationLayer,
 .react-pdf__Page__textLayer {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
+  background: transparent !important;
 }
 
+/* Force unwanted text layer to stay hidden if rendered */
 .react-pdf__Page__textLayer {
-  opacity: 1 !important;
-  color: transparent !important;
-  user-select: text !important;
-}
-
-.react-pdf__Page__textLayer span {
-  color: transparent !important;
+  display: none !important;
+  pointer-events: none !important;
 }
 
 /* Annotation Layer Styling */
