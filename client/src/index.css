@@ -363,24 +363,22 @@
   margin: 0 !important;
 }
 
-/* Annotation and Text Layers (Locked to Page) */
+/* Let the library set Width/Height and internal scaling */
 .react-pdf__Page__annotations.annotationLayer,
 .react-pdf__Page__textLayer {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
-  width: 100% !important;
-  /* Required for internal positioning of children */
-  height: 100% !important;
-  /* Required for internal positioning of children */
   background: transparent !important;
   margin: 0 !important;
+  transform-origin: top left !important;
 }
 
-/* Force Text layer to stay hidden - Fixes "testo bianco" artifacts */
+/* Absolutely hide text layer artifacts */
 .react-pdf__Page__textLayer {
   display: none !important;
   visibility: hidden !important;
+  opacity: 0 !important;
   pointer-events: none !important;
 }
 
