@@ -39,6 +39,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
     const [scale, setScale] = useState<number>(1.2);
     const [rotation, setRotation] = useState<number>(0);
     const [isLoading, setIsLoading] = useState(true);
+    const [isDocumentLoading, setIsDocumentLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
     const [isEyeSpinning, setIsEyeSpinning] = useState(false);
@@ -77,7 +78,9 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
         setNumPages(numPages);
         setError(null);
-        setIsLoading(false); // Restore fallback to prevent stuck loading
+        setIsDocumentLoading(false);
+        // Fallback for Page rendering
+        setTimeout(() => setIsLoading(false), 1000);
     }
 
     function onDocumentLoadError(err: Error) {
@@ -142,7 +145,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                         />
                         <span className="text-[10px] opacity-60">/ {numPages}</span>
                     </div>
-                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v1.9-stable-layout</span>
+                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v2.0-pixel-perfect</span>
                 </div>
 
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 hidden md:flex">
@@ -220,10 +223,10 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
             {/* PDF Viewport */}
             <div className="flex-1 overflow-auto bg-slate-100 flex justify-center p-4 scrollbar-thin group relative">
                 <div className="h-fit">
-                    {isLoading && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                    {(isDocumentLoading || !blobUrl) && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm z-10 text-center">
                             <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-2" />
-                            <p className="text-xs text-muted-foreground">Caricamento PDF...</p>
+                            <p className="text-xs text-muted-foreground">Inizializzazione PDF...</p>
                         </div>
                     )}
 
@@ -260,7 +263,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                                 renderForms={true}
                                 renderTextLayer={false}
                                 onRenderSuccess={() => setIsLoading(false)}
-                                className="shadow-2xl"
+                                className={`shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                                 loading={null}
                             />
                         </Document>
