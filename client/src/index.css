@@ -418,15 +418,41 @@
 .annotationLayer input:focus,
 .annotationLayer textarea:focus {
   background-color: rgba(59, 130, 246, 0.12) !important;
-  border-color: rgba(59, 130, 246, 0.4) !important;
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
   outline: none !important;
 }
 
-.annotationLayer input:focus,
-.annotationLayer textarea:focus {
-  background-color: rgba(59, 130, 246, 0.12) !important;
-  border-color: rgba(59, 130, 246, 0.4) !important;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+/* 
+   CHECKBOX STYLING:
+   Black checkmark on transparent background.
+*/
+.annotationLayer input[type="checkbox"] {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-color: transparent !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  cursor: pointer !important;
+}
+
+.annotationLayer input[type="checkbox"]:checked {
+  background-color: transparent !important;
+  border-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+.annotationLayer input[type="checkbox"]:checked::after {
+  content: "L" !important;
+  /* A simple checkmark-like shape or tick */
+  color: black !important;
+  font-family: Arial, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: bold !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -60%) rotate(40deg) scaleX(-1) !important;
+  display: block !important;
 }
 
 .google-search-entry-point div[role="listitem"],

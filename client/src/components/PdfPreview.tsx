@@ -134,18 +134,6 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                         Documento PDF
                     </span>
                     <div className="h-4 w-[1px] bg-border hidden sm:block" />
-                    <div className="flex items-center gap-1 bg-background/50 rounded px-2">
-                        <Input
-                            value={pageNumber}
-                            onChange={(e) => {
-                                const val = parseInt(e.target.value);
-                                if (!isNaN(val) && val >= 1 && val <= numPages) setPageNumber(val);
-                            }}
-                            className="w-10 h-7 bg-transparent border-none text-center p-0 text-xs focus-visible:ring-0 focus-visible:ring-offset-0"
-                        />
-                        <span className="text-[10px] opacity-60">/ {numPages}</span>
-                    </div>
-                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v3.5-resurrection-fix</span>
                 </div>
 
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 hidden md:flex">
@@ -262,14 +250,13 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                                 renderForms={true}
                                 renderTextLayer={false}
                                 onRenderSuccess={() => setIsLoading(false)}
-                                className="shadow-2xl"
+                                className={`shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                                 loading={null}
                             />
                         </Document>
                     )}
                 </div>
             </div>
-
         </Card>
     );
 }
