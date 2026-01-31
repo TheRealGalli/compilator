@@ -336,7 +336,7 @@
   @apply flex flex-wrap gap-2 mt-2 !important;
 }
 
-/* PDF Visual Fixes - Sub-pixel Precision v3.2 */
+/* PDF Visual Fixes - Horizontal Calibration v3.3 */
 .react-pdf__Document {
   display: flex !important;
   flex-direction: column !important;
@@ -352,14 +352,14 @@
   margin: 0 auto 3.5rem !important;
   box-shadow: 0 20px 25px -5px rgb(0 0% 0% / 0.1), 0 8px 10px -6px rgb(0 0% 0% / 0.1) !important;
   position: relative !important;
-  /* 
-     STABLE ANCHOR: inline-block forces the container to SHRINK 
+  /*
+     STABLE ANCHOR: inline-block forces the container to SHRINK
      exactly to the canvas width. This is the only 100% reliable anchor.
   */
   display: inline-block !important;
   vertical-align: top !important;
   border-radius: 4px !important;
-  /* 
+  /*
      CRITICAL: ZERO BASELINE
      Eliminates the "ghost space" below the canvas that shifts fields down.
   */
@@ -375,34 +375,34 @@
   image-rendering: crisp-edges !important;
 }
 
-/* 
-   STRICT OVERLAY & BOXING:
-   Force the layer and its descendants to use border-box to prevent 
-   border-width from adding to the calculated width/height.
+/*
+   ANNOTATION LAYER:
+   We remove right: 0 and bottom: 0 to let the library-calculated
+   width/height be the sole source of truth.
 */
 .react-pdf__Page__annotations.annotationLayer {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
   z-index: 10 !important;
   background: transparent !important;
   pointer-events: auto !important;
   transform-origin: top left !important;
-  box-sizing: border-box !important;
   margin: 0 !important;
   padding: 0 !important;
 }
 
-/* Ensure individual form elements are absolute and correctly sized */
+/* Ensure individual form elements are absolute */
 .annotationLayer section {
   position: absolute !important;
   pointer-events: auto !important;
-  box-sizing: border-box !important;
-  margin: 0 !important;
 }
 
+/*
+   CONTENT-BOX FOR FIELDS:
+   Restoring standard boxing prevents borders from "eating"
+   the library-calculated dimensions.
+*/
 .annotationLayer input,
 .annotationLayer textarea,
 .annotationLayer select {
@@ -412,7 +412,7 @@
   border: 1px solid rgba(59, 130, 246, 0.2) !important;
   background-color: rgba(59, 130, 246, 0.08) !important;
   color: black !important;
-  box-sizing: border-box !important;
+  box-sizing: content-box !important;
   pointer-events: auto !important;
   line-height: normal !important;
   /* Reset from Page's 0 */
