@@ -342,38 +342,42 @@
   flex-direction: column !important;
   align-items: center !important;
   background-color: #f1f5f9 !important;
-  /* Slightly more professional gray */
-  padding: 2.5rem 0 !important;
+  padding: 3rem 0 !important;
   min-height: 100% !important;
 }
 
 .react-pdf__Page {
   background-color: white !important;
-  margin-bottom: 2.5rem !important;
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+  margin-bottom: 3.5rem !important;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.15) !important;
   position: relative !important;
-  display: block !important;
+  /* GRID STACK: Layers stacked perfectly */
+  display: grid !important;
+  grid-template-areas: "pdf-page-content" !important;
   border-radius: 4px !important;
+  overflow: visible !important;
 }
 
-/* LOCK CANVAS AND LAYERS TOGETHER - Let the library set the dimensions */
-.react-pdf__Page__canvas {
-  display: block !important;
+.react-pdf__Page__canvas,
+.react-pdf__Page__annotations,
+.react-pdf__Page__textLayer {
+  grid-area: pdf-page-content !important;
   margin: 0 !important;
-  background-color: white !important;
 }
 
-/* Text Layer for selection - Transparent but visible for selection */
+/* Fix text layer contrast/visibility */
 .react-pdf__Page__textLayer {
   opacity: 1 !important;
-  color: black !important;
+  color: transparent !important;
+  user-select: text !important;
 }
 
-/* Annotation Layer (Forms) - MUST LOCK TO CANVAS */
+.react-pdf__Page__textLayer span {
+  color: transparent !important;
+}
+
+/* Annotation Layer (Forms) */
 .react-pdf__Page__annotations.annotationLayer {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
   z-index: 10 !important;
   pointer-events: auto !important;
 }
@@ -382,7 +386,6 @@
 .annotationLayer textarea,
 .annotationLayer select {
   background-color: rgba(59, 130, 246, 0.08) !important;
-  /* Blue subtle tint */
   border: 1px solid rgba(59, 130, 246, 0.2) !important;
   color: black !important;
   box-sizing: border-box !important;
@@ -394,7 +397,7 @@
 .annotationLayer textarea:focus {
   background-color: rgba(59, 130, 246, 0.15) !important;
   border-color: rgba(59, 130, 246, 0.5) !important;
-  outline: none !important;
+  outline: 2px solid rgba(59, 130, 246, 0.3) !important;
 }
 
 .google-search-entry-point div[role="listitem"],
