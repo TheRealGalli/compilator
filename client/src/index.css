@@ -351,7 +351,8 @@
   margin-bottom: 3.5rem !important;
   box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
   position: relative !important;
-  display: block !important;
+  display: inline-block !important;
+  /* Critical: forces container to match canvas width */
   border-radius: 4px !important;
 }
 
