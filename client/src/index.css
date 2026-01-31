@@ -336,7 +336,7 @@
   @apply flex flex-wrap gap-2 mt-2 !important;
 }
 
-/* PDF Visual Fixes - Final Sync v1.8 */
+/* PDF Visual Fixes - Stable Layout v1.9 */
 .react-pdf__Document {
   display: flex !important;
   flex-direction: column !important;
@@ -344,15 +344,15 @@
   background-color: #f1f5f9 !important;
   padding: 3rem 0 !important;
   min-height: 100% !important;
+  width: 100% !important;
 }
 
 .react-pdf__Page {
   background-color: white !important;
   margin-bottom: 3.5rem !important;
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+  box-shadow: 0 20px 25px -5px rgb(0 0% 0% / 0.1), 0 8px 10px -6px rgb(0 0% 0% / 0.1) !important;
   position: relative !important;
   display: inline-block !important;
-  /* Critical: keeps container sized to canvas */
   min-width: min-content !important;
   border-radius: 4px !important;
 }
@@ -362,15 +362,18 @@
   margin: 0 !important;
 }
 
-/* Restore explicit viewport for annotations - Fixes "clustered left" fields */
+/* Perfect Overlay - Fixes disaligned fields */
 .react-pdf__Page__annotations.annotationLayer {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   width: 100% !important;
   height: 100% !important;
   background: transparent !important;
   z-index: 10 !important;
+  pointer-events: auto !important;
 }
 
 /* Ensure text artifacts remain hidden */

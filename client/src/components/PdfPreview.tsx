@@ -77,7 +77,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
         setNumPages(numPages);
         setError(null);
-        // We wait for Page.onRenderSuccess to set setIsLoading(false)
+        setIsLoading(false); // Restore fallback to prevent stuck loading
     }
 
     function onDocumentLoadError(err: Error) {
@@ -142,7 +142,7 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                         />
                         <span className="text-[10px] opacity-60">/ {numPages}</span>
                     </div>
-                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v1.8-final-sync</span>
+                    <span className="text-[9px] opacity-30 px-1 border rounded border-border hidden lg:block select-none">v1.9-stable-layout</span>
                 </div>
 
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 hidden md:flex">
@@ -259,7 +259,6 @@ export function PdfPreview({ fileBase64, className }: PdfPreviewProps) {
                                 renderAnnotationLayer={true}
                                 renderForms={true}
                                 renderTextLayer={false}
-                                onLoadSuccess={() => setIsLoading(true)}
                                 onRenderSuccess={() => setIsLoading(false)}
                                 className="shadow-2xl"
                                 loading={null}
