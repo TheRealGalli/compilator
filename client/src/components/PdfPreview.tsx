@@ -142,27 +142,8 @@ export function PdfPreview({
     const handleEyeClick = async () => {
         if (isCompiling || !fileBase64) return;
 
-        // Check if document is already filled
-        const annotationLayer = document.querySelector('.annotationLayer');
-        let filledCount = 0;
-        if (annotationLayer) {
-            const inputs = annotationLayer.querySelectorAll('input, textarea, select');
-            inputs.forEach((el: any) => {
-                if (el.type === 'checkbox' || el.type === 'radio') {
-                    if (el.checked) filledCount++;
-                } else if (el.value && el.value.trim().length > 0) {
-                    filledCount++;
-                }
-            });
-        }
-
-        if (filledCount > 20) { // Only show warning/stop if it's REALLY full (almost 100%)
-            console.log(`[PdfPreview] Document heavily filled (${filledCount} fields). Triggering 1s animation, but allowing compilation.`);
-            setIsEyeSpinning(true);
-            setTimeout(() => setIsEyeSpinning(false), 1000);
-            // We NO LONGER return here, we let the user compile if they want.
-        }
-
+        // Start compilation immediately, ignoring pre-filled status
+        // so the user can always use AI assist if they want.
         setIsCompiling(true);
 
         try {
@@ -411,7 +392,7 @@ export function PdfPreview({
                                 cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
                                 cMapPacked: true,
                                 standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
-                                enableXfa: false,
+                                enableXfa: true,
                             }}
                             loading={null}
                         >

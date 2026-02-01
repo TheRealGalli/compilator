@@ -12,7 +12,6 @@ export interface Source {
     isMaster?: boolean; // Master source for formatting (Blue Check)
     isFillable?: boolean; // Native PDF Form Fields detected
     isAlreadyFilled?: boolean; // Threshold of filled fields detected
-    isFlattened?: boolean; // PDF without fields
     driveId?: string; // Original Google Drive ID
 }
 
@@ -67,19 +66,29 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
 
         let isFillable = false;
         let isAlreadyFilled = false;
-        let isFlattened = false;
         if (extension === 'pdf') {
             try {
                 const { PDFDocument } = await import('pdf-lib');
                 const arrayBuffer = await file.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
                 const form = pdfDoc.getForm();
-                const fields = form.getFields();
-                isFillable = fields.length > 0;
+
+                // Refined fields: only count fields that have actual widgets (visible elements)
+                const allFields = form.getFields();
+                const fillableFields = allFields.filter(f => {
+                    try {
+                        // Some fields might exist in the form but not have widgets on any page
+                        return (f as any).acroField.getWidgets()?.length > 0;
+                    } catch (e) {
+                        return true; // Fallback
+                    }
+                });
+
+                isFillable = fillableFields.length > 0;
 
                 if (isFillable) {
                     let filledCount = 0;
-                    fields.forEach(field => {
+                    fillableFields.forEach(field => {
                         try {
                             // Robust value check (minification-safe)
                             let hasValue = false;
@@ -109,9 +118,6 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                     if (filledCount > 0) {
                         isAlreadyFilled = true;
                     }
-                } else {
-                    // PDF with NO fields = Red
-                    isFlattened = true;
                 }
             } catch (error) {
                 console.warn('[SourcesContext] Error checking if PDF is fillable:', error);
@@ -140,7 +146,6 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 isMemory: options?.isMemory,
                 isFillable: isFillable,
                 isAlreadyFilled: isAlreadyFilled,
-                isFlattened: isFlattened,
                 driveId: options?.driveId
             };
 
