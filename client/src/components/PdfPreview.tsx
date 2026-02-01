@@ -156,11 +156,11 @@ export function PdfPreview({
             });
         }
 
-        if (filledCount > 5) {
-            console.log(`[PdfPreview] Document already filled (${filledCount} fields). Triggering 1s animation.`);
+        if (filledCount > 20) { // Only show warning/stop if it's REALLY full (almost 100%)
+            console.log(`[PdfPreview] Document heavily filled (${filledCount} fields). Triggering 1s animation, but allowing compilation.`);
             setIsEyeSpinning(true);
             setTimeout(() => setIsEyeSpinning(false), 1000);
-            return;
+            // We NO LONGER return here, we let the user compile if they want.
         }
 
         setIsCompiling(true);

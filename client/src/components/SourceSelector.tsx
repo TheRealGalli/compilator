@@ -17,6 +17,7 @@ interface Source {
   isMaster?: boolean;
   isFillable?: boolean;
   isAlreadyFilled?: boolean;
+  isFlattened?: boolean;
 }
 
 interface SourceSelectorProps {
@@ -68,10 +69,12 @@ export function SourceSelector({ sources, onToggle, onToggleMaster }: SourceSele
                   className="w-3.5 h-3.5"
                 />
                 <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${source.isAlreadyFilled
-                  ? 'text-orange-500 fill-orange-500/20'
-                  : source.isFillable
-                    ? 'text-green-500 fill-green-500/20'
-                    : 'text-muted-foreground'
+                    ? 'text-orange-500 fill-orange-500/20'
+                    : source.isFlattened
+                      ? 'text-red-500 fill-red-500/20'
+                      : source.isFillable
+                        ? 'text-green-500 fill-green-500/20'
+                        : 'text-muted-foreground'
                   }`} />
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>

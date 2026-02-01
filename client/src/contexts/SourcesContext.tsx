@@ -12,6 +12,7 @@ export interface Source {
     isMaster?: boolean; // Master source for formatting (Blue Check)
     isFillable?: boolean; // Native PDF Form Fields detected
     isAlreadyFilled?: boolean; // Threshold of filled fields detected
+    isFlattened?: boolean; // PDF without fields
     driveId?: string; // Original Google Drive ID
 }
 
@@ -66,6 +67,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
 
         let isFillable = false;
         let isAlreadyFilled = false;
+        let isFlattened = false;
         if (extension === 'pdf') {
             try {
                 const { PDFDocument } = await import('pdf-lib');
@@ -79,22 +81,37 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                     let filledCount = 0;
                     fields.forEach(field => {
                         try {
-                            const type = field.constructor.name;
-                            // Checking values based on field type names from pdf-lib
-                            if (type === 'PDFTextField') {
-                                if ((field as any).getText()?.trim().length > 0) filledCount++;
-                            } else if (type === 'PDFCheckBox') {
-                                if ((field as any).isChecked()) filledCount++;
-                            } else if (type === 'PDFRadioGroup') {
-                                if ((field as any).getSelected()) filledCount++;
-                            } else if (type === 'PDFDropdown' || type === 'PDFOptionList') {
-                                if ((field as any).getSelected()?.length > 0) filledCount++;
+                            // Robust value check (minification-safe)
+                            let hasValue = false;
+                            const f = field as any;
+
+                            // Check for text
+                            if (typeof f.getText === 'function') {
+                                if (f.getText()?.trim().length > 0) hasValue = true;
                             }
+                            // Check for checkboxes
+                            else if (typeof f.isChecked === 'function') {
+                                if (f.isChecked()) hasValue = true;
+                            }
+                            // Check for selections
+                            else if (typeof f.getSelected === 'function') {
+                                const selected = f.getSelected();
+                                if (selected && (!Array.isArray(selected) || selected.length > 0)) hasValue = true;
+                            }
+
+                            if (hasValue) filledCount++;
                         } catch (e) {
-                            // Ignore errors for specific field types
+                            // Silent field check error
                         }
                     });
-                    if (filledCount > 5) isAlreadyFilled = true;
+
+                    // ANY filled field triggers Orange state
+                    if (filledCount > 0) {
+                        isAlreadyFilled = true;
+                    }
+                } else {
+                    // PDF with NO fields = Red
+                    isFlattened = true;
                 }
             } catch (error) {
                 console.warn('[SourcesContext] Error checking if PDF is fillable:', error);
@@ -123,6 +140,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 isMemory: options?.isMemory,
                 isFillable: isFillable,
                 isAlreadyFilled: isAlreadyFilled,
+                isFlattened: isFlattened,
                 driveId: options?.driveId
             };
 
