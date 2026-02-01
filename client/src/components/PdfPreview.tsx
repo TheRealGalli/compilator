@@ -83,6 +83,20 @@ export function PdfPreview({
             const url = URL.createObjectURL(blob);
             setBlobUrl(url);
 
+            // Also check for FLX technology here to show the tag
+            import('pdf-lib').then(async ({ PDFDocument }) => {
+                try {
+                    const pdfDoc = await PDFDocument.load(byteNumbers);
+                    const producer = pdfDoc.getProducer()?.toLowerCase() || '';
+                    const creator = pdfDoc.getCreator()?.toLowerCase() || '';
+                    if (producer.includes('flx') || producer.includes('dula') || creator.includes('flx') || creator.includes('dula')) {
+                        setIsFlxAdobe(true);
+                    }
+                } catch (err) {
+                    console.warn('[PdfPreview] Metadata check failed:', err);
+                }
+            });
+
             return () => {
                 URL.revokeObjectURL(url);
             };
@@ -304,8 +318,13 @@ export function PdfPreview({
             {/* Custom Toolbar - Matching ModeSettings style */}
             <div className="flex items-center justify-between px-4 py-1.5 bg-muted/30 border-b select-none z-10 shadow-sm">
                 <div className="flex items-center gap-4">
-                    <span className="text-sm font-medium truncate max-w-[200px]">
+                    <span className="text-sm font-medium truncate max-w-[200px] flex items-center gap-2">
                         Documento PDF
+                        {isFlxAdobe && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20 leading-none">
+                                FLX
+                            </span>
+                        )}
                     </span>
                     <div className="h-4 w-[1px] bg-border hidden sm:block" />
                 </div>

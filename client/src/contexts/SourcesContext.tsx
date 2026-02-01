@@ -12,6 +12,7 @@ export interface Source {
     isMaster?: boolean; // Master source for formatting (Blue Check)
     isFillable?: boolean; // Native PDF Form Fields detected
     isAlreadyFilled?: boolean; // Threshold of filled fields detected
+    isFlx?: boolean; // FLX/Dula technology detected
     driveId?: string; // Original Google Drive ID
 }
 
@@ -66,11 +67,21 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
 
         let isFillable = false;
         let isAlreadyFilled = false;
+        let isFlx = false;
         if (extension === 'pdf') {
             try {
                 const { PDFDocument } = await import('pdf-lib');
                 const arrayBuffer = await file.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
+
+                // 1. Detect FLX/Dula technology via metadata
+                const producer = pdfDoc.getProducer()?.toLowerCase() || '';
+                const creator = pdfDoc.getCreator()?.toLowerCase() || '';
+                if (producer.includes('flx') || producer.includes('dula') ||
+                    creator.includes('flx') || creator.includes('dula') ||
+                    file.name.toLowerCase().includes('signed')) {
+                    isFlx = true;
+                }
                 const form = pdfDoc.getForm();
 
                 // Refined fields: only count fields that have actual widgets (visible elements)
@@ -146,6 +157,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 isMemory: options?.isMemory,
                 isFillable: isFillable,
                 isAlreadyFilled: isAlreadyFilled,
+                isFlx: isFlx,
                 driveId: options?.driveId
             };
 
