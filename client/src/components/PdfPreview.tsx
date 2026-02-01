@@ -101,31 +101,8 @@ export function PdfPreview({
                         }
                     }
 
-                    if (xfaKeyFound && acroFormNode) {
-                        const xfaVal = pdfDoc.context.lookup(acroFormNode.get(PDFName.of('XFA')));
-
-                        const checkStreamForFormCalc = (stream: any) => {
-                            const contents = stream.getContents();
-                            const text = new TextDecoder().decode(contents);
-                            return text.toLowerCase().includes('formcalc');
-                        };
-
-                        if (xfaVal instanceof PDFStream) {
-                            if (checkStreamForFormCalc(xfaVal)) setIsXfaAdobe(true);
-                        } else if (xfaVal instanceof PDFArray) {
-                            for (let i = 0; i < xfaVal.size(); i++) {
-                                const element = pdfDoc.context.lookup(xfaVal.get(i));
-                                if (element instanceof PDFStream) {
-                                    if (checkStreamForFormCalc(element)) {
-                                        setIsXfaAdobe(true);
-                                        break;
-                                    }
-                                }
-                            }
-                        } else {
-                            // Fallback if key exists but not standard
-                            setIsXfaAdobe(true);
-                        }
+                    if (xfaKeyFound) {
+                        setIsXfaAdobe(true);
                     }
                 } catch (err) {
                     console.warn('[PdfPreview] XFA check failed:', err);
