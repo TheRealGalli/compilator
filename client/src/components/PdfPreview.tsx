@@ -100,15 +100,7 @@ export function PdfPreview({
                         }
                     }
 
-                    const producer = pdfDoc.getProducer()?.toLowerCase() || '';
-                    const creator = pdfDoc.getCreator()?.toLowerCase() || '';
-                    const nameLower = fileName?.toLowerCase() || '';
-
-                    // Broaden detection consistency with SourcesContext
-                    if (xfaKeyFound ||
-                        producer.includes('livecycle') || creator.includes('livecycle') ||
-                        producer.includes('designer') || creator.includes('designer') ||
-                        nameLower.includes('signed') || nameLower.includes('form 5472')) {
+                    if (xfaKeyFound) {
                         setIsXfaAdobe(true);
                     }
                 } catch (err) {
