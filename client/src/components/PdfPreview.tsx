@@ -122,9 +122,27 @@ export function PdfPreview({
                         producer.includes('Designer') ||
                         producer.includes('LiveCycle');
 
-                    // --- CALIBRATION LOGIC ---
-                    // RED (isXfaAdobe = true): Dynamic, Encrypted, or Signed
-                    if (isDynamic || pdfDoc.isEncrypted || isSigned) {
+                    // CHECK 5: Deep Signature & Read-Only Check
+                    const form = pdfDoc.getForm();
+                    const allFields = form.getFields();
+                    const hasSignatureValue = allFields.some(f => {
+                        try {
+                            const acroField = (f as any).acroField;
+                            return acroField.get(PDFName.of('FT')) === PDFName.of('Sig') && acroField.has(PDFName.of('V'));
+                        } catch { return false; }
+                    });
+
+                    const fillableFields = allFields.filter(f => {
+                        try { return (f as any).acroField.getWidgets()?.length > 0; } catch { return true; }
+                    });
+
+                    const editableFieldsCount = fillableFields.filter(f => {
+                        try { return !f.isReadOnly(); } catch { return true; }
+                    }).length;
+
+                    // --- CALIBRATION LOGIC 2.0 ---
+                    // RED (isXfaAdobe = true): Dynamic, Encrypted, Signed, or All Fields are Read-Only
+                    if (isDynamic || pdfDoc.isEncrypted || isSigned || hasSignatureValue || (fillableFields.length > 0 && editableFieldsCount === 0)) {
                         setIsXfaAdobe(true);
                     } else {
                         setIsXfaAdobe(false);

@@ -77,6 +77,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         let isFillable = false;
         let isAlreadyFilled = false;
         let isXfa = false;
+        let isSigned = false;
         if (extension === 'pdf') {
             try {
                 const { PDFDocument, PDFName } = await import('pdf-lib');
@@ -90,7 +91,6 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                     // CHECK 1: XFA key in AcroForm
                     const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
                     let hasXfaKey = false;
-                    let isSigned = false;
                     if (acroFormRef) {
                         const acroFormNode = pdfDoc.context.lookup(acroFormRef);
                         if (acroFormNode instanceof PDFDict) {
@@ -137,6 +137,15 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
 
                 const form = pdfDoc.getForm();
                 const allFields = form.getFields();
+
+                // 2. Deep Signature & Read-Only Check
+                const hasSignatureValue = allFields.some(f => {
+                    try {
+                        const acroField = (f as any).acroField;
+                        return acroField.get(PDFName.of('FT')) === PDFName.of('Sig') && acroField.has(PDFName.of('V'));
+                    } catch { return false; }
+                });
+
                 const fillableFields = allFields.filter(f => {
                     try {
                         return (f as any).acroField.getWidgets()?.length > 0;
@@ -145,7 +154,18 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                     }
                 });
 
-                isFillable = fillableFields.length > 0;
+                const editableFieldsCount = fillableFields.filter(f => {
+                    try { return !f.isReadOnly(); } catch { return true; }
+                }).length;
+
+                // --- CALIBRATION LOGIC 2.0 ---
+                // If the document is signed (via flags or fields) or if ALL fields are read-only
+                // it means it's a finalized/locked document -> mark as Red (isXfa = true)
+                if (isSigned || hasSignatureValue || (fillableFields.length > 0 && editableFieldsCount === 0)) {
+                    isXfa = true;
+                }
+
+                isFillable = editableFieldsCount > 0;
 
                 if (isFillable) {
                     let filledCount = 0;
