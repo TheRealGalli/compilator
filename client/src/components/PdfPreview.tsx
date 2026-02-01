@@ -84,12 +84,22 @@ export function PdfPreview({
             setBlobUrl(url);
 
             // Also check for FLX technology here to show the tag
-            import('pdf-lib').then(async ({ PDFDocument }) => {
+            import('pdf-lib').then(async ({ PDFDocument, PDFName, PDFDict }) => {
                 try {
                     const pdfDoc = await PDFDocument.load(byteNumbers);
+
+                    // Structural XFA check
+                    let xfaDetected = false;
+                    try {
+                        const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
+                        if (acroForm instanceof PDFDict && acroForm.has(PDFName.of('XFA'))) {
+                            xfaDetected = true;
+                        }
+                    } catch (e) { }
+
                     const producer = pdfDoc.getProducer()?.toLowerCase() || '';
                     const creator = pdfDoc.getCreator()?.toLowerCase() || '';
-                    if (producer.includes('flx') || producer.includes('dula') || creator.includes('flx') || creator.includes('dula')) {
+                    if (xfaDetected || producer.includes('flx') || producer.includes('dula') || creator.includes('flx') || creator.includes('dula')) {
                         setIsFlxAdobe(true);
                     }
                 } catch (err) {

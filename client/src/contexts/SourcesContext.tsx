@@ -70,14 +70,25 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         let isFlx = false;
         if (extension === 'pdf') {
             try {
-                const { PDFDocument } = await import('pdf-lib');
+                const { PDFDocument, PDFName, PDFDict } = await import('pdf-lib');
                 const arrayBuffer = await file.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
 
-                // 1. Detect FLX/Dula technology via metadata
+                // 1. Detect FLX/Dula technology via internal XFA check or metadata
+                let xfaDetected = false;
+                try {
+                    const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
+                    if (acroForm instanceof PDFDict && acroForm.has(PDFName.of('XFA'))) {
+                        xfaDetected = true;
+                    }
+                } catch (e) {
+                    console.warn('[SourcesContext] XFA structural check failed:', e);
+                }
+
                 const producer = pdfDoc.getProducer()?.toLowerCase() || '';
                 const creator = pdfDoc.getCreator()?.toLowerCase() || '';
-                if (producer.includes('flx') || producer.includes('dula') ||
+                if (xfaDetected ||
+                    producer.includes('flx') || producer.includes('dula') ||
                     creator.includes('flx') || creator.includes('dula') ||
                     file.name.toLowerCase().includes('signed')) {
                     isFlx = true;
