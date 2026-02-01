@@ -86,23 +86,29 @@ export function PdfPreview({
             setBlobUrl(url);
 
             // Also check for XFA technology here to show the tag
-            import('pdf-lib').then(async ({ PDFDocument, PDFName, PDFDict, PDFStream, PDFArray }) => {
+            import('pdf-lib').then(async ({ PDFDocument, PDFName, PDFDict, PDFBool }) => {
                 try {
                     const pdfDoc = await PDFDocument.load(byteNumbers);
 
+                    // Check for NeedsRendering flag in Catalog (Dynamic XFA indicator)
+                    const needsRendering = pdfDoc.catalog.get(PDFName.of('NeedsRendering'));
+                    const isDynamic = needsRendering instanceof PDFBool && needsRendering.asBoolean() === true;
+
                     // Structural XFA check
                     const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
-                    let xfaKeyFound = false;
-                    let acroFormNode: any = null;
+                    let hasXfaKey = false;
                     if (acroFormRef) {
-                        acroFormNode = pdfDoc.context.lookup(acroFormRef);
+                        const acroFormNode = pdfDoc.context.lookup(acroFormRef);
                         if (acroFormNode instanceof PDFDict && acroFormNode.has(PDFName.of('XFA'))) {
-                            xfaKeyFound = true;
+                            hasXfaKey = true;
                         }
                     }
 
-                    if (xfaKeyFound) {
+                    // Only mark as Red (isXfaAdobe) if it's dynamic
+                    if (isDynamic) {
                         setIsXfaAdobe(true);
+                    } else {
+                        setIsXfaAdobe(false);
                     }
                 } catch (err) {
                     console.warn('[PdfPreview] XFA check failed:', err);
