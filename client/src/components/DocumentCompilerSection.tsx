@@ -695,6 +695,7 @@ export function DocumentCompilerSection({
                 <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
                   <PdfPreview
                     fileBase64={masterSource?.base64 || ""}
+                    fileName={masterSource?.name}
                     className="rounded-none border-none h-full"
                     selectedSources={selectedSources.map(s => ({
                       name: s.name,

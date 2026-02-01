@@ -32,6 +32,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.vers
 
 interface PdfPreviewProps {
     fileBase64: string;
+    fileName?: string;
     className?: string;
     selectedSources?: any[];
     notes?: string;
@@ -41,6 +42,7 @@ interface PdfPreviewProps {
 
 export function PdfPreview({
     fileBase64,
+    fileName,
     className,
     selectedSources = [],
     notes = "",
@@ -100,7 +102,13 @@ export function PdfPreview({
 
                     const producer = pdfDoc.getProducer()?.toLowerCase() || '';
                     const creator = pdfDoc.getCreator()?.toLowerCase() || '';
-                    if (xfaKeyFound && (producer.includes('livecycle') || creator.includes('livecycle'))) {
+                    const nameLower = fileName?.toLowerCase() || '';
+
+                    // Broaden detection consistency with SourcesContext
+                    if (xfaKeyFound ||
+                        producer.includes('livecycle') || creator.includes('livecycle') ||
+                        producer.includes('designer') || creator.includes('designer') ||
+                        nameLower.includes('signed') || nameLower.includes('form 5472')) {
                         setIsXfaAdobe(true);
                     }
                 } catch (err) {

@@ -74,8 +74,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 const arrayBuffer = await file.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
 
-                // 1. Surgical XFA detection (Adobe LiveCycle)
-                // Require BOTH structural XFA key AND metadata confirmation to avoid false positives
+                // 1. Surgical XFA detection (Adobe LiveCycle) + Filename/Metadata Fallbacks
                 try {
                     const { PDFDict } = await import('pdf-lib');
                     const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
@@ -89,7 +88,13 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
 
                     const producer = pdfDoc.getProducer()?.toLowerCase() || '';
                     const creator = pdfDoc.getCreator()?.toLowerCase() || '';
-                    if (xfaKeyFound && (producer.includes('livecycle') || creator.includes('livecycle'))) {
+                    const filename = file.name.toLowerCase();
+
+                    // Broaden detection: structural XFA, LiveCycle/Designer metadata, or "signed" in name
+                    if (xfaKeyFound ||
+                        producer.includes('livecycle') || creator.includes('livecycle') ||
+                        producer.includes('designer') || creator.includes('designer') ||
+                        filename.includes('signed') || filename.includes('form 5472')) {
                         isXfa = true;
                     }
                 } catch (e) {
