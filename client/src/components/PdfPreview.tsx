@@ -90,11 +90,12 @@ export function PdfPreview({
                 try {
                     const pdfDoc = await PDFDocument.load(byteNumbers);
 
-                    // Check for NeedsRendering flag in Catalog (Dynamic XFA indicator)
-                    const needsRendering = pdfDoc.catalog.get(PDFName.of('NeedsRendering'));
-                    const isDynamic = needsRendering instanceof PDFBool && needsRendering.asBoolean() === true;
+                    // CHECK 1: NeedsRendering flag (with lookup)
+                    const needsRef = pdfDoc.catalog.get(PDFName.of('NeedsRendering'));
+                    const needsVal = needsRef ? pdfDoc.context.lookup(needsRef) : null;
+                    const isDynamic = needsVal instanceof PDFBool && needsVal.asBoolean() === true;
 
-                    // Structural XFA check
+                    // CHECK 2: XFA key in AcroForm
                     const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
                     let hasXfaKey = false;
                     if (acroFormRef) {
@@ -104,14 +105,21 @@ export function PdfPreview({
                         }
                     }
 
-                    // Only mark as Red (isXfaAdobe) if it's dynamic
-                    if (isDynamic) {
+                    // CHECK 3: Metadata fingerprints
+                    const creator = pdfDoc.getCreator() || '';
+                    const producer = pdfDoc.getProducer() || '';
+                    const isAdobeDesigner = creator.includes('Designer') ||
+                        producer.includes('Designer') ||
+                        producer.includes('LiveCycle');
+
+                    // If any proprietary Adobe DNA is found or if the file is encrypted, mark as Red (isXfaAdobe)
+                    if (hasXfaKey || isDynamic || isAdobeDesigner || pdfDoc.isEncrypted) {
                         setIsXfaAdobe(true);
                     } else {
                         setIsXfaAdobe(false);
                     }
                 } catch (err) {
-                    console.warn('[PdfPreview] XFA check failed:', err);
+                    console.warn('[PdfPreview] Adobe DNA check failed:', err);
                 }
             });
 

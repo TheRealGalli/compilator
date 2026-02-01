@@ -74,15 +74,11 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 const arrayBuffer = await file.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
 
-                // 1. Surgical XFA detection (Adobe LiveCycle) - Dynamic vs Static
+                // 1. Surgical XFA detection (Adobe LiveCycle) - Comprehensive DNA
                 try {
                     const { PDFDict, PDFBool } = await import('pdf-lib');
 
-                    // Check for NeedsRendering flag in Catalog (Standard for Dynamic XFA)
-                    const needsRendering = pdfDoc.catalog.get(PDFName.of('NeedsRendering'));
-                    const isDynamic = needsRendering instanceof PDFBool && needsRendering.asBoolean() === true;
-
-                    // Check for XFA key in AcroForm
+                    // CHECK 1: XFA key in AcroForm (Classic Adobe Designer signature)
                     const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
                     let hasXfaKey = false;
                     if (acroFormRef) {
@@ -92,19 +88,24 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                         }
                     }
 
-                    // Only mark as Red (isXfa) if it's explicitly Dynamic or a known problematic XFA type
-                    if (isDynamic || hasXfaKey) {
-                        // If it's Dynamic, it's definitely Red
-                        if (isDynamic) {
-                            isXfa = true;
-                        } else {
-                            // If it has XFA but NOT NeedsRendering, it's a Static XFA.
-                            // We allow it to be fillable (Green/Orange) because pdf.js handles it.
-                            isXfa = false;
-                        }
+                    // CHECK 2: NeedsRendering flag (Dynamic XFA indicator)
+                    const needsRef = pdfDoc.catalog.get(PDFName.of('NeedsRendering'));
+                    const needsVal = needsRef ? pdfDoc.context.lookup(needsRef) : null;
+                    const isDynamic = needsVal instanceof PDFBool && needsVal.asBoolean() === true;
+
+                    // CHECK 3: Metadata Fingerprints
+                    const creator = pdfDoc.getCreator() || '';
+                    const producer = pdfDoc.getProducer() || '';
+                    const isAdobeDesigner = creator.includes('Designer') ||
+                        producer.includes('Designer') ||
+                        producer.includes('LiveCycle');
+
+                    // If any proprietary Adobe DNA is found or if the file is encrypted, mark as Red
+                    if (hasXfaKey || isDynamic || isAdobeDesigner || pdfDoc.isEncrypted) {
+                        isXfa = true;
                     }
                 } catch (e) {
-                    console.warn('[SourcesContext] XFA structural check failed:', e);
+                    console.warn('[SourcesContext] Adobe DNA check failed:', e);
                 }
 
                 const form = pdfDoc.getForm();
