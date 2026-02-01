@@ -60,7 +60,7 @@ export function PdfPreview({
     const [isCompiling, setIsCompiling] = useState(false);
     const [proposals, setProposals] = useState<any[]>([]);
     const [cacheKey, setCacheKey] = useState<string | null>(null);
-    const [isFlxAdobe, setIsFlxAdobe] = useState(false);
+    const [isXfaAdobe, setIsXfaAdobe] = useState(false);
 
     useEffect(() => {
         if (!fileBase64) return;
@@ -83,7 +83,7 @@ export function PdfPreview({
             const url = URL.createObjectURL(blob);
             setBlobUrl(url);
 
-            // Also check for FLX technology here to show the tag
+            // Also check for XFA technology here to show the tag
             import('pdf-lib').then(async ({ PDFDocument, PDFName, PDFDict }) => {
                 try {
                     const pdfDoc = await PDFDocument.load(byteNumbers);
@@ -91,19 +91,22 @@ export function PdfPreview({
                     // Structural XFA check
                     let xfaDetected = false;
                     try {
-                        const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
-                        if (acroForm instanceof PDFDict && acroForm.has(PDFName.of('XFA'))) {
-                            xfaDetected = true;
+                        const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
+                        if (acroFormRef) {
+                            const acroForm = pdfDoc.context.lookup(acroFormRef);
+                            if (acroForm instanceof PDFDict && acroForm.has(PDFName.of('XFA'))) {
+                                xfaDetected = true;
+                            }
                         }
                     } catch (e) { }
 
                     const producer = pdfDoc.getProducer()?.toLowerCase() || '';
                     const creator = pdfDoc.getCreator()?.toLowerCase() || '';
-                    if (xfaDetected || producer.includes('flx') || producer.includes('dula') || creator.includes('flx') || creator.includes('dula')) {
-                        setIsFlxAdobe(true);
+                    if (xfaDetected || producer.includes('livecycle') || creator.includes('livecycle')) {
+                        setIsXfaAdobe(true);
                     }
                 } catch (err) {
-                    console.warn('[PdfPreview] Metadata check failed:', err);
+                    console.warn('[PdfPreview] XFA check failed:', err);
                 }
             });
 
@@ -330,9 +333,9 @@ export function PdfPreview({
                 <div className="flex items-center gap-4">
                     <span className="text-sm font-medium truncate max-w-[200px] flex items-center gap-2">
                         Documento PDF
-                        {isFlxAdobe && (
+                        {isXfaAdobe && (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20 leading-none">
-                                FLX
+                                XFA
                             </span>
                         )}
                     </span>
@@ -439,7 +442,7 @@ export function PdfPreview({
                                     // Small delay to ensure browser layout is stable
                                     setTimeout(() => setIsLoading(false), 50);
                                 }}
-                                className={`shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                                className={`shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'} ${isXfaAdobe ? 'xfa-lockout' : ''}`}
                                 loading={null}
                             />
                         </Document>

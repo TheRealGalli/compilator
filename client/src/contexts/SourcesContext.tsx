@@ -12,7 +12,7 @@ export interface Source {
     isMaster?: boolean; // Master source for formatting (Blue Check)
     isFillable?: boolean; // Native PDF Form Fields detected
     isAlreadyFilled?: boolean; // Threshold of filled fields detected
-    isFlx?: boolean; // FLX/Dula technology detected
+    isXfa?: boolean; // XFA (Adobe LiveCycle) technology detected
     driveId?: string; // Original Google Drive ID
 }
 
@@ -67,42 +67,41 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
 
         let isFillable = false;
         let isAlreadyFilled = false;
-        let isFlx = false;
+        let isXfa = false;
         if (extension === 'pdf') {
             try {
-                const { PDFDocument, PDFName, PDFDict } = await import('pdf-lib');
+                const { PDFDocument, PDFName } = await import('pdf-lib');
                 const arrayBuffer = await file.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
 
-                // 1. Detect FLX/Dula technology via internal XFA check or metadata
-                let xfaDetected = false;
+                // 1. Surgical XFA detection (Adobe LiveCycle)
                 try {
-                    const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
-                    if (acroForm instanceof PDFDict && acroForm.has(PDFName.of('XFA'))) {
-                        xfaDetected = true;
+                    const { PDFDict } = await import('pdf-lib');
+                    const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
+                    if (acroFormRef) {
+                        const acroForm = pdfDoc.context.lookup(acroFormRef);
+                        if (acroForm instanceof PDFDict && acroForm.has(PDFName.of('XFA'))) {
+                            isXfa = true;
+                        }
                     }
                 } catch (e) {
                     console.warn('[SourcesContext] XFA structural check failed:', e);
                 }
 
+                // Metadata fallback for some older Adobe forms
                 const producer = pdfDoc.getProducer()?.toLowerCase() || '';
                 const creator = pdfDoc.getCreator()?.toLowerCase() || '';
-                if (xfaDetected ||
-                    producer.includes('flx') || producer.includes('dula') ||
-                    creator.includes('flx') || creator.includes('dula') ||
-                    file.name.toLowerCase().includes('signed')) {
-                    isFlx = true;
+                if (!isXfa && (producer.includes('livecycle') || creator.includes('livecycle'))) {
+                    isXfa = true;
                 }
-                const form = pdfDoc.getForm();
 
-                // Refined fields: only count fields that have actual widgets (visible elements)
+                const form = pdfDoc.getForm();
                 const allFields = form.getFields();
                 const fillableFields = allFields.filter(f => {
                     try {
-                        // Some fields might exist in the form but not have widgets on any page
                         return (f as any).acroField.getWidgets()?.length > 0;
                     } catch (e) {
-                        return true; // Fallback
+                        return true;
                     }
                 });
 
@@ -112,37 +111,26 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                     let filledCount = 0;
                     fillableFields.forEach(field => {
                         try {
-                            // Robust value check (minification-safe)
                             let hasValue = false;
                             const f = field as any;
-
-                            // Check for text
                             if (typeof f.getText === 'function') {
                                 if (f.getText()?.trim().length > 0) hasValue = true;
-                            }
-                            // Check for checkboxes
-                            else if (typeof f.isChecked === 'function') {
+                            } else if (typeof f.isChecked === 'function') {
                                 if (f.isChecked()) hasValue = true;
-                            }
-                            // Check for selections
-                            else if (typeof f.getSelected === 'function') {
+                            } else if (typeof f.getSelected === 'function') {
                                 const selected = f.getSelected();
                                 if (selected && (!Array.isArray(selected) || selected.length > 0)) hasValue = true;
                             }
-
                             if (hasValue) filledCount++;
-                        } catch (e) {
-                            // Silent field check error
-                        }
+                        } catch (e) { }
                     });
 
-                    // ANY filled field triggers Orange state
                     if (filledCount > 0) {
                         isAlreadyFilled = true;
                     }
                 }
             } catch (error) {
-                console.warn('[SourcesContext] Error checking if PDF is fillable:', error);
+                console.warn('[SourcesContext] Error checking PDF XFA/fields:', error);
             }
         }
 
@@ -168,7 +156,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 isMemory: options?.isMemory,
                 isFillable: isFillable,
                 isAlreadyFilled: isAlreadyFilled,
-                isFlx: isFlx,
+                isXfa: isXfa,
                 driveId: options?.driveId
             };
 

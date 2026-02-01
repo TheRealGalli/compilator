@@ -17,7 +17,7 @@ interface Source {
   isMaster?: boolean;
   isFillable?: boolean;
   isAlreadyFilled?: boolean;
-  isFlx?: boolean;
+  isXfa?: boolean;
 }
 
 interface SourceSelectorProps {
@@ -68,7 +68,7 @@ export function SourceSelector({ sources, onToggle, onToggleMaster }: SourceSele
                   data-testid={`checkbox-source-${source.id}`}
                   className="w-3.5 h-3.5"
                 />
-                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${source.isFlx
+                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${source.isXfa
                   ? 'text-red-500 fill-red-500/20'
                   : source.isAlreadyFilled
                     ? 'text-orange-500 fill-orange-500/20'
