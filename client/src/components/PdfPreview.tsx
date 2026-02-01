@@ -88,21 +88,19 @@ export function PdfPreview({
                 try {
                     const pdfDoc = await PDFDocument.load(byteNumbers);
 
-                    // Structural XFA check
-                    let xfaDetected = false;
-                    try {
-                        const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
-                        if (acroFormRef) {
-                            const acroForm = pdfDoc.context.lookup(acroFormRef);
-                            if (acroForm instanceof PDFDict && acroForm.has(PDFName.of('XFA'))) {
-                                xfaDetected = true;
-                            }
+                    // Structural XFA check + Metadata confirmation
+                    const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
+                    let xfaKeyFound = false;
+                    if (acroFormRef) {
+                        const acroForm = pdfDoc.context.lookup(acroFormRef);
+                        if (acroForm instanceof PDFDict && acroForm.has(PDFName.of('XFA'))) {
+                            xfaKeyFound = true;
                         }
-                    } catch (e) { }
+                    }
 
                     const producer = pdfDoc.getProducer()?.toLowerCase() || '';
                     const creator = pdfDoc.getCreator()?.toLowerCase() || '';
-                    if (xfaDetected || producer.includes('livecycle') || creator.includes('livecycle')) {
+                    if (xfaKeyFound && (producer.includes('livecycle') || creator.includes('livecycle'))) {
                         setIsXfaAdobe(true);
                     }
                 } catch (err) {
@@ -333,13 +331,13 @@ export function PdfPreview({
                 <div className="flex items-center gap-4">
                     <span className="text-sm font-medium truncate max-w-[200px] flex items-center gap-2">
                         Documento PDF
-                        {isXfaAdobe && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20 leading-none">
-                                XFA
-                            </span>
-                        )}
                     </span>
                     <div className="h-4 w-[1px] bg-border hidden sm:block" />
+                    {isXfaAdobe && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20 leading-none">
+                            XFA
+                        </span>
+                    )}
                 </div>
 
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 hidden md:flex">

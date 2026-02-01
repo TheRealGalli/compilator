@@ -75,24 +75,25 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
 
                 // 1. Surgical XFA detection (Adobe LiveCycle)
+                // Require BOTH structural XFA key AND metadata confirmation to avoid false positives
                 try {
                     const { PDFDict } = await import('pdf-lib');
                     const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
+                    let xfaKeyFound = false;
                     if (acroFormRef) {
                         const acroForm = pdfDoc.context.lookup(acroFormRef);
                         if (acroForm instanceof PDFDict && acroForm.has(PDFName.of('XFA'))) {
-                            isXfa = true;
+                            xfaKeyFound = true;
                         }
+                    }
+
+                    const producer = pdfDoc.getProducer()?.toLowerCase() || '';
+                    const creator = pdfDoc.getCreator()?.toLowerCase() || '';
+                    if (xfaKeyFound && (producer.includes('livecycle') || creator.includes('livecycle'))) {
+                        isXfa = true;
                     }
                 } catch (e) {
                     console.warn('[SourcesContext] XFA structural check failed:', e);
-                }
-
-                // Metadata fallback for some older Adobe forms
-                const producer = pdfDoc.getProducer()?.toLowerCase() || '';
-                const creator = pdfDoc.getCreator()?.toLowerCase() || '';
-                if (!isXfa && (producer.includes('livecycle') || creator.includes('livecycle'))) {
-                    isXfa = true;
                 }
 
                 const form = pdfDoc.getForm();
