@@ -90,7 +90,7 @@ ${webResearch ? `5. **Ricerca Web**: Se l'etichetta è ambigua (es: "Box 13 code
 REGOLE PER I VALORI:
 - **Testo**: Inserisci il valore pulito. Se un campo chiede "Anno", scrivi "2025", non "L'anno è 2025".
 - **Checkbox**: Rispondi SOLO true o false.
-- **Dati Mancanti**: Se non trovi nulla, scrivi "[FONTE MANCANTE]".
+- **Dati Mancanti**: Se non trovi l'informazione esatta nelle FONTI, scrivi "[DATO MANCANTE]". NON provare mai a indovinare, ipotizzare o inventare valori plausibili. L'integrità del dato è più importante della completezza.
 
 CAMPI DA ANALIZZARE:
 ${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label Attuale: "${f.label || 'N/A'}"`).join('\n')}

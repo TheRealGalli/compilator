@@ -86,34 +86,45 @@ export function PdfPreview({
             setBlobUrl(url);
 
             // Also check for XFA technology here to show the tag
-            import('pdf-lib').then(async ({ PDFDocument, PDFName, PDFDict, PDFBool }) => {
+            import('pdf-lib').then(async ({ PDFDocument, PDFName, PDFDict, PDFBool, PDFNumber }) => {
                 try {
                     const pdfDoc = await PDFDocument.load(byteNumbers);
 
-                    // CHECK 1: NeedsRendering flag (with lookup)
+                    // CHECK 1: NeedsRendering flag (Dynamic XFA indicator)
                     const needsRef = pdfDoc.catalog.get(PDFName.of('NeedsRendering'));
                     const needsVal = needsRef ? pdfDoc.context.lookup(needsRef) : null;
                     const isDynamic = needsVal instanceof PDFBool && needsVal.asBoolean() === true;
 
-                    // CHECK 2: XFA key in AcroForm
+                    // CHECK 2: XFA key and Signatures in AcroForm
                     const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
                     let hasXfaKey = false;
+                    let isSigned = false;
                     if (acroFormRef) {
                         const acroFormNode = pdfDoc.context.lookup(acroFormRef);
-                        if (acroFormNode instanceof PDFDict && acroFormNode.has(PDFName.of('XFA'))) {
-                            hasXfaKey = true;
+                        if (acroFormNode instanceof PDFDict) {
+                            if (acroFormNode.has(PDFName.of('XFA'))) {
+                                hasXfaKey = true;
+                            }
+                            // CHECK 3: Signatures (SigFlags)
+                            const sigFlags = acroFormNode.get(PDFName.of('SigFlags'));
+                            if (sigFlags instanceof PDFNumber) {
+                                if ((sigFlags.asNumber() & 1) !== 0) {
+                                    isSigned = true;
+                                }
+                            }
                         }
                     }
 
-                    // CHECK 3: Metadata fingerprints
+                    // CHECK 4: Metadata fingerprints
                     const creator = pdfDoc.getCreator() || '';
                     const producer = pdfDoc.getProducer() || '';
                     const isAdobeDesigner = creator.includes('Designer') ||
                         producer.includes('Designer') ||
                         producer.includes('LiveCycle');
 
-                    // If any proprietary Adobe DNA is found or if the file is encrypted, mark as Red (isXfaAdobe)
-                    if (hasXfaKey || isDynamic || isAdobeDesigner || pdfDoc.isEncrypted) {
+                    // --- CALIBRATION LOGIC ---
+                    // RED (isXfaAdobe = true): Dynamic, Encrypted, or Signed
+                    if (isDynamic || pdfDoc.isEncrypted || isSigned) {
                         setIsXfaAdobe(true);
                     } else {
                         setIsXfaAdobe(false);

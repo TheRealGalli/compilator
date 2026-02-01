@@ -1030,7 +1030,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 - **Tabelle Markdown:** Usa le tabelle (| Col | Col |) per dati strutturati, importi o elenchi tecnici.
 - Elenca punti chiave (•)
 - Massimo 500 parole
-- Linguaggio professionale ma accessibile`;
+- Linguaggio professionale ma accessibile
+
+**REGOLA ANTI-ALLUCINAZIONE (RIGOROSA):**
+- Descrivi SOLO quello che vedi nel documento.
+- NON inventare dettagli, scadenze, importi o nomi non presenti.
+- Se il documento è illeggibile o appare vuoto, dichiaralo onestamente senza provare a dedurne il contenuto.
+- Se non sei sicuro di un dato, segnalalo come "Ipotesi da verificare" o scrivi "Dato non chiaramente leggibile".
+`;
 
       // Simplified prompt construction
       const userPrompt = `Analizza questo documento e fornisci una preview intelligente seguendo le istruzioni del sistema.`;
@@ -1889,6 +1896,12 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
               source.type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
             } else if (source.name.toLowerCase().endsWith('.doc')) {
               source.type = 'application/msword';
+            } else if (source.name.toLowerCase().endsWith('.jpg') || source.name.toLowerCase().endsWith('.jpeg')) {
+              source.type = 'image/jpeg';
+            } else if (source.name.toLowerCase().endsWith('.png')) {
+              source.type = 'image/png';
+            } else if (source.name.toLowerCase().endsWith('.webp')) {
+              source.type = 'image/webp';
             }
 
             const isMultimodal =
@@ -2071,6 +2084,11 @@ ${filesContext}
 2. **Google Docs (Word)**:
    - Usa \`update_drive_file\` con il testo completo. Qui devi riscrivere l'intero documento aggiornato.
 
+**ZERO HALLUCINATION PROTOCOL (DIRETTIVA ASSOLUTA):**
+1. **Veracità**: NON inventare MAI nomi di persone, date, cifre, indirizzi o fatti non esplicitamente presenti nei documenti caricati.
+2. **Onestà Intellettuale**: Se un'informazione fondamentale manca nei documenti per rispondere a una domanda specifica, DEVI dichiararlo chiaramente: "Questa informazione non è presente nei documenti forniti".
+3. **Divieto di Deduzione Creativa**: Non "indovinare" dati sensibili o anagrafici basandoti su probabilità. Se il documento non dice che un soggetto è nato a Milano, non dirlo solo perché la pratica è gestita a Milano.
+4. **Citazione**: Quando possibile, cita il nome del file da cui hai tratto l'informazione per dare prova della fonte.
 
 **GUARDRAIL ALLEGATI E AZIONI FUTURE:**
 1. **DIVIETO DI INVENZIONE**: NON fare mai riferimento ad allegati, documenti o file che NON sono presenti nell'elenco delle "FONTI CARICATE" sopra riportato.
@@ -2705,7 +2723,7 @@ ${filesContext}
         model: "gemini-2.5-flash",
         systemInstruction: {
           role: 'system',
-          parts: [{ text: "Sei il MASTER AI. Hai priorità assoluta sulla fonte pinnata. [LOGICA DA SVILUPPARE]" }]
+          parts: [{ text: "Sei il MASTER AI. Hai priorità assoluta sulla fonte pinnata. RIGORE MASSIMO: non inventare mai dati non presenti nella fonte MASTER." }]
         }
       });
 

@@ -65,6 +65,15 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
             return 'invalid_format';
         }
 
+        // 0. Mime-type fallback based on extension (fix for mobile/WhatsApp uploads)
+        let mimeType = file.type;
+        if (!mimeType || mimeType === 'application/octet-stream') {
+            if (extension === 'jpg' || extension === 'jpeg') mimeType = 'image/jpeg';
+            else if (extension === 'png') mimeType = 'image/png';
+            else if (extension === 'webp') mimeType = 'image/webp';
+            else if (extension === 'pdf') mimeType = 'application/pdf';
+        }
+
         let isFillable = false;
         let isAlreadyFilled = false;
         let isXfa = false;
@@ -74,36 +83,54 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 const arrayBuffer = await file.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
 
-                // 1. Surgical XFA detection (Adobe LiveCycle) - Comprehensive DNA
+                // 1. Surgical XFA detection (Adobe LiveCycle) - Improved Calibration
                 try {
-                    const { PDFDict, PDFBool } = await import('pdf-lib');
+                    const { PDFDict, PDFBool, PDFNumber } = await import('pdf-lib');
 
-                    // CHECK 1: XFA key in AcroForm (Classic Adobe Designer signature)
+                    // CHECK 1: XFA key in AcroForm
                     const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
                     let hasXfaKey = false;
+                    let isSigned = false;
                     if (acroFormRef) {
                         const acroFormNode = pdfDoc.context.lookup(acroFormRef);
-                        if (acroFormNode instanceof PDFDict && acroFormNode.has(PDFName.of('XFA'))) {
-                            hasXfaKey = true;
+                        if (acroFormNode instanceof PDFDict) {
+                            if (acroFormNode.has(PDFName.of('XFA'))) {
+                                hasXfaKey = true;
+                            }
+                            // CHECK 2: Signatures (SigFlags)
+                            const sigFlags = acroFormNode.get(PDFName.of('SigFlags'));
+                            if (sigFlags instanceof PDFNumber) {
+                                // Bit 0 (value 1) indicates signatures exist
+                                if ((sigFlags.asNumber() & 1) !== 0) {
+                                    isSigned = true;
+                                }
+                            }
                         }
                     }
 
-                    // CHECK 2: NeedsRendering flag (Dynamic XFA indicator)
+                    // CHECK 3: NeedsRendering flag (Dynamic XFA indicator - THE GOLD STANDARD)
                     const needsRef = pdfDoc.catalog.get(PDFName.of('NeedsRendering'));
                     const needsVal = needsRef ? pdfDoc.context.lookup(needsRef) : null;
                     const isDynamic = needsVal instanceof PDFBool && needsVal.asBoolean() === true;
 
-                    // CHECK 3: Metadata Fingerprints
+                    // CHECK 4: Metadata Fingerprints (Used only as warning or secondary check)
                     const creator = pdfDoc.getCreator() || '';
                     const producer = pdfDoc.getProducer() || '';
                     const isAdobeDesigner = creator.includes('Designer') ||
                         producer.includes('Designer') ||
                         producer.includes('LiveCycle');
 
-                    // If any proprietary Adobe DNA is found or if the file is encrypted, mark as Red
-                    if (hasXfaKey || isDynamic || isAdobeDesigner || pdfDoc.isEncrypted) {
+                    // --- CALIBRATION LOGIC ---
+                    // RED (isXfa = true):
+                    // - Explicitly Dynamic (NeedsRendering = true)
+                    // - Encrypted
+                    // - Signed (Read-only for us)
+                    if (isDynamic || pdfDoc.isEncrypted || isSigned) {
                         isXfa = true;
                     }
+                    // Note: If hasXfaKey or isAdobeDesigner is true but NOT dynamic/signed/encrypted,
+                    // we DON'T mark it as Red (isXfa = false). It will be Green or Orange based on fields.
+                    // This fixes the "Red-Shift" for standard IRS forms.
                 } catch (e) {
                     console.warn('[SourcesContext] Adobe DNA check failed:', e);
                 }
@@ -163,7 +190,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 name: file.name,
                 selected: true,
-                type: file.type,
+                type: mimeType || file.type,
                 size: file.size,
                 base64: base64,
                 isMemory: options?.isMemory,
