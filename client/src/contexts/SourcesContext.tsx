@@ -74,14 +74,38 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 const arrayBuffer = await file.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
 
-                // 1. Surgical XFA detection (Adobe LiveCycle) - DNA based
+                // 1. Surgical XFA detection (Adobe LiveCycle) - DNA based (FormCalc)
                 try {
-                    const { PDFDict } = await import('pdf-lib');
+                    const { PDFDict, PDFStream, PDFArray } = await import('pdf-lib');
                     const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'));
                     if (acroFormRef) {
                         const acroForm = pdfDoc.context.lookup(acroFormRef);
                         if (acroForm instanceof PDFDict && acroForm.has(PDFName.of('XFA'))) {
-                            isXfa = true;
+                            const xfa = pdfDoc.context.lookup(acroForm.get(PDFName.of('XFA')));
+
+                            const checkStreamForFormCalc = (stream: any) => {
+                                const contents = stream.getContents();
+                                const text = new TextDecoder().decode(contents);
+                                return text.toLowerCase().includes('formcalc');
+                            };
+
+                            if (xfa instanceof PDFStream) {
+                                if (checkStreamForFormCalc(xfa)) isXfa = true;
+                            } else if (xfa instanceof PDFArray) {
+                                for (let i = 0; i < xfa.size(); i++) {
+                                    const element = pdfDoc.context.lookup(xfa.get(i));
+                                    if (element instanceof PDFStream) {
+                                        if (checkStreamForFormCalc(element)) {
+                                            isXfa = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Fallback: if XFA key exists but it's not a standard stream/array, we still mark it
+                                // as it's almost certainly an Adobe form that would fail AcroForm filling
+                                isXfa = true;
+                            }
                         }
                     }
                 } catch (e) {
