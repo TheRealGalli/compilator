@@ -1377,18 +1377,25 @@ ${masterSource ? `
   - Se il template o il MASTER contengono checkbox (es. "[ ]", "☐", o punti elenco che fungono da scelta), devi **spuntarli precisamente** in base ai dati trovati nelle fonti.
   - Usa la notazione standard: **[x]** per opzione selezionata e **[ ]** per opzione non selezionata.
   - Esempio: Se trovi "Mezzi propri" selezionato nel Master, scrivi **[x] Mezzi propri** nel documento finale.
-- **FORMATTAZIONE PROFESSIONALE:**
-  - **TITOLI LUNGHI (REGOLA D'ORO):** Non spezzare MAI un titolo lungo con un ritorno a capo. Il grassetto deve racchiudere l'INTERA riga senza interruzioni (es. "**Information Return of a 25% Foreign-Owned U.S. Corporation or a Foreign Corporation...**").
-  - Scrivi i titoli e le etichette in modo compatto: "**Titolo**".
-  - **ARCHITETTURA GEMELLARE:** Organizza il documento finale utilizzando l'ESATTA logica spaziale (rientri, paragrafi, elenchi, spazi bianchi) che applichi al "Template Compilato". Le due colonne devono essere cloni visivi.
-  - Se il documento MASTER o il template sono divisi in "Parti", "Articoli" o "Sezioni", queste devono essere chiaramente delimitate e mai accorpate.
-  - Assicurati che il testo sia fluido, eliminando ogni ritorno a capo non necessario che spezza la lettura professionale.
-- **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
+
+- **FORMATTAZIONE PROFESSIONALE & TITOLI:**
+  - **TITOLI (IMPORTANTE):** I titoli e le intestazioni DEVONO essere su una riga separata. Esempio:
+    **Titolo del Documento**
+    (riga vuota)
+    Testo del paragrafo...
+  - **TITOLI LUNGHI:** Non spezzare MAI un titolo lungo con un ritorno a capo all'interno del grassetto. Il grassetto deve racchiudere l'INTERA riga (es. "**Information Return of a 25% Foreign-Owned U.S. Corporation...**").
+  - **ARCHITETTURA GEMELLARE:** Organizza il documento finale utilizzando l'ESATTA logica spaziale (rientri, paragrafi distinti, elenchi, spazi bianchi) del documento MASTER.
+  - **CHECKBOX & OPZIONI:** Se il Master ha caselle [ ] o Yes/No, ricreale FEDELMENTE. Usa **[x]** per le scelte attive.
+  
+- **STRUTTURA DEL CONTENUTO (MASTER PIN RULE):**
+  - **DIVIETO DI PAGINE ALLEGATE:** Se c'è un MASTER SOURCE, il tuo output deve essere ESCLUSIVAMENTE la ricreazione di quel documento compilato.
+  - **NON AGGIUNGERE** pagine extra, "Appendici", "Note dell'AI", "Riepilogo Fonti" o altro testo alla fine.
+  - Se le informazioni dalle altre fonti non entrano nel layout del Master, SINTETIZZALE nei campi appropriati del Master stesso, non accodarle.
+  - Il documento deve finire esattamente dove finisce il Master.
 
 ${detailedAnalysis ? `
 MODALITÀ ANALISI DETTAGLIATA ATTIVA:
-- Fornisci risposte approfondite.
-- Includi i dettagli rilevanti trovati nei documenti.` : ''}
+- Sii prolisso nei campi di testo aperti, fornendo tutti i dettagli necessari.` : ''}
 
 ${webResearch ? `
 MODALITÀ WEB RESEARCH ATTIVA:
