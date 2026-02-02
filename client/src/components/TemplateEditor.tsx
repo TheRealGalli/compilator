@@ -12,7 +12,7 @@ interface TemplateEditorProps {
 export function TemplateEditor({
   value = "",
   onChange,
-  placeholder = "Seleziona un modello o scrivi il tuo template...",
+  placeholder = "Seleziona un template preimpostato o incolla qui il tuo modello...",
   className = "",
   title = "Template da Compilare"
 }: TemplateEditorProps) {

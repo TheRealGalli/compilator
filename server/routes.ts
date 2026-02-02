@@ -1387,14 +1387,18 @@ ${masterSource ? `
     Testo del paragrafo...
   - **TITOLI LUNGHI:** Non spezzare MAI un titolo lungo con un ritorno a capo all'interno del grassetto. Il grassetto deve racchiudere l'INTERA riga.
   - **ARCHITETTURA VISIVA:** Usa **DOPPI A CAPO** per separare ogni singolo paragrafo, clausola o sezione. Il testo non deve mai essere un muro di parole.
-  - **TABELLE E LISTE (CRITICO):**
-    - Se nel Master vedi dati impaginati in **colonne verticali** o **griglie** (es. codici tributo, importi, dati finanziari):
-      - Usa le **TABELLE MARKDOWN** per preservare la struttura.
-      - Esempio:
-        | Codice | Descrizione | Importo |
-        |---|---|---|
-        | 1040 | Ritenute | € 1.000 |
-    - Se sono elenchi semplici, usa gli **ELENCHI PUNTATI**.
+  - **TABELLE E LISTE (CRITICO - ORDINE TASSATIVO):**
+    - **DIVIETO ASSOLUTO** di replicare la struttura tabellare usando spazi, tabulazioni o elenchi verticali.
+    - Se il dato ha una struttura a griglia o "Chiave - Valore" (es. Riga 50, 51 del Form 5472), DEVI usare una **TABELLA MARKDOWN**.
+    - Esempio Corretto:
+      | Part | Description | Value |
+      |---|---|---|
+      | 50 | Base erosion payments | $0 |
+      | 51 | Tax benefits | $0 |
+    - Esempio ERRATO (Non fare questo):
+      50
+      Base erosion payments
+      $0
   - **CHECKBOX & OPZIONI:** Se il Master ha caselle [ ] o Yes/No, ricreale FEDELMENTE su righe separate.
     Esempio:
     [x] Opzione Selezionata
