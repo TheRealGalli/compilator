@@ -51,7 +51,7 @@ export function TemplateEditor({
     content: value,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none h-full focus:outline-none p-8 text-base leading-loose tracking-wide font-normal text-foreground/90 font-mono',
+        class: 'prose prose-sm dark:prose-invert max-w-none h-full focus:outline-none p-8 text-sm leading-loose tracking-wide font-normal text-foreground/90 font-mono',
       },
     },
     onUpdate: ({ editor }) => {
@@ -85,7 +85,7 @@ export function TemplateEditor({
         .ProseMirror td,
         .ProseMirror th {
           min-width: 1em;
-          border: 1px solid #ced4da;
+          border: 1px solid hsl(var(--border)); 
           padding: 3px 5px;
           vertical-align: top;
           box-sizing: border-box;
@@ -94,7 +94,7 @@ export function TemplateEditor({
         .ProseMirror th {
           font-weight: bold;
           text-align: left;
-          background-color: #f1f3f5;
+          background-color: hsl(var(--muted));
         }
         .ProseMirror .selectedCell:after {
           z-index: 2;
@@ -104,26 +104,37 @@ export function TemplateEditor({
           background: rgba(200, 200, 255, 0.4);
           pointer-events: none;
         }
-        /* List Styles */
+        /* Checkbox / TaskList Styles */
         .ProseMirror ul[data-type="taskList"] {
           list-style: none;
           padding: 0;
         }
-        .ProseMirror ul[data-type="taskList"] li {
+        .ProseMirror li[data-type="taskItem"] {
           display: flex;
-          align-items: center; 
+          align-items: flex-start;
+          margin-bottom: 0.5rem;
         }
-        .ProseMirror ul[data-type="taskList"] li > label {
+        .ProseMirror li[data-type="taskItem"] > label {
           margin-right: 0.5rem;
           user-select: none;
+          margin-top: 0.35rem; /* Align checkbox with text */
         }
+        
         /* Placeholder */
         .ProseMirror p.is-editor-empty:first-child::before {
-          color: #adb5bd;
+          color: hsl(var(--muted-foreground));
           content: attr(data-placeholder);
           float: left;
           height: 0;
           pointer-events: none;
+        }
+        
+        /* Dark Mode Specific Overrides if prose-invert isn't enough */
+        .dark .ProseMirror h1, 
+        .dark .ProseMirror h2, 
+        .dark .ProseMirror h3,
+        .dark .ProseMirror h4 {
+            color: hsl(var(--foreground));
         }
       `}</style>
       <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex justify-between items-center">

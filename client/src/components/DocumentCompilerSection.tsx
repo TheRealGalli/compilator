@@ -370,8 +370,11 @@ export function DocumentCompilerSection({
 
       const data = await response.json();
       if (data.compiledContent) {
-        setCompiledContent(data.compiledContent);
-        setTemplateContent(data.compiledContent);
+        // Sanitize escaped brackets used by some models for checkboxes
+        const sanitizedContent = data.compiledContent.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
+
+        setCompiledContent(sanitizedContent);
+        setTemplateContent(sanitizedContent);
         setIsCompiledView(true);
         setIsPdfMode(false);
 
