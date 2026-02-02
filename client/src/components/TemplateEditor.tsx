@@ -136,6 +136,24 @@ export function TemplateEditor({
         .dark .ProseMirror h4 {
             color: hsl(var(--foreground));
         }
+        
+        /* Force Text Color & Size (Aggressive Override) */
+        .ProseMirror p, 
+        .ProseMirror span, 
+        .ProseMirror div,
+        .ProseMirror li, 
+        .ProseMirror td,
+        .ProseMirror th {
+          color: hsl(var(--foreground)) !important;
+          font-size: 0.875rem !important; /* text-sm */
+          line-height: 2 !important; /* leading-loose */
+        }
+        
+        .ProseMirror h1, 
+        .ProseMirror h2, 
+        .ProseMirror h3 {
+          color: hsl(var(--foreground)) !important;
+        }
       `}</style>
       <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex justify-between items-center">
         <h3 className="text-sm font-medium">{title}</h3>

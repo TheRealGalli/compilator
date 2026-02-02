@@ -1401,10 +1401,11 @@ ${masterSource ? `
       $0
   - **CHECKBOX & OPZIONI (CRITICO):**
     - Se il Master ha caselle [ ] o Yes/No, ricreale FEDELMENTE su righe separate.
-    - **NON USARE MAI L'ESCAPE**: Scrivi SEMPRE "[ ]" o "[x]". NON scrivere MAI "\\[ \\]" o "\\[x\\]".
+    - **LISTA CHECKBOX (OBBLIGATORIO):** Usa SEMPRE il formato lista puntata `- []` o ` - [x]`.
+    - **NON USARE MAI L'ESCAPE**: Scrivi SEMPRE "- [ ]" o "- [x]". NON scrivere MAI "\\[ \\]" o "\\[x\\]" o senza il trattino iniziale.
     - Esempio Corretto:
-      [x] Opzione Selezionata
-      [ ] Opzione Non Selezionata
+      - [x] Opzione Selezionata
+      - [ ] Opzione Non Selezionata
   
 - **STRUTTURA DEL CONTENUTO (MASTER PIN RULE):**
   - **DIVIETO DI PAGINE ALLEGATE:** Se c'è un MASTER SOURCE, il tuo output deve essere ESCLUSIVAMENTE la ricreazione di quel documento compilato.

@@ -371,7 +371,9 @@ export function DocumentCompilerSection({
       const data = await response.json();
       if (data.compiledContent) {
         // Sanitize escaped brackets used by some models for checkboxes
-        const sanitizedContent = data.compiledContent.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
+        let sanitizedContent = data.compiledContent.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
+        // Force checkboxes to be list items for Tiptap (replace "^[ ]" with "- [ ]")
+        sanitizedContent = sanitizedContent.replace(/^(\s*)\[([ xX])\]/gm, '$1- [$2]');
 
         setCompiledContent(sanitizedContent);
         setTemplateContent(sanitizedContent);
