@@ -208,6 +208,28 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             continue;
         }
 
+        // 2.5 Detect Task List Items (- [ ] or - [x])
+        const taskMatch = line.match(/^(\s*)-\s\[([ xX])\]\s+(.*)/);
+        if (taskMatch) {
+            const [, indent, checkState, content] = taskMatch;
+            const isChecked = checkState.toLowerCase() === 'x';
+            elements.push(
+                <div key={`task-${i}`} className="flex items-start gap-2 ml-4">
+                    <span className="mt-1 flex-shrink-0 inline-flex items-center justify-center">
+                        {isChecked ? (
+                            <span className="w-4 h-4 rounded border border-blue-500 bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold">✓</span>
+                        ) : (
+                            <span className="w-4 h-4 rounded border border-muted-foreground/40 bg-muted/20 flex items-center justify-center" />
+                        )}
+                    </span>
+                    <div className="flex-1 whitespace-pre-wrap leading-relaxed text-foreground/90">
+                        {formatInline(content, `task-${i}`)}
+                    </div>
+                </div>
+            );
+            i++;
+            continue;
+        }
         // 3. Detect Bullet Points
         const bulletMatch = line.match(/^(\s*)([\*\-\•])(\s+)(.*)/);
         if (bulletMatch) {

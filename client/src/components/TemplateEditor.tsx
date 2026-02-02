@@ -145,14 +145,16 @@ export function TemplateEditor({
         .ProseMirror td,
         .ProseMirror th {
           color: hsl(var(--foreground)) !important;
-          font-size: 0.875rem !important; /* text-sm */
-          line-height: 2 !important; /* leading-loose */
+          font-size: 13px !important; /* Smaller than text-sm */
+          line-height: 2 !important; 
         }
         
-        .ProseMirror h1, 
-        .ProseMirror h2, 
-        .ProseMirror h3 {
-          color: hsl(var(--foreground)) !important;
+        /* Dark Mode Specific - Force White Titles */
+        .dark .ProseMirror h1, 
+        .dark .ProseMirror h2, 
+        .dark .ProseMirror h3,
+        .dark .ProseMirror h4 {
+            color: #ffffff !important;
         }
       `}</style>
       <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex justify-between items-center">
