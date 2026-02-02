@@ -80,10 +80,11 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         return linkParts;
     };
 
-    // Helper to render checkboxes [x] and [ ] as UI elements
+    // Helper to render checkboxes [x] and [ ] and \[x\] as UI elements
     const renderCheckboxes = (text: string, baseKey: string) => {
         const checkboxParts: (string | JSX.Element)[] = [];
-        const checkboxRegex = /\[([ xX])\]/g;
+        // Match [x], [ ], \[x\], \[ \] allowing optional backslashes
+        const checkboxRegex = /\\?\[([ xX])\\?\]/g;
         let lastIdx = 0;
         let cMatch;
         let cCounter = 0;
@@ -94,7 +95,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             }
             const isChecked = cMatch[1].toLowerCase() === 'x';
             checkboxParts.push(
-                <span key={`${baseKey}-cb-${cCounter++}`} className="inline-flex items-center mx-1">
+                <span key={`${baseKey}-cb-${cCounter++}`} className="inline-flex items-center mx-1 align-middle">
                     {isChecked ? (
                         <span className="w-4 h-4 rounded border border-blue-500 bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold">✓</span>
                     ) : (
