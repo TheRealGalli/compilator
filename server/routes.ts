@@ -1378,10 +1378,11 @@ ${masterSource ? `
   - Usa la notazione standard: **[x]** per opzione selezionata e **[ ]** per opzione non selezionata.
   - Esempio: Se trovi "Mezzi propri" selezionato nel Master, scrivi **[x] Mezzi propri** nel documento finale.
 - **FORMATTAZIONE PROFESSIONALE:**
-  - Evita di andare a capo tra i marcatori di grassetto (es. NON scrivere "**\\nTitolo\\n**").
+  - **TITOLI LUNGHI:** Non spezzare MAI un titolo lungo con un ritorno a capo. Il grassetto deve racchiudere l'intera riga (es. "**Information Return of a 25% Foreign-Owned U.S. Corporation or a Foreign Corporation...**").
   - Scrivi i titoli e le etichette in modo compatto: "**Titolo**".
-  - **COERENZA STRUTTURALE:** Se il documento MASTER o il template sono divisi in "Parti", "Articoli" o "Sezioni", il documento finale deve riflettere questa divisione in modo netto e professionale. Non accorpare sezioni distinte.
-  - Assicurati che il testo sia fluido e professionale, senza interruzioni di riga non necessarie all'interno di blocchi di testo o intestazioni.
+  - **COERENZA STRUTTURALE:** Organizza il documento finale seguendo la STESSA logica spaziale (paragrafi, rientri, elenchi) che utilizzi per il "Template Compilato". I due devono essere visivamente gemelli.
+  - Se il documento MASTER o il template sono divisi in "Parti", "Articoli" o "Sezioni", il documento finale deve riflettere questa divisione in modo netto.
+  - Assicurati che il testo sia fluido e professionale, senza interruzioni di riga non necessarie.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
 
 ${detailedAnalysis ? `

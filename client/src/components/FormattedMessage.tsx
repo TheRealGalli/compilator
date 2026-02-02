@@ -213,7 +213,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         if (bulletMatch) {
             const [, indent, bullet, space, content] = bulletMatch;
             elements.push(
-                <div key={`bullet-${i}`} className="flex items-start gap-2 py-1 ml-4">
+                <div key={`bullet-${i}`} className="flex items-start gap-2 ml-4">
                     <span className="text-blue-500 font-bold mt-1.5">•</span>
                     <div className="flex-1 whitespace-pre-wrap">
                         {formatInline(content, `bullet-${i}`)}
@@ -226,10 +226,10 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
 
         // 4. Regular Lines
         if (line === '') {
-            elements.push(<div key={`empty-${i}`} className="h-2" />);
+            elements.push(<div key={`empty-${i}`} className="h-4" />);
         } else {
             elements.push(
-                <div key={`p-${i}`} className="py-1 whitespace-pre-wrap leading-relaxed text-foreground/90">
+                <div key={`p-${i}`} className="whitespace-pre-wrap leading-relaxed text-foreground/90">
                     {formatInline(lines[i], `p-${i}`)}
                 </div>
             );
@@ -238,7 +238,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
     }
 
     return (
-        <div className={`formatted-message text-base ${className} space-y-1`}>
+        <div className={`formatted-message text-base ${className}`}>
             {elements}
         </div>
     );
