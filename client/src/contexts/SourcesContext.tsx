@@ -13,6 +13,7 @@ export interface Source {
     isFillable?: boolean; // Native PDF Form Fields detected
     isAlreadyFilled?: boolean; // Threshold of filled fields detected
     isXfa?: boolean; // XFA (Adobe LiveCycle) technology detected
+    isBypass?: boolean; // Bypass automated intelligence (Native PDF filling)
     driveId?: string; // Original Google Drive ID
 }
 
@@ -21,7 +22,8 @@ interface SourcesContextType {
     addSource: (file: File, options?: { isMemory?: boolean; driveId?: string }) => Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'invalid_format' | 'error'>;
     removeSource: (id: string) => void;
     toggleSource: (id: string) => void;
-    toggleMaster: (id: string) => void; // New: Master Source Toggle
+    toggleMaster: (id: string) => void;
+    toggleBypass: (id: string) => void;
     selectedSources: Source[];
     masterSource: Source | undefined; // New: Master Source Reference
     maxSources: number;
@@ -253,7 +255,11 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         }));
     }, []);
 
-    const selectedSources = sources.filter(s => s.selected);
+    const toggleBypass = useCallback((id: string) => {
+        setSources(prev => prev.map(s => (s.id === id ? { ...s, isBypass: !s.isBypass } : s)));
+    }, []);
+
+    const selectedSources = sources.filter(s => !s.isMemory && s.selected);
     const masterSource = sources.find(s => s.isMaster);
 
     return (
@@ -264,6 +270,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 removeSource,
                 toggleSource,
                 toggleMaster,
+                toggleBypass,
                 selectedSources,
                 masterSource,
                 maxSources: MAX_SOURCES

@@ -244,15 +244,15 @@ export function DocumentCompilerSection({
 
 
   useEffect(() => {
-    // AUTO-ACTIVATE PDF STUDIO if master is fillable
-    if (masterSource?.isFillable) {
+    // AUTO-ACTIVATE PDF STUDIO if master is fillable AND not in bypass mode
+    if (masterSource?.isFillable && !masterSource?.isBypass) {
       if (!isPdfMode) {
         setIsPdfMode(true);
       }
     } else {
       setIsPdfMode(false);
     }
-  }, [masterSource?.id, masterSource?.isFillable]);
+  }, [masterSource?.id, masterSource?.isFillable, masterSource?.isBypass]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
   //   try {

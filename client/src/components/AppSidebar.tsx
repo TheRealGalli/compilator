@@ -12,6 +12,7 @@ interface AppSidebarProps {
   onRemoveSource?: (id: string) => void;
   onToggleSource?: (id: string) => void;
   onToggleMaster?: (id: string) => void;
+  onToggleBypass?: (id: string) => void;
 }
 
 export function AppSidebar({
@@ -19,7 +20,8 @@ export function AppSidebar({
   onSectionChange = () => { },
   sources = [],
   onToggleSource,
-  onToggleMaster
+  onToggleMaster,
+  onToggleBypass
 }: AppSidebarProps) {
   const sections = [
     { id: "documents" as const, label: "Documenti", icon: FileText },
@@ -61,6 +63,7 @@ export function AppSidebar({
           sources={sources}
           onToggle={onToggleSource}
           onToggleMaster={onToggleMaster}
+          onToggleBypass={onToggleBypass}
         />
       </div>
     </aside>

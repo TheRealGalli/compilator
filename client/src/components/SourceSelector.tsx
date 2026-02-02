@@ -18,15 +18,17 @@ interface Source {
   isFillable?: boolean;
   isAlreadyFilled?: boolean;
   isXfa?: boolean;
+  isBypass?: boolean;
 }
 
 interface SourceSelectorProps {
   sources: Source[];
   onToggle?: (id: string) => void;
   onToggleMaster?: (id: string) => void;
+  onToggleBypass?: (id: string) => void;
 }
 
-export function SourceSelector({ sources, onToggle, onToggleMaster }: SourceSelectorProps) {
+export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypass }: SourceSelectorProps) {
   // Filter out memory files from the UI list
   const visibleSources = sources.filter(s => !s.isMemory);
   const selectedCount = visibleSources.filter(s => s.selected).length;
@@ -68,14 +70,26 @@ export function SourceSelector({ sources, onToggle, onToggleMaster }: SourceSele
                   data-testid={`checkbox-source-${source.id}`}
                   className="w-3.5 h-3.5"
                 />
-                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${source.isXfa
-                  ? 'text-red-500 fill-red-500/20'
-                  : source.isAlreadyFilled
-                    ? 'text-orange-500 fill-orange-500/20'
-                    : source.isFillable
-                      ? 'text-green-500 fill-green-500/20'
-                      : 'text-muted-foreground'
-                  }`} />
+                <Tooltip delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <Icon
+                      onClick={() => onToggleBypass?.(source.id)}
+                      className={`w-3.5 h-3.5 flex-shrink-0 cursor-pointer transition-all hover:scale-110 active:scale-95 ${source.isBypass
+                          ? 'text-muted-foreground'
+                          : source.isXfa
+                            ? 'text-red-500 fill-red-500/20'
+                            : source.isAlreadyFilled
+                              ? 'text-orange-500 fill-orange-500/20'
+                              : source.isFillable
+                                ? 'text-green-500 fill-green-500/20'
+                                : 'text-muted-foreground'
+                        }`}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>{source.isBypass ? 'Ripristina analisi intelligente' : 'Forza modalità standard (Grigio)'}</p>
+                  </TooltipContent>
+                </Tooltip>
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>
                     <span className="text-xs flex-1 cursor-default min-w-0 whitespace-nowrap">
