@@ -25,7 +25,7 @@ export function TemplateEditor({
         <Textarea
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
-          className="h-full w-full resize-none border-0 rounded-none focus-visible:ring-0 p-6 text-sm leading-relaxed"
+          className="h-full w-full resize-none border-0 rounded-none focus-visible:ring-0 p-8 text-base leading-loose tracking-wide font-normal text-foreground/90"
           placeholder={placeholder}
           data-testid="textarea-template-editor"
         />
