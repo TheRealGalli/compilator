@@ -238,7 +238,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
     }
 
     return (
-        <div className={`formatted-message text-base ${className}`}>
+        <div className={`formatted-message text-sm ${className}`}>
             {elements}
         </div>
     );

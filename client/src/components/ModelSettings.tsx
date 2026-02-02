@@ -221,14 +221,14 @@ export function ModelSettings({
               <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
                 <div className="flex-1">
                   <div className="flex items-center gap-1.5">
-                    <Label className="text-xs font-medium">
+                    <Label className="text-xs font-medium cursor-pointer">
                       Guardrail
                     </Label>
-                    <div className="ml-auto flex gap-2">
+                    <div className="ml-auto flex gap-3">
                       {[1, 2, 3, 4, 5].map((i) => (
                         <div
                           key={i}
-                          className="w-[22px] h-[22px] rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
+                          className="w-[24px] h-[24px] rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
                         />
                       ))}
                     </div>
