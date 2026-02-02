@@ -249,7 +249,12 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     const toggleMaster = useCallback((id: string) => {
         setSources(prev => prev.map(s => {
             if (s.id === id) {
-                return { ...s, isMaster: !s.isMaster };
+                const isNowMaster = !s.isMaster;
+                return {
+                    ...s,
+                    isMaster: isNowMaster,
+                    selected: isNowMaster ? true : s.selected // Auto-select when pinning
+                };
             }
             return { ...s, isMaster: false }; // Ensure only one master source at a time
         }));

@@ -330,7 +330,8 @@ export function DocumentCompilerSection({
   const handleCompile = async () => {
     if (isCompiling || isPdfMode) return;
 
-    if (!templateContent.trim() && selectedSources.length === 0) {
+    // Allow empty template if masterSource is present (Classic Workflow)
+    if (!templateContent.trim() && !masterSource && selectedSources.length === 0) {
       toast({
         title: "Errore",
         description: "Seleziona un template o aggiungi delle fonti per procedere.",
@@ -650,19 +651,26 @@ export function DocumentCompilerSection({
                 data-testid="button-compile"
                 className="w-full sm:w-auto"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`w-6 h-6 mr-2 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
-                >
-                  <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
-                </svg>
-                {isCompiling ? "Processando..." : "Compila con AI"}
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center gap-2">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={`w-6 h-6 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
+                    >
+                      <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
+                    </svg>
+                    <span>{isCompiling ? "Processando..." : "Compila con AI"}</span>
+                  </div>
+                  {!templateContent && masterSource && (
+                    <span className="text-[9px] opacity-70 mt-0.5 uppercase tracking-tighter">Basato sul Master Pin</span>
+                  )}
+                </div>
               </Button>
             </>
           )}
