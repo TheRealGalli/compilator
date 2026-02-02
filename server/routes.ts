@@ -1379,19 +1379,24 @@ ${masterSource ? `
   - Esempio: Se trovi "Mezzi propri" selezionato nel Master, scrivi **[x] Mezzi propri** nel documento finale.
 
 - **FORMATTAZIONE PROFESSIONALE & TITOLI:**
-  - **TITOLI (IMPORTANTE):** I titoli e le intestazioni DEVONO essere su una riga separata. Esempio:
+  - **TITOLI (IMPORTANTE):** I titoli e le intestazioni DEVONO essere su una riga separata, circondati da righe vuote.
+    Esempio corretto:
+    
     **Titolo del Documento**
-    (riga vuota)
+    
     Testo del paragrafo...
-  - **TITOLI LUNGHI:** Non spezzare MAI un titolo lungo con un ritorno a capo all'interno del grassetto. Il grassetto deve racchiudere l'INTERA riga (es. "**Information Return of a 25% Foreign-Owned U.S. Corporation...**").
-  - **ARCHITETTURA GEMELLARE:** Organizza il documento finale utilizzando l'ESATTA logica spaziale (rientri, paragrafi distinti, elenchi, spazi bianchi) del documento MASTER.
-  - **CHECKBOX & OPZIONI:** Se il Master ha caselle [ ] o Yes/No, ricreale FEDELMENTE. Usa **[x]** per le scelte attive.
+  - **TITOLI LUNGHI:** Non spezzare MAI un titolo lungo con un ritorno a capo all'interno del grassetto. Il grassetto deve racchiudere l'INTERA riga.
+  - **ARCHITETTURA VISIVA:** Usa **DOPPI A CAPO** per separare ogni singolo paragrafo, clausola o sezione. Il testo non deve mai essere un muro di parole.
+  - **CHECKBOX & OPZIONI:** Se il Master ha caselle [ ] o Yes/No, ricreale FEDELMENTE su righe separate.
+    Esempio:
+    [x] Opzione Selezionata
+    [ ] Opzione Non Selezionata
   
 - **STRUTTURA DEL CONTENUTO (MASTER PIN RULE):**
   - **DIVIETO DI PAGINE ALLEGATE:** Se c'è un MASTER SOURCE, il tuo output deve essere ESCLUSIVAMENTE la ricreazione di quel documento compilato.
   - **NON AGGIUNGERE** pagine extra, "Appendici", "Note dell'AI", "Riepilogo Fonti" o altro testo alla fine.
-  - Se le informazioni dalle altre fonti non entrano nel layout del Master, SINTETIZZALE nei campi appropriati del Master stesso, non accodarle.
-  - Il documento deve finire esattamente dove finisce il Master.
+  - **RICREAZIONE INTELLIGENTE:** Se il documento originale ha spazi per firme, date o timbri, ricreali usando placeholder testuali (es. "[FIRMA...]", "[DATA...]").
+  - Se le informazioni dalle altre fonti non entrano nel layout del Master, SINTETIZZALE nei campi appropriati del Master stesso.
 
 ${detailedAnalysis ? `
 MODALITÀ ANALISI DETTAGLIATA ATTIVA:
