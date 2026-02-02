@@ -220,6 +220,7 @@ export function DocumentCompilerSection({
   const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof templates | "">("");
   const [templateContent, setTemplateContent] = useState("");
   const [compiledContent, setCompiledContent] = useState("");
+  const [isCompiledView, setIsCompiledView] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const { toast } = useToast();
   const { selectedSources, masterSource } = useSources();
@@ -269,6 +270,7 @@ export function DocumentCompilerSection({
 
   const handleTemplateChange = (value: string) => {
     setSelectedTemplate(value as keyof typeof templates);
+    setIsCompiledView(false);
     if (value && templates[value as keyof typeof templates]) {
       setTemplateContent(templates[value as keyof typeof templates].content);
       setCompiledContent("");
@@ -303,6 +305,7 @@ export function DocumentCompilerSection({
       if (data.template) {
         setTemplateContent(data.template);
         setSelectedTemplate(""); // Clear predefined selection
+        setIsCompiledView(false);
         setIsGenerateModalOpen(false);
         setGeneratePrompt("");
 
@@ -368,6 +371,8 @@ export function DocumentCompilerSection({
       const data = await response.json();
       if (data.compiledContent) {
         setCompiledContent(data.compiledContent);
+        setTemplateContent(data.compiledContent);
+        setIsCompiledView(true);
         setIsPdfMode(false);
 
         toast({
@@ -618,6 +623,7 @@ export function DocumentCompilerSection({
                             reader.onload = (event) => {
                               setTemplateContent(event.target?.result as string);
                               setSelectedTemplate("");
+                              setIsCompiledView(false);
                               toast({
                                 title: "Template caricato",
                                 description: `${file.name} è stato caricato con successo.`,
@@ -724,7 +730,13 @@ export function DocumentCompilerSection({
                 <div className="min-h-[400px] lg:min-h-0 h-full">
                   <TemplateEditor
                     value={templateContent}
-                    onChange={setTemplateContent}
+                    onChange={(val) => {
+                      setTemplateContent(val);
+                      if (isCompiledView) {
+                        setCompiledContent(val);
+                      }
+                    }}
+                    title={isCompiledView ? "Template Compilato" : "Template da Compilare"}
                   />
                 </div>
 

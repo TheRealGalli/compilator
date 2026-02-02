@@ -6,18 +6,20 @@ interface TemplateEditorProps {
   onChange?: (value: string) => void;
   placeholder?: string;
   className?: string;
+  title?: string;
 }
 
 export function TemplateEditor({
   value = "",
   onChange,
   placeholder = "Seleziona un modello o scrivi il tuo template...",
-  className = ""
+  className = "",
+  title = "Template da Compilare"
 }: TemplateEditorProps) {
   return (
     <div className={`h-full flex flex-col border rounded-lg overflow-hidden bg-background ${className}`}>
       <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0">
-        <h3 className="text-sm font-medium">Template da Compilare</h3>
+        <h3 className="text-sm font-medium">{title}</h3>
       </div>
       <div className="flex-1 overflow-hidden">
         <Textarea
