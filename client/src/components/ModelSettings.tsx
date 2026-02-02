@@ -217,46 +217,53 @@ export function ModelSettings({
                 />
               </div>
 
+              {/* Guardrail 1 (Replaces Detailed Analysis) */}
               <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
                 <div className="flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="detailed-analysis" className="text-xs font-medium cursor-pointer">
-                      Analisi Dettagliata
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs font-medium uppercase tracking-tighter opacity-70">
+                      Guardrail
                     </Label>
+                    <div className="flex gap-1 mt-0.5">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div
+                          key={i}
+                          className="w-2.5 h-2.5 rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <Switch
-                  id="detailed-analysis"
-                  checked={detailedAnalysis}
-                  onCheckedChange={onDetailedAnalysisChange}
-                  data-testid="switch-detailed-analysis"
-                />
               </div>
 
+              {/* Guardrail 2 (Replaces Formal Tone) */}
               <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
                 <div className="flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="formal-tone" className="text-xs font-medium cursor-pointer">
-                      Tono Formale
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs font-medium uppercase tracking-tighter opacity-70">
+                      Guardrail
                     </Label>
+                    <div className="flex gap-1 mt-0.5 opacity-40 grayscale">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div
+                          key={i}
+                          className="w-2.5 h-2.5 rounded-[1px] border border-muted-foreground/20 bg-muted-foreground/5"
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <Switch
-                  id="formal-tone"
-                  checked={formalTone}
-                  onCheckedChange={onFormalToneChange}
-                  data-testid="switch-formal-tone"
-                />
               </div>
+
               <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
                 <div className="flex-1">
                   <div className="flex items-center gap-1.5">
                     <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
                       Modello
                     </Label>
-                    <div className="space-y-2">
-                      <div className="p-2 border rounded-md bg-muted/50 text-sm text-muted-foreground">
-                        Gemini 2.5 Flash (Google)
+                    <div className="ml-auto">
+                      <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
+                        Gemini 2.5 Flash
                       </div>
                     </div>
                   </div>

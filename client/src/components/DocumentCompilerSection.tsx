@@ -670,7 +670,7 @@ export function DocumentCompilerSection({
             )}
           </div>
           {!templateContent && masterSource && !isPdfMode && (
-            <div className="absolute top-full right-0 mt-1 pointer-events-none">
+            <div className="absolute top-[38px] right-0 pointer-events-none">
               <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold opacity-60 mr-1">
                 Basato sul Master Pin
               </span>
