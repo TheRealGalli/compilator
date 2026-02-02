@@ -209,10 +209,12 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             continue;
         }
 
-        // 2.5 Detect Task List Items (- [ ] or - [x])
-        const taskMatch = line.match(/^(\s*)-\s\[([ xX])\]\s+(.*)/);
+        // 2.5 Detect Task List Items (- [ ] or * [ ] or - [x])
+        // Allow * or - as bullet, and optional text countent
+        const taskMatch = line.match(/^(\s*)([\-\*])\s+\[([ xX])\](.*)/);
         if (taskMatch) {
-            const [, indent, checkState, content] = taskMatch;
+            const [, indent, bulletChar, checkState, contentRaw] = taskMatch;
+            const content = contentRaw.trim();
             const isChecked = checkState.toLowerCase() === 'x';
             elements.push(
                 <div key={`task-${i}`} className="flex items-start gap-2 ml-4">
