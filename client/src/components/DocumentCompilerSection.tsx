@@ -584,95 +584,97 @@ export function DocumentCompilerSection({
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold">Compilatore Documenti AI</h2>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {!isPdfMode && (
-            <>
-              <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-                <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
-                  <SelectValue placeholder="Seleziona template" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2 border-b space-y-1">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        document.getElementById('template-upload')?.click();
-                      }}
-                      data-testid="button-upload-template"
-                    >
-                      <span className="mr-2">📄</span>
-                      Upload Template
-                    </Button>
-                    <input
-                      id="template-upload"
-                      type="file"
-                      accept=".txt,.md,.rtf"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            setTemplateContent(event.target?.result as string);
-                            setSelectedTemplate("");
-                            toast({
-                              title: "Template caricato",
-                              description: `${file.name} è stato caricato con successo.`,
-                            });
-                          };
-                          reader.readAsText(file);
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setIsGenerateModalOpen(true);
-                      }}
-                      data-testid="button-generate-template"
-                    >
-                      <span className="mr-2">✏️</span>
-                      Genera Template
-                    </Button>
-                  </div>
-                  <SelectItem value="privacy">Privacy Policy</SelectItem>
-                  <SelectItem value="relazione">Relazione Tecnica</SelectItem>
-                  <SelectItem value="contratto">Contratto di Servizio</SelectItem>
-                </SelectContent>
-              </Select>
+        <div className="relative flex flex-col items-end">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {!isPdfMode && (
+              <>
+                <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
+                  <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
+                    <SelectValue placeholder="Seleziona template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <div className="p-2 border-b space-y-1">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          document.getElementById('template-upload')?.click();
+                        }}
+                        data-testid="button-upload-template"
+                      >
+                        <span className="mr-2">📄</span>
+                        Upload Template
+                      </Button>
+                      <input
+                        id="template-upload"
+                        type="file"
+                        accept=".txt,.md,.rtf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              setTemplateContent(event.target?.result as string);
+                              setSelectedTemplate("");
+                              toast({
+                                title: "Template caricato",
+                                description: `${file.name} è stato caricato con successo.`,
+                              });
+                            };
+                            reader.readAsText(file);
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setIsGenerateModalOpen(true);
+                        }}
+                        data-testid="button-generate-template"
+                      >
+                        <span className="mr-2">✏️</span>
+                        Genera Template
+                      </Button>
+                    </div>
+                    <SelectItem value="privacy">Privacy Policy</SelectItem>
+                    <SelectItem value="relazione">Relazione Tecnica</SelectItem>
+                    <SelectItem value="contratto">Contratto di Servizio</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Button
-                onClick={handleCompile}
-                disabled={(!templateContent && !masterSource) || isCompiling}
-                data-testid="button-compile"
-                className="w-full sm:w-auto"
-              >
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center gap-2">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className={`w-6 h-6 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
-                    >
-                      <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
-                    </svg>
-                    <span>{isCompiling ? "Processando..." : "Compila con AI"}</span>
-                  </div>
-                  {!templateContent && masterSource && (
-                    <span className="text-[9px] opacity-70 mt-0.5 uppercase tracking-tighter">Basato sul Master Pin</span>
-                  )}
-                </div>
-              </Button>
-            </>
+                <Button
+                  onClick={handleCompile}
+                  disabled={(!templateContent && !masterSource) || isCompiling}
+                  data-testid="button-compile"
+                  className="w-full sm:w-auto gap-2"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`w-6 h-6 ${isCompiling ? 'animate-turbo-spin text-blue-300' : ''}`}
+                  >
+                    <path d="M12 2v20M2 12h20M4.929 4.929l14.142 14.142M4.929 19.071L19.071 4.929" />
+                  </svg>
+                  {isCompiling ? "Processando..." : "Compila con AI"}
+                </Button>
+              </>
+            )}
+          </div>
+          {!templateContent && masterSource && !isPdfMode && (
+            <div className="absolute top-full right-0 mt-1 pointer-events-none">
+              <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold opacity-60 mr-1">
+                Basato sul Master Pin
+              </span>
+            </div>
           )}
         </div>
       </div>
