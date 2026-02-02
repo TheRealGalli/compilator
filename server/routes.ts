@@ -1377,6 +1377,10 @@ ${masterSource ? `
   - Se il template o il MASTER contengono checkbox (es. "[ ]", "☐", o punti elenco che fungono da scelta), devi **spuntarli precisamente** in base ai dati trovati nelle fonti.
   - Usa la notazione standard: **[x]** per opzione selezionata e **[ ]** per opzione non selezionata.
   - Esempio: Se trovi "Mezzi propri" selezionato nel Master, scrivi **[x] Mezzi propri** nel documento finale.
+- **FORMATTAZIONE PROFESSIONALE:**
+  - Evita di andare a capo tra i marcatori di grassetto (es. NON scrivere "**\\nTitolo\\n**").
+  - Scrivi i titoli e le etichette in modo compatto: "**Titolo**".
+  - Assicurati che il testo sia fluido e professionale, senza interruzioni di riga non necessarie all'interno di blocchi di testo o intestazioni.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
 
 ${detailedAnalysis ? `

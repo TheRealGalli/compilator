@@ -217,18 +217,18 @@ export function ModelSettings({
                 />
               </div>
 
-              {/* Guardrail 1 (Replaces Detailed Analysis) */}
-              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
+              {/* Guardrail 1 (Active) */}
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
                 <div className="flex-1">
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5">
                     <Label className="text-xs font-medium uppercase tracking-tighter opacity-70">
                       Guardrail
                     </Label>
-                    <div className="flex gap-1 mt-0.5">
+                    <div className="ml-auto flex gap-1.5">
                       {[1, 2, 3, 4, 5].map((i) => (
                         <div
                           key={i}
-                          className="w-2.5 h-2.5 rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
+                          className="w-5 h-5 rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
                         />
                       ))}
                     </div>
@@ -236,23 +236,19 @@ export function ModelSettings({
                 </div>
               </div>
 
-              {/* Guardrail 2 (Replaces Formal Tone) */}
-              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
+              {/* Guardrail 2 (Empty for Balance) */}
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px] opacity-40">
                 <div className="flex-1">
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-medium uppercase tracking-tighter opacity-70">
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-xs font-medium uppercase tracking-tighter opacity-30">
                       Guardrail
                     </Label>
-                    <div className="flex gap-1 mt-0.5 opacity-40 grayscale">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div
-                          key={i}
-                          className="w-2.5 h-2.5 rounded-[1px] border border-muted-foreground/20 bg-muted-foreground/5"
-                        />
-                      ))}
-                    </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Space Filler Card */}
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px] opacity-20">
               </div>
 
               <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
