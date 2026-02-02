@@ -1,5 +1,14 @@
-import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TaskList } from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import { Markdown } from 'tiptap-markdown';
+import Placeholder from '@tiptap/extension-placeholder';
+import { useEffect } from 'react';
 
 interface TemplateEditorProps {
   value?: string;
@@ -16,19 +25,112 @@ export function TemplateEditor({
   className = "",
   title = "Template da Compilare"
 }: TemplateEditorProps) {
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      TaskList,
+      TaskItem.configure({
+        nested: true,
+      }),
+      Markdown.configure({
+        html: false, // Force markdown output
+        transformPastedText: true,
+        transformCopiedText: true,
+      }),
+      Placeholder.configure({
+        placeholder: placeholder,
+      }),
+    ],
+    content: value,
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none h-full focus:outline-none p-8 text-base leading-loose tracking-wide font-normal text-foreground/90 font-mono',
+      },
+    },
+    onUpdate: ({ editor }) => {
+      const markdown = (editor.storage as any).markdown.getMarkdown();
+      onChange?.(markdown);
+    },
+  });
+
+  // Sync external value changes to editor (e.g. when template is selected)
+  useEffect(() => {
+    if (editor && value !== (editor.storage as any).markdown.getMarkdown()) {
+      editor.commands.setContent(value);
+    }
+  }, [value, editor]);
+
   return (
     <div className={`h-full flex flex-col border rounded-lg overflow-hidden bg-background ${className}`}>
-      <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0">
+      <style>{`
+        .ProseMirror {
+          height: 100%;
+          overflow-y: auto;
+        }
+        /* Table Styles */
+        .ProseMirror table {
+          border-collapse: collapse;
+          table-layout: fixed;
+          width: 100%;
+          margin: 0;
+          overflow: hidden;
+        }
+        .ProseMirror td,
+        .ProseMirror th {
+          min-width: 1em;
+          border: 1px solid #ced4da;
+          padding: 3px 5px;
+          vertical-align: top;
+          box-sizing: border-box;
+          position: relative;
+        }
+        .ProseMirror th {
+          font-weight: bold;
+          text-align: left;
+          background-color: #f1f3f5;
+        }
+        .ProseMirror .selectedCell:after {
+          z-index: 2;
+          position: absolute;
+          content: "";
+          left: 0; right: 0; top: 0; bottom: 0;
+          background: rgba(200, 200, 255, 0.4);
+          pointer-events: none;
+        }
+        /* List Styles */
+        .ProseMirror ul[data-type="taskList"] {
+          list-style: none;
+          padding: 0;
+        }
+        .ProseMirror ul[data-type="taskList"] li {
+          display: flex;
+          align-items: center; 
+        }
+        .ProseMirror ul[data-type="taskList"] li > label {
+          margin-right: 0.5rem;
+          user-select: none;
+        }
+        /* Placeholder */
+        .ProseMirror p.is-editor-empty:first-child::before {
+          color: #adb5bd;
+          content: attr(data-placeholder);
+          float: left;
+          height: 0;
+          pointer-events: none;
+        }
+      `}</style>
+      <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex justify-between items-center">
         <h3 className="text-sm font-medium">{title}</h3>
       </div>
-      <div className="flex-1 overflow-hidden">
-        <Textarea
-          value={value}
-          onChange={(e) => onChange?.(e.target.value)}
-          className="h-full w-full resize-none border-0 rounded-none focus-visible:ring-0 p-8 text-base leading-loose tracking-wide font-normal text-foreground/90"
-          placeholder={placeholder}
-          data-testid="textarea-template-editor"
-        />
+      <div className="flex-1 overflow-hidden relative">
+        <EditorContent editor={editor} className="h-full w-full" />
       </div>
     </div>
   );

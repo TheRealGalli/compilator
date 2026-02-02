@@ -407,7 +407,8 @@ export function DocumentCompilerSection({
     if (!compiledContent) return;
 
     try {
-      const { Document: DocxDocument, Packer, Paragraph, TextRun, Footer, SimpleField, AlignmentType } = await import("docx");
+      // Add Table imports
+      const { Document: DocxDocument, Packer, Paragraph, TextRun, Footer, SimpleField, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = await import("docx");
       const { saveAs } = await import("file-saver");
 
       // Helper to strip emojis (Standard ranges without u flag for compatibility)
@@ -479,15 +480,59 @@ export function DocumentCompilerSection({
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-
         const rawText = cleanText(line);
         if (!rawText) {
           docChildren.push(new Paragraph({ text: "" }));
           continue;
         }
-        // ... (rest of headers logic remains same)
 
-        // Detect Headers (# Header)
+        // 0. Detect Tables (starts with |)
+        if (line.trim().startsWith('|')) {
+          const tableRowsData: string[][] = [];
+          let j = i;
+          // Buffer table lines
+          while (j < lines.length && lines[j].trim().startsWith('|')) {
+            const rowLine = lines[j].trim();
+            // Skip separator lines like |---|---|
+            if (!rowLine.match(/^[|\s\-:.]+$/)) {
+              // Split by pipe, remove first/last empty elements if pipe exists there
+              let cells = rowLine.split('|');
+              if (rowLine.startsWith('|')) cells.shift();
+              if (rowLine.endsWith('|')) cells.pop();
+              tableRowsData.push(cells.map(c => c.trim()));
+            }
+            j++;
+          }
+
+          // If we captured valid rows, create a Table
+          if (tableRowsData.length > 0) {
+            const tableRows = tableRowsData.map((row, rowIndex) => {
+              const isHeader = rowIndex === 0;
+              return new TableRow({
+                children: row.map(cellText => new TableCell({
+                  children: [new Paragraph({
+                    children: parseInline(cellText, { size: 22, bold: isHeader }), // Slightly smaller font for table
+                    alignment: AlignmentType.LEFT
+                  })],
+                  width: { size: 100 / row.length, type: WidthType.PERCENTAGE },
+                  shading: isHeader ? { fill: "F3F4F6" } : undefined, // Light gray header
+                  margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                }))
+              });
+            });
+
+            docChildren.push(new Table({
+              rows: tableRows,
+              width: { size: 100, type: WidthType.PERCENTAGE },
+            }));
+
+            // Fast forward loop
+            i = j - 1;
+            continue;
+          }
+        }
+
+        // 1. Detect Headers (# Header)
         if (rawText.startsWith('# ')) {
           docChildren.push(new Paragraph({
             children: parseInline(rawText.substring(2), { size: 36, bold: true }),
@@ -504,7 +549,7 @@ export function DocumentCompilerSection({
             spacing: { before: 200, after: 100 }
           }));
         }
-        // Detect Bullets
+        // 2. Detect Bullets
         else if (rawText.startsWith('- ') || rawText.startsWith('* ') || rawText.match(/^\d+\. /)) {
           const isNumbered = rawText.match(/^\d+\. /);
           const textContent = isNumbered ? rawText.replace(/^\d+\. /, '') : rawText.substring(2);
@@ -515,7 +560,7 @@ export function DocumentCompilerSection({
             spacing: { after: 120, line: 360 }
           }));
         }
-        // Standard Paragraph
+        // 3. Standard Paragraph
         else {
           docChildren.push(new Paragraph({
             children: parseInline(rawText),
