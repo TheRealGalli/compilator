@@ -370,11 +370,10 @@ export function DocumentCompilerSection({
 
       const data = await response.json();
       if (data.compiledContent) {
-        // Sanitize escaped brackets used by some models for checkboxes (Aggressive Loop)
-        let sanitizedContent = data.compiledContent;
-        while (sanitizedContent.includes('\\[') || sanitizedContent.includes('\\]')) {
-          sanitizedContent = sanitizedContent.split('\\[').join('[').split('\\]').join(']');
-        }
+        // Sanitize escaped brackets: replace \[ with [ and \] with ]
+        let sanitizedContent = data.compiledContent
+          .replace(/\\([\[\]])/g, '$1') // First pass
+          .replace(/\\([\[\]])/g, '$1'); // Second pass just in case of double escapes
 
         // Force checkboxes to be list items for Tiptap (replace "^[ ]" with "- [ ]")
         sanitizedContent = sanitizedContent.replace(/^(\s*)\[([ xX])\]/gm, '$1- [$2]');

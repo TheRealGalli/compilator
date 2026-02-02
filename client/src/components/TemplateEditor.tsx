@@ -149,11 +149,15 @@ export function TemplateEditor({
           line-height: 2 !important; 
         }
         
-        /* Dark Mode Specific - Force White Titles */
+        /* Dark Mode Specific - Force White Titles & Links */
         .dark .ProseMirror h1, 
         .dark .ProseMirror h2, 
         .dark .ProseMirror h3,
-        .dark .ProseMirror h4 {
+        .dark .ProseMirror h4,
+        .dark .ProseMirror h5,
+        .dark .ProseMirror h6,
+        .dark .ProseMirror a,
+        .dark .ProseMirror strong {
             color: #ffffff !important;
         }
       `}</style>
