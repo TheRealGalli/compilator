@@ -1399,14 +1399,16 @@ ${masterSource ? `
       50
       Base erosion payments
       $0
-  - **CHECKBOX & OPZIONI (CRITICO):**
-    - Se il Master ha caselle [ ] o Yes/No, ricreale FEDELMENTE su righe separate.
-    - **LISTA CHECKBOX (OBBLIGATORIO):** Usa SEMPRE il formato lista puntata `- []` o ` - [x]`.
-    - **NON USARE MAI L'ESCAPE**: Scrivi SEMPRE "- [ ]" o "- [x]". NON scrivere MAI "\\[ \\]" o "\\[x\\]" o senza il trattino iniziale.
-    - Esempio Corretto:
-      - [x] Opzione Selezionata
-      - [ ] Opzione Non Selezionata
-  
+- **GESTIONE CHECKBOX & OPZIONI (CRITICO):**
+  - Se il template o il MASTER contengono checkbox (es. "[ ]", "☐", o punti elenco che fungono da scelta), devi **spuntarli precisamente** in base ai dati trovati nelle fonti.
+  - Usa la notazione standard: **[x]** per opzione selezionata e **[ ]** per opzione non selezionata.
+  - Esempio: Se trovi "Mezzi propri" selezionato nel Master, scrivi **[x] Mezzi propri** nel documento finale.
+  - **LISTA CHECKBOX (OBBLIGATORIO):** Usa SEMPRE il formato lista puntata "- [ ]" o "- [x]".
+  - **NON USARE MAI L'ESCAPE**: Scrivi SEMPRE "- [ ]" o "- [x]". NON scrivere MAI "\\[ \\]" o "\\[x\\]" o senza il trattino iniziale.
+  - Esempio Corretto:
+    - [x] Opzione Selezionata
+    - [ ] Opzione Non Selezionata
+
 - **STRUTTURA DEL CONTENUTO (MASTER PIN RULE):**
   - **DIVIETO DI PAGINE ALLEGATE:** Se c'è un MASTER SOURCE, il tuo output deve essere ESCLUSIVAMENTE la ricreazione di quel documento compilato.
   - **NON AGGIUNGERE** pagine extra, "Appendici", "Note dell'AI", "Riepilogo Fonti" o altro testo alla fine.
