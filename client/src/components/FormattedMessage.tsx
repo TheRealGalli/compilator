@@ -51,8 +51,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
 
         while ((match = linkRegex.exec(text)) !== null) {
             if (match.index > lastIdx) {
-                const textPart = text.substring(lastIdx, match.index);
-                linkParts.push(...renderCheckboxes(textPart, `${baseKey}-prelink-${counter}`));
+                linkParts.push(text.substring(lastIdx, match.index));
             }
 
             const linkText = match[1];
@@ -73,44 +72,10 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         }
 
         if (lastIdx < text.length) {
-            const textPart = text.substring(lastIdx);
-            linkParts.push(...renderCheckboxes(textPart, `${baseKey}-postlink-${counter}`));
+            linkParts.push(text.substring(lastIdx));
         }
 
         return linkParts;
-    };
-
-    // Helper to render checkboxes [x] and [ ] and \[x\] as UI elements
-    const renderCheckboxes = (text: string, baseKey: string) => {
-        const checkboxParts: (string | JSX.Element)[] = [];
-        // Match [x], [ ], \[x\], \[ \] allowing optional backslashes
-        const checkboxRegex = /\\?\[([ xX])\\?\]/g;
-        let lastIdx = 0;
-        let cMatch;
-        let cCounter = 0;
-
-        while ((cMatch = checkboxRegex.exec(text)) !== null) {
-            if (cMatch.index > lastIdx) {
-                checkboxParts.push(text.substring(lastIdx, cMatch.index));
-            }
-            const isChecked = cMatch[1].toLowerCase() === 'x';
-            checkboxParts.push(
-                <span key={`${baseKey}-cb-${cCounter++}`} className="inline-flex items-center mx-1 align-middle">
-                    {isChecked ? (
-                        <span className="w-4 h-4 rounded border border-blue-500 bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold">✓</span>
-                    ) : (
-                        <span className="w-4 h-4 rounded border border-muted-foreground/40 bg-muted/20 flex items-center justify-center" />
-                    )}
-                </span>
-            );
-            lastIdx = cMatch.index + cMatch[0].length;
-        }
-
-        if (lastIdx < text.length) {
-            checkboxParts.push(text.substring(lastIdx));
-        }
-
-        return checkboxParts;
     };
 
     let i = 0;
