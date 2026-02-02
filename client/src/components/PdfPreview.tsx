@@ -86,7 +86,7 @@ export function PdfPreview({
             setBlobUrl(url);
 
             // Also check for XFA technology here to show the tag
-            import('pdf-lib').then(async ({ PDFDocument, PDFName, PDFDict, PDFBool, PDFNumber }) => {
+            import('pdf-lib').then(async ({ PDFDocument, PDFName, PDFDict, PDFBool, PDFNumber, PDFTextField }) => {
                 try {
                     const pdfDoc = await PDFDocument.load(byteNumbers);
 
@@ -136,13 +136,20 @@ export function PdfPreview({
                         try { return (f as any).acroField.getWidgets()?.length > 0; } catch { return true; }
                     });
 
+                    const textFields = fillableFields.filter(f => f instanceof PDFTextField);
+                    const editableTextFieldsCount = textFields.filter(f => {
+                        try { return !f.isReadOnly(); } catch { return true; }
+                    }).length;
+
                     const editableFieldsCount = fillableFields.filter(f => {
                         try { return !f.isReadOnly(); } catch { return true; }
                     }).length;
 
-                    // --- CALIBRATION LOGIC 2.0 ---
-                    // RED (isXfaAdobe = true): Dynamic, Encrypted, Signed, or All Fields are Read-Only
-                    if (isDynamic || pdfDoc.isEncrypted || isSigned || hasSignatureValue || (fillableFields.length > 0 && editableFieldsCount === 0)) {
+                    // --- CALIBRATION LOGIC 3.0 ---
+                    // RED (isXfaAdobe = true): Dynamic, Encrypted, Signed, or Locked Text Fields (False Orange resolution)
+                    const allTextLocked = textFields.length > 0 && editableTextFieldsCount === 0;
+
+                    if (isDynamic || pdfDoc.isEncrypted || isSigned || hasSignatureValue || allTextLocked || (fillableFields.length > 0 && editableFieldsCount === 0)) {
                         setIsXfaAdobe(true);
                     } else {
                         setIsXfaAdobe(false);

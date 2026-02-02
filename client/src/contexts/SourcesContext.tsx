@@ -80,7 +80,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         let isSigned = false;
         if (extension === 'pdf') {
             try {
-                const { PDFDocument, PDFName } = await import('pdf-lib');
+                const { PDFDocument, PDFName, PDFTextField } = await import('pdf-lib');
                 const arrayBuffer = await file.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
 
@@ -154,14 +154,20 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                     }
                 });
 
+                const textFields = fillableFields.filter(f => f instanceof PDFTextField);
+                const editableTextFieldsCount = textFields.filter(f => {
+                    try { return !f.isReadOnly(); } catch { return true; }
+                }).length;
+
                 const editableFieldsCount = fillableFields.filter(f => {
                     try { return !f.isReadOnly(); } catch { return true; }
                 }).length;
 
-                // --- CALIBRATION LOGIC 2.0 ---
-                // If the document is signed (via flags or fields) or if ALL fields are read-only
-                // it means it's a finalized/locked document -> mark as Red (isXfa = true)
-                if (isSigned || hasSignatureValue || (fillableFields.length > 0 && editableFieldsCount === 0)) {
+                // --- CALIBRATION LOGIC 3.0 ---
+                // If text fields exist but NONE are editable, it's a strongly finalized/locked form (False Orange resolution).
+                const allTextLocked = textFields.length > 0 && editableTextFieldsCount === 0;
+
+                if (isSigned || hasSignatureValue || allTextLocked || (fillableFields.length > 0 && editableFieldsCount === 0)) {
                     isXfa = true;
                 }
 
