@@ -1380,6 +1380,7 @@ ${masterSource ? `
 - **FORMATTAZIONE PROFESSIONALE:**
   - Evita di andare a capo tra i marcatori di grassetto (es. NON scrivere "**\\nTitolo\\n**").
   - Scrivi i titoli e le etichette in modo compatto: "**Titolo**".
+  - **COERENZA STRUTTURALE:** Se il documento MASTER o il template sono divisi in "Parti", "Articoli" o "Sezioni", il documento finale deve riflettere questa divisione in modo netto e professionale. Non accorpare sezioni distinte.
   - Assicurati che il testo sia fluido e professionale, senza interruzioni di riga non necessarie all'interno di blocchi di testo o intestazioni.
 - **SINTESI:** Incrocia i dati delle varie fonti per ottenere un risultato completo.
 

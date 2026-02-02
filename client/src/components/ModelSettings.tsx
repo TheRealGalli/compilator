@@ -221,14 +221,14 @@ export function ModelSettings({
               <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
                 <div className="flex-1">
                   <div className="flex items-center gap-1.5">
-                    <Label className="text-xs font-medium uppercase tracking-tighter opacity-70">
+                    <Label className="text-xs font-medium">
                       Guardrail
                     </Label>
-                    <div className="ml-auto flex gap-1.5">
+                    <div className="ml-auto flex gap-2">
                       {[1, 2, 3, 4, 5].map((i) => (
                         <div
                           key={i}
-                          className="w-5 h-5 rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
+                          className="w-[22px] h-[22px] rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
                         />
                       ))}
                     </div>
@@ -236,19 +236,12 @@ export function ModelSettings({
                 </div>
               </div>
 
-              {/* Guardrail 2 (Empty for Balance) */}
-              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px] opacity-40">
-                <div className="flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label className="text-xs font-medium uppercase tracking-tighter opacity-30">
-                      Guardrail
-                    </Label>
-                  </div>
-                </div>
+              {/* Guardrail 2 (Filler) */}
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
               </div>
 
               {/* Space Filler Card */}
-              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px] opacity-20">
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
               </div>
 
               <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
