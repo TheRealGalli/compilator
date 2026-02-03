@@ -145,7 +145,6 @@ export function ModelSettings({
               exit={{ opacity: 0, y: -10 }}
               className="flex items-center gap-2 text-indigo-700"
             >
-              <Sparkles className="w-4 h-4" />
               <h3 className="text-sm font-semibold">Document Copilot</h3>
             </motion.div>
           ) : (
@@ -168,7 +167,7 @@ export function ModelSettings({
             {/* Note Aggiuntive / Chat Area */}
             <motion.div
               layout
-              animate={{ minHeight: isRefining ? 500 : 180 }}
+              animate={{ minHeight: isRefining ? 500 : 195 }}
               transition={{ duration: 0.5, ease: "easeInOut" }}
               className="flex flex-col flex-1 min-h-0"
             >
