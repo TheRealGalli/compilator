@@ -810,9 +810,10 @@ export function DocumentCompilerSection({
             </Card>
           </div>
         ) : (
-          /* STANDARD COMPILER VIEW with Refine Mode */
-          <div className="grid grid-cols-12 gap-6 h-full"> {/* Changed to h-full */}
-            <div className="col-span-4 h-full flex flex-col">
+          <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+            {/* COLUMN 1: Settings OR Chat (col-span-3) */}
+            <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full flex flex-col overflow-hidden">
               <AnimatePresence mode="wait">
                 {!isRefiningMode ? (
                   <motion.div
@@ -820,37 +821,47 @@ export function DocumentCompilerSection({
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.5 }}
-                    className="h-full"
+                    transition={{ duration: 0.3 }}
+                    className="h-full flex flex-col"
                   >
-                    <ModelSettings
-                      notes={notes}
-                      temperature={temperature}
-                      webResearch={webResearch}
-                      detailedAnalysis={detailedAnalysis}
-                      formalTone={formalTone}
-                      modelProvider={modelProvider}
-                      onNotesChange={setNotes}
-                      onTemperatureChange={setTemperature}
-                      onWebResearchChange={setWebResearch}
-                      onDetailedAnalysisChange={setDetailedAnalysis}
-                      onFormalToneChange={setFormalTone}
-                      onModelProviderChange={setModelProvider}
-                    />
-                    <Button
-                      onClick={() => setIsRefiningMode(true)}
-                      className="mt-4 w-full"
-                      variant="outline"
-                    >
-                      Attiva Co-pilot (Refine Mode)
-                    </Button>
+                    <ScrollArea className="flex-1">
+                      <ModelSettings
+                        notes={notes}
+                        temperature={temperature}
+                        webResearch={webResearch}
+                        detailedAnalysis={detailedAnalysis}
+                        formalTone={formalTone}
+                        modelProvider={modelProvider}
+                        onNotesChange={setNotes}
+                        onTemperatureChange={setTemperature}
+                        onWebResearchChange={setWebResearch}
+                        onDetailedAnalysisChange={setDetailedAnalysis}
+                        onFormalToneChange={setFormalTone}
+                        onModelProviderChange={setModelProvider}
+                      />
+                    </ScrollArea>
+
+                    {/* Trigger for Refine Mode (only if content likely exists) */}
+                    {compiledContent && (
+                      <div className="pt-4 mt-auto">
+                        <Button
+                          onClick={() => setIsRefiningMode(true)}
+                          className="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200"
+                          variant="outline"
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Apri Co-pilot
+                        </Button>
+                      </div>
+                    )}
                   </motion.div>
                 ) : (
                   <motion.div
                     key="chat-panel"
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.2 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
                     className="h-full"
                   >
                     <RefineChat
@@ -863,117 +874,124 @@ export function DocumentCompilerSection({
                       isReviewing={isReviewing}
                       onAccept={handleAcceptRefinement}
                       onReject={handleRejectRefinement}
-                      onClose={() => setIsRefiningMode(false)} // Allow closing refine mode
+                      onClose={() => setIsRefiningMode(false)}
                     />
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
 
-            {/* Right Column: Template Editor */}
-            <div className="col-span-8 h-full flex flex-col">
-              <Card className={`flex-1 flex flex-col shadow-md border-slate-200 overflow-hidden bg-white/80 backdrop-blur-md transition-all duration-300 ${isReviewing ? 'ring-2 ring-blue-500 shadow-blue-100' : ''}`}>
-                <CardHeader className={`py-3 px-5 border-b border-slate-100 flex flex-row items-center justify-between transition-colors duration-300 ${isReviewing ? 'bg-blue-50/80' : 'bg-white/50'}`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg transition-colors ${isReviewing ? 'bg-blue-200 text-blue-700' : 'bg-blue-50 text-blue-600'}`}>
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base font-semibold text-slate-800">
-                        {isReviewing ? "Anteprima Modifica" : "Documento Compilato"}
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        {isReviewing ? "Conferma o annulla le modifiche proposte" : (isRefiningMode ? "Modalità Co-pilot attiva" : "Anteprima e modifica in tempo reale")}
-                      </CardDescription>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {isReviewing ? (
-                      // Review Actions: Accept / Reject
-                      <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 w-8 p-0 rounded-full border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700"
-                          onClick={handleRejectRefinement}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="h-8 w-8 p-0 rounded-full bg-green-600 hover:bg-green-700 text-white shadow-sm"
-                          onClick={handleAcceptRefinement}
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      // Standard Actions
-                      <div className="flex items-center gap-2 animate-in fade-in duration-300">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600" onClick={handleDownload}>
-                          <Download className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600" onClick={handleCopy}>
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 p-0 overflow-hidden relative">
-                  <TemplateEditor
-                    key={isReviewing && pendingContent ? 'pending' : (compiledContent ? 'compiled' : 'empty')}
-                    value={isReviewing && pendingContent ? pendingContent : compiledContent}
-                    onChange={isReviewing ? setPendingContent : setCompiledContent} // Allow edits even in preview? Yes, why not.
-                    title={isCompiledView ? "Template Compilato" : "Template da Compilare"} // Re-using existing title logic
-                    placeholder="Il documento compilato apparirà qui..."
-                  //    readOnly={false}
-                  />
-
-                  {/* Overlay for "Review Mode" to indicate it's pending? Maybe subtle border is enough. */}
-                </CardContent>
-              </Card>
+            {/* COLUMN 2: Template Editor (col-span-5) */}
+            <div className="lg:col-span-5 min-h-[400px] lg:min-h-0 lg:h-full overflow-hidden">
+              <TemplateEditor
+                key="template-editor"
+                value={templateContent}
+                onChange={(val) => {
+                  setTemplateContent(val);
+                  // If we are strictly just compiling, we might not auto-update compiledContent until compile is hit.
+                  // But previously `isCompiledView` logic linked them.
+                  // For now, standard behavior: Input.
+                }}
+                title="Template da Compilare"
+                placeholder="Inserisci qui il testo o il template..."
+              />
             </div>
+
+            {/* COLUMN 3: Compiled Output (col-span-4) */}
+            <div className="lg:col-span-4 min-h-[400px] lg:min-h-0 lg:h-full overflow-hidden flex flex-col">
+              {isReviewing ? (
+                // REVIEW MODE CARD
+                <Card className="flex-1 flex flex-col shadow-lg border-blue-200 bg-blue-50/10 overflow-hidden ring-2 ring-blue-500/20">
+                  <CardHeader className="py-3 px-4 border-b border-blue-100 bg-blue-50/50 flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-blue-100 text-blue-600 rounded-md">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-sm font-semibold text-blue-900">Anteprima Modifica</CardTitle>
+                        <CardDescription className="text-xs text-blue-700">Conferma per applicare</CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 w-7 p-0 rounded-full border-red-200 bg-white text-red-600 hover:bg-red-50"
+                        onClick={handleRejectRefinement}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 w-7 p-0 rounded-full bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                        onClick={handleAcceptRefinement}
+                      >
+                        <Check className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-1 p-0 overflow-hidden relative bg-white">
+                    <div className="absolute inset-0 overflow-auto p-4 prose prose-sm max-w-none">
+                      {/* Simple preview of markdown for now, or reuse a readonly editor/renderer */}
+                      {/* We can reuse CompiledOutput but force content */}
+                      <CompiledOutput
+                        content={pendingContent || ""}
+                        onCopy={() => { }}
+                        onDownload={() => { }}
+                        readOnly={true} // Assuming it supports this or just hides controls
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                // STANDARD COMPILED OUTPUT
+                <CompiledOutput
+                  content={compiledContent}
+                  onCopy={handleCopy}
+                  onDownload={handleDownload}
+                />
+              )}
+            </div>
+
           </div>
         )}
-      </div>
 
-      {/* Template Generation Modal */}
-      <Dialog open={isGenerateModalOpen} onOpenChange={setIsGenerateModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span className="text-xl">✏️</span>
-              Genera Template con AI
-            </DialogTitle>
-            <DialogDescription>
-              Descrivi il tipo di documento che ti serve. L'AI genererà uno scheletro pronto con i placeholder corretti.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <Textarea
-              placeholder="Es: Verbale di riunione del consiglio di amministrazione, formale, con elenco partecipanti e deliberazioni..."
-              value={generatePrompt}
-              onChange={(e) => setGeneratePrompt(e.target.value)}
-              className="min-h-[120px]"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsGenerateModalOpen(false)}>
-              Annulla
-            </Button>
-            <Button
-              onClick={handleGenerateTemplate}
-              disabled={!generatePrompt.trim() || isGeneratingTemplate}
-              className="bg-indigo-600 hover:bg-indigo-700"
-            >
-              <Asterisk className={`mr-2 h-4 w-4 text-white ${isGeneratingTemplate ? 'animate-turbo-spin' : ''}`} />
-              {isGeneratingTemplate ? "Generazione..." : "Genera Template"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Template Generation Modal */}
+        <Dialog open={isGenerateModalOpen} onOpenChange={setIsGenerateModalOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <span className="text-xl">✏️</span>
+                Genera Template con AI
+              </DialogTitle>
+              <DialogDescription>
+                Descrivi il tipo di documento che ti serve. L'AI genererà uno scheletro pronto con i placeholder corretti.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <Textarea
+                placeholder="Es: Verbale di riunione del consiglio di amministrazione, formale, con elenco partecipanti e deliberazioni..."
+                value={generatePrompt}
+                onChange={(e) => setGeneratePrompt(e.target.value)}
+                className="min-h-[120px]"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsGenerateModalOpen(false)}>
+                Annulla
+              </Button>
+              <Button
+                onClick={handleGenerateTemplate}
+                disabled={!generatePrompt.trim() || isGeneratingTemplate}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                <Asterisk className={`mr-2 h-4 w-4 text-white ${isGeneratingTemplate ? 'animate-turbo-spin' : ''}`} />
+                {isGeneratingTemplate ? "Generazione..." : "Genera Template"}
+              </Button>
+            </DialogFooter>
+          </DialogContent >
+        </Dialog>
+      </div>
     </div>
   );
 }

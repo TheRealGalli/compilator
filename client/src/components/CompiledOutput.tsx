@@ -7,33 +7,38 @@ interface CompiledOutputProps {
   content: string;
   onCopy: () => void;
   onDownload: () => void;
+  readOnly?: boolean;
 }
 
-export function CompiledOutput({ content, onCopy, onDownload }: CompiledOutputProps) {
+export function CompiledOutput({ content, onCopy, onDownload, readOnly = false }: CompiledOutputProps) {
   return (
     <Card className="h-full flex flex-col min-h-0">
       <CardHeader className="flex-shrink-0 pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Documento Compilato</CardTitle>
           <div className="flex gap-2">
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={onCopy}
-              disabled={!content}
-              data-testid="button-copy-compiled"
-            >
-              <Copy className="w-4 h-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={onDownload}
-              disabled={!content}
-              data-testid="button-download-compiled"
-            >
-              <Download className="w-4 h-4" />
-            </Button>
+            {!readOnly && (
+              <>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={onCopy}
+                  disabled={!content}
+                  data-testid="button-copy-compiled"
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={onDownload}
+                  disabled={!content}
+                  data-testid="button-download-compiled"
+                >
+                  <Download className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </CardHeader>
