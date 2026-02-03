@@ -1285,54 +1285,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  app.post('/api/compile', async (req: Request, res: Response) => {
-    try {
-      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations } = req.body;
 
-      console.log('[API compile] Request received:', {
-        modelProvider,
-        sourcesCount: multimodalFiles?.length,
-        notesLength: notes?.length,
-        webResearch,
-        detailedAnalysis
-      });
+  // --- Helper: Build System Prompt (Shared between Compile and Refine) ---
+  const buildSystemPrompt = (ctx: any) => {
+    const { dateTimeIT, hasMemory, extractedFields, manualAnnotations, masterSource, detailedAnalysis, webResearch, multimodalFiles, fetchedCompilerContext, hasExternalSources } = ctx;
 
-      // Get current datetime in Italian format
-      const now = new Date();
-      const dateTimeIT = now.toLocaleString('it-IT', {
-        timeZone: 'Europe/Rome',
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-      // --- URL FETCHING LOGIC ---
-      let fetchedCompilerContext = '';
-      if (webResearch && notes) {
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
-        const urls = notes.match(urlRegex);
-        if (urls && urls.length > 0) {
-          console.log(`[DEBUG Compile] Found URLs in notes: ${urls.join(', ')}`);
-          for (const url of urls) {
-            const content = await fetchUrlContent(url);
-            if (content) {
-              fetchedCompilerContext += `\n--- FONTE WEB ESTERNA (${url}) ---\n${content}\n--- FINE FONTE WEB ---\n`;
-            }
-          }
-        }
-      }
-
-      const hasExternalSources = fetchedCompilerContext.length > 0;
-      let compileTextContext = fetchedCompilerContext;
-
-      // Check for memory file
-      const hasMemory = multimodalFiles?.some((s: any) => s.isMemory);
-
-      // Build System Prompt
-      let systemPrompt = `Data e ora corrente: ${dateTimeIT}
+    return `Data e ora corrente: ${dateTimeIT}
 
 Sei un assistente AI esperto nella compilazione di documenti.
 
@@ -1429,6 +1387,64 @@ ${(multimodalFiles.length > 0 || masterSource || hasExternalSources) ? `
 Hai accesso a ${multimodalFiles.length + (masterSource ? 1 : 0) + (hasExternalSources ? 1 : 0)} fonti.
 ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo basandoti sulle Note o rifiuta la compilazione.'}
 `;
+  };
+
+  app.post('/api/compile', async (req: Request, res: Response) => {
+    try {
+      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations } = req.body;
+
+      console.log('[API compile] Request received:', {
+        modelProvider,
+        sourcesCount: multimodalFiles?.length,
+        notesLength: notes?.length,
+        webResearch,
+        detailedAnalysis
+      });
+
+      // Get current datetime in Italian format
+      const now = new Date();
+      const dateTimeIT = now.toLocaleString('it-IT', {
+        timeZone: 'Europe/Rome',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // --- URL FETCHING LOGIC ---
+      let fetchedCompilerContext = '';
+      if (webResearch && notes) {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const urls = notes.match(urlRegex);
+        if (urls && urls.length > 0) {
+          console.log(`[DEBUG Compile] Found URLs in notes: ${urls.join(', ')}`);
+          for (const url of urls) {
+            const content = await fetchUrlContent(url);
+            if (content) {
+              fetchedCompilerContext += `\n--- FONTE WEB ESTERNA (${url}) ---\n${content}\n--- FINE FONTE WEB ---\n`;
+            }
+          }
+        }
+      }
+
+      const hasExternalSources = fetchedCompilerContext.length > 0;
+      // Check for memory file
+      const hasMemory = multimodalFiles?.some((s: any) => s.isMemory);
+
+      const systemPrompt = buildSystemPrompt({
+        dateTimeIT,
+        hasMemory,
+        extractedFields,
+        manualAnnotations,
+        masterSource,
+        detailedAnalysis,
+        webResearch,
+        multimodalFiles,
+        fetchedCompilerContext,
+        hasExternalSources
+      });
 
       // Build User Prompt
       const userPrompt = template ? `Compila il seguente template:
@@ -1475,9 +1491,21 @@ ISTRUZIONI OUTPUT:
 
       console.log('[DEBUG Compile] AI Compilation complete.');
 
+      // Extra: Since the user wants an "explanation" even in the first pass (implied by "dopo l'invio della prima compilazione"),
+      // we could generate it here, but typically we want the document first.
+      // The user said: "La sezione degli strumenti... diventa una mini chat che ti da tutti gli avvertimenti".
+      // We might want to generate this metadata here or in a parallel step.
+      // For now, let's stick to returning just content to avoid breaking existing frontend expectations,
+      // and let the frontend trigger a "Review" call or just assume "Done" until user asks something.
+      // Actually, the user asked for: "dopo la prima compilazione... diventa una mini chat che ti da tutti gli avvertimenti".
+      // This implies the AI should return metadata about the compilation.
+      // IF I change the return type, I might break frontend.
+      // Strategy: Keep this as string for now. The "warnings" can be generated by the FIRST call to /api/refine (passing the document) or we can just say "Document compiled" and wait for user input.
+
       res.json({
         success: true,
-        compiledContent: finalContent
+        compiledContent: finalContent,
+        fetchedCompilerContext // Return this context so frontend can pass it back to refine!
       });
 
     } catch (error: any) {
@@ -1487,6 +1515,105 @@ ISTRUZIONI OUTPUT:
       });
     }
   });
+
+  // --- NEW: Refine / Chat Endpoint ---
+  app.post('/api/refine', async (req: Request, res: Response) => {
+    try {
+      const { compileContext, currentContent, userInstruction, chatHistory } = req.body;
+
+      console.log('[API refine] Request received');
+
+      // Reconstruct Context
+      const multimodalFiles = compileContext.sources || [];
+      const masterSource = compileContext.masterSource;
+      const notes = compileContext.notes;
+      const hasMemory = multimodalFiles?.some((s: any) => s.isMemory);
+      // We use the fetched context passed from frontend to avoid re-fetching
+      const fetchedCompilerContext = compileContext.fetchedCompilerContext || '';
+      const hasExternalSources = fetchedCompilerContext.length > 0;
+
+      const now = new Date();
+      const dateTimeIT = now.toLocaleString('it-IT', { timeZone: 'Europe/Rome', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+      const systemPrompt = buildSystemPrompt({
+        dateTimeIT,
+        hasMemory,
+        extractedFields: compileContext.extractedFields,
+        manualAnnotations: compileContext.manualAnnotations,
+        masterSource,
+        detailedAnalysis: compileContext.detailedAnalysis,
+        webResearch: compileContext.webResearch,
+        multimodalFiles,
+        fetchedCompilerContext,
+        hasExternalSources
+      });
+
+      const refineInstructions = `
+*** MODALITÀ RAFFINAMENTO / CHAT ATTIVA ***
+Hai già compilato una prima bozza del documento. Ora l'utente vuole discuterne o modificarlo.
+
+DOC:
+"""
+${currentContent}
+"""
+
+STORICO CHAT:
+${chatHistory.map((m: any) => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
+
+UTENTE: "${userInstruction}"
+
+ISTRUZIONI:
+1. Se l'utente chiede una modifica al testo:
+   - Riscrivi IL DOCUMENTO COMPLETO applicando la modifica.
+   - Restituisci JSON: { "newContent": "TESTO COMPLETO AGGIORNATO...", "explanation": "Ho modificato..." }
+2. Se l'utente fa solo una domanda (senza chiedere modifiche):
+   - Restituisci JSON: { "newContent": null, "explanation": "Risposta alla domanda..." }
+
+IMPORTANTE:
+- Quando restituisci "newContent", DEVE ESSERE IL DOCUMENTO INTERO PRONTO PER L'EDITOR (Markdown), non solo uno snippet.
+- Mantieni lo stile e la formattazione (grassetto, checkbox) come definito nel System Prompt originale.
+- Rispondi sempre in JSON valido.
+`;
+
+      // Call AI
+      // Note: We're overloading userPrompt with the refine instructions to ensure it's seen as the latest task.
+      // Or we append to systemPrompt. Appending to system is stronger for rules.
+
+      const { content: jsonResponse } = await aiService.compileDocument({
+        systemPrompt: systemPrompt + refineInstructions,
+        userPrompt: "Analizza la richiesta e rispondi in JSON.",
+        multimodalFiles: multimodalFiles || [],
+        masterSource: masterSource || null,
+        preProcessedParts: [] // Assume text-based context is sufficient or re-process if critical.
+        // For speed/cost in chat, maybe skipping full re-OCR is better if we have the text?
+        // But the prompt relies on "documenti allegati".
+        // Let's pass empty preProcessedParts but provide the files in multimodalFiles so AiService handles them if checks pass.
+      });
+
+      // Parse JSON safely
+      let parsed;
+      try {
+        // Strip markdown code blocks if present ```json ... ```
+        const cleanJson = jsonResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+        parsed = JSON.parse(cleanJson);
+      } catch (e) {
+        console.error("Failed to parse JSON from AI", jsonResponse);
+        // Fallback: assume text is explanation if no new content, or just fail gracefully
+        parsed = { newContent: null, explanation: jsonResponse };
+      }
+
+      res.json({
+        success: true,
+        newContent: parsed.newContent,
+        explanation: parsed.explanation
+      });
+
+    } catch (error: any) {
+      console.error('Errore durante refine:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
 
 
 
