@@ -167,7 +167,7 @@ export function ModelSettings({
             {/* Note Aggiuntive / Chat Area */}
             <motion.div
               layout
-              animate={{ minHeight: isRefining ? "100%" : 195 }}
+              animate={{ minHeight: isRefining ? 550 : 195 }}
               transition={{ duration: 0.5, ease: "easeInOut" }}
               className="flex flex-col flex-1 min-h-0"
             >
