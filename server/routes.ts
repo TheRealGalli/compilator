@@ -1369,7 +1369,7 @@ ${manualAnnotations && manualAnnotations.length > 0 ? `
 ${masterSource ? `
 4. **MASTER SOURCE (Spunta Blu) - Fonte Primaria di Dati e Stile:**
    Il documento "${masterSource.name}" è contrassegnato come MASTER.
-   - **DATI:** Estrai con priorità massima ogni informazione utile (nomi, date, importi) da questo documento. Se il Master dice "Dott. Carlo Galli", NON scrivere "[DATO MANCANTE]".
+   - **DATI:** Estrai con priorità massima ogni informazione utile (nomi, date, importi) da questo documento. Se il Master dice per esempio "Dott. Carlo Galli", NON scrivere "[DATO MANCANTE]".
    - **STILE:** Usa questo documento come riferimento per lo STILE e il LAYOUT del documento finale.
 ` : ''}
 
