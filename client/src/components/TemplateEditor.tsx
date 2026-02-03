@@ -17,6 +17,28 @@ interface TemplateEditorProps {
   title?: string;
 }
 
+// Helper to escape markdown characters so they appear as literals in Tiptap
+const escapeMarkdown = (text: string) => {
+  if (!text) return "";
+  // Escape *, _, [, ] to prevent them from being parsed as formatting
+  // We strictly target characters the user wants to see: ** for bold, [ ] for checkbox
+  return text
+    .replace(/(\*)/g, '\\$1')
+    .replace(/(\[)/g, '\\$1')
+    .replace(/(\])/g, '\\$1');
+  // Note: We don't escape _ yet unless requested, to minimize noise. 
+  // User specifically asked for ** and checkboxes.
+};
+
+const unescapeMarkdown = (text: string) => {
+  if (!text) return "";
+  // Revert the escaping to get back raw markdown
+  return text
+    .replace(/\\(\*)/g, '$1')
+    .replace(/\\(\[)/g, '$1')
+    .replace(/\\(\])/g, '$1');
+};
+
 export function TemplateEditor({
   value = "",
   onChange,
@@ -28,14 +50,14 @@ export function TemplateEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: false, // Show # Title as text
-        bold: false,    // Show **text** as text
-        italic: false,  // Show *text* as text
-        strike: false,  // Show ~~text~~ as text
-        code: false,    // Show `code` as text
-        blockquote: false, // Show > quote as text
-        bulletList: false, // Show - item as text
-        orderedList: false, // Show 1. item as text
+        heading: false,
+        bold: false,
+        italic: false,
+        strike: false,
+        code: false,
+        blockquote: false,
+        bulletList: false,
+        orderedList: false,
         listItem: false,
         codeBlock: false,
         horizontalRule: false,
@@ -46,9 +68,8 @@ export function TemplateEditor({
       TableRow,
       TableHeader,
       TableCell,
-      // TaskList and TaskItem removed to show raw [ ] checkboxes
       Markdown.configure({
-        html: false, // Force markdown output
+        html: false,
         transformPastedText: true,
         transformCopiedText: true,
       }),
@@ -56,7 +77,7 @@ export function TemplateEditor({
         placeholder: placeholder,
       }),
     ],
-    content: value,
+    content: escapeMarkdown(value), // Initialize with escaped content
     editorProps: {
       attributes: {
         class: 'prose prose-sm dark:prose-invert max-w-none h-full focus:outline-none p-8 text-sm leading-loose tracking-wide font-normal text-foreground/90 font-mono',
@@ -64,14 +85,21 @@ export function TemplateEditor({
     },
     onUpdate: ({ editor }) => {
       const markdown = (editor.storage as any).markdown.getMarkdown();
-      onChange?.(markdown);
+      // Unescape before sending back to parent
+      onChange?.(unescapeMarkdown(markdown));
     },
   });
 
-  // Sync external value changes to editor (e.g. when template is selected)
+  // Sync external value changes to editor
   useEffect(() => {
-    if (editor && value !== (editor.storage as any).markdown.getMarkdown()) {
-      editor.commands.setContent(value);
+    if (editor) {
+      const currentRaw = unescapeMarkdown((editor.storage as any).markdown.getMarkdown());
+      if (value !== currentRaw) {
+        // Only update if genuinely different to avoid cursor jumps
+        // Note: Cursor jumps might still happen if we transform. 
+        // Ideally we only update if *remote* change.
+        editor.commands.setContent(escapeMarkdown(value));
+      }
     }
   }, [value, editor]);
 
@@ -90,6 +118,7 @@ export function TemplateEditor({
           margin: 0;
           overflow: hidden;
         }
+        /* ... existing styles ... */
         .ProseMirror td,
         .ProseMirror th {
           min-width: 1em;
@@ -112,21 +141,7 @@ export function TemplateEditor({
           background: rgba(200, 200, 255, 0.4);
           pointer-events: none;
         }
-        /* Checkbox / TaskList Styles */
-        .ProseMirror ul[data-type="taskList"] {
-          list-style: none;
-          padding: 0;
-        }
-        .ProseMirror li[data-type="taskItem"] {
-          display: flex;
-          align-items: flex-start;
-          margin-bottom: 0.5rem;
-        }
-        .ProseMirror li[data-type="taskItem"] > label {
-          margin-right: 0.5rem;
-          user-select: none;
-          margin-top: 0.35rem; /* Align checkbox with text */
-        }
+        /* Checkbox / TaskList Styles - Keep purely CSS if needed, but we rely on text [ ] now */
         
         /* Placeholder */
         .ProseMirror p.is-editor-empty:first-child::before {
@@ -137,7 +152,7 @@ export function TemplateEditor({
           pointer-events: none;
         }
         
-        /* Dark Mode Specific Overrides if prose-invert isn't enough */
+        /* ... styles ... */
         .dark .ProseMirror h1, 
         .dark .ProseMirror h2, 
         .dark .ProseMirror h3,
@@ -145,7 +160,6 @@ export function TemplateEditor({
             color: hsl(var(--foreground));
         }
         
-        /* Force Text Color & Size (Aggressive Override) */
         .ProseMirror p, 
         .ProseMirror span, 
         .ProseMirror div,
@@ -153,11 +167,10 @@ export function TemplateEditor({
         .ProseMirror td,
         .ProseMirror th {
           color: hsl(var(--foreground)) !important;
-          font-size: 13px !important; /* Smaller than text-sm */
+          font-size: 13px !important;
           line-height: 2 !important; 
         }
         
-        /* Dark Mode Specific - Force White Titles & Links */
         .dark .ProseMirror h1, 
         .dark .ProseMirror h2, 
         .dark .ProseMirror h3,
