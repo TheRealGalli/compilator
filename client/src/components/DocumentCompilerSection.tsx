@@ -369,11 +369,15 @@ export function DocumentCompilerSection({
       });
 
       const data = await response.json();
+      console.log("DEBUG: Raw Compiled Content from API:", data.compiledContent);
+
       if (data.compiledContent) {
         // Sanitize escaped brackets (Super Robust: handles multiple escapes & spaces)
         let sanitizedContent = data.compiledContent
           .replace(/\\+\s*\[/g, '[')
-          .replace(/\\+\s*\]/g, ']');
+          .replace(/\\+\s*\]/g, ']')
+          .replace(/\\-/g, '-') // Handle escaped dashes
+          .replace(/\\\*/g, '*'); // Handle escaped asterisks
 
         // Force checkboxes to be list items for Tiptap (replace "^[ ]" with "- [ ]")
         sanitizedContent = sanitizedContent.replace(/^(\s*)\[([ xX])\]/gm, '$1- [$2]');

@@ -1395,16 +1395,14 @@ ${masterSource ? `
       50
       Base erosion payments
       $0
-- **GESTIONE CHECKBOX & OPZIONI (CRITICO - ZERO ESCAPE):**
-  - Se il template o il MASTER contengono checkbox (es. "[ ]", "☐", o punti elenco che fungono da scelta), devi **spuntarli precisamente**.
-  - **SINTASSI TASSATIVA**: Usa SEMPRE la lista puntata Markdown:
-    - **- [x] Opzione Selezionata**
-    - **- [ ] Opzione Non Selezionata**
-  - **DIVIETO ASSOLUTO DI ESCAPE**: 
-    - È SEVERAMENTE VIETATO inserire backslash davanti alle parentesi.
-    - **ERRORE GRAVE**: "\\[ ]", "\\[x\\]", "\\ [ ]"
-    - **CORRETTO**: "[ ]", "[x]"
-  - Il tuo output DEVE essere renderizzabile direttamente in Markdown senza cleanup. Se inserisci "\\", rompi il rendering.
+- **GESTIONE CHECKBOX (CRITICO):**
+  - Usa ESCLUSIVAMENTE la sintassi standard Markdown per le checkbox:
+    - \`[ ]\` per non selezionato
+    - \`[x]\` per selezionato
+  - NON usare MAI il carattere backslash \`\\\` prima delle parentesi quadre.
+  - Esempio corretto: \`- [x] Opzione\`
+  - Esempio ERRORE: \`- \\[x\\] Opzione\`
+  - Il tuo output deve essere codice Markdown puro e valido.
 
 - **STRUTTURA DEL CONTENUTO (MASTER PIN RULE):**
   - **DIVIETO DI PAGINE ALLEGATE:** Se c'è un MASTER SOURCE, il tuo output deve essere ESCLUSIVAMENTE la ricreazione di quel documento compilato.

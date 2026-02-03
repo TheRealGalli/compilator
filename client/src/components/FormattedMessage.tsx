@@ -5,7 +5,11 @@ interface FormattedMessageProps {
     className?: string;
 }
 
+
+
 export function FormattedMessage({ content, className = '' }: FormattedMessageProps) {
+    if (!content) return null;
+
     const lines = content.split('\n');
     const elements: JSX.Element[] = [];
 
