@@ -306,23 +306,30 @@ export function ModelSettings({
               )}
             </AnimatePresence>
 
-            {/* Modello Indicator (Pushed to bottom by flex-1 notes) */}
-            {!isRefining && (
-              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card mt-auto">
-                <div className="flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
-                      Modello
-                    </Label>
-                    <div className="ml-auto">
-                      <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
-                        Gemini 2.5 Flash
+            {/* Modello Indicator (Animated Exit) */}
+            <AnimatePresence>
+              {!isRefining && (
+                <motion.div
+                  initial={{ opacity: 1, height: 'auto', marginTop: 'auto' }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0, overflow: 'hidden' }}
+                  transition={{ duration: 0.3 }}
+                  className="flex items-center justify-between p-1.5 rounded-lg border bg-card"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
+                        Modello
+                      </Label>
+                      <div className="ml-auto">
+                        <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
+                          Gemini 2.5 Flash
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </ScrollArea>
       </div>
