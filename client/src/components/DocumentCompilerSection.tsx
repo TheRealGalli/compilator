@@ -814,7 +814,7 @@ export function DocumentCompilerSection({
           <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
 
             {/* COLUMN 1: Settings OR Chat (col-span-3) */}
-            <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full flex flex-col overflow-hidden">
+            <div className="lg:col-span-3 min-h-[400px] lg:min-h-[600px] lg:h-full flex flex-col overflow-hidden">
               <ModelSettings
                 notes={notes}
                 temperature={temperature}
@@ -848,7 +848,7 @@ export function DocumentCompilerSection({
             </div>
 
             {/* COLUMN 2: Template Editor (col-span-5) */}
-            <div className="lg:col-span-5 min-h-[400px] lg:min-h-0 lg:h-full overflow-hidden">
+            <div className="lg:col-span-5 min-h-[400px] lg:min-h-[600px] lg:h-full overflow-hidden">
               <TemplateEditor
                 key="template-editor"
                 value={templateContent}
@@ -864,7 +864,7 @@ export function DocumentCompilerSection({
             </div>
 
             {/* COLUMN 3: Compiled Output (col-span-4) */}
-            <div className="lg:col-span-4 min-h-[400px] lg:min-h-0 lg:h-full overflow-hidden flex flex-col">
+            <div className="lg:col-span-4 min-h-[400px] lg:min-h-[600px] lg:h-full overflow-hidden flex flex-col">
               {isReviewing ? (
                 // REVIEW MODE CARD
                 <Card className="flex-1 flex flex-col shadow-lg border-blue-200 bg-blue-50/10 overflow-hidden ring-2 ring-blue-500/20">
