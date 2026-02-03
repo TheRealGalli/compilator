@@ -489,10 +489,11 @@ export function DocumentCompilerSection({
 
       // Helper to strip markdown escapes for DOCX (e.g. \# -> #, \[ -> [)
       const unescapeMarkdown = (text: string) => {
+        if (!text) return "";
         return text.replace(/\\([#*_\[\]\-|])/g, '$1');
       };
 
-      const lines = compiledContent.split('\n');
+      const lines = compiledContent ? compiledContent.split('\n') : [];
       const docChildren: any[] = [];
 
       for (let i = 0; i < lines.length; i++) {
