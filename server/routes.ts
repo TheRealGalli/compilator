@@ -1373,10 +1373,6 @@ ${masterSource ? `
    - **STILE:** Usa questo documento come riferimento per lo STILE e il LAYOUT del documento finale.
 ` : ''}
 
-- **GESTIONE CHECKBOX:**
-  - Se il template o il MASTER contengono checkbox (es. "[ ]", "☐", o punti elenco che fungono da scelta), devi **spuntarli precisamente** in base ai dati trovati nelle fonti.
-  - Usa la notazione standard: **[x]** per opzione selezionata e **[ ]** per opzione non selezionata.
-  - Esempio: Se trovi "Mezzi propri" selezionato nel Master, scrivi **[x] Mezzi propri** nel documento finale.
 
 - **FORMATTAZIONE PROFESSIONALE & TITOLI:**
   - **TITOLI (IMPORTANTE):** I titoli e le intestazioni DEVONO essere su una riga separata, circondati da righe vuote.
@@ -1400,14 +1396,14 @@ ${masterSource ? `
       Base erosion payments
       $0
 - **GESTIONE CHECKBOX & OPZIONI (CRITICO):**
-  - Se il template o il MASTER contengono checkbox (es. "[ ]", "☐", o punti elenco che fungono da scelta), devi **spuntarli precisamente** in base ai dati trovati nelle fonti.
-  - Usa la notazione standard: **[x]** per opzione selezionata e **[ ]** per opzione non selezionata.
-  - Esempio: Se trovi "Mezzi propri" selezionato nel Master, scrivi **[x] Mezzi propri** nel documento finale.
-  - **LISTA CHECKBOX (OBBLIGATORIO):** Usa SEMPRE il formato lista puntata "- [ ]" o "- [x]".
-  - **NON USARE MAI L'ESCAPE**: Scrivi SEMPRE "- [ ]" o "- [x]". NON scrivere MAI "\\[ \\]" o "\\[x\\]" o senza il trattino iniziale.
-  - Esempio Corretto:
-    - [x] Opzione Selezionata
-    - [ ] Opzione Non Selezionata
+  - Se il template o il MASTER contengono checkbox (es. "[ ]", "☐", o punti elenco che fungono da scelta), devi **spuntarli precisamente**.
+  - **SINTASSI TASSATIVA**: Usa SEMPRE la lista puntata Markdown:
+    - **- [x] Opzione Selezionata**
+    - **- [ ] Opzione Non Selezionata**
+  - **DIVIETO DI ESCAPE**: NON inserire MAI caratteri di escape (backslash "\\") prima delle parentesi.
+    - ERRORE: "\\[x\\]" o "\\[ \\]"
+    - CORRETTO: "[x]" o "[ ]"
+  - Se l'opzione è "Mezzi propri", scrivi: "- [x] Mezzi propri".
 
 - **STRUTTURA DEL CONTENUTO (MASTER PIN RULE):**
   - **DIVIETO DI PAGINE ALLEGATE:** Se c'è un MASTER SOURCE, il tuo output deve essere ESCLUSIVAMENTE la ricreazione di quel documento compilato.
