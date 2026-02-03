@@ -20,7 +20,7 @@ interface TemplateEditorProps {
 export function TemplateEditor({
   value = "",
   onChange,
-  placeholder = "Seleziona un template preimpostato o incolla qui il tuo modello...",
+  placeholder = "Seleziona un template preimpostato o incolla qui il tuo modello...\n\nIstruzioni Formattazione:\n# Titolo\n**Grassetto**\n[ ] Checkbox vuota\n[x] Checkbox selezionata",
   className = "",
   title = "Template da Compilare"
 }: TemplateEditorProps) {
