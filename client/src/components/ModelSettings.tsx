@@ -168,6 +168,8 @@ export function ModelSettings({
             {/* Note Aggiuntive / Chat Area */}
             <motion.div
               layout
+              animate={{ minHeight: isRefining ? 500 : 180 }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
               className="flex flex-col flex-1 min-h-0"
             >
               <div className="flex items-center justify-between mb-1">
@@ -195,25 +197,39 @@ export function ModelSettings({
                 )}
               </div>
 
-              {isRefining ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex-1 flex flex-col min-h-0"
-                >
-                  {chatInterface}
-                </motion.div>
-              ) : (
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => onNotesChange?.(e.target.value)}
-                  placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
-                  className="flex-1 text-xs resize-none min-h-[250px]"
-                  data-testid="textarea-notes"
-                  disabled={isRecording || isTranscribing}
-                />
-              )}
+              <AnimatePresence mode="wait">
+                {isRefining ? (
+                  <motion.div
+                    key="chat-interface"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="flex-1 flex flex-col min-h-0"
+                  >
+                    {chatInterface}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="textarea-notes"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="flex-1 flex flex-col min-h-0"
+                  >
+                    <Textarea
+                      id="notes"
+                      value={notes}
+                      onChange={(e) => onNotesChange?.(e.target.value)}
+                      placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
+                      className="flex-1 text-xs resize-none h-full"
+                      data-testid="textarea-notes"
+                      disabled={isRecording || isTranscribing}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
 
             {/* Other Settings (Fade out when refining) */}
