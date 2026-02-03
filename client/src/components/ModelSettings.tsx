@@ -278,7 +278,7 @@ export function ModelSettings({
                       <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
                         <div className="flex-1">
                           <div className="flex items-center gap-1.5">
-                            <Label className="text-xs font-medium cursor-pointer">
+                            <Label className="text-xs font-medium cursor-pointer uppercase">
                               Guardrail
                             </Label>
                             <div className="ml-auto flex gap-3">
@@ -294,11 +294,18 @@ export function ModelSettings({
                       </div>
 
                       {/* Guardrail 2 (Filler) */}
-                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
+                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px] opacity-50">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <Label className="text-xs font-medium uppercase text-muted-foreground">
+                              Guardrail
+                            </Label>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Space Filler Card */}
-                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
+                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px] opacity-20">
                       </div>
                     </div>
                   </div>
