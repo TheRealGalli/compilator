@@ -816,6 +816,7 @@ export function DocumentCompilerSection({
             {/* COLUMN 1: Settings OR Chat (col-span-3) */}
             <div className="lg:col-span-3 min-h-[400px] lg:min-h-[600px] lg:h-full flex flex-col overflow-hidden">
               <ModelSettings
+                className="flex-1"
                 notes={notes}
                 temperature={temperature}
                 webResearch={webResearch}

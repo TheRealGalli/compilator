@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useToast } from "@/hooks/use-toast";
 import { getApiUrl } from "@/lib/api-config";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface ModelSettingsProps {
   notes?: string;
@@ -27,6 +28,7 @@ interface ModelSettingsProps {
   onModelProviderChange?: (value: 'openai' | 'gemini') => void;
   isRefining?: boolean;
   chatInterface?: React.ReactNode;
+  className?: string;
 }
 
 export function ModelSettings({
@@ -43,7 +45,8 @@ export function ModelSettings({
   onFormalToneChange,
   onModelProviderChange,
   isRefining = false,
-  chatInterface
+  chatInterface,
+  className
 }: ModelSettingsProps) {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
@@ -134,7 +137,7 @@ export function ModelSettings({
   };
 
   return (
-    <div className="h-full flex flex-col border rounded-lg bg-background overflow-hidden transition-all duration-500">
+    <div className={cn("h-full flex flex-col border rounded-lg bg-background overflow-hidden transition-all duration-500", className)}>
       <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex items-center gap-2">
         <AnimatePresence mode="wait">
           {isRefining ? (
