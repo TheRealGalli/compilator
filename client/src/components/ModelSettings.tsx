@@ -161,13 +161,13 @@ export function ModelSettings({
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 relative">
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 [&>[data-radix-scroll-area-viewport]]:h-full">
           <div className="p-2 space-y-2 h-full flex flex-col">
 
             {/* Note Aggiuntive / Chat Area */}
             <motion.div
               layout
-              animate={{ minHeight: isRefining ? 550 : 195 }}
+              animate={{ minHeight: isRefining ? "100%" : 195 }}
               transition={{ duration: 0.5, ease: "easeInOut" }}
               className="flex flex-col flex-1 min-h-0"
             >
