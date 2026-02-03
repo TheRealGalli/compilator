@@ -223,7 +223,7 @@ export function ModelSettings({
                       value={notes}
                       onChange={(e) => onNotesChange?.(e.target.value)}
                       placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
-                      className="flex-1 text-xs resize-none min-h-[205px]"
+                      className="flex-1 text-xs resize-none min-h-[200px]"
                       data-testid="textarea-notes"
                       disabled={isRecording || isTranscribing}
                     />
