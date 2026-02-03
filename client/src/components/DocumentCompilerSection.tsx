@@ -1,4 +1,6 @@
-import { Asterisk, FileText, ChevronUp, Wand2, Menu, Type, ChevronDown, Printer, Download } from "lucide-react";
+import { Asterisk, FileText, ChevronUp, Wand2, Menu, Type, ChevronDown, Printer, Download, X, Check, Copy, Settings2, Sparkles, Zap, BookOpen, Scale, Loader2 } from "lucide-react";
+import { RefineChat } from "./RefineChat";
+import { motion, AnimatePresence } from "framer-motion";
 import { ThreeStars } from "@/components/ui/three-stars"; // Gromit Core Branding
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,7 +8,7 @@ import { TemplateEditor } from "./TemplateEditor";
 import { CompiledOutput } from "./CompiledOutput";
 import { PdfPreview } from "./PdfPreview";
 import { ModelSettings } from "./ModelSettings";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -206,6 +208,7 @@ ___________________                    ___________________
 interface DocumentCompilerSectionProps {
   modelProvider?: 'openai' | 'gemini';
   onModelProviderChange?: (value: 'openai' | 'gemini') => void;
+  onCompile?: (content: string) => void;
 }
 
 interface Document {
@@ -215,7 +218,8 @@ interface Document {
 
 export function DocumentCompilerSection({
   modelProvider: initialModelProvider = 'gemini',
-  onModelProviderChange
+  onModelProviderChange,
+  onCompile
 }: DocumentCompilerSectionProps = {}) {
   const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof templates | "">("");
   const [templateContent, setTemplateContent] = useState("");
@@ -241,6 +245,12 @@ export function DocumentCompilerSection({
 
   // PDF Mode
   const [isPdfMode, setIsPdfMode] = useState(false);
+
+  // Refine / Review Mode State
+  const [isRefiningMode, setIsRefiningMode] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [pendingContent, setPendingContent] = useState<string | null>(null);
+  const [lastCompileContext, setLastCompileContext] = useState<any>(null);
 
 
 

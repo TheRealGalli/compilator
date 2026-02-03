@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Loader2, Bot, User, Sparkles } from "lucide-react";
+import { Send, Loader2, Bot, User, Sparkles, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -21,9 +21,10 @@ interface RefineChatProps {
     onAccept: () => void;
     onReject: () => void;
     initialExplanation?: string;
+    onClose?: () => void; // Optional close callback
 }
 
-export function RefineChat({ compileContext, currentContent, onPreview, isReviewing, onAccept, onReject, initialExplanation }: RefineChatProps) {
+export function RefineChat({ compileContext, currentContent, onPreview, isReviewing, onAccept, onReject, initialExplanation, onClose }: RefineChatProps) {
     const [messages, setMessages] = useState<ChatMessage[]>(() => {
         // ... initial state mostly same
         if (initialExplanation) {
@@ -130,16 +131,23 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
             className="flex flex-col h-full bg-slate-50/50 rounded-xl border border-slate-200 overflow-hidden"
         >
             {/* Header */}
-            <div className="p-4 border-b border-slate-200 bg-white/50 backdrop-blur-sm flex items-center gap-2">
-                <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
-                    <Bot className="w-5 h-5" />
+            <div className="p-4 border-b border-slate-200 bg-white/50 backdrop-blur-sm flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                        <Bot className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-slate-800">Document Co-pilot</h3>
+                        <p className="text-xs text-slate-500">
+                            {isReviewing ? "In attesa di conferma..." : "Pronto a modificare"}
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h3 className="font-semibold text-slate-800">Document Co-pilot</h3>
-                    <p className="text-xs text-slate-500">
-                        {isReviewing ? "In attesa di conferma..." : "Pronto a modificare"}
-                    </p>
-                </div>
+                {onClose && (
+                    <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0 rounded-full hover:bg-slate-100">
+                        <X className="w-4 h-4 text-slate-500" />
+                    </Button>
+                )}
             </div>
 
             {/* Chat Area */}
