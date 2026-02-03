@@ -167,9 +167,12 @@ export function ModelSettings({
             {/* Note Aggiuntive / Chat Area */}
             <motion.div
               layout
-              animate={{ minHeight: isRefining ? "100%" : 195 }}
+              animate={{
+                height: isRefining ? "100%" : "auto",
+                minHeight: isRefining ? 0 : 195
+              }}
               transition={{ duration: 0.5, ease: "easeInOut" }}
-              className="flex flex-col flex-1 min-h-0"
+              className={`flex flex-col flex-1 min-h-0 ${isRefining ? 'h-full' : ''}`}
             >
               <div className="flex items-center justify-between mb-1">
                 {!isRefining && <Label htmlFor="notes" className="text-xs font-medium">Note Aggiuntive</Label>}
