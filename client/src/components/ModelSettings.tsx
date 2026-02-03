@@ -168,7 +168,7 @@ export function ModelSettings({
             {/* Note Aggiuntive / Chat Area */}
             <motion.div
               layout
-              className={`flex flex-col ${isRefining ? 'flex-1 min-h-0 h-full' : ''}`}
+              className="flex flex-col flex-1 min-h-0"
             >
               <div className="flex items-center justify-between mb-1">
                 {!isRefining && <Label htmlFor="notes" className="text-xs font-medium">Note Aggiuntive</Label>}
@@ -209,7 +209,7 @@ export function ModelSettings({
                   value={notes}
                   onChange={(e) => onNotesChange?.(e.target.value)}
                   placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
-                  className="min-h-[100px] flex-1 text-xs resize-none"
+                  className="flex-1 text-xs resize-none"
                   data-testid="textarea-notes"
                   disabled={isRecording || isTranscribing}
                 />
@@ -305,28 +305,26 @@ export function ModelSettings({
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-        </ScrollArea>
 
-        {/* Footer: Modello Indicator */}
-        {!isRefining && (
-          <div className="p-2 border-t bg-muted/10 mt-auto">
-            <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
-              <div className="flex-1">
-                <div className="flex items-center gap-1.5">
-                  <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
-                    Modello
-                  </Label>
-                  <div className="ml-auto">
-                    <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
-                      Gemini 2.5 Flash
+            {/* Modello Indicator (Pushed to bottom by flex-1 notes) */}
+            {!isRefining && (
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card mt-auto">
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
+                      Modello
+                    </Label>
+                    <div className="ml-auto">
+                      <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
+                        Gemini 2.5 Flash
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
-        )}
+        </ScrollArea>
       </div>
     </div>
   );
