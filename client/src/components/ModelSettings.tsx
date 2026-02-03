@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -6,10 +6,11 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Info, Mic, Square } from "lucide-react";
+import { Info, Mic, Square, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { getApiUrl } from "@/lib/api-config";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ModelSettingsProps {
   notes?: string;
@@ -24,6 +25,8 @@ interface ModelSettingsProps {
   onDetailedAnalysisChange?: (value: boolean) => void;
   onFormalToneChange?: (value: boolean) => void;
   onModelProviderChange?: (value: 'openai' | 'gemini') => void;
+  isRefining?: boolean;
+  chatInterface?: React.ReactNode;
 }
 
 export function ModelSettings({
@@ -39,6 +42,8 @@ export function ModelSettings({
   onDetailedAnalysisChange,
   onFormalToneChange,
   onModelProviderChange,
+  isRefining = false,
+  chatInterface
 }: ModelSettingsProps) {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
@@ -127,141 +132,196 @@ export function ModelSettings({
       setIsTranscribing(false);
     }
   };
+
   return (
-    <div className="h-full flex flex-col border rounded-lg bg-background overflow-hidden">
-      <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0">
-        <h3 className="text-sm font-medium">Impostazioni Modello</h3>
+    <div className="h-full flex flex-col border rounded-lg bg-background overflow-hidden transition-all duration-500">
+      <div className="border-b px-3 py-3 bg-muted/30 flex-shrink-0 flex items-center gap-2">
+        <AnimatePresence mode="wait">
+          {isRefining ? (
+            <motion.div
+              key="title-copilot"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-center gap-2 text-indigo-700"
+            >
+              <Sparkles className="w-4 h-4" />
+              <h3 className="text-sm font-semibold">Document Copilot</h3>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="title-settings"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <h3 className="text-sm font-medium">Impostazioni Modello</h3>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-2 space-y-3">
-          {/* Note */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="notes" className="text-xs font-medium">Note Aggiuntive</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`h-6 w-6 rounded-full transition-all ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted-foreground hover:text-blue-600 hover:bg-blue-50'}`}
-                      onClick={() => isRecording ? stopRecording() : startRecording()}
-                      disabled={isTranscribing}
-                    >
-                      {isRecording ? <Square className="w-2.5 h-2.5 fill-current" /> : <Mic className="w-3.5 h-3.5" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left">
-                    <p className="text-[10px]">{isRecording ? "Ferma e trascrivi" : "Attiva input vocale"}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => onNotesChange?.(e.target.value)}
-              placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
-              className="min-h-[186px] text-xs resize-none"
-              data-testid="textarea-notes"
-              disabled={isRecording || isTranscribing}
-            />
-          </div>
+      <div className="flex-1 flex flex-col min-h-0 relative">
+        <ScrollArea className="flex-1">
+          <div className="p-3 space-y-4 h-full flex flex-col">
 
-          <Separator />
+            {/* Note Aggiuntive / Chat Area */}
+            <motion.div
+              layout
+              className={`flex flex-col ${isRefining ? 'flex-1 min-h-0 h-full' : ''}`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                {!isRefining && <Label htmlFor="notes" className="text-xs font-medium">Note Aggiuntive</Label>}
 
-          {/* Temperature */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-medium">Creatività</Label>
-            </div>
-            <div className="space-y-1.5">
-              <Slider
-                value={[temperature]}
-                onValueChange={(value) => onTemperatureChange?.(value[0])}
-                min={0}
-                max={1}
-                step={0.1}
-                className="w-full"
-                data-testid="slider-temperature"
-              />
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Preciso</span>
-                <span className="font-medium text-foreground">{temperature.toFixed(1)}</span>
-                <span>Creativo</span>
+                {!isRefining && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-6 w-6 rounded-full transition-all ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted-foreground hover:text-blue-600 hover:bg-blue-50'}`}
+                          onClick={() => isRecording ? stopRecording() : startRecording()}
+                          disabled={isTranscribing}
+                        >
+                          {isRecording ? <Square className="w-2.5 h-2.5 fill-current" /> : <Mic className="w-3.5 h-3.5" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">
+                        <p className="text-[10px]">{isRecording ? "Ferma e trascrivi" : "Attiva input vocale"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
-            </div>
-          </div>
 
-          <Separator />
-
-          {/* Tools */}
-          <div className="space-y-2">
-            <Label className="text-xs font-medium">Strumenti AI</Label>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
-                <div className="flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="web-research" className="text-xs font-medium cursor-pointer">
-                      Web Research
-                    </Label>
-                  </div>
-                </div>
-                <Switch
-                  id="web-research"
-                  checked={webResearch}
-                  onCheckedChange={onWebResearchChange}
-                  data-testid="switch-web-research"
+              {isRefining ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex-1 flex flex-col min-h-0"
+                >
+                  {chatInterface}
+                </motion.div>
+              ) : (
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => onNotesChange?.(e.target.value)}
+                  placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
+                  className="min-h-[186px] text-xs resize-none flex-1"
+                  data-testid="textarea-notes"
+                  disabled={isRecording || isTranscribing}
                 />
-              </div>
+              )}
+            </motion.div>
 
-              {/* Guardrail 1 (Active) */}
-              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
-                <div className="flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label className="text-xs font-medium cursor-pointer">
-                      Guardrail
-                    </Label>
-                    <div className="ml-auto flex gap-3">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div
-                          key={i}
-                          className="w-[24px] h-[24px] rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
-                        />
-                      ))}
+            {/* Other Settings (Fade out when refining) */}
+            <AnimatePresence>
+              {!isRefining && (
+                <motion.div
+                  initial={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <Separator />
+
+                  {/* Temperature */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">Creatività</Label>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Guardrail 2 (Filler) */}
-              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
-              </div>
-
-              {/* Space Filler Card */}
-              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
-              </div>
-
-              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
-                <div className="flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
-                      Modello
-                    </Label>
-                    <div className="ml-auto">
-                      <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
-                        Gemini 2.5 Flash
+                    <div className="space-y-1.5">
+                      <Slider
+                        value={[temperature]}
+                        onValueChange={(value) => onTemperatureChange?.(value[0])}
+                        min={0}
+                        max={1}
+                        step={0.1}
+                        className="w-full"
+                        data-testid="slider-temperature"
+                      />
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Preciso</span>
+                        <span className="font-medium text-foreground">{temperature.toFixed(1)}</span>
+                        <span>Creativo</span>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
+
+                  <Separator />
+
+                  {/* Tools */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium">Strumenti AI</Label>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <Label htmlFor="web-research" className="text-xs font-medium cursor-pointer">
+                              Web Research
+                            </Label>
+                          </div>
+                        </div>
+                        <Switch
+                          id="web-research"
+                          checked={webResearch}
+                          onCheckedChange={onWebResearchChange}
+                          data-testid="switch-web-research"
+                        />
+                      </div>
+
+                      {/* Guardrail 1 (Active) */}
+                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <Label className="text-xs font-medium cursor-pointer">
+                              Guardrail
+                            </Label>
+                            <div className="ml-auto flex gap-3">
+                              {[1, 2, 3, 4, 5].map((i) => (
+                                <div
+                                  key={i}
+                                  className="w-[24px] h-[24px] rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Guardrail 2 (Filler) */}
+                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
+                      </div>
+
+                      {/* Space Filler Card */}
+                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
+                      </div>
+
+                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
+                              Modello
+                            </Label>
+                            <div className="ml-auto">
+                              <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
+                                Gemini 2.5 Flash
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
-      </ScrollArea>
+        </ScrollArea>
+      </div>
     </div>
   );
 }

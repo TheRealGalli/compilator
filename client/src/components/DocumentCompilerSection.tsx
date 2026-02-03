@@ -396,6 +396,7 @@ export function DocumentCompilerSection({
         setTemplateContent(sanitizedContent);
         setIsCompiledView(true);
         setIsPdfMode(false);
+        setIsRefiningMode(true); // Auto-trigger Copilot Mode
         if (onCompile) onCompile(sanitizedContent); // Notify parent of compilation
 
         toast({
@@ -814,71 +815,35 @@ export function DocumentCompilerSection({
 
             {/* COLUMN 1: Settings OR Chat (col-span-3) */}
             <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full flex flex-col overflow-hidden">
-              <AnimatePresence mode="wait">
-                {!isRefiningMode ? (
-                  <motion.div
-                    key="settings-panel"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="h-full flex flex-col"
-                  >
-                    <ScrollArea className="flex-1">
-                      <ModelSettings
-                        notes={notes}
-                        temperature={temperature}
-                        webResearch={webResearch}
-                        detailedAnalysis={detailedAnalysis}
-                        formalTone={formalTone}
-                        modelProvider={modelProvider}
-                        onNotesChange={setNotes}
-                        onTemperatureChange={setTemperature}
-                        onWebResearchChange={setWebResearch}
-                        onDetailedAnalysisChange={setDetailedAnalysis}
-                        onFormalToneChange={setFormalTone}
-                        onModelProviderChange={setModelProvider}
-                      />
-                    </ScrollArea>
-
-                    {/* Trigger for Refine Mode (only if content likely exists) */}
-                    {compiledContent && (
-                      <div className="pt-4 mt-auto">
-                        <Button
-                          onClick={() => setIsRefiningMode(true)}
-                          className="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200"
-                          variant="outline"
-                        >
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Apri Co-pilot
-                        </Button>
-                      </div>
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="chat-panel"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="h-full"
-                  >
-                    <RefineChat
-                      compileContext={lastCompileContext}
-                      currentContent={isReviewing && pendingContent ? pendingContent : compiledContent}
-                      onPreview={(newContent) => {
-                        setPendingContent(newContent);
-                        setIsReviewing(true);
-                      }}
-                      isReviewing={isReviewing}
-                      onAccept={handleAcceptRefinement}
-                      onReject={handleRejectRefinement}
-                      onClose={() => setIsRefiningMode(false)}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <ModelSettings
+                notes={notes}
+                temperature={temperature}
+                webResearch={webResearch}
+                detailedAnalysis={detailedAnalysis}
+                formalTone={formalTone}
+                modelProvider={modelProvider}
+                onNotesChange={setNotes}
+                onTemperatureChange={setTemperature}
+                onWebResearchChange={setWebResearch}
+                onDetailedAnalysisChange={setDetailedAnalysis}
+                onFormalToneChange={setFormalTone}
+                onModelProviderChange={setModelProvider}
+                isRefining={isRefiningMode}
+                chatInterface={
+                  <RefineChat
+                    compileContext={lastCompileContext}
+                    currentContent={isReviewing && pendingContent ? pendingContent : compiledContent}
+                    onPreview={(newContent) => {
+                      setPendingContent(newContent);
+                      setIsReviewing(true);
+                    }}
+                    isReviewing={isReviewing}
+                    onAccept={handleAcceptRefinement}
+                    onReject={handleRejectRefinement}
+                    onClose={() => setIsRefiningMode(false)}
+                  />
+                }
+              />
             </div>
 
             {/* COLUMN 2: Template Editor (col-span-5) */}
