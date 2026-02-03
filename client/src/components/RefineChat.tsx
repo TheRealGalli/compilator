@@ -16,13 +16,16 @@ interface ChatMessage {
 interface RefineChatProps {
     compileContext: any;
     currentContent: string;
-    onUpdateContent: (newContent: string) => void;
-    initialExplanation?: string; // Optional explanation from first compile
+    onPreview: (newContent: string) => void; // Changed from onUpdateContent
+    isReviewing: boolean; // Sync with parent state
+    onAccept: () => void;
+    onReject: () => void;
+    initialExplanation?: string;
 }
 
-export function RefineChat({ compileContext, currentContent, onUpdateContent, initialExplanation }: RefineChatProps) {
+export function RefineChat({ compileContext, currentContent, onPreview, isReviewing, onAccept, onReject, initialExplanation }: RefineChatProps) {
     const [messages, setMessages] = useState<ChatMessage[]>(() => {
-        // Initial message if provided
+        // ... initial state mostly same
         if (initialExplanation) {
             return [{
                 id: 'init-1',
@@ -34,7 +37,7 @@ export function RefineChat({ compileContext, currentContent, onUpdateContent, in
         return [{
             id: 'init-0',
             role: 'ai',
-            text: "Documento compilato! Sono pronto a fare modifiche o rispondere a domande.",
+            text: "Documento compilato! Sono pronto a fare modifiche. Scrivimi cosa vuoi cambiare.",
             timestamp: new Date()
         }];
     });
@@ -43,15 +46,20 @@ export function RefineChat({ compileContext, currentContent, onUpdateContent, in
     const [isLoading, setIsLoading] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll to bottom
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages]);
 
+    // Hook: If isReviewing becomes FALSE, and we had a pending update logic?
+    // Actually the parent handles the content commitment. 
+    // We just need to know if we are blocked from sending new requests?
+    // Ideally user should Confirm/Reject before sending NEW chat messages to avoid branching confusion.
+    // So let's disable Input if isReviewing is true.
+
     const handleSend = async () => {
-        if (!input.trim() || isLoading) return;
+        if (!input.trim() || isLoading || isReviewing) return; // Block input during review
 
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
@@ -77,21 +85,19 @@ export function RefineChat({ compileContext, currentContent, onUpdateContent, in
             });
 
             const data = await response.json();
-
             if (!data.success) throw new Error(data.error);
 
             // Add AI response
             const aiMsg: ChatMessage = {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
-                text: data.explanation || "Fatto!",
+                text: data.explanation || "Ecco la bozza modificata. Controlla e conferma.",
                 timestamp: new Date()
             };
             setMessages(prev => [...prev, aiMsg]);
 
-            // If content changed, update parent
             if (data.newContent) {
-                onUpdateContent(data.newContent);
+                onPreview(data.newContent); // Trigger Preview Mode in Parent
             }
 
         } catch (error) {
@@ -99,7 +105,7 @@ export function RefineChat({ compileContext, currentContent, onUpdateContent, in
             const errorMsg: ChatMessage = {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
-                text: "Scusa, c'è stato un problema durante l'aggiornamento. Riprova.",
+                text: "Errore durante la modifica. Riprova.",
                 timestamp: new Date()
             };
             setMessages(prev => [...prev, errorMsg]);
@@ -108,6 +114,7 @@ export function RefineChat({ compileContext, currentContent, onUpdateContent, in
         }
     };
 
+    // ... Handle KeyDown ...
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -129,7 +136,9 @@ export function RefineChat({ compileContext, currentContent, onUpdateContent, in
                 </div>
                 <div>
                     <h3 className="font-semibold text-slate-800">Document Co-pilot</h3>
-                    <p className="text-xs text-slate-500">Pronto a modificare il documento</p>
+                    <p className="text-xs text-slate-500">
+                        {isReviewing ? "In attesa di conferma..." : "Pronto a modificare"}
+                    </p>
                 </div>
             </div>
 
@@ -166,7 +175,20 @@ export function RefineChat({ compileContext, currentContent, onUpdateContent, in
                         >
                             <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex items-center gap-2">
                                 <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                                <span className="text-xs text-slate-500">Sto pensando...</span>
+                                <span className="text-xs text-slate-500">Elaborazione modifiche...</span>
+                            </div>
+                        </motion.div>
+                    )}
+                    {/* Guidance Message when reviewing */}
+                    {isReviewing && !isLoading && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex w-full justify-center"
+                        >
+                            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-full px-4 py-1.5 text-xs font-medium shadow-sm flex items-center gap-2 animate-pulse">
+                                <Sparkles className="w-3 h-3" />
+                                Controlla l'anteprima a destra e conferma/rifiuta.
                             </div>
                         </motion.div>
                     )}
@@ -180,15 +202,16 @@ export function RefineChat({ compileContext, currentContent, onUpdateContent, in
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Chiedi modifiche (es. 'Cambia la data')..."
-                        className="pr-12 min-h-[50px] max-h-[120px] resize-none rounded-xl border-slate-200 focus:ring-blue-500 focus:border-blue-500"
+                        disabled={isReviewing || isLoading}
+                        placeholder={isReviewing ? "Conferma o rifiuta la modifica corrente..." : "Chiedi modifiche (es. 'Cambia la data')..."}
+                        className="pr-12 min-h-[50px] max-h-[120px] resize-none rounded-xl border-slate-200 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-slate-50"
                         rows={1}
                     />
                     <Button
                         size="icon"
                         onClick={handleSend}
-                        disabled={!input.trim() || isLoading}
-                        className="absolute right-1 bottom-1 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors"
+                        disabled={!input.trim() || isLoading || isReviewing}
+                        className="absolute right-1 bottom-1 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors disabled:bg-slate-300"
                     >
                         <Send className="w-4 h-4" />
                     </Button>

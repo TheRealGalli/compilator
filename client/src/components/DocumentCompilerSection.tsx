@@ -386,6 +386,7 @@ export function DocumentCompilerSection({
         setTemplateContent(sanitizedContent);
         setIsCompiledView(true);
         setIsPdfMode(false);
+        if (onCompile) onCompile(sanitizedContent); // Notify parent of compilation
 
         toast({
           title: "Documento compilato con successo",
@@ -402,6 +403,24 @@ export function DocumentCompilerSection({
     } finally {
       setIsCompiling(false);
     }
+  };
+
+  // Handle Review Actions
+  const handleAcceptRefinement = () => {
+    if (pendingContent) {
+      setCompiledContent(pendingContent);
+      setTemplateContent(pendingContent); // Update template content as well
+      if (onCompile) onCompile(pendingContent);
+      toast({ title: "Modifica Accettata", description: "Il documento è stato aggiornato." });
+    }
+    setIsReviewing(false);
+    setPendingContent(null);
+  };
+
+  const handleRejectRefinement = () => {
+    setIsReviewing(false);
+    setPendingContent(null);
+    toast({ title: "Modifica Annullata", description: "Ripristinata versione precedente." });
   };
 
 
@@ -761,71 +780,153 @@ export function DocumentCompilerSection({
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-3 min-h-[400px] lg:min-h-0 lg:h-full overflow-auto">
-            <ModelSettings
-              notes={notes}
-              temperature={temperature}
-              webResearch={webResearch}
-              detailedAnalysis={detailedAnalysis}
-              formalTone={formalTone}
-              modelProvider={modelProvider}
-              onNotesChange={setNotes}
-              onTemperatureChange={setTemperature}
-              onWebResearchChange={setWebResearch}
-              onDetailedAnalysisChange={setDetailedAnalysis}
-              onFormalToneChange={setFormalTone}
-              onModelProviderChange={setModelProvider}
-            />
+        {isPdfMode ? (
+          /* PDF STUDIO UNIFIED VIEW */
+          <div className="h-full flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-500">
+            <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
+              <PdfPreview
+                fileBase64={masterSource?.base64 || ""}
+                fileName={masterSource?.name}
+                className="rounded-none border-none h-full"
+                selectedSources={selectedSources.map(s => ({
+                  name: s.name,
+                  type: s.type,
+                  base64: s.base64
+                }))}
+                notes={notes}
+                webResearch={webResearch}
+                modelProvider={modelProvider}
+              />
+            </Card>
           </div>
+        ) : (
+          /* STANDARD COMPILER VIEW with Refine Mode */
+          <div className="grid grid-cols-12 gap-6 h-full"> {/* Changed to h-full */}
+            <div className="col-span-4 h-full flex flex-col">
+              <AnimatePresence mode="wait">
+                {!isRefiningMode ? (
+                  <motion.div
+                    key="settings-panel"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.5 }}
+                    className="h-full"
+                  >
+                    <ModelSettings
+                      notes={notes}
+                      temperature={temperature}
+                      webResearch={webResearch}
+                      detailedAnalysis={detailedAnalysis}
+                      formalTone={formalTone}
+                      modelProvider={modelProvider}
+                      onNotesChange={setNotes}
+                      onTemperatureChange={setTemperature}
+                      onWebResearchChange={setWebResearch}
+                      onDetailedAnalysisChange={setDetailedAnalysis}
+                      onFormalToneChange={setFormalTone}
+                      onModelProviderChange={setModelProvider}
+                    />
+                    <Button
+                      onClick={() => setIsRefiningMode(true)}
+                      className="mt-4 w-full"
+                      variant="outline"
+                    >
+                      Attiva Co-pilot (Refine Mode)
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="chat-panel"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="h-full"
+                  >
+                    <RefineChat
+                      compileContext={lastCompileContext}
+                      currentContent={isReviewing && pendingContent ? pendingContent : compiledContent}
+                      onPreview={(newContent) => {
+                        setPendingContent(newContent);
+                        setIsReviewing(true);
+                      }}
+                      isReviewing={isReviewing}
+                      onAccept={handleAcceptRefinement}
+                      onReject={handleRejectRefinement}
+                      onClose={() => setIsRefiningMode(false)} // Allow closing refine mode
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-          <div className="lg:col-span-9 min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
-            {isPdfMode ? (
-              /* PDF STUDIO UNIFIED VIEW */
-              <div className="h-full flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-500">
-                <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
-                  <PdfPreview
-                    fileBase64={masterSource?.base64 || ""}
-                    fileName={masterSource?.name}
-                    className="rounded-none border-none h-full"
-                    selectedSources={selectedSources.map(s => ({
-                      name: s.name,
-                      type: s.type,
-                      base64: s.base64
-                    }))}
-                    notes={notes}
-                    webResearch={webResearch}
-                    modelProvider={modelProvider}
-                  />
-                </Card>
-              </div>
-            ) : (
-              /* STANDARD COMPILER VIEW */
-              <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="min-h-[400px] lg:min-h-0 h-full">
+            {/* Right Column: Template Editor */}
+            <div className="col-span-8 h-full flex flex-col">
+              <Card className={`flex-1 flex flex-col shadow-md border-slate-200 overflow-hidden bg-white/80 backdrop-blur-md transition-all duration-300 ${isReviewing ? 'ring-2 ring-blue-500 shadow-blue-100' : ''}`}>
+                <CardHeader className={`py-3 px-5 border-b border-slate-100 flex flex-row items-center justify-between transition-colors duration-300 ${isReviewing ? 'bg-blue-50/80' : 'bg-white/50'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg transition-colors ${isReviewing ? 'bg-blue-200 text-blue-700' : 'bg-blue-50 text-blue-600'}`}>
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-semibold text-slate-800">
+                        {isReviewing ? "Anteprima Modifica" : "Documento Compilato"}
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        {isReviewing ? "Conferma o annulla le modifiche proposte" : (isRefiningMode ? "Modalità Co-pilot attiva" : "Anteprima e modifica in tempo reale")}
+                      </CardDescription>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {isReviewing ? (
+                      // Review Actions: Accept / Reject
+                      <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0 rounded-full border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700"
+                          onClick={handleRejectRefinement}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-8 w-8 p-0 rounded-full bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                          onClick={handleAcceptRefinement}
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      // Standard Actions
+                      <div className="flex items-center gap-2 animate-in fade-in duration-300">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600" onClick={handleDownload}>
+                          <Download className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600" onClick={handleCopy}>
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 p-0 overflow-hidden relative">
                   <TemplateEditor
-                    value={templateContent}
-                    onChange={(val) => {
-                      setTemplateContent(val);
-                      if (isCompiledView) {
-                        setCompiledContent(val);
-                      }
-                    }}
-                    title={isCompiledView ? "Template Compilato" : "Template da Compilare"}
+                    key={isReviewing && pendingContent ? 'pending' : (compiledContent ? 'compiled' : 'empty')}
+                    value={isReviewing && pendingContent ? pendingContent : compiledContent}
+                    onChange={isReviewing ? setPendingContent : setCompiledContent} // Allow edits even in preview? Yes, why not.
+                    title={isCompiledView ? "Template Compilato" : "Template da Compilare"} // Re-using existing title logic
+                    placeholder="Il documento compilato apparirà qui..."
+                  //    readOnly={false}
                   />
-                </div>
 
-                <div className="min-h-[300px] lg:min-h-0 h-full">
-                  <CompiledOutput
-                    content={compiledContent}
-                    onCopy={handleCopy}
-                    onDownload={handleDownload}
-                  />
-                </div>
-              </div>
-            )}
+                  {/* Overlay for "Review Mode" to indicate it's pending? Maybe subtle border is enough. */}
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Template Generation Modal */}
