@@ -831,8 +831,9 @@ export function DocumentCompilerSection({
                 isRefining={isRefiningMode}
                 chatInterface={
                   <RefineChat
+                    minimal={true}
                     compileContext={lastCompileContext}
-                    currentContent={isReviewing && pendingContent ? pendingContent : compiledContent}
+                    currentContent={pendingContent || compiledContent}
                     onPreview={(newContent) => {
                       setPendingContent(newContent);
                       setIsReviewing(true);
