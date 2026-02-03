@@ -209,7 +209,7 @@ export function ModelSettings({
                   value={notes}
                   onChange={(e) => onNotesChange?.(e.target.value)}
                   placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
-                  className="flex-1 text-xs resize-none"
+                  className="flex-1 text-xs resize-none min-h-[250px]"
                   data-testid="textarea-notes"
                   disabled={isRecording || isTranscribing}
                 />
@@ -223,7 +223,7 @@ export function ModelSettings({
                   initial={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                   transition={{ duration: 0.3 }}
-                  className="space-y-4"
+                  className="space-y-4 shrink-0"
                 >
                   <Separator />
 
@@ -310,10 +310,10 @@ export function ModelSettings({
             <AnimatePresence>
               {!isRefining && (
                 <motion.div
-                  initial={{ opacity: 1, height: 'auto', marginTop: 'auto' }}
+                  initial={{ opacity: 1, height: 'auto', marginTop: 8 }}
                   exit={{ opacity: 0, height: 0, marginTop: 0, overflow: 'hidden' }}
                   transition={{ duration: 0.3 }}
-                  className="flex items-center justify-between p-1.5 rounded-lg border bg-card"
+                  className="flex items-center justify-between p-1.5 rounded-lg border bg-card shrink-0"
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-1.5">
