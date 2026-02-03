@@ -178,9 +178,10 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             continue;
         }
 
-        // 2.5 Detect Task List Items (- [ ] or * [ ] or - [x])
-        // Allow * or - as bullet, and optional text countent
-        const taskMatch = line.match(/^(\s*)([\-\*])\s+\[([ xX])\](.*)/);
+        // 2.5 Detect Task List Items (Standard or Escaped)
+        // We match both `[ ]` and `\[ ]` because some models might escape them, 
+        // and we want to render them as checkboxes regardless.
+        const taskMatch = line.match(/^(\s*)([\-\*])\s+\\?\[([ xX])\\?\](.*)/);
         if (taskMatch) {
             const [, indent, bulletChar, checkState, contentRaw] = taskMatch;
             const content = contentRaw.trim();
@@ -222,9 +223,11 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         if (line === '') {
             elements.push(<div key={`empty-${i}`} className="h-4" />);
         } else {
+            // General cleanup of escapes for display (e.g. \[ -> [) if not handled above
+            const displayLine = lines[i].replace(/\\([\[\]\-\*])/g, '$1');
             elements.push(
                 <div key={`p-${i}`} className="whitespace-pre-wrap leading-relaxed text-foreground/90">
-                    {formatInline(lines[i], `p-${i}`)}
+                    {formatInline(displayLine, `p-${i}`)}
                 </div>
             );
         }
