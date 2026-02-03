@@ -135,7 +135,7 @@ export function ModelSettings({
 
   return (
     <div className="h-full flex flex-col border rounded-lg bg-background overflow-hidden transition-all duration-500">
-      <div className="border-b px-3 py-3 bg-muted/30 flex-shrink-0 flex items-center gap-2">
+      <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex items-center gap-2">
         <AnimatePresence mode="wait">
           {isRefining ? (
             <motion.div
@@ -163,14 +163,14 @@ export function ModelSettings({
 
       <div className="flex-1 flex flex-col min-h-0 relative">
         <ScrollArea className="flex-1">
-          <div className="p-3 space-y-4 h-full flex flex-col">
+          <div className="p-2 space-y-2 h-full flex flex-col">
 
             {/* Note Aggiuntive / Chat Area */}
             <motion.div
               layout
               className={`flex flex-col ${isRefining ? 'flex-1 min-h-0 h-full' : ''}`}
             >
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-1">
                 {!isRefining && <Label htmlFor="notes" className="text-xs font-medium">Note Aggiuntive</Label>}
 
                 {!isRefining && (
@@ -209,7 +209,7 @@ export function ModelSettings({
                   value={notes}
                   onChange={(e) => onNotesChange?.(e.target.value)}
                   placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
-                  className="min-h-[186px] text-xs resize-none flex-1"
+                  className="min-h-[100px] flex-1 text-xs resize-none"
                   data-testid="textarea-notes"
                   disabled={isRecording || isTranscribing}
                 />
