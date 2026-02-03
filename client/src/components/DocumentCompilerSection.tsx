@@ -370,10 +370,10 @@ export function DocumentCompilerSection({
 
       const data = await response.json();
       if (data.compiledContent) {
-        // Sanitize escaped brackets (Standard Regex)
+        // Sanitize escaped brackets (Robust Regex for multiple escapes)
         let sanitizedContent = data.compiledContent
-          .replace(/\\\[/g, '[')
-          .replace(/\\\]/g, ']');
+          .replace(/\\+\[/g, '[')
+          .replace(/\\+\]/g, ']');
 
         // Force checkboxes to be list items for Tiptap (replace "^[ ]" with "- [ ]")
         sanitizedContent = sanitizedContent.replace(/^(\s*)\[([ xX])\]/gm, '$1- [$2]');
