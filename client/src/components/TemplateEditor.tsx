@@ -28,9 +28,17 @@ export function TemplateEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: false, // Disable rich header rendering (show # Title as text)
-        bold: false,    // Disable rich bold (show **text** as text)
-        italic: false,  // Disable rich italic (show *text* as text)
+        heading: false, // Show # Title as text
+        bold: false,    // Show **text** as text
+        italic: false,  // Show *text* as text
+        strike: false,  // Show ~~text~~ as text
+        code: false,    // Show `code` as text
+        blockquote: false, // Show > quote as text
+        bulletList: false, // Show - item as text
+        orderedList: false, // Show 1. item as text
+        listItem: false,
+        codeBlock: false,
+        horizontalRule: false,
       }),
       Table.configure({
         resizable: true,

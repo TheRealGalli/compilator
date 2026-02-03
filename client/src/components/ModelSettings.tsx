@@ -254,7 +254,8 @@ export function ModelSettings({
 
                   {/* Tools */}
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium">Strumenti AI</Label>
+                    <Label className="text-xs font-medium">Strumenti AI</Label> {/* ... existing tools ... */}
+
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
@@ -299,21 +300,6 @@ export function ModelSettings({
                       {/* Space Filler Card */}
                       <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
                       </div>
-
-                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
-                              Modello
-                            </Label>
-                            <div className="ml-auto">
-                              <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
-                                Gemini 2.5 Flash
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -321,6 +307,26 @@ export function ModelSettings({
             </AnimatePresence>
           </div>
         </ScrollArea>
+
+        {/* Footer: Modello Indicator */}
+        {!isRefining && (
+          <div className="p-2 border-t bg-muted/10 mt-auto">
+            <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
+                    Modello
+                  </Label>
+                  <div className="ml-auto">
+                    <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
+                      Gemini 2.5 Flash
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
