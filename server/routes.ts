@@ -1355,10 +1355,10 @@ ${hasMemory ? `
    - **VIETATO** inventare dati anagrafici (es. "Mario Rossi", date a caso). È meglio un campo vuoto che un dato falso, ma è UN ERRORE dichiarare mancate informazioni presenti nelle fonti.
 
 ${extractedFields && extractedFields.length > 0 ? `
-3. **STRUTTURA DOCUMENTO TARGET (Intelligence Gemini Vision):**
-   Il documento che stiamo compilando (o che fa da base) contiene i seguenti campi rilevati visivamente:
-   ${extractedFields.map((f: any) => `- ${f.fieldName} (${f.fieldType})`).join('\n')}
-   ASSICURATI che il contenuto generato includa o faccia riferimento a questi campi se pertinenti.
+3. **STRUTTURA VISIVA DEL DOCUMENTO TARGET:**
+   Il documento base contiene i seguenti campi tecnici (Riferimento per posizionamento dati):
+   ${extractedFields.map((f: any) => `- ${f.fieldName}`).join('\n')}
+   Usa questi riferimenti per capire DOVE inserire i dati, ma NON creare un elenco di questi campi nel documento finale se non fanno parte del layout naturale.
 ` : ''}
 ${manualAnnotations && manualAnnotations.length > 0 ? `
 4. **ANNOTAZIONI MANUALI STUDIO (Priorità Massima):**
@@ -1395,15 +1395,16 @@ ${masterSource ? `
       50
       Base erosion payments
       $0
-- **GESTIONE CHECKBOX & OPZIONI (CRITICO):**
+- **GESTIONE CHECKBOX & OPZIONI (CRITICO - ZERO ESCAPE):**
   - Se il template o il MASTER contengono checkbox (es. "[ ]", "☐", o punti elenco che fungono da scelta), devi **spuntarli precisamente**.
   - **SINTASSI TASSATIVA**: Usa SEMPRE la lista puntata Markdown:
     - **- [x] Opzione Selezionata**
     - **- [ ] Opzione Non Selezionata**
-  - **DIVIETO DI ESCAPE**: NON inserire MAI caratteri di escape (backslash "\\") prima delle parentesi.
-    - ERRORE: "\\[x\\]" o "\\[ \\]"
-    - CORRETTO: "[x]" o "[ ]"
-  - Se l'opzione è "Mezzi propri", scrivi: "- [x] Mezzi propri".
+  - **DIVIETO ASSOLUTO DI ESCAPE**: 
+    - È SEVERAMENTE VIETATO inserire backslash davanti alle parentesi.
+    - **ERRORE GRAVE**: "\\[ ]", "\\[x\\]", "\\ [ ]"
+    - **CORRETTO**: "[ ]", "[x]"
+  - Il tuo output DEVE essere renderizzabile direttamente in Markdown senza cleanup. Se inserisci "\\", rompi il rendering.
 
 - **STRUTTURA DEL CONTENUTO (MASTER PIN RULE):**
   - **DIVIETO DI PAGINE ALLEGATE:** Se c'è un MASTER SOURCE, il tuo output deve essere ESCLUSIVAMENTE la ricreazione di quel documento compilato.
