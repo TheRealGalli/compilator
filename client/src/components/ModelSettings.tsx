@@ -137,7 +137,8 @@ export function ModelSettings({
   };
 
   return (
-    <div className={cn("h-full flex flex-col border rounded-lg bg-background overflow-hidden transition-all duration-500", className)}>
+  return (
+    <div className={cn("h-full flex flex-col min-h-0 border rounded-lg bg-background overflow-hidden transition-all duration-500", className)}>
       <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex items-center gap-2">
         <AnimatePresence mode="wait">
           {isRefining ? (

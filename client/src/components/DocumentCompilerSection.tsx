@@ -382,12 +382,15 @@ export function DocumentCompilerSection({
       console.log("DEBUG: Raw Compiled Content from API:", data.compiledContent);
 
       if (data.compiledContent) {
-        // Sanitize escaped brackets (Super Robust: handles multiple escapes & spaces)
+        // Sanitize escaped brackets and clean up formatting artifacts
         let sanitizedContent = data.compiledContent
           .replace(/\\+\s*\[/g, '[')
           .replace(/\\+\s*\]/g, ']')
-          .replace(/\\-/g, '-') // Handle escaped dashes
-          .replace(/\\\*/g, '*'); // Handle escaped asterisks
+          .replace(/\\-/g, '-')
+          .replace(/\\\*/g, '*')
+          .replace(/\*\*\s*\*\*/g, '') // Remove empty bold markers
+          .replace(/\*\*\s+/g, '**')   // Remove leading space inside bold
+          .replace(/\s+\*\*/g, '**');  // Remove trailing space inside bold
 
         // Force checkboxes to be list items for Tiptap (replace "^[ ]" with "- [ ]")
         sanitizedContent = sanitizedContent.replace(/^(\s*)\[([ xX])\]/gm, '$1- [$2]');
@@ -855,9 +858,10 @@ export function DocumentCompilerSection({
                 value={templateContent}
                 onChange={(val) => {
                   setTemplateContent(val);
-                  // If we are strictly just compiling, we might not auto-update compiledContent until compile is hit.
-                  // But previously `isCompiledView` logic linked them.
-                  // For now, standard behavior: Input.
+                  // Restore synchronized editing: Update output when template changes manually
+                  if (!isReviewing) {
+                    setCompiledContent(val);
+                  }
                 }}
                 title="Template da Compilare"
                 placeholder="Inserisci qui il testo o il template..."
