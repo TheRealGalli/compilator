@@ -1369,10 +1369,15 @@ ${manualAnnotations && manualAnnotations.length > 0 ? `
 ${masterSource ? `
 4. **MASTER SOURCE (Spunta Blu) - Fonte Primaria di Dati e Stile:**
    Il documento "${masterSource.name}" è contrassegnato come MASTER.
-   - **DATI:** Estrai con priorità massima ogni informazione utile (nomi, date, importi) da questo documento. Se il Master dice "Dott. Mario Zanchi", NON scrivere "[DATO MANCANTE]".
+   - **DATI:** Estrai con priorità massima ogni informazione utile (nomi, date, importi) da questo documento. Se il Master dice "Dott. Carlo Galli", NON scrivere "[DATO MANCANTE]".
    - **STILE:** Usa questo documento come riferimento per lo STILE e il LAYOUT del documento finale.
 ` : ''}
 
+
+- **EVIDENZIAZIONE DATI ESTRATTI (IMPORTANTE):**
+  - Quando inserisci un dato specifico proveniente dai documenti (es. Nomi, Date, Importi, Codici, Indirizzi), DEVI scriverlo in **GRASSETTO**.
+  - Esempio: "Il contratto stipulato in data **12/01/2025** tra **Mario Rossi** e **Azienda SRL**..."
+  - Questo serve all'utente per verificare visivamente quali dati sono stati compilati dall'AI.
 
 - **FORMATTAZIONE PROFESSIONALE & TITOLI:**
   - **TITOLI (IMPORTANTE):** I titoli e le intestazioni DEVONO essere su una riga separata, circondati da righe vuote.
