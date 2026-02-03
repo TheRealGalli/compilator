@@ -382,15 +382,12 @@ export function DocumentCompilerSection({
       console.log("DEBUG: Raw Compiled Content from API:", data.compiledContent);
 
       if (data.compiledContent) {
-        // Sanitize escaped brackets and clean up formatting artifacts
+        // Sanitize escaped brackets
         let sanitizedContent = data.compiledContent
           .replace(/\\+\s*\[/g, '[')
           .replace(/\\+\s*\]/g, ']')
           .replace(/\\-/g, '-')
-          .replace(/\\\*/g, '*')
-          .replace(/\*\*\s*\*\*/g, '') // Remove empty bold markers
-          .replace(/\*\*\s+/g, '**')   // Remove leading space inside bold
-          .replace(/\s+\*\*/g, '**');  // Remove trailing space inside bold
+          .replace(/\\\*/g, '*');
 
         // Force checkboxes to be list items for Tiptap (replace "^[ ]" with "- [ ]")
         sanitizedContent = sanitizedContent.replace(/^(\s*)\[([ xX])\]/gm, '$1- [$2]');
