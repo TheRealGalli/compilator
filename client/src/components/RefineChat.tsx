@@ -320,7 +320,7 @@ export function RefineChat({
                             onKeyDown={handleKeyDown}
                             disabled={isReviewing || isLoading || isAnalyzing}
                             placeholder="Scrivi qui..."
-                            className="pr-12 min-h-[60px] max-h-[150px] resize-none bg-transparent border-none focus-visible:ring-0 text-sm shadow-none"
+                            className="pr-12 min-h-[60px] max-h-[150px] resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent text-sm shadow-none"
                             rows={1}
                             autoFocus
                         />
@@ -519,7 +519,7 @@ export function RefineChat({
                             onKeyDown={handleKeyDown}
                             disabled={isReviewing || isLoading || isAnalyzing}
                             placeholder={isReviewing ? "Conferma o rifiuta la modifica corrente..." : "Chiedi modifiche (es. 'Cambia la data')..."}
-                            className="pr-12 min-h-[50px] max-h-[120px] resize-none border-none bg-transparent focus-visible:ring-0 shadow-none text-sm"
+                            className="pr-12 min-h-[50px] max-h-[120px] resize-none border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent shadow-none text-sm"
                             rows={1}
                         />
                         <Button
