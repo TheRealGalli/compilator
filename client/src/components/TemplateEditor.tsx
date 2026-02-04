@@ -196,16 +196,17 @@ export function TemplateEditor({
       <div className="flex-1 overflow-hidden relative">
         {editor && (
           <BubbleMenu
+            // @ts-ignore
             editor={editor}
             tippyOptions={{
               duration: 100,
-              zIndex: 99999,
+              zIndex: 2000,
               placement: 'top',
               offset: [0, 10],
               appendTo: () => document.body, // Very important: avoid clipping
               interactive: true,
             }}
-            shouldShow={({ from, to }) => {
+            shouldShow={({ from, to }: { from: number; to: number }) => {
               // Show if selection is not empty and mentions are enabled
               return enableMentions && from !== to;
             }}
