@@ -694,7 +694,7 @@ export function DocumentCompilerSection({
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold">Compilatore Documenti AI</h2>
         </div>
-        <div className="relative flex flex-col items-end">
+        <div className="relative flex flex-col items-end min-h-[40px]">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             {!isPdfMode && (
               <>
@@ -793,7 +793,7 @@ export function DocumentCompilerSection({
       <div className="flex-1 min-h-0 overflow-hidden">
         {isPdfMode ? (
           /* PDF STUDIO UNIFIED VIEW */
-          <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4 animate-in fade-in zoom-in-95 duration-500">
+          <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* COLUMN 1: Settings OR Chat (col-span-3) */}
             <div className="lg:col-span-3 min-h-[400px] lg:min-h-[600px] lg:h-full flex flex-col overflow-hidden">
               <ModelSettings
@@ -830,7 +830,7 @@ export function DocumentCompilerSection({
             </div>
 
             {/* COLUMN 2: PDF Preview (col-span-9) */}
-            <div className="lg:col-span-9 flex flex-col min-h-0 overflow-hidden">
+            <div className="lg:col-span-9 flex flex-col min-h-0 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
               <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
                 <PdfPreview
                   fileBase64={masterSource?.base64 || ""}
