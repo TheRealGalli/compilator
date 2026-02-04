@@ -5,6 +5,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2, Bot, User, Sparkles, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { getApiUrl } from "@/lib/api-config";
+import { apiRequest } from "@/lib/queryClient";
 
 interface ChatMessage {
     id: string;
@@ -43,16 +45,12 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
         setIsAnalyzing(true);
         try {
             const analysisPrompt = "Effettua un'analisi iniziale del documento appena compilato. Riassumi brevemente il contenuto, identifica chiaramente quale documento è stato usato come Master Pin (se presente) e quali fonti hai consultato. Concludi chiedendo come posso aiutarti oggi.";
-
-            const response = await fetch('/api/refine', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    compileContext,
-                    currentContent,
-                    userInstruction: analysisPrompt,
-                    chatHistory: []
-                })
+            console.log("[RefineChat] Triggering initial analysis...");
+            const response = await apiRequest('POST', '/api/refine', {
+                compileContext,
+                currentContent,
+                userInstruction: analysisPrompt,
+                chatHistory: []
             });
 
             const data = await response.json();
@@ -68,10 +66,11 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
 
         } catch (error) {
             console.error("Initial analysis error:", error);
+            const errorMsg = error instanceof Error ? error.message : "Errore sconosciuto";
             setMessages([{
                 id: 'init-err',
                 role: 'ai',
-                text: "Documento pronto. C'è stato un piccolo intoppo durante l'analisi automatica, ma puoi chiedermi qualsiasi cosa qui sotto.",
+                text: `Documento pronto. C'è stato un intoppo durante l'analisi: ${errorMsg}. Puoi comunque scrivermi qui sotto per qualsiasi chiarimento.`,
                 timestamp: new Date()
             }]);
         } finally {
@@ -102,15 +101,11 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
         setIsLoading(true);
 
         try {
-            const response = await fetch('/api/refine', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    compileContext,
-                    currentContent,
-                    userInstruction: userMsg.text,
-                    chatHistory: messages.map(m => ({ role: m.role, text: m.text }))
-                })
+            const response = await apiRequest('POST', '/api/refine', {
+                compileContext,
+                currentContent,
+                userInstruction: userMsg.text,
+                chatHistory: messages.map(m => ({ role: m.role, text: m.text }))
             });
 
             const data = await response.json();

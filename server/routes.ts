@@ -1522,6 +1522,10 @@ ISTRUZIONI OUTPUT:
       const { compileContext, currentContent, userInstruction, chatHistory } = req.body;
 
       console.log('[API refine] Request received');
+      console.log(`[API refine] User Instruction: "${userInstruction}"`);
+      console.log(`[API refine] Context: ${compileContext ? 'Present' : 'MISSING'}`);
+      console.log(`[API refine] Current Content Length: ${currentContent?.length || 0}`);
+      console.log(`[API refine] Sources Count: ${compileContext?.sources?.length || 0}`);
 
       // Reconstruct Context
       const multimodalFiles = compileContext.sources || [];
@@ -1552,7 +1556,7 @@ ISTRUZIONI OUTPUT:
 *** MODALITÀ RAFFINAMENTO / CHAT ATTIVA ***
 Hai già compilato una prima bozza del documento. Ora l'utente vuole discuterne o modificarlo.
 
-DOC:
+DOC ATTUALE:
 """
 ${currentContent}
 """
@@ -1560,34 +1564,26 @@ ${currentContent}
 STORICO CHAT:
 ${chatHistory.map((m: any) => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
 
-UTENTE: "${userInstruction}"
+ISTRUZIONI OPERATIVE:
+1. Se l'utente chiede una MODIFICA:
+   - Riscrivi il documento INTERO.
+   - Restituisci JSON: { "newContent": "...", "explanation": "Breve descrizione della modifica applicata" }
+2. Se l'utente chiede un'ANALISI o fa una DOMANDA:
+   - Rispondi in modo cordiale e professionale.
+   - Non modificare il documento (newContent: null).
+   - Se è un'analisi iniziale: identifica il Master Source, riassumi le fonti e i punti chiave del documento compilato.
+   - Restituisci JSON: { "newContent": null, "explanation": "Tua risposta/analisi" }
 
-ISTRUZIONI:
-1. Se l'utente chiede una modifica al testo:
-   - Riscrivi IL DOCUMENTO COMPLETO applicando la modifica.
-   - Restituisci JSON: { "newContent": "TESTO COMPLETO AGGIORNATO...", "explanation": "Ho modificato..." }
-2. Se l'utente chiede un'analisi o fa una domanda (senza chiedere modifiche):
-   - Se la richiesta riguarda un'analisi iniziale: identifica il Master Pin, riassumi le fonti usate e i punti salienti del documento compilato.
-   - Restituisci JSON: { "newContent": null, "explanation": "Risposta alla domanda o analisi..." }
-
-IMPORTANTE:
-- Quando restituisci "newContent", DEVE ESSERE IL DOCUMENTO INTERO PRONTO PER L'EDITOR (Markdown), non solo uno snippet.
-- Rispondi sempre in JSON valido.
+IMPORTANTE: Mantieni coerenza con il documento originale e le fonti caricate. Rispondi SEMPRE in JSON.
 `;
 
       // Call AI
-      // Note: We're overloading userPrompt with the refine instructions to ensure it's seen as the latest task.
-      // Or we append to systemPrompt. Appending to system is stronger for rules.
-
       const { content: jsonResponse } = await aiService.compileDocument({
         systemPrompt: systemPrompt + refineInstructions,
-        userPrompt: "Analizza la richiesta e rispondi in JSON.",
+        userPrompt: userInstruction, // The actual instruction/query from the user
         multimodalFiles: multimodalFiles || [],
         masterSource: masterSource || null,
-        preProcessedParts: [] // Assume text-based context is sufficient or re-process if critical.
-        // For speed/cost in chat, maybe skipping full re-OCR is better if we have the text?
-        // But the prompt relies on "documenti allegati".
-        // Let's pass empty preProcessedParts but provide the files in multimodalFiles so AiService handles them if checks pass.
+        preProcessedParts: []
       });
 
       // Parse JSON safely

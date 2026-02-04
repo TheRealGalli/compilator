@@ -408,7 +408,10 @@ export function DocumentCompilerSection({
           webResearch,
           detailedAnalysis,
           formalTone,
-          modelProvider
+          modelProvider,
+          fetchedCompilerContext: data.fetchedCompilerContext,
+          extractedFields: data.extractedFields,
+          manualAnnotations: data.manualAnnotations
         };
 
         setLastCompileContext(context);
