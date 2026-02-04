@@ -719,7 +719,7 @@ export function DocumentCompilerSection({
         </div>
         <div className="relative flex flex-col items-end min-h-[40px]">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            {!isPdfMode && (
+            {!isPdfMode && !isRefiningMode && (
               <>
                 <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
                   <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-template">
