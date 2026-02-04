@@ -32,6 +32,12 @@ interface RefineChatProps {
     onMentionConsumed?: () => void;
 }
 
+interface MentionContext {
+    id: string;
+    text: string;
+    source: 'copilot' | 'template';
+}
+
 export function RefineChat({
     compileContext,
     currentContent,
@@ -50,6 +56,7 @@ export function RefineChat({
     const [isLoading, setIsLoading] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
+    const [mentions, setMentions] = useState<MentionContext[]>([]);
     const scrollRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -101,10 +108,12 @@ export function RefineChat({
 
     useEffect(() => {
         if (pendingMention) {
-            setInput(prev => {
-                const separator = prev.trim() ? "\n" : "";
-                return `${prev}${separator}> "${pendingMention}"\n`;
-            });
+            const newMention: MentionContext = {
+                id: `mention-t-${Date.now()}`,
+                text: pendingMention,
+                source: 'template'
+            };
+            setMentions(prev => [...prev, newMention]);
             onMentionConsumed?.();
         }
     }, [pendingMention]);
@@ -135,14 +144,14 @@ export function RefineChat({
         }
 
         if (selection) {
-            const mentionedText = selection.text;
-            setInput(prev => {
-                const separator = prev.trim() ? "\n" : "";
-                return `${prev}${separator}> "${mentionedText}"\n`;
-            });
+            const newMention: MentionContext = {
+                id: `mention-c-${Date.now()}`,
+                text: selection.text,
+                source: 'copilot'
+            };
+            setMentions(prev => [...prev, newMention]);
             setSelection(null);
-            // Clear window selection
-            window.getSelection()?.removeAllRanges();
+            // We keep window selection for better feedback
         }
     };
 
@@ -165,6 +174,7 @@ export function RefineChat({
                 compileContext,
                 currentContent,
                 userInstruction: userMsg.text,
+                mentions: mentions.map(m => ({ source: m.source, text: m.text })),
                 chatHistory: messages.map(m => ({ role: m.role, text: m.text }))
             });
 
@@ -184,6 +194,9 @@ export function RefineChat({
             if (data.newContent) {
                 onPreview(data.newContent);
             }
+
+            // Clear mentions after successful send
+            setMentions([]);
 
         } catch (error) {
             console.error("Refine error:", error);
@@ -272,17 +285,41 @@ export function RefineChat({
                     </div>
                 </ScrollArea>
 
-                <div className="relative shrink-0">
-                    <Textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        disabled={isReviewing || isLoading || isAnalyzing}
-                        placeholder="Scrivi qui..."
-                        className="pr-12 min-h-[60px] max-h-[150px] resize-none bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500 text-sm"
-                        rows={1}
-                        autoFocus
-                    />
+                <div className="relative shrink-0 flex flex-col gap-2">
+                    {/* Tags Area */}
+                    {mentions.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-1 px-1 max-h-16 overflow-y-auto">
+                            {mentions.map((m, idx) => (
+                                <motion.div
+                                    initial={{ scale: 0.8, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    key={m.id}
+                                    className="flex items-center gap-1.5 px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-semibold border border-indigo-200"
+                                >
+                                    <span>#{m.source === 'template' ? 'T' : 'C'}{idx + 1}</span>
+                                    <span className="max-w-[80px] truncate opacity-60 font-normal">{m.text}</span>
+                                    <button
+                                        onClick={() => setMentions(prev => prev.filter(item => item.id !== m.id))}
+                                        className="hover:text-indigo-900 transition-colors"
+                                    >
+                                        <X className="w-2.5 h-2.5" />
+                                    </button>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
+                    <div className="relative">
+                        <Textarea
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            disabled={isReviewing || isLoading || isAnalyzing}
+                            placeholder="Scrivi qui..."
+                            className="pr-12 min-h-[60px] max-h-[150px] resize-none bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500 text-sm"
+                            rows={1}
+                            autoFocus
+                        />
+                    </div>
                 </div>
 
                 {/* Selection Mention Button */}
@@ -444,6 +481,31 @@ export function RefineChat({
 
             {/* Input Area */}
             <div className="p-4 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+                {/* Tags Area */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                    <AnimatePresence>
+                        {mentions.map((m, idx) => (
+                            <motion.div
+                                key={m.id}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, scale: 0.5 }}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600/10 text-indigo-700 rounded-full text-xs font-semibold border border-indigo-600/20"
+                            >
+                                <span className="uppercase tracking-tighter opacity-70">
+                                    {m.source === 'template' ? 'Menzione Template Compilato' : 'Menzione Copilot'} {idx + 1}
+                                </span>
+                                <button
+                                    onClick={() => setMentions(prev => prev.filter(item => item.id !== m.id))}
+                                    className="hover:text-indigo-900 p-0.5"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </div>
+
                 <div className="relative">
                     <Textarea
                         value={input}

@@ -1532,13 +1532,12 @@ ISTRUZIONI OUTPUT:
   // --- NEW: Refine / Chat Endpoint ---
   app.post('/api/refine', async (req: Request, res: Response) => {
     try {
-      const { compileContext, currentContent, userInstruction, chatHistory } = req.body;
+      const { compileContext, currentContent, userInstruction, chatHistory, mentions } = req.body;
 
       console.log('[API refine] Request received');
       console.log(`[API refine] User Instruction: "${userInstruction}"`);
       console.log(`[API refine] Context: ${compileContext ? 'Present' : 'MISSING'}`);
-      console.log(`[API refine] Current Content Length: ${currentContent?.length || 0}`);
-      console.log(`[API refine] Sources Count: ${compileContext?.sources?.length || 0}`);
+      console.log(`[API refine] Mentions Count: ${mentions?.length || 0}`);
 
       // Reconstruct Context
       const multimodalFiles = compileContext.sources || [];
@@ -1565,6 +1564,12 @@ ISTRUZIONI OUTPUT:
         hasExternalSources
       });
 
+      // Format mentions for the AI
+      const formattedMentions = (mentions || []).map((m: any, idx: number) => {
+        const typeLabel = m.source === 'template' ? 'Template' : 'Copilot';
+        return `- MENZIONE ${typeLabel} ${idx + 1}: "${m.text}"`;
+      }).join('\n');
+
       const refineInstructions = `
 *** MODALITÀ RAFFINAMENTO / CHAT ATTIVA ***
 Hai già compilato una prima bozza del documento. Ora l'utente vuole discuterne o modificarlo.
@@ -1576,6 +1581,8 @@ DOC ATTUALE:
 """
 ${currentContent}
 """
+
+${formattedMentions ? `TESTO MENZIONATO (L'utente si riferisce a questi frammenti specifici):\n${formattedMentions}\n` : ''}
 
 STORICO CHAT:
 ${chatHistory.map((m: any) => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
