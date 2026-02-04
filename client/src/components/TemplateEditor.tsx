@@ -200,6 +200,8 @@ export function TemplateEditor({
               duration: 100,
               zIndex: 9999,
               appendTo: () => document.body,
+              placement: 'top',
+              offset: [0, 10], // Move it up a bit more
             }}
             shouldShow={({ editor, from, to }) => {
               // Only show if there's a selection and it's not empty

@@ -38,6 +38,7 @@ interface PdfPreviewProps {
     notes?: string;
     webResearch?: boolean;
     modelProvider?: string;
+    onCompile?: (content: string) => void;
 }
 
 export function PdfPreview({
@@ -47,7 +48,8 @@ export function PdfPreview({
     selectedSources = [],
     notes = "",
     webResearch = false,
-    modelProvider = 'gemini'
+    modelProvider = 'gemini',
+    onCompile
 }: PdfPreviewProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [pageNumber, setPageNumber] = useState<number>(1);
@@ -267,6 +269,11 @@ export function PdfPreview({
                 title: "Compilazione completata",
                 description: `Gromit ha generato ${newProposals?.length || 0} proposte. Naviga tra le pagine per vederle applicate.`,
             });
+
+            if (onCompile) {
+                // Return something that represents the state, though for PDF it's the proposals
+                onCompile(JSON.stringify(newProposals));
+            }
 
         } catch (err: any) {
             console.error("Gromit Assist Error:", err);
