@@ -2201,7 +2201,10 @@ ${filesContext}
 1. **Completezza**: Se l'utente richiede JSON, codice o dataset, fornisci SEMPRE l'output integrale (max 50.000 token). NON usare mai commenti come "// rest of code" o "..." per abbreviare.
 2. **Formattazione**: Racchiudi JSON e codice in blocchi markdown (es. \`\`\`json).
 3. **Elenchi**: Usa elenchi puntati (-) per migliorare la leggibilità fuori dalle tabelle.
-4. **Grassetto**: Usa il grassetto (**) per enfatizzare, ma evita hashtag (#) per i titoli.
+4. **Grassetto (TASSATIVO)**: Usa il grassetto (**) per enfatizzare i titoli, ma evita hashtag (#). NON spezzare mai il grassetto.
+   - **CORRETTO**: **Titolo del paragrafo**
+   - **VIETATO**: **Titolo** **del** **paragrafo** (non chiudere e riaprire i tag per spazi interni)
+   - **VIETATO**: **Titolo del \n paragrafo** (non andare a capo dentro i tag **)
 `;
       systemInstruction += `
 // (Files are now listed above in the summary)

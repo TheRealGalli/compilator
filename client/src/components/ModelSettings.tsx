@@ -165,23 +165,30 @@ export function ModelSettings({
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 relative">
-        <ScrollArea className="flex-1 [&>[data-radix-scroll-area-viewport]]:h-full">
-          <div className="p-2 space-y-2 h-full flex flex-col">
-
-            {/* Note Aggiuntive / Chat Area */}
-            <motion.div
-              layout
-              animate={{
-                height: isRefining ? "100%" : "auto",
-                minHeight: isRefining ? 0 : 195
-              }}
-              transition={{ duration: 0.5, ease: "easeInOut" }}
-              className={`flex flex-col flex-1 min-h-0 ${isRefining ? 'h-full' : ''}`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                {!isRefining && <Label htmlFor="notes" className="text-xs font-medium">Note Aggiuntive</Label>}
-
-                {!isRefining && (
+        {isRefining ? (
+          /* Copilot Mode: Direct flex layout without ScrollArea to allow proper height expansion */
+          <div className="flex-1 flex flex-col min-h-0 p-2">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key="chat-interface"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
+                className="flex-1 flex flex-col min-h-0"
+              >
+                {chatInterface}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        ) : (
+          /* Settings Mode: ScrollArea for scrollable content */
+          <ScrollArea className="flex-1 [&>[data-radix-scroll-area-viewport]]:h-full">
+            <div className="p-2 space-y-2">
+              {/* Note Aggiuntive */}
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-1">
+                  <Label htmlFor="notes" className="text-xs font-medium">Note Aggiuntive</Label>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -200,160 +207,112 @@ export function ModelSettings({
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                )}
+                </div>
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => onNotesChange?.(e.target.value)}
+                  placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
+                  className="flex-1 text-xs resize-none min-h-[195px]"
+                  data-testid="textarea-notes"
+                  disabled={isRecording || isTranscribing}
+                />
+              </div>
+              <Separator />
+
+              {/* Temperature */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium">Creatività</Label>
+                </div>
+                <div className="space-y-1.5">
+                  <Slider
+                    value={[temperature]}
+                    onValueChange={(value) => onTemperatureChange?.(value[0])}
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    className="w-full"
+                    data-testid="slider-temperature"
+                  />
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Preciso</span>
+                    <span className="font-medium text-foreground">{temperature.toFixed(1)}</span>
+                    <span>Creativo</span>
+                  </div>
+                </div>
               </div>
 
-              <AnimatePresence mode="wait">
-                {isRefining ? (
-                  <motion.div
-                    key="chat-interface"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.4 }}
-                    className="flex-1 flex flex-col min-h-0"
-                  >
-                    {chatInterface}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="textarea-notes"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.4 }}
-                    className="flex-1 flex flex-col min-h-0"
-                  >
-                    <Textarea
-                      id="notes"
-                      value={notes}
-                      onChange={(e) => onNotesChange?.(e.target.value)}
-                      placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
-                      className="flex-1 text-xs resize-none min-h-[195px]"
-                      data-testid="textarea-notes"
-                      disabled={isRecording || isTranscribing}
+              <Separator />
+
+              {/* Tools */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Strumenti AI</Label> {/* ... existing tools ... */}
+
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor="web-research" className="text-xs font-medium cursor-pointer">
+                          Web Research
+                        </Label>
+                      </div>
+                    </div>
+                    <Switch
+                      id="web-research"
+                      checked={webResearch}
+                      onCheckedChange={onWebResearchChange}
+                      data-testid="switch-web-research"
                     />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-
-            {/* Other Settings (Fade out when refining) */}
-            <AnimatePresence>
-              {!isRefining && (
-                <motion.div
-                  initial={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4 shrink-0"
-                >
-                  <Separator />
-
-                  {/* Temperature */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-medium">Creatività</Label>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Slider
-                        value={[temperature]}
-                        onValueChange={(value) => onTemperatureChange?.(value[0])}
-                        min={0}
-                        max={1}
-                        step={0.1}
-                        className="w-full"
-                        data-testid="slider-temperature"
-                      />
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Preciso</span>
-                        <span className="font-medium text-foreground">{temperature.toFixed(1)}</span>
-                        <span>Creativo</span>
-                      </div>
-                    </div>
                   </div>
 
-                  <Separator />
-
-                  {/* Tools */}
-                  <div className="space-y-2">
-                    <Label className="text-xs font-medium">Strumenti AI</Label> {/* ... existing tools ... */}
-
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <Label htmlFor="web-research" className="text-xs font-medium cursor-pointer">
-                              Web Research
-                            </Label>
-                          </div>
-                        </div>
-                        <Switch
-                          id="web-research"
-                          checked={webResearch}
-                          onCheckedChange={onWebResearchChange}
-                          data-testid="switch-web-research"
-                        />
-                      </div>
-
-                      {/* Guardrail 1 (Active) */}
-                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <Label className="text-xs font-medium cursor-pointer">
-                              Guardrail
-                            </Label>
-                            <div className="ml-auto flex gap-3">
-                              {[1, 2, 3, 4, 5].map((i) => (
-                                <div
-                                  key={i}
-                                  className="w-[24px] h-[24px] rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Guardrail 2 (Filler) */}
-                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
-                      </div>
-
-                      {/* Space Filler Card */}
-                      <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Modello Indicator (Animated Exit) */}
-            <AnimatePresence>
-              {!isRefining && (
-                <motion.div
-                  initial={{ opacity: 1, height: 'auto', marginTop: 8 }}
-                  exit={{ opacity: 0, height: 0, marginTop: 0, overflow: 'hidden' }}
-                  transition={{ duration: 0.3 }}
-                  className="flex items-center justify-between p-1.5 rounded-lg border bg-card shrink-0"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
-                        Modello
-                      </Label>
-                      <div className="ml-auto">
-                        <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
-                          Gemini 2.5 Flash
+                  {/* Guardrail 1 (Active) */}
+                  <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-xs font-medium cursor-pointer">
+                          Guardrail
+                        </Label>
+                        <div className="ml-auto flex gap-3">
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <div
+                              key={i}
+                              className="w-[24px] h-[24px] rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors"
+                            />
+                          ))}
                         </div>
                       </div>
                     </div>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </ScrollArea>
+
+                  {/* Guardrail 2 (Filler) */}
+                  <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
+                  </div>
+
+                  {/* Space Filler Card */}
+                  <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card min-h-[42px]">
+                  </div>
+                </div>
+              </div>
+              {/* Modello Indicator */}
+              <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card shrink-0">
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
+                      Modello
+                    </Label>
+                    <div className="ml-auto">
+                      <div className="px-2 py-1 border rounded-md bg-muted/50 text-[10px] text-muted-foreground">
+                        Gemini 2.5 Flash
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        )}
       </div>
     </div>
   );

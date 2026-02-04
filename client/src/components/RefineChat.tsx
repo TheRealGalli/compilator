@@ -186,7 +186,7 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
                 animate={{ opacity: 1 }}
                 className="flex flex-col h-full rounded-md border border-input bg-transparent px-3 py-2 text-xs shadow-sm ring-offset-background focus-within:ring-1 focus-within:ring-ring"
             >
-                <ScrollArea className="flex-1 -mr-2 pr-2 mb-2">
+                <ScrollArea className="flex-1 -mr-2 pr-2 mb-2 [&>[data-radix-scroll-area-viewport]]:h-full">
                     <div className="space-y-4">
                         {messages.filter(m => m.role === 'ai' || m.role === 'user').map((msg) => (
                             <div key={msg.id} className={cn(
