@@ -204,9 +204,9 @@ export function TemplateEditor({
               placement: 'top',
               offset: [0, 10],
             }}
-            shouldShow={({ editor, from, to }) => {
+            shouldShow={({ from, to }) => {
               // Only show if mentions are enabled and there is a non-empty selection
-              return enableMentions && from !== to && !editor.state.selection.empty;
+              return enableMentions && from !== to;
             }}
           >
             <MentionButton
