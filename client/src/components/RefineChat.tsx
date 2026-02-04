@@ -28,13 +28,15 @@ interface RefineChatProps {
     initialExplanation?: string;
     onClose?: () => void;
     minimal?: boolean;
-    pendingMention?: string | null;
+    pendingMention?: { text: string; id: string } | null;
     onMentionConsumed?: () => void;
+    onMentionCreated?: (text: string, source: 'copilot' | 'template') => void;
 }
 
 interface MentionContext {
     id: string;
     text: string;
+    label: string;
     source: 'copilot' | 'template';
 }
 
@@ -49,7 +51,8 @@ export function RefineChat({
     onClose,
     minimal = false,
     pendingMention,
-    onMentionConsumed
+    onMentionConsumed,
+    onMentionCreated
 }: RefineChatProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -109,8 +112,9 @@ export function RefineChat({
     useEffect(() => {
         if (pendingMention) {
             const newMention: MentionContext = {
-                id: `mention-t-${Date.now()}`,
-                text: pendingMention,
+                id: `mention-${Date.now()}`,
+                text: pendingMention.text,
+                label: pendingMention.id,
                 source: 'template'
             };
             setMentions(prev => [...prev, newMention]);
@@ -118,13 +122,17 @@ export function RefineChat({
         }
     }, [pendingMention]);
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: React.MouseEvent) => {
+        // Only process selection if we are NOT clicking inside the tag area or input area
+        const target = e.target as HTMLElement;
+        if (target.closest('.mentions-tag-area') || target.closest('textarea')) return;
+
         const sel = window.getSelection();
         if (sel && sel.toString().trim().length > 0 && containerRef.current) {
             const range = sel.getRangeAt(0);
             const rect = range.getBoundingClientRect();
 
-            // Check if selection is within the container
+            // Ensure the selection is actually within the chat container we care about
             if (containerRef.current.contains(sel.anchorNode)) {
                 setSelection({
                     text: sel.toString().trim(),
@@ -144,14 +152,8 @@ export function RefineChat({
         }
 
         if (selection) {
-            const newMention: MentionContext = {
-                id: `mention-c-${Date.now()}`,
-                text: selection.text,
-                source: 'copilot'
-            };
-            setMentions(prev => [...prev, newMention]);
+            onMentionCreated?.(selection.text, 'copilot');
             setSelection(null);
-            // We keep window selection for better feedback
         }
     };
 
@@ -285,19 +287,18 @@ export function RefineChat({
                     </div>
                 </ScrollArea>
 
-                <div className="relative shrink-0 flex flex-col gap-2">
-                    {/* Tags Area */}
+                <div className="relative shrink-0 flex flex-col pt-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                    {/* Tags Area (Internal) */}
                     {mentions.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-1 px-1 max-h-16 overflow-y-auto">
-                            {mentions.map((m, idx) => (
+                        <div className="flex flex-wrap gap-1.5 mb-1.5 px-3 max-h-20 overflow-y-auto">
+                            {mentions.map((m) => (
                                 <motion.div
                                     initial={{ scale: 0.8, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
                                     key={m.id}
-                                    className="flex items-center gap-1.5 px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-semibold border border-indigo-200"
+                                    className="flex items-center gap-1.5 px-2 py-0.5 bg-indigo-600/10 text-indigo-700 rounded-md text-[10px] font-bold border border-indigo-600/20"
                                 >
-                                    <span>#{m.source === 'template' ? 'T' : 'C'}{idx + 1}</span>
-                                    <span className="max-w-[80px] truncate opacity-60 font-normal">{m.text}</span>
+                                    <span>{m.label}</span>
                                     <button
                                         onClick={() => setMentions(prev => prev.filter(item => item.id !== m.id))}
                                         className="hover:text-indigo-900 transition-colors"
@@ -315,10 +316,18 @@ export function RefineChat({
                             onKeyDown={handleKeyDown}
                             disabled={isReviewing || isLoading || isAnalyzing}
                             placeholder="Scrivi qui..."
-                            className="pr-12 min-h-[60px] max-h-[150px] resize-none bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500 text-sm"
+                            className="pr-12 min-h-[60px] max-h-[150px] resize-none bg-transparent border-none focus-visible:ring-0 text-sm shadow-none"
                             rows={1}
                             autoFocus
                         />
+                        <Button
+                            size="icon"
+                            onClick={handleSend}
+                            disabled={!input.trim() || isLoading || isReviewing || isAnalyzing}
+                            className="absolute right-1 bottom-1 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors disabled:bg-slate-300"
+                        >
+                            <Send className="w-4 h-4" />
+                        </Button>
                     </div>
                 </div>
 
@@ -481,49 +490,51 @@ export function RefineChat({
 
             {/* Input Area */}
             <div className="p-4 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
-                {/* Tags Area */}
-                <div className="flex flex-wrap gap-2 mb-3">
+                <div className="relative flex flex-col pt-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                    {/* Tags Area (Internal) */}
                     <AnimatePresence>
-                        {mentions.map((m, idx) => (
-                            <motion.div
-                                key={m.id}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, scale: 0.5 }}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600/10 text-indigo-700 rounded-full text-xs font-semibold border border-indigo-600/20"
-                            >
-                                <span className="uppercase tracking-tighter opacity-70">
-                                    {m.source === 'template' ? 'Menzione Template Compilato' : 'Menzione Copilot'} {idx + 1}
-                                </span>
-                                <button
-                                    onClick={() => setMentions(prev => prev.filter(item => item.id !== m.id))}
-                                    className="hover:text-indigo-900 p-0.5"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </motion.div>
-                        ))}
+                        {mentions.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-1.5 px-3 pt-2 mentions-tag-area">
+                                {mentions.map((m) => (
+                                    <motion.div
+                                        key={m.id}
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.5 }}
+                                        className="flex items-center gap-1.5 px-2 py-0.5 bg-indigo-600/10 text-indigo-700 rounded-md text-[10px] font-bold border border-indigo-600/20"
+                                    >
+                                        <span>{m.label}</span>
+                                        <button
+                                            onClick={() => setMentions(prev => prev.filter(item => item.id !== m.id))}
+                                            className="hover:text-indigo-900 p-0.5"
+                                        >
+                                            <X className="w-2.5 h-2.5" />
+                                        </button>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        )}
                     </AnimatePresence>
-                </div>
 
-                <div className="relative">
-                    <Textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        disabled={isReviewing || isLoading || isAnalyzing}
-                        placeholder={isReviewing ? "Conferma o rifiuta la modifica corrente..." : "Chiedi modifiche (es. 'Cambia la data')..."}
-                        className="pr-12 min-h-[50px] max-h-[120px] resize-none rounded-xl border-slate-200 bg-slate-100 dark:bg-slate-800 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-slate-50"
-                        rows={1}
-                    />
-                    <Button
-                        size="icon"
-                        onClick={handleSend}
-                        disabled={!input.trim() || isLoading || isReviewing || isAnalyzing}
-                        className="absolute right-1 bottom-1 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors disabled:bg-slate-300"
-                    >
-                        <Send className="w-4 h-4" />
-                    </Button>
+                    <div className="relative">
+                        <Textarea
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            disabled={isReviewing || isLoading || isAnalyzing}
+                            placeholder={isReviewing ? "Conferma o rifiuta la modifica corrente..." : "Chiedi modifiche (es. 'Cambia la data')..."}
+                            className="pr-12 min-h-[50px] max-h-[120px] resize-none border-none bg-transparent focus-visible:ring-0 shadow-none text-sm"
+                            rows={1}
+                        />
+                        <Button
+                            size="icon"
+                            onClick={handleSend}
+                            disabled={!input.trim() || isLoading || isReviewing || isAnalyzing}
+                            className="absolute right-2 bottom-2 h-8 w-8 rounded-xl bg-blue-600 hover:bg-blue-700 transition-colors disabled:bg-slate-300 text-white shadow-lg shadow-blue-500/20"
+                        >
+                            <Send className="w-4 h-4" />
+                        </Button>
+                    </div>
                 </div>
             </div>
 

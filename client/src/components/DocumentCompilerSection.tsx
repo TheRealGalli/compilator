@@ -252,7 +252,17 @@ export function DocumentCompilerSection({
   const [isReviewing, setIsReviewing] = useState(false);
   const [pendingContent, setPendingContent] = useState<string | null>(null);
   const [lastCompileContext, setLastCompileContext] = useState<any>(null);
-  const [pendingMention, setPendingMention] = useState<string | null>(null);
+  const [pendingMention, setPendingMention] = useState<{ text: string; id: string } | null>(null);
+  const [mentionCounts, setMentionCounts] = useState({ template: 0, copilot: 0 });
+
+  const handleMention = (text: string, source: 'template' | 'copilot') => {
+    setMentionCounts(prev => {
+      const newCount = prev[source] + 1;
+      const mentionId = `#${source === 'template' ? 'T' : 'C'}${newCount}`;
+      setPendingMention({ text, id: mentionId });
+      return { ...prev, [source]: newCount };
+    });
+  };
 
 
 
@@ -854,6 +864,7 @@ export function DocumentCompilerSection({
                     onClose={() => setIsRefiningMode(false)}
                     pendingMention={pendingMention}
                     onMentionConsumed={() => setPendingMention(null)}
+                    onMentionCreated={(text, source) => handleMention(text, source)}
                   />
                 }
               />
@@ -940,6 +951,7 @@ export function DocumentCompilerSection({
                     onClose={() => setIsRefiningMode(false)}
                     pendingMention={pendingMention}
                     onMentionConsumed={() => setPendingMention(null)}
+                    onMentionCreated={(text, source) => handleMention(text, source)}
                   />
                 }
               />
@@ -960,7 +972,7 @@ export function DocumentCompilerSection({
                 title={isRefiningMode ? "Template Compilato" : "Template da Compilare"}
                 placeholder="Inserisci qui il testo o il template..."
                 enableMentions={isRefiningMode}
-                onMention={(text) => setPendingMention(text)}
+                onMention={(text) => handleMention(text, 'template')}
               />
             </div>
 

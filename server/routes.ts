@@ -1564,10 +1564,9 @@ ISTRUZIONI OUTPUT:
         hasExternalSources
       });
 
-      // Format mentions for the AI
-      const formattedMentions = (mentions || []).map((m: any, idx: number) => {
-        const typeLabel = m.source === 'template' ? 'Template' : 'Copilot';
-        return `- MENZIONE ${typeLabel} ${idx + 1}: "${m.text}"`;
+      // Format mentions for the AI using the new label system (#C1, #T1)
+      const formattedMentions = (mentions || []).map((m: any) => {
+        return `- MENZIONE ${m.label || m.source}: "${m.text}"`;
       }).join('\n');
 
       const refineInstructions = `
