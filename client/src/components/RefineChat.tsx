@@ -170,7 +170,7 @@ export function RefineChat({
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col h-full rounded-md border border-input bg-transparent px-3 py-2 text-xs shadow-sm ring-offset-background focus-within:ring-1 focus-within:ring-ring"
+                className="flex flex-col h-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-xs shadow-sm focus-within:ring-1 focus-within:ring-blue-500"
             >
                 <ScrollArea className="flex-1 -mr-2 pr-2 mb-2 [&>[data-radix-scroll-area-viewport]]:h-full">
                     <div className="space-y-4">
@@ -234,7 +234,7 @@ export function RefineChat({
                         onKeyDown={handleKeyDown}
                         disabled={isReviewing || isLoading || isAnalyzing}
                         placeholder="Scrivi qui..."
-                        className="min-h-[40px] w-full resize-none bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-slate-400"
+                        className="pr-12 min-h-[60px] max-h-[150px] resize-none bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500 text-sm"
                         rows={1}
                         autoFocus
                     />
@@ -345,9 +345,9 @@ export function RefineChat({
                             animate={{ opacity: 1, y: 0 }}
                             className="flex w-full justify-start"
                         >
-                            <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex items-center gap-2">
+                            <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex items-center gap-2">
                                 <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                                <span className="text-xs text-slate-500">Elaborazione modifiche...</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">Elaborazione modifiche...</span>
                             </div>
                         </motion.div>
                     )}
@@ -357,9 +357,9 @@ export function RefineChat({
                             animate={{ opacity: 1, y: 0 }}
                             className="flex w-full justify-start"
                         >
-                            <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex items-center gap-2">
+                            <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex items-center gap-2">
                                 <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                                <span className="text-xs text-slate-500">L'AI sta analizzando il documento...</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">L'AI sta analizzando il documento...</span>
                             </div>
                         </motion.div>
                     )}
@@ -380,7 +380,7 @@ export function RefineChat({
             </div>
 
             {/* Input Area */}
-            <div className="p-4 bg-white border-t border-slate-200">
+            <div className="p-4 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
                 <div className="relative">
                     <Textarea
                         value={input}
@@ -388,7 +388,7 @@ export function RefineChat({
                         onKeyDown={handleKeyDown}
                         disabled={isReviewing || isLoading || isAnalyzing}
                         placeholder={isReviewing ? "Conferma o rifiuta la modifica corrente..." : "Chiedi modifiche (es. 'Cambia la data')..."}
-                        className="pr-12 min-h-[50px] max-h-[120px] resize-none rounded-xl border-slate-200 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-slate-50"
+                        className="pr-12 min-h-[50px] max-h-[120px] resize-none rounded-xl border-slate-200 bg-slate-100 dark:bg-slate-800 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-slate-50"
                         rows={1}
                     />
                     <Button

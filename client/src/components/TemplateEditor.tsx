@@ -81,9 +81,6 @@ export function TemplateEditor({
       Placeholder.configure({
         placeholder: placeholder,
       }),
-      BubbleMenuExtension.configure({
-        element: null, // This is usually managed by the BubbleMenu component in React
-      }),
     ],
     content: escapeMarkdown(value), // Initialize with escaped content
     editorProps: {
@@ -198,7 +195,15 @@ export function TemplateEditor({
           <BubbleMenu
             // @ts-ignore
             editor={editor}
-            tippyOptions={{ duration: 100 }}
+            tippyOptions={{
+              duration: 100,
+              zIndex: 9999,
+              appendTo: () => document.body,
+            }}
+            shouldShow={({ editor, from, to }) => {
+              // Only show if there's a selection and it's not empty
+              return from !== to;
+            }}
           >
             <MentionButton
               onClick={() => {
@@ -206,8 +211,8 @@ export function TemplateEditor({
                 const text = editor.state.doc.textBetween(from, to, ' ');
                 if (text.trim()) {
                   onMention?.(text.trim());
-                  // Clear selection after clicking
-                  editor.commands.focus();
+                  // Clear selection after clicking to hide menu
+                  editor.chain().focus().run();
                 }
               }}
             />
