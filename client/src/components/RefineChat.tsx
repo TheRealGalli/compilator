@@ -130,6 +130,8 @@ export function RefineChat({
             });
 
             const data = await response.json();
+
+            // Success might be true even if JSON parsing failed but fallback was used
             if (!data.success) throw new Error(data.error);
 
             const aiMsg: ChatMessage = {

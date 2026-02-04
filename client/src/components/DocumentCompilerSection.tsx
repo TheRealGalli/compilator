@@ -993,7 +993,6 @@ export function DocumentCompilerSection({
               />
             </div>
 
-            {/* COLUMN 3: Compiled Output (col-span-4) */}
             <div className="lg:col-span-4 min-h-[400px] lg:min-h-[600px] lg:h-full overflow-hidden flex flex-col">
               {isReviewing ? (
                 // REVIEW MODE CARD
@@ -1008,43 +1007,49 @@ export function DocumentCompilerSection({
                         <CardDescription className="text-xs text-blue-700">Conferma per applicare</CardDescription>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex gap-1.5">
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="h-7 w-7 p-0 rounded-full border-red-200 bg-white text-red-600 hover:bg-red-50"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
                         onClick={handleRejectRefinement}
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-4 h-4" />
                       </Button>
                       <Button
                         size="sm"
-                        className="h-7 w-7 p-0 rounded-full bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                        className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm"
                         onClick={handleAcceptRefinement}
                       >
-                        <Check className="w-3 h-3" />
+                        <Check className="w-3.5 h-3.5" />
+                        Applica
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent className="flex-1 p-0 overflow-hidden relative bg-white">
-                    <div className="absolute inset-0 overflow-auto p-4 prose prose-sm max-w-none">
-                      {/* Simple preview of markdown for now, or reuse a readonly editor/renderer */}
-                      {/* We can reuse CompiledOutput but force content */}
-                      <CompiledOutput
-                        content={pendingContent || ""}
-                        onCopy={() => { }}
-                        onDownload={() => { }}
-                        readOnly={true} // Assuming it supports this or just hides controls
-                      />
-                    </div>
+                  <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
+                    <CompiledOutput
+                      content={pendingContent || ""}
+                      onCopy={() => { }}
+                      onDownload={() => { }}
+                      readOnly={true}
+                      enableMentions={isRefiningMode}
+                      onMention={(text) => setPendingMention(text)}
+                    />
                   </CardContent>
                 </Card>
               ) : (
-                // STANDARD COMPILED OUTPUT
                 <CompiledOutput
                   content={compiledContent}
-                  onCopy={handleCopy}
+                  onCopy={() => {
+                    navigator.clipboard.writeText(compiledContent);
+                    toast({
+                      title: "Copiato",
+                      description: "Il contenuto è stato copiato negli appunti.",
+                    });
+                  }}
                   onDownload={handleDownload}
+                  enableMentions={isRefiningMode}
+                  onMention={(text) => setPendingMention(text)}
                 />
               )}
             </div>

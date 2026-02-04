@@ -1593,11 +1593,17 @@ IMPORTANTE: Mantieni coerenza con il documento originale e le fonti caricate. Ri
       // Parse JSON safely
       let parsed;
       try {
-        const cleanJson = jsonResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+        // More robust extraction: find anything between { and }
+        const jsonMatch = jsonResponse.match(/\{[\s\S]*\}/);
+        const cleanJson = jsonMatch ? jsonMatch[0] : jsonResponse;
         parsed = JSON.parse(cleanJson);
       } catch (e) {
-        console.error("Failed to parse JSON from AI", jsonResponse);
-        parsed = { newContent: null, explanation: jsonResponse };
+        console.error("Failed to parse JSON from AI. Raw response:", jsonResponse);
+        // Fallback: if it's not JSON, treat the whole thing as an explanation
+        parsed = {
+          newContent: null,
+          explanation: jsonResponse.replace(/```json/g, '').replace(/```/g, '').trim()
+        };
       }
 
       res.json({
