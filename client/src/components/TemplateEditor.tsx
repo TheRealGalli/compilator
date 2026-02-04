@@ -81,6 +81,7 @@ export function TemplateEditor({
       Placeholder.configure({
         placeholder: placeholder,
       }),
+      BubbleMenuExtension,
     ],
     content: escapeMarkdown(value), // Initialize with escaped content
     editorProps: {
