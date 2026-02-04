@@ -48,6 +48,7 @@ const MAX_FILE_SIZE_MB = 250;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // Cache for PDF buffers to allow incremental frontend loops without re-uploading
+// SESSION ISOLATED: Key is now "sessionId:fileId"
 const pdfCache = new Map<string, { buffer: Buffer, mimeType: string, timestamp: number }>();
 
 // Cleanup cache every 30 mins
@@ -1161,7 +1162,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fields = await getPdfFormFields(buffer);
 
       // Store in cache for subsequent incremental proposal calls
-      const cacheKey = crypto.createHash('md5').update(masterSource.base64).digest('hex');
+      const sessionSalt = req.sessionID || 'anonymous';
+      const cacheKey = crypto.createHash('md5').update(masterSource.base64 + sessionSalt).digest('hex');
       pdfCache.set(cacheKey, { buffer, mimeType: masterSource.type, timestamp: Date.now() });
 
       res.json({ fields, cacheKey });
@@ -1306,11 +1308,13 @@ ${hasMemory ? `
    - Usa questo file per recuperare l'IDENTITÀ di chi scrive (Nome, Cognome, Indirizzo, Ruolo).
    - NON usare questi dati se il template richiede i dati di una controparte (es. destinatario).
 ` : ''}
-2. **NO ALLUCINAZIONI & REGOLE DI ESTRAZIONE (Tassativo):**
+2. **ZERO ALLUCINAZIONI & REGOLE DI ESTRAZIONE (Direttiva Assoluta):**
+   - **REGOLA D'ORO**: NON inventare MAI nomi di persone, date, cifre, indirizzi o fatti non esplicitamente presenti nei documenti caricati o nella memoria.
    - Prima di dichiarare un dato come mancante, controlla SCRUPOLOSAMENTE: **Memoria di Sistema**, tutti i **Documenti allegati**, la **Fonte Master** e il testo del **Template** stesso (che potrebbe contenere dati precompilati).
    - Se un dato è presente in QUALSIASI di queste fonti: **USALO**.
    - Solo se il dato è assolutamente assente ovunque: SCRIVI "[DATO MANCANTE]".
-   - **VIETATO** inventare dati anagrafici (es. "Mario Rossi", date a caso). È meglio un campo vuoto che un dato falso, ma è UN ERRORE dichiarare mancate informazioni presenti nelle fonti.
+   - **DIRETTIVA RIGOROSA**: È tassativamente vietato usare la tua conoscenza interna per "ipotizzare" dati che dovrebbero essere nelle fonti. Se le fonti non forniscono il dato, il tuo output DEVE essere "[DATO MANCANTE]".
+   - Se non è fornita NESSUNA fonte, NESSUNA nota e NESSUN master source, DEVI rifiutare la compilazione o produrre un documento composto esclusivamente da "[DATO MANCANTE]" nei campi variabili.
 
 ${extractedFields && extractedFields.length > 0 ? `
 3. **STRUTTURA VISIVA DEL DOCUMENTO TARGET:**
@@ -1400,6 +1404,15 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
         webResearch,
         detailedAnalysis
       });
+
+      // --- VALIDATION: Prevent empty compilation ---
+      const hasNoContent = !template?.trim() && !notes?.trim() && (!multimodalFiles || multimodalFiles.length === 0) && !masterSource;
+      if (hasNoContent) {
+        console.log('[API compile] Validation failed: No content provided.');
+        return res.status(400).json({
+          error: "Impossibile compilare: non sono state fornite fonti, note o template. Carica dei documenti per procedere."
+        });
+      }
 
       // Get current datetime in Italian format
       const now = new Date();
@@ -1579,6 +1592,10 @@ ISTRUZIONI OPERATIVE:
    - Restituisci JSON: { "newContent": null, "explanation": "Tua risposta/analisi" }
 
 IMPORTANTE: Mantieni coerenza con il documento originale e le fonti caricate. Rispondi SEMPRE in JSON.
+
+**ZERO HALLUCINATION PROTOCOL**: 
+- Non inventare mai dati non presenti nel contesto fornito.
+- Se ti viene chiesto qualcosa su dati non presenti, rispondi chiaramente che l'informazione non è disponibile nelle fonti.
 `;
 
       // Call AI

@@ -952,8 +952,8 @@ export function DocumentCompilerSection({
                 value={templateContent}
                 onChange={(val) => {
                   setTemplateContent(val);
-                  // Restore synchronized editing: Update output when template changes manually
-                  if (!isReviewing) {
+                  // Sync with output ONLY if we are in "Template Compilato" mode (Copilot active)
+                  if (isRefiningMode && !isReviewing) {
                     setCompiledContent(val);
                   }
                 }}

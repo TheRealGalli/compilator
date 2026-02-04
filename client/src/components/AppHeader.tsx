@@ -38,14 +38,6 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick
       </div>
 
       <div className="flex items-center gap-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={toggleTheme}
-          data-testid="button-toggle-theme"
-        >
-          {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-        </Button>
 
         <Avatar className="w-8 h-8" data-testid="avatar-user">
           <AvatarFallback className={userIdentity ? "bg-blue-100 text-blue-700 font-bold" : ""}>

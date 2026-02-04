@@ -192,7 +192,7 @@ export function TemplateEditor({
         <h3 className="text-sm font-medium">{title}</h3>
       </div>
       <div className="flex-1 overflow-hidden relative">
-        {editor && enableMentions && (
+        {editor && (
           <BubbleMenu
             // @ts-ignore
             editor={editor}
@@ -203,8 +203,8 @@ export function TemplateEditor({
               offset: [0, 10],
             }}
             shouldShow={({ editor, from, to }) => {
-              // Only show if there's a selection and it's not empty
-              return from !== to;
+              // Only show if mentions are enabled and there is a non-empty selection
+              return enableMentions && from !== to && !editor.state.selection.empty;
             }}
           >
             <MentionButton

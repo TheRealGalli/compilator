@@ -76,7 +76,7 @@ export async function configureBucketLifecycle(): Promise<void> {
           rule: [
             {
               action: { type: 'Delete' },
-              condition: { age: 30 }, // Days
+              condition: { age: 1 }, // 24 hours (1 day) retention for session-only data
             },
           ],
         },
