@@ -793,22 +793,60 @@ export function DocumentCompilerSection({
       <div className="flex-1 min-h-0 overflow-hidden">
         {isPdfMode ? (
           /* PDF STUDIO UNIFIED VIEW */
-          <div className="h-full flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-500">
-            <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
-              <PdfPreview
-                fileBase64={masterSource?.base64 || ""}
-                fileName={masterSource?.name}
-                className="rounded-none border-none h-full"
-                selectedSources={selectedSources.map(s => ({
-                  name: s.name,
-                  type: s.type,
-                  base64: s.base64
-                }))}
+          <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4 animate-in fade-in zoom-in-95 duration-500">
+            {/* COLUMN 1: Settings OR Chat (col-span-3) */}
+            <div className="lg:col-span-3 min-h-[400px] lg:min-h-[600px] lg:h-full flex flex-col overflow-hidden">
+              <ModelSettings
+                className="flex-1"
                 notes={notes}
+                temperature={temperature}
                 webResearch={webResearch}
+                detailedAnalysis={detailedAnalysis}
+                formalTone={formalTone}
                 modelProvider={modelProvider}
+                onNotesChange={setNotes}
+                onTemperatureChange={setTemperature}
+                onWebResearchChange={setWebResearch}
+                onDetailedAnalysisChange={setDetailedAnalysis}
+                onFormalToneChange={setFormalTone}
+                onModelProviderChange={setModelProvider}
+                isRefining={isRefiningMode}
+                chatInterface={
+                  <RefineChat
+                    minimal={true}
+                    compileContext={lastCompileContext}
+                    currentContent={pendingContent || compiledContent}
+                    onPreview={(newContent) => {
+                      setPendingContent(newContent);
+                      setIsReviewing(true);
+                    }}
+                    isReviewing={isReviewing}
+                    onAccept={handleAcceptRefinement}
+                    onReject={handleRejectRefinement}
+                    onClose={() => setIsRefiningMode(false)}
+                  />
+                }
               />
-            </Card>
+            </div>
+
+            {/* COLUMN 2: PDF Preview (col-span-9) */}
+            <div className="lg:col-span-9 flex flex-col min-h-0 overflow-hidden">
+              <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
+                <PdfPreview
+                  fileBase64={masterSource?.base64 || ""}
+                  fileName={masterSource?.name}
+                  className="rounded-none border-none h-full"
+                  selectedSources={selectedSources.map(s => ({
+                    name: s.name,
+                    type: s.type,
+                    base64: s.base64
+                  }))}
+                  notes={notes}
+                  webResearch={webResearch}
+                  modelProvider={modelProvider}
+                />
+              </Card>
+            </div>
           </div>
         ) : (
           <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
