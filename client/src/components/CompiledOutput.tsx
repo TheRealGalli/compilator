@@ -127,7 +127,6 @@ export function CompiledOutput({
                   tippyOptions={{
                     duration: 100,
                     zIndex: 9999,
-                    appendTo: () => document.body,
                     placement: 'top',
                     offset: [0, 10],
                   }}

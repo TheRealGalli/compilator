@@ -199,9 +199,8 @@ export function TemplateEditor({
             tippyOptions={{
               duration: 100,
               zIndex: 9999,
-              appendTo: () => document.body,
               placement: 'top',
-              offset: [0, 10], // Move it up a bit more
+              offset: [0, 10],
             }}
             shouldShow={({ editor, from, to }) => {
               // Only show if there's a selection and it's not empty

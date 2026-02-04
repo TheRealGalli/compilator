@@ -720,36 +720,7 @@ export function DocumentCompilerSection({
     <div className="h-full flex flex-col p-6 gap-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "p-1.5 rounded-lg transition-all",
-              isCompiledView
-                ? "cursor-not-allowed opacity-50"
-                : "cursor-pointer hover:bg-slate-100 active:scale-95 group"
-            )}
-            onClick={() => {
-              if (isCompiledView) {
-                toast({
-                  title: "Modalità bloccata",
-                  description: "Non è possibile cambiare modalità dopo la prima compilazione.",
-                });
-                return;
-              }
-              setIsPdfMode(!isPdfMode);
-              toast({
-                title: !isPdfMode ? "PDF Studio Attivato" : "Modalità Standard Attivata",
-                description: !isPdfMode
-                  ? "Ora puoi gestire i campi del PDF direttamente."
-                  : "Sei tornato alla modalità di compilazione classica.",
-              });
-            }}
-          >
-            <ThreeStars className={cn(
-              "w-5 h-5 transition-colors",
-              isPdfMode ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
-            )} />
-          </div>
-          <h2 className="text-xl font-semibold">Compilatore Documenti AI</h2>
+          <h2 className="text-xl font-semibold">Compilatore Documenti</h2>
         </div>
         <div className="relative flex flex-col items-end min-h-[40px]">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
