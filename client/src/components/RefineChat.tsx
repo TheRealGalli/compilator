@@ -9,6 +9,7 @@ import { getApiUrl } from "@/lib/api-config";
 import { apiRequest } from "@/lib/queryClient";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { MentionButton } from './MentionButton';
 
 interface ChatMessage {
     id: string;
@@ -48,7 +49,9 @@ export function RefineChat({
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     // Initial Analysis Trigger
     useEffect(() => {
@@ -100,12 +103,42 @@ export function RefineChat({
         if (pendingMention) {
             setInput(prev => {
                 const separator = prev.trim() ? "\n" : "";
-                // Wrap in quotes or a specific block for clarity
                 return `${prev}${separator}> "${pendingMention}"\n`;
             });
             onMentionConsumed?.();
         }
     }, [pendingMention]);
+
+    const handleMouseUp = () => {
+        const sel = window.getSelection();
+        if (sel && sel.toString().trim().length > 0 && containerRef.current) {
+            const range = sel.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+
+            // Check if selection is within the container
+            if (containerRef.current.contains(sel.anchorNode)) {
+                setSelection({
+                    text: sel.toString().trim(),
+                    x: rect.left + rect.width / 2,
+                    y: rect.top - 10
+                });
+            }
+        } else {
+            setSelection(null);
+        }
+    };
+
+    const handleMentionClick = () => {
+        if (selection) {
+            setInput(prev => {
+                const separator = prev.trim() ? "\n" : "";
+                return `${prev}${separator}> "${selection.text}"\n`;
+            });
+            setSelection(null);
+            // Clear window selection
+            window.getSelection()?.removeAllRanges();
+        }
+    };
 
     const handleSend = async () => {
         if (!input.trim() || isLoading || isReviewing || isAnalyzing) return;
@@ -172,7 +205,9 @@ export function RefineChat({
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col h-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-xs shadow-sm focus-within:ring-1 focus-within:ring-blue-500"
+                className="flex flex-col h-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-xs shadow-sm focus-within:ring-1 focus-within:ring-blue-500 relative"
+                onMouseUp={handleMouseUp}
+                ref={containerRef}
             >
                 <ScrollArea className="flex-1 -mr-2 pr-2 mb-2 [&>[data-radix-scroll-area-viewport]]:h-full">
                     <div className="space-y-4">
@@ -241,6 +276,20 @@ export function RefineChat({
                         autoFocus
                     />
                 </div>
+
+                {/* Selection Mention Button */}
+                {selection && (
+                    <div
+                        className="fixed z-[9999]"
+                        style={{
+                            left: selection.x,
+                            top: selection.y,
+                            transform: 'translate(-50%, -100%)'
+                        }}
+                    >
+                        <MentionButton onClick={handleMentionClick} />
+                    </div>
+                )}
             </motion.div>
         );
     }
@@ -250,7 +299,9 @@ export function RefineChat({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="flex flex-col h-full bg-slate-50/50 rounded-xl border border-slate-200 overflow-hidden"
+            className="flex flex-col h-full bg-slate-50/50 rounded-xl border border-slate-200 overflow-hidden relative"
+            onMouseUp={handleMouseUp}
+            ref={containerRef}
         >
             {/* Header */}
             <div className="p-4 border-b border-slate-200 bg-white/50 backdrop-blur-sm flex items-center justify-between">
@@ -403,6 +454,20 @@ export function RefineChat({
                     </Button>
                 </div>
             </div>
+
+            {/* Selection Mention Button */}
+            {selection && (
+                <div
+                    className="fixed z-[9999]"
+                    style={{
+                        left: selection.x,
+                        top: selection.y,
+                        transform: 'translate(-50%, -100%)'
+                    }}
+                >
+                    <MentionButton onClick={handleMentionClick} />
+                </div>
+            )}
         </motion.div>
     );
 }

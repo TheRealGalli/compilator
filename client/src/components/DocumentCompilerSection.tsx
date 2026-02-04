@@ -1003,8 +1003,6 @@ export function DocumentCompilerSection({
                       onCopy={() => { }}
                       onDownload={() => { }}
                       readOnly={true}
-                      enableMentions={isRefiningMode}
-                      onMention={(text) => setPendingMention(text)}
                     />
                   </CardContent>
                 </Card>
@@ -1019,8 +1017,6 @@ export function DocumentCompilerSection({
                     });
                   }}
                   onDownload={handleDownload}
-                  enableMentions={isRefiningMode}
-                  onMention={(text) => setPendingMention(text)}
                 />
               )}
             </div>
