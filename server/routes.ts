@@ -1564,9 +1564,10 @@ ISTRUZIONI OUTPUT:
         hasExternalSources
       });
 
-      // Format mentions for the AI using the new label system (#C1, #T1)
+      // Format mentions for the AI using the new label system (#C1, #T1) and position offsets
       const formattedMentions = (mentions || []).map((m: any) => {
-        return `- MENZIONE ${m.label || m.source}: "${m.text}"`;
+        const positionInfo = (m.start !== undefined && m.end !== undefined) ? ` [pos: ${m.start}-${m.end}]` : '';
+        return `- MENZIONE ${m.label || m.source}${positionInfo}: "${m.text}"`;
       }).join('\n');
 
       const refineInstructions = `

@@ -17,7 +17,7 @@ interface TemplateEditorProps {
   className?: string;
   title?: string;
   enableMentions?: boolean;
-  onMention?: (text: string) => void;
+  onMention?: (text: string, start: number, end: number) => void;
 }
 
 // Helper to escape markdown characters so they appear as literals in Tiptap
@@ -214,7 +214,7 @@ export function TemplateEditor({
                 const { from, to } = editor.state.selection;
                 const text = editor.state.doc.textBetween(from, to, ' ');
                 if (text.trim()) {
-                  onMention?.(text.trim());
+                  onMention?.(text.trim(), from, to);
                   // Clear selection after clicking to hide menu
                   editor.chain().focus().run();
                 }

@@ -28,9 +28,9 @@ interface RefineChatProps {
     initialExplanation?: string;
     onClose?: () => void;
     minimal?: boolean;
-    pendingMention?: { text: string; id: string } | null;
+    pendingMention?: { text: string; id: string; start?: number; end?: number } | null;
     onMentionConsumed?: () => void;
-    onMentionCreated?: (text: string, source: 'copilot' | 'template') => void;
+    onMentionCreated?: (text: string, source: 'copilot' | 'template', start?: number, end?: number) => void;
 }
 
 interface MentionContext {
@@ -38,6 +38,8 @@ interface MentionContext {
     text: string;
     label: string;
     source: 'copilot' | 'template';
+    start?: number;
+    end?: number;
 }
 
 export function RefineChat({
@@ -115,7 +117,9 @@ export function RefineChat({
                 id: `mention-${Date.now()}`,
                 text: pendingMention.text,
                 label: pendingMention.id,
-                source: 'template'
+                source: 'template',
+                start: pendingMention.start,
+                end: pendingMention.end
             };
             setMentions(prev => [...prev, newMention]);
             onMentionConsumed?.();
@@ -152,7 +156,7 @@ export function RefineChat({
         }
 
         if (selection) {
-            onMentionCreated?.(selection.text, 'copilot');
+            onMentionCreated?.(selection.text, 'copilot'); // Chat selection doesn't have reliable document offsets easily
             setSelection(null);
         }
     };
@@ -290,7 +294,7 @@ export function RefineChat({
                 <div className="relative shrink-0 flex flex-col pt-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                     {/* Tags Area (Internal) */}
                     {mentions.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-1.5 px-3 max-h-20 overflow-y-auto">
+                        <div className="flex flex-wrap gap-1.5 mb-1.5 px-3 max-h-20 overflow-y-auto mentions-tag-area">
                             {mentions.map((m) => (
                                 <motion.div
                                     initial={{ scale: 0.8, opacity: 0 }}
@@ -320,14 +324,6 @@ export function RefineChat({
                             rows={1}
                             autoFocus
                         />
-                        <Button
-                            size="icon"
-                            onClick={handleSend}
-                            disabled={!input.trim() || isLoading || isReviewing || isAnalyzing}
-                            className="absolute right-1 bottom-1 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors disabled:bg-slate-300"
-                        >
-                            <Send className="w-4 h-4" />
-                        </Button>
                     </div>
                 </div>
 
@@ -336,8 +332,8 @@ export function RefineChat({
                     <div
                         className="fixed z-[9999]"
                         style={{
-                            left: selection.x,
-                            top: selection.y,
+                            left: selection?.x,
+                            top: selection?.y,
                             transform: 'translate(-50%, -100%)'
                         }}
                     >

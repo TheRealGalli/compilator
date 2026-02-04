@@ -252,14 +252,14 @@ export function DocumentCompilerSection({
   const [isReviewing, setIsReviewing] = useState(false);
   const [pendingContent, setPendingContent] = useState<string | null>(null);
   const [lastCompileContext, setLastCompileContext] = useState<any>(null);
-  const [pendingMention, setPendingMention] = useState<{ text: string; id: string } | null>(null);
+  const [pendingMention, setPendingMention] = useState<{ text: string; id: string; start?: number; end?: number } | null>(null);
   const [mentionCounts, setMentionCounts] = useState({ template: 0, copilot: 0 });
 
-  const handleMention = (text: string, source: 'template' | 'copilot') => {
+  const handleMention = (text: string, source: 'template' | 'copilot', start?: number, end?: number) => {
     setMentionCounts(prev => {
       const newCount = prev[source] + 1;
       const mentionId = `#${source === 'template' ? 'T' : 'C'}${newCount}`;
-      setPendingMention({ text, id: mentionId });
+      setPendingMention({ text, id: mentionId, start, end });
       return { ...prev, [source]: newCount };
     });
   };
@@ -864,7 +864,7 @@ export function DocumentCompilerSection({
                     onClose={() => setIsRefiningMode(false)}
                     pendingMention={pendingMention}
                     onMentionConsumed={() => setPendingMention(null)}
-                    onMentionCreated={(text, source) => handleMention(text, source)}
+                    onMentionCreated={(text, source, start, end) => handleMention(text, source, start, end)}
                   />
                 }
               />
@@ -951,7 +951,7 @@ export function DocumentCompilerSection({
                     onClose={() => setIsRefiningMode(false)}
                     pendingMention={pendingMention}
                     onMentionConsumed={() => setPendingMention(null)}
-                    onMentionCreated={(text, source) => handleMention(text, source)}
+                    onMentionCreated={(text, source, start, end) => handleMention(text, source, start, end)}
                   />
                 }
               />
@@ -972,7 +972,7 @@ export function DocumentCompilerSection({
                 title={isRefiningMode ? "Template Compilato" : "Template da Compilare"}
                 placeholder="Inserisci qui il testo o il template..."
                 enableMentions={isRefiningMode}
-                onMention={(text) => handleMention(text, 'template')}
+                onMention={(text, start, end) => handleMention(text, 'template', start, end)}
               />
             </div>
 
