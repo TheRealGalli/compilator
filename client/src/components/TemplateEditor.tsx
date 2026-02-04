@@ -1,13 +1,14 @@
-import { useEditor, EditorContent } from '@tiptap/react';
+import { TiptapBubbleMenu as BubbleMenu, useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
-// TaskList and TaskItem imports removed
 import { Markdown } from 'tiptap-markdown';
 import Placeholder from '@tiptap/extension-placeholder';
+import { BubbleMenu as BubbleMenuExtension } from '@tiptap/extension-bubble-menu';
 import { useEffect } from 'react';
+import { MentionButton } from './MentionButton';
 
 interface TemplateEditorProps {
   value?: string;
@@ -15,6 +16,8 @@ interface TemplateEditorProps {
   placeholder?: string;
   className?: string;
   title?: string;
+  enableMentions?: boolean;
+  onMention?: (text: string) => void;
 }
 
 // Helper to escape markdown characters so they appear as literals in Tiptap
@@ -44,7 +47,9 @@ export function TemplateEditor({
   onChange,
   placeholder = "Seleziona un template preimpostato o incolla qui il tuo modello...\n\nIstruzioni Formattazione:\n# Titolo\n**Grassetto**\n[ ] Checkbox vuota\n[x] Checkbox selezionata",
   className = "",
-  title = "Template da Compilare"
+  title = "Template da Compilare",
+  enableMentions = false,
+  onMention
 }: TemplateEditorProps) {
 
   const editor = useEditor({
@@ -75,6 +80,9 @@ export function TemplateEditor({
       }),
       Placeholder.configure({
         placeholder: placeholder,
+      }),
+      BubbleMenuExtension.configure({
+        element: null, // This is usually managed by the BubbleMenu component in React
       }),
     ],
     content: escapeMarkdown(value), // Initialize with escaped content
@@ -186,6 +194,25 @@ export function TemplateEditor({
         <h3 className="text-sm font-medium">{title}</h3>
       </div>
       <div className="flex-1 overflow-hidden relative">
+        {editor && enableMentions && (
+          <BubbleMenu
+            // @ts-ignore
+            editor={editor}
+            tippyOptions={{ duration: 100 }}
+          >
+            <MentionButton
+              onClick={() => {
+                const { from, to } = editor.state.selection;
+                const text = editor.state.doc.textBetween(from, to, ' ');
+                if (text.trim()) {
+                  onMention?.(text.trim());
+                  // Clear selection after clicking
+                  editor.commands.focus();
+                }
+              }}
+            />
+          </BubbleMenu>
+        )}
         <EditorContent editor={editor} className="h-full w-full" />
       </div>
     </div>

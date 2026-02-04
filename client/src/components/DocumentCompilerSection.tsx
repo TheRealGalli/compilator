@@ -251,6 +251,7 @@ export function DocumentCompilerSection({
   const [isReviewing, setIsReviewing] = useState(false);
   const [pendingContent, setPendingContent] = useState<string | null>(null);
   const [lastCompileContext, setLastCompileContext] = useState<any>(null);
+  const [pendingMention, setPendingMention] = useState<string | null>(null);
 
 
 
@@ -847,6 +848,8 @@ export function DocumentCompilerSection({
                     onAccept={handleAcceptRefinement}
                     onReject={handleRejectRefinement}
                     onClose={() => setIsRefiningMode(false)}
+                    pendingMention={pendingMention}
+                    onMentionConsumed={() => setPendingMention(null)}
                   />
                 }
               />
@@ -904,6 +907,8 @@ export function DocumentCompilerSection({
                     onAccept={handleAcceptRefinement}
                     onReject={handleRejectRefinement}
                     onClose={() => setIsRefiningMode(false)}
+                    pendingMention={pendingMention}
+                    onMentionConsumed={() => setPendingMention(null)}
                   />
                 }
               />
@@ -923,6 +928,8 @@ export function DocumentCompilerSection({
                 }}
                 title={isRefiningMode ? "Template Compilato" : "Template da Compilare"}
                 placeholder="Inserisci qui il testo o il template..."
+                enableMentions={isRefiningMode}
+                onMention={(text) => setPendingMention(text)}
               />
             </div>
 

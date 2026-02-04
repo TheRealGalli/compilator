@@ -27,9 +27,23 @@ interface RefineChatProps {
     initialExplanation?: string;
     onClose?: () => void;
     minimal?: boolean;
+    pendingMention?: string | null;
+    onMentionConsumed?: () => void;
 }
 
-export function RefineChat({ compileContext, currentContent, onPreview, isReviewing, onAccept, onReject, initialExplanation, onClose, minimal = false }: RefineChatProps) {
+export function RefineChat({
+    compileContext,
+    currentContent,
+    onPreview,
+    isReviewing,
+    onAccept,
+    onReject,
+    initialExplanation,
+    onClose,
+    minimal = false,
+    pendingMention,
+    onMentionConsumed
+}: RefineChatProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -83,10 +97,15 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
     const lastAiMessage = messages.slice().reverse().find(m => m.role === 'ai')?.text || "";
 
     useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        if (pendingMention) {
+            setInput(prev => {
+                const separator = prev.trim() ? "\n" : "";
+                // Wrap in quotes or a specific block for clarity
+                return `${prev}${separator}> "${pendingMention}"\n`;
+            });
+            onMentionConsumed?.();
         }
-    }, [messages]);
+    }, [pendingMention]);
 
     const handleSend = async () => {
         if (!input.trim() || isLoading || isReviewing || isAnalyzing) return;
@@ -269,7 +288,7 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
                                     "max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm",
                                     msg.role === 'user'
                                         ? "bg-blue-600 text-white rounded-br-none"
-                                        : "bg-slate-50 border border-slate-200 text-slate-800 rounded-bl-none"
+                                        : "bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 rounded-bl-none"
                                 )}
                             >
                                 {msg.role === 'user' ? (
