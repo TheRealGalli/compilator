@@ -1566,12 +1566,12 @@ ISTRUZIONI:
 1. Se l'utente chiede una modifica al testo:
    - Riscrivi IL DOCUMENTO COMPLETO applicando la modifica.
    - Restituisci JSON: { "newContent": "TESTO COMPLETO AGGIORNATO...", "explanation": "Ho modificato..." }
-2. Se l'utente fa solo una domanda (senza chiedere modifiche):
-   - Restituisci JSON: { "newContent": null, "explanation": "Risposta alla domanda..." }
+2. Se l'utente chiede un'analisi o fa una domanda (senza chiedere modifiche):
+   - Se la richiesta riguarda un'analisi iniziale: identifica il Master Pin, riassumi le fonti usate e i punti salienti del documento compilato.
+   - Restituisci JSON: { "newContent": null, "explanation": "Risposta alla domanda o analisi..." }
 
 IMPORTANTE:
 - Quando restituisci "newContent", DEVE ESSERE IL DOCUMENTO INTERO PRONTO PER L'EDITOR (Markdown), non solo uno snippet.
-- Mantieni lo stile e la formattazione (grassetto, checkbox) come definito nel System Prompt originale.
 - Rispondi sempre in JSON valido.
 `;
 
@@ -1593,12 +1593,10 @@ IMPORTANTE:
       // Parse JSON safely
       let parsed;
       try {
-        // Strip markdown code blocks if present ```json ... ```
         const cleanJson = jsonResponse.replace(/```json/g, '').replace(/```/g, '').trim();
         parsed = JSON.parse(cleanJson);
       } catch (e) {
         console.error("Failed to parse JSON from AI", jsonResponse);
-        // Fallback: assume text is explanation if no new content, or just fail gracefully
         parsed = { newContent: null, explanation: jsonResponse };
       }
 

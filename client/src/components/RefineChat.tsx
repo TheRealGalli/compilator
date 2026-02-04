@@ -26,44 +26,58 @@ interface RefineChatProps {
 }
 
 export function RefineChat({ compileContext, currentContent, onPreview, isReviewing, onAccept, onReject, initialExplanation, onClose, minimal = false }: RefineChatProps) {
-    const [messages, setMessages] = useState<ChatMessage[]>(() => {
-        if (initialExplanation) {
-            return [{
-                id: 'init-1',
-                role: 'ai',
-                text: initialExplanation,
-                timestamp: new Date()
-            }];
-        }
-        return [{
-            id: 'init-0',
-            role: 'ai',
-            text: "Documento compilato! Sono pronto a fare modifiche. Scrivimi cosa vuoi cambiare.",
-            timestamp: new Date()
-        }];
-    });
-
-    // In minimal mode, we might want to pre-fill the input with the AI's message 
-    // to simulate "the model wrote into the text field", allowing the user to read and then clear/type.
-    // OR we relies on placeholder? 
-    // User expectation: "Compare la risposta del modello".
-    // Let's use a state that combines everything for the minimal view.
-    // Actually, `messages` are the source of truth.
-    // If minimal, we display the LAST AI message as a read-only block? No, "campo di testo".
-    // Let's just render the Textarea.
-
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Minimal Mode Effect: When a new AI message arrives, update 'input'?
-    // Disadvantage: User loses what they typed if they were typing. (Unlikely in turn-based).
-    // Let's try: The text interface SHOWS the interaction.
-    // But the user specifically asked for "campo di testo... che si allarga".
-    // I'll stick to standard chat logic state, but RENDER only the textarea.
-    // But what does the user see?
-    // I will show the LAST message from the AI as the "Placeholder" (if input empty).
-    // Visual Hack: Use a value derived from "Input" (if typing) OR "Last AI Message" (if idle).
+    // Initial Analysis Trigger
+    useEffect(() => {
+        if (compileContext && messages.length === 0 && !isAnalyzing) {
+            performInitialAnalysis();
+        }
+    }, [compileContext]);
+
+    const performInitialAnalysis = async () => {
+        setIsAnalyzing(true);
+        try {
+            const analysisPrompt = "Effettua un'analisi iniziale del documento appena compilato. Riassumi brevemente il contenuto, identifica chiaramente quale documento è stato usato come Master Pin (se presente) e quali fonti hai consultato. Concludi chiedendo come posso aiutarti oggi.";
+
+            const response = await fetch('/api/refine', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    compileContext,
+                    currentContent,
+                    userInstruction: analysisPrompt,
+                    chatHistory: []
+                })
+            });
+
+            const data = await response.json();
+            if (!data.success) throw new Error(data.error);
+
+            const aiMsg: ChatMessage = {
+                id: 'init-analysis',
+                role: 'ai',
+                text: data.explanation || "Analisi completata. Pronti per le tue modifiche.",
+                timestamp: new Date()
+            };
+            setMessages([aiMsg]);
+
+        } catch (error) {
+            console.error("Initial analysis error:", error);
+            setMessages([{
+                id: 'init-err',
+                role: 'ai',
+                text: "Documento pronto. C'è stato un piccolo intoppo durante l'analisi automatica, ma puoi chiedermi qualsiasi cosa qui sotto.",
+                timestamp: new Date()
+            }]);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
 
     const lastAiMessage = messages.slice().reverse().find(m => m.role === 'ai')?.text || "";
 
@@ -74,7 +88,7 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
     }, [messages]);
 
     const handleSend = async () => {
-        if (!input.trim() || isLoading || isReviewing) return;
+        if (!input.trim() || isLoading || isReviewing || isAnalyzing) return;
 
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
@@ -136,50 +150,6 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
     };
 
     if (minimal) {
-        // Minimal Console Mode
-        // We show the Input value.
-        // If Input is empty and we are NOT loading, we show the last AI message as a "prompt" or pseudo-value.
-        // Actually, to make it feel like "the model replied inside the field", let's render the last AI message
-        // UNTIL the user focuses or starts typing? 
-        // Or cleaner: Just show the Last AI Message as the value, and when user types, they replace it?
-        // Let's rely on standard Placeholder behavior with the AI message as placeholder.
-        // PROBLEM: Placeholders are gray and cutoff. 
-        // SOLUTION: We render a Textarea. If input is empty, we show a standard placeholder or the AI message?
-        // The user wants "Dissolvenza".
-        // Let's try: Display the AI message. User types blindly? No.
-
-        // Revised Minimal Logic:
-        // We treat the "Conversation" as a single buffer? No.
-        // Let's show:
-        // 1. Textarea for Input.
-        // 2. ABOVE it (or inside via absolute positioning?) the AI response fading in/out?
-        // User said: "All'interno di questo campo di testo".
-        // I will use a simple textarea. The `value` is `input`. 
-        // The `placeholder` is `lastAiMessage`.
-        // This is safe and standard.
-        // "Dissolvenza" happens when the component mounts (already handled by parent).
-
-        // Wait, if I use placeholder, it will look like gray ghost text. 
-        // The user might want it to look like real text.
-        // Let's try using `input` state to HOLD the AI message initially?
-        // Yes. When AI replies, we `setInput(aiMsg.text)`. User can edit it to send? 
-        // No, that sends the AI message back.
-        // Let's stick to: Textarea is for USER input.
-        // But we need to show the AI output.
-        // "Compare ... la risposta del modello".
-        // I will render the AI response as a styled block *within* the container, and the Input below it?
-        // User said: "Soltanto il campo di testo".
-        // Maybe the interactions are just text lines?
-        // Let's implement a "Log" style textarea.
-        // No, keep it simple.
-        // Textarea `value` = `input`.
-        // AI response is rendered as a clean paragraph *above* the input in a shared container that *looks* like one text area?
-        // User said "Al posto della seconda foto".
-        // Let's try:
-        // Container (looks like textarea)
-        //   - AI Message (Text)
-        //   - Input (Textarea, transparent, no border)
-
         return (
             <motion.div
                 initial={{ opacity: 0 }}
@@ -202,6 +172,12 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
                                 Scrivendo...
                             </div>
                         )}
+                        {isAnalyzing && (
+                            <div className="flex items-center gap-2 text-slate-400 italic">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Analisi in corso...
+                            </div>
+                        )}
                     </div>
                 </ScrollArea>
 
@@ -210,7 +186,7 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        disabled={isReviewing || isLoading}
+                        disabled={isReviewing || isLoading || isAnalyzing}
                         placeholder="Scrivi qui..."
                         className="min-h-[40px] w-full resize-none bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-slate-400"
                         rows={1}
@@ -285,6 +261,18 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
                             </div>
                         </motion.div>
                     )}
+                    {isAnalyzing && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex w-full justify-start"
+                        >
+                            <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex items-center gap-2">
+                                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                                <span className="text-xs text-slate-500">L'AI sta analizzando il documento...</span>
+                            </div>
+                        </motion.div>
+                    )}
                     {/* Guidance Message when reviewing */}
                     {isReviewing && !isLoading && (
                         <motion.div
@@ -308,7 +296,7 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        disabled={isReviewing || isLoading}
+                        disabled={isReviewing || isLoading || isAnalyzing}
                         placeholder={isReviewing ? "Conferma o rifiuta la modifica corrente..." : "Chiedi modifiche (es. 'Cambia la data')..."}
                         className="pr-12 min-h-[50px] max-h-[120px] resize-none rounded-xl border-slate-200 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-slate-50"
                         rows={1}
@@ -316,7 +304,7 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
                     <Button
                         size="icon"
                         onClick={handleSend}
-                        disabled={!input.trim() || isLoading || isReviewing}
+                        disabled={!input.trim() || isLoading || isReviewing || isAnalyzing}
                         className="absolute right-1 bottom-1 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors disabled:bg-slate-300"
                     >
                         <Send className="w-4 h-4" />

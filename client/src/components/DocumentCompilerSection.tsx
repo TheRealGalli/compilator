@@ -392,6 +392,26 @@ export function DocumentCompilerSection({
         // Force checkboxes to be list items for Tiptap (replace "^[ ]" with "- [ ]")
         sanitizedContent = sanitizedContent.replace(/^(\s*)\[([ xX])\]/gm, '$1- [$2]');
 
+        const context = {
+          sources: selectedSources.map(s => ({
+            name: s.name,
+            type: s.type,
+            base64: s.base64
+          })),
+          masterSource: masterSource ? {
+            name: masterSource.name,
+            type: masterSource.type,
+            base64: masterSource.base64
+          } : null,
+          notes,
+          temperature,
+          webResearch,
+          detailedAnalysis,
+          formalTone,
+          modelProvider
+        };
+
+        setLastCompileContext(context);
         setCompiledContent(sanitizedContent);
         setTemplateContent(sanitizedContent);
         setIsCompiledView(true);
