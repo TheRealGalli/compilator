@@ -196,30 +196,33 @@ export function TemplateEditor({
       <div className="flex-1 overflow-hidden relative">
         {editor && (
           <BubbleMenu
-            // @ts-ignore
             editor={editor}
             tippyOptions={{
               duration: 100,
-              zIndex: 9999,
+              zIndex: 99999,
               placement: 'top',
               offset: [0, 10],
+              appendTo: () => document.body, // Very important: avoid clipping
+              interactive: true,
             }}
             shouldShow={({ from, to }) => {
-              // Only show if mentions are enabled and there is a non-empty selection
+              // Show if selection is not empty and mentions are enabled
               return enableMentions && from !== to;
             }}
           >
-            <MentionButton
-              onClick={() => {
-                const { from, to } = editor.state.selection;
-                const text = editor.state.doc.textBetween(from, to, ' ');
-                if (text.trim()) {
-                  onMention?.(text.trim(), from, to);
-                  // Clear selection after clicking to hide menu
-                  editor.chain().focus().run();
-                }
-              }}
-            />
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <MentionButton
+                onClick={() => {
+                  const { from, to } = editor.state.selection;
+                  const text = editor.state.doc.textBetween(from, to, ' ');
+                  if (text.trim()) {
+                    onMention?.(text.trim(), from, to);
+                    // Clear selection after clicking to hide menu
+                    editor.chain().focus().run();
+                  }
+                }}
+              />
+            </div>
           </BubbleMenu>
         )}
         <EditorContent editor={editor} className="h-full w-full" />
