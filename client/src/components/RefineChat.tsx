@@ -269,7 +269,7 @@ export function RefineChat({ compileContext, currentContent, onPreview, isReview
                                     "max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm",
                                     msg.role === 'user'
                                         ? "bg-blue-600 text-white rounded-br-none"
-                                        : "bg-white border border-slate-200 text-slate-800 rounded-bl-none"
+                                        : "bg-slate-50 border border-slate-200 text-slate-800 rounded-bl-none"
                                 )}
                             >
                                 {msg.role === 'user' ? (

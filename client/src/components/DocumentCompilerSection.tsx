@@ -921,7 +921,7 @@ export function DocumentCompilerSection({
                     setCompiledContent(val);
                   }
                 }}
-                title="Template da Compilare"
+                title={isRefiningMode ? "Template Compilato" : "Template da Compilare"}
                 placeholder="Inserisci qui il testo o il template..."
               />
             </div>

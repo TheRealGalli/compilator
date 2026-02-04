@@ -1556,6 +1556,9 @@ ISTRUZIONI OUTPUT:
 *** MODALITÀ RAFFINAMENTO / CHAT ATTIVA ***
 Hai già compilato una prima bozza del documento. Ora l'utente vuole discuterne o modificarlo.
 
+NOTE IMPORTANTI DAL MODELLO (Rispettale sempre):
+${compileContext.notes || 'Nessuna nota specifica.'}
+
 DOC ATTUALE:
 """
 ${currentContent}
@@ -1569,7 +1572,8 @@ ISTRUZIONI OPERATIVE:
    - Riscrivi il documento INTERO.
    - Restituisci JSON: { "newContent": "...", "explanation": "Breve descrizione della modifica applicata" }
 2. Se l'utente chiede un'ANALISI o fa una DOMANDA:
-   - Rispondi in modo cordiale e professionale.
+   - Rispondi in modo asciutto e professionale. 
+   - NON usare introduzioni di cortesia (es. "Certamente!", "Ecco l'analisi..."). Inizia subito con le informazioni richieste.
    - Non modificare il documento (newContent: null).
    - Se è un'analisi iniziale: identifica il Master Source, riassumi le fonti e i punti chiave del documento compilato.
    - Restituisci JSON: { "newContent": null, "explanation": "Tua risposta/analisi" }
