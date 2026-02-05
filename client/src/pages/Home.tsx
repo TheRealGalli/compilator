@@ -33,21 +33,23 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <AppHeader notebookTitle="Gromit" onHomeClick={() => setActiveSection("documents")} />
-      <div className="flex-1 flex overflow-hidden">
-        <AppSidebar
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          sources={sources}
-          onRemoveSource={removeSource}
-          onToggleSource={toggleSource}
-          onToggleMaster={toggleMaster}
-          onToggleBypass={toggleBypass}
-        />
-        <main className="flex-1 overflow-auto">
-          {renderSection()}
-        </main>
+    <div className="h-screen flex flex-col overflow-x-auto overflow-y-hidden bg-background">
+      <div className="min-w-[1360px] flex-1 flex flex-col overflow-hidden">
+        <AppHeader notebookTitle="Gromit" onHomeClick={() => setActiveSection("documents")} />
+        <div className="flex-1 flex overflow-hidden">
+          <AppSidebar
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            sources={sources}
+            onRemoveSource={removeSource}
+            onToggleSource={toggleSource}
+            onToggleMaster={toggleMaster}
+            onToggleBypass={toggleBypass}
+          />
+          <main className="flex-1 overflow-auto">
+            {renderSection()}
+          </main>
+        </div>
       </div>
     </div>
   );

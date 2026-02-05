@@ -913,7 +913,7 @@ export function DocumentCompilerSection({
       <div className="flex-1 min-h-0 overflow-hidden">
         {isPdfMode ? (
           /* PDF STUDIO UNIFIED VIEW */
-          <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="h-full grid grid-cols-12 gap-4">
             {/* COLUMN 1: Settings OR Chat (col-span-3) */}
             <div className="lg:col-span-3 min-h-[400px] lg:min-h-[600px] lg:h-full flex flex-col overflow-hidden">
               <ModelSettings
@@ -999,7 +999,7 @@ export function DocumentCompilerSection({
             </div>
           </div>
         ) : (
-          <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="h-full grid grid-cols-12 gap-4">
 
             {/* COLUMN 1: Settings OR Chat (col-span-3) */}
             <div className="lg:col-span-3 min-h-[400px] lg:min-h-[600px] lg:h-full flex flex-col overflow-hidden">
