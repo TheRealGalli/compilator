@@ -7,7 +7,7 @@ interface MentionButtonProps {
 
 export function MentionButton({ onClick }: MentionButtonProps) {
     return (
-        <div className="flex items-center bg-indigo-600 border border-indigo-400/30 rounded-lg shadow-xl p-0.5 animate-in fade-in zoom-in duration-200">
+        <div data-mention-button="true" className="flex items-center bg-indigo-600 border border-indigo-400/30 rounded-lg shadow-xl p-0.5 animate-in fade-in zoom-in duration-200">
             <Button
                 variant="ghost"
                 size="sm"

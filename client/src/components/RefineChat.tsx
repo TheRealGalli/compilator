@@ -130,15 +130,20 @@ export function RefineChat({
         }
     }, [pendingMention]);
 
-    // Handle outside clicks to clear selection
+    // Handle clicks to clear selection
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (selection && containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                setSelection(null);
-            }
+        const handleAnyClick = (e: MouseEvent) => {
+            if (!selection) return;
+
+            // If we click the mention button itself, don't clear
+            const isMentionBtn = (e.target as HTMLElement).closest('[data-mention-button]');
+            if (isMentionBtn) return;
+
+            // Clear selection for any other click (inside or outside chat)
+            setSelection(null);
         };
-        window.addEventListener('mousedown', handleClickOutside);
-        return () => window.removeEventListener('mousedown', handleClickOutside);
+        window.addEventListener('mousedown', handleAnyClick);
+        return () => window.removeEventListener('mousedown', handleAnyClick);
     }, [selection]);
 
     // Track mouse state at window level for reliability
