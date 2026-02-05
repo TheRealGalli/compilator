@@ -548,7 +548,11 @@ export function DocumentCompilerSection({
 
     try {
       // Add Table imports
-      const { Document: DocxDocument, Packer, Paragraph, TextRun, Footer, SimpleField, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = await import("docx");
+      const {
+        Document: DocxDocument, Packer, Paragraph, TextRun, Footer, SimpleField,
+        AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle,
+        TableLayoutType
+      } = await import("docx");
       const { saveAs } = await import("file-saver");
 
       // Helper to strip emojis (Standard ranges without u flag for compatibility)
@@ -594,10 +598,10 @@ export function DocumentCompilerSection({
           const isChecked = match[1].toLowerCase() === 'x';
           runs.push(new TextRun({
             text: isChecked ? " ☒ " : " ☐ ",
-            bold: true, // Make checkboxes bold for visibility
-            font: "MS Gothic", // Use MS Gothic for reliable symbol rendering
+            bold: true,
+            font: "Segoe UI Symbol", // More standard symbol font fallback
             size: options.size || 24,
-            color: isChecked ? "1D4ED8" : "37352F" // Blue for checked, dark for unchecked
+            color: isChecked ? "1D4ED8" : "37352F"
           }));
           lastIdx = match.index + match[0].length;
         }
@@ -667,7 +671,7 @@ export function DocumentCompilerSection({
                     children: parseInline(unescapeMarkdown(cellText), { size: 22, bold: isHeader }),
                     alignment: AlignmentType.LEFT
                   })],
-                  width: { size: 100 / row.length, type: WidthType.PERCENTAGE },
+                  width: { size: (100 / row.length) * 50, type: WidthType.PERCENTAGE },
                   shading: isHeader ? { fill: "F3F4F6" } : undefined,
                   margins: { top: 100, bottom: 100, left: 100, right: 100 },
                 }))
@@ -677,6 +681,7 @@ export function DocumentCompilerSection({
             docChildren.push(new Table({
               rows: tableRows,
               width: { size: 100, type: WidthType.PERCENTAGE },
+              layout: TableLayoutType.FIXED, // Force fixed layout to prevent "vertical" collapse
             }));
 
             i = j - 1;
@@ -711,7 +716,8 @@ export function DocumentCompilerSection({
 
           docChildren.push(new Paragraph({
             children: parseInline(textContent),
-            bullet: { level: 0 },
+            bullet: isNumbered ? undefined : { level: 0 },
+            numbering: isNumbered ? { reference: "numbered-list", level: 0 } : undefined,
             spacing: { after: 120, line: 360 }
           }));
         }
@@ -738,6 +744,26 @@ export function DocumentCompilerSection({
               }
             }
           }
+        },
+        numbering: {
+          config: [
+            {
+              reference: "numbered-list",
+              levels: [
+                {
+                  level: 0,
+                  format: "decimal",
+                  text: "%1.",
+                  alignment: AlignmentType.START,
+                  style: {
+                    paragraph: {
+                      indent: { left: 720, hanging: 360 },
+                    },
+                  },
+                },
+              ],
+            },
+          ],
         },
         sections: [{
           properties: {},
