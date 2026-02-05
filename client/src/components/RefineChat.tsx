@@ -138,14 +138,17 @@ export function RefineChat({
         const sel = window.getSelection();
         if (sel && sel.toString().trim().length > 0 && containerRef.current) {
             const range = sel.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
+            const rects = range.getClientRects();
+            if (rects.length === 0) return;
+
+            const firstLineRect = rects[0];
 
             // Ensure the selection is actually within the chat container we care about
             if (containerRef.current.contains(sel.anchorNode)) {
                 setSelection({
                     text: sel.toString().trim(),
-                    x: rect.right,
-                    y: rect.top - 8
+                    x: firstLineRect.right,
+                    y: firstLineRect.top - 8
                 });
             }
         } else {

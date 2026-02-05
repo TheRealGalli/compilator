@@ -112,21 +112,28 @@ export function TemplateEditor({
 
     // Capture current view and container state
     const { view } = editor;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+
+    const range = sel.getRangeAt(0);
+    const rects = range.getClientRects();
+    if (rects.length === 0) return;
+
     const container = containerRef.current;
     if (!container) return;
 
-    try {
-      const start = view.coordsAtPos(from);
-      const end = view.coordsAtPos(to);
-      const rect = container.getBoundingClientRect();
+    // Use the first rect (first line) for positioning
+    const firstRect = rects[0];
 
-      // Calculate relative coordinates
-      // Align to the right edge of the selection
-      const x = end.left - rect.left;
-      const y = start.top - rect.top - 8;
+    try {
+      const containerRect = container.getBoundingClientRect();
+
+      // Align to the right edge of the FIRST line
+      const x = firstRect.right - containerRect.left;
+      const y = firstRect.top - containerRect.top - 8;
 
       // Visibility check: only hide if significantly out of bounds
-      if (y < -150 || y > rect.height + 100) {
+      if (y < -150 || y > containerRect.height + 100) {
         setSelection(null);
         return;
       }
@@ -137,7 +144,6 @@ export function TemplateEditor({
         y
       });
     } catch (e) {
-      // Coords calculation might fail if selection is not in view
       setSelection(null);
     }
   }, [editor, enableMentions]);
