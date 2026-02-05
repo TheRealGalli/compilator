@@ -1,4 +1,4 @@
-import { TiptapBubbleMenu as BubbleMenu, useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -6,8 +6,7 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { Markdown } from 'tiptap-markdown';
 import Placeholder from '@tiptap/extension-placeholder';
-import { BubbleMenu as BubbleMenuExtension } from '@tiptap/extension-bubble-menu';
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MentionButton } from './MentionButton';
 
 interface TemplateEditorProps {
@@ -51,6 +50,8 @@ export function TemplateEditor({
   enableMentions = false,
   onMention
 }: TemplateEditorProps) {
+  const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -81,9 +82,6 @@ export function TemplateEditor({
       Placeholder.configure({
         placeholder: placeholder,
       }),
-      BubbleMenuExtension.configure({
-        pluginKey: 'bubbleMenu',
-      }),
     ],
     content: escapeMarkdown(value), // Initialize with escaped content
     editorProps: {
@@ -96,6 +94,40 @@ export function TemplateEditor({
       // Unescape before sending back to parent
       onChange?.(unescapeMarkdown(markdown));
     },
+    onSelectionUpdate: ({ editor }) => {
+      if (!enableMentions) {
+        setSelection(null);
+        return;
+      }
+
+      const { from, to, empty } = editor.state.selection;
+
+      if (empty || from === to) {
+        setSelection(null);
+        return;
+      }
+
+      try {
+        const { view } = editor;
+        const { from, to } = editor.state.selection;
+
+        const start = view.coordsAtPos(from);
+        const end = view.coordsAtPos(to);
+
+        // Convert to coordinates relative to containerRef
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          setSelection({
+            text: editor.state.doc.textBetween(from, to, ' '),
+            x: ((start.left + end.left) / 2) - rect.left,
+            y: start.top - rect.top - 10
+          });
+        }
+      } catch (e) {
+        setSelection(null);
+      }
+    },
+    // REMOVED onBlur to prevent flickering when clicking button
   });
 
   // Sync external value changes to editor
@@ -193,38 +225,33 @@ export function TemplateEditor({
       <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex justify-between items-center">
         <h3 className="text-sm font-medium">{title}</h3>
       </div>
-      <div className="flex-1 overflow-hidden relative">
-        {editor && (
-          <BubbleMenu
-            // @ts-ignore
-            editor={editor}
-            tippyOptions={{
-              duration: 100,
-              zIndex: 2000,
-              placement: 'top',
-              offset: [0, 10],
-              appendTo: () => document.body, // Very important: avoid clipping
-              interactive: true,
-            }}
-            shouldShow={({ from, to }: { from: number; to: number }) => {
-              // Show if selection is not empty and mentions are enabled
-              return enableMentions && from !== to;
+      <div className="flex-1 overflow-hidden relative" ref={containerRef}>
+        {selection && (
+          <div
+            className="absolute z-[99999]"
+            style={{
+              left: selection.x,
+              top: selection.y,
+              transform: 'translate(-50%, -100%)'
             }}
           >
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden pointer-events-auto">
               <MentionButton
                 onClick={() => {
-                  const { from, to } = editor.state.selection;
-                  const text = editor.state.doc.textBetween(from, to, ' ');
-                  if (text.trim()) {
-                    onMention?.(text.trim(), from, to);
-                    // Clear selection after clicking to hide menu
-                    editor.chain().focus().run();
+                  if (editor) {
+                    const { from, to } = editor.state.selection;
+                    const text = editor.state.doc.textBetween(from, to, ' ');
+                    if (text.trim()) {
+                      onMention?.(text.trim(), from, to);
+                      // Clear selection after clicking to hide menu
+                      editor.chain().focus().run();
+                      setSelection(null);
+                    }
                   }
                 }}
               />
             </div>
-          </BubbleMenu>
+          </div>
         )}
         <EditorContent editor={editor} className="h-full w-full" />
       </div>

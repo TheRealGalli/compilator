@@ -10,6 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MentionButton } from './MentionButton';
+import { useCompiler } from '@/contexts/CompilerContext';
 
 interface ChatMessage {
     id: string;
@@ -56,12 +57,15 @@ export function RefineChat({
     onMentionConsumed,
     onMentionCreated
 }: RefineChatProps) {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const {
+        messages, setMessages,
+        mentions, setMentions
+    } = useCompiler();
+
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
-    const [mentions, setMentions] = useState<MentionContext[]>([]);
     const scrollRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 

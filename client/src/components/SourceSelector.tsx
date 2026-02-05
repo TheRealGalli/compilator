@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, Image, Music, Pin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useCompiler } from "@/contexts/CompilerContext";
 import {
   Tooltip,
   TooltipContent,
@@ -29,6 +30,7 @@ interface SourceSelectorProps {
 }
 
 export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypass }: SourceSelectorProps) {
+  const { isLocked, frozenColor } = useCompiler();
   // Filter out memory files from the UI list
   const visibleSources = sources.filter(s => !s.isMemory);
   const selectedCount = visibleSources.filter(s => s.selected).length;
@@ -61,33 +63,36 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
             return (
               <div
                 key={source.id}
-                className="flex items-center gap-2 p-1.5 rounded-md hover-elevate active-elevate-2 group"
+                className={`flex items-center gap-2 p-1.5 rounded-md group ${isLocked ? 'opacity-80' : 'hover-elevate active-elevate-2'}`}
                 data-testid={`source-item-${source.id}`}
               >
                 <Checkbox
                   checked={source.selected}
-                  onCheckedChange={() => onToggle?.(source.id)}
+                  onCheckedChange={() => !isLocked && onToggle?.(source.id)}
+                  disabled={isLocked}
                   data-testid={`checkbox-source-${source.id}`}
                   className="w-3.5 h-3.5"
                 />
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>
                     <Icon
-                      onClick={() => onToggleBypass?.(source.id)}
-                      className={`w-3.5 h-3.5 flex-shrink-0 cursor-pointer transition-all hover:scale-110 active:scale-95 ${source.isBypass
-                          ? 'text-muted-foreground'
-                          : source.isXfa
-                            ? 'text-red-500 fill-red-500/20'
-                            : source.isAlreadyFilled
-                              ? 'text-orange-500 fill-orange-500/20'
-                              : source.isFillable
-                                ? 'text-green-500 fill-green-500/20'
-                                : 'text-muted-foreground'
+                      onClick={() => !isLocked && onToggleBypass?.(source.id)}
+                      className={`w-3.5 h-3.5 flex-shrink-0 transition-all ${isLocked ? 'cursor-default' : 'cursor-pointer hover:scale-110 active:scale-95'} ${isLocked && source.isMaster && frozenColor
+                          ? frozenColor
+                          : source.isBypass
+                            ? 'text-muted-foreground'
+                            : source.isXfa
+                              ? 'text-red-500 fill-red-500/20'
+                              : source.isAlreadyFilled
+                                ? 'text-orange-500 fill-orange-500/20'
+                                : source.isFillable
+                                  ? 'text-green-500 fill-green-500/20'
+                                  : 'text-muted-foreground'
                         }`}
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    <p>{source.isBypass ? 'Ripristina analisi intelligente' : 'Forza modalità standard (Grigio)'}</p>
+                    <p>{isLocked ? 'Fonte congelata dalla sessione' : source.isBypass ? 'Ripristina analisi intelligente' : 'Forza modalità standard (Grigio)'}</p>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip delayDuration={300}>
@@ -104,8 +109,9 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => onToggleMaster?.(source.id)}
-                  className={`h-6 w-6 flex-shrink-0 transition-all ${source.isMaster ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}
+                  onClick={() => !isLocked && onToggleMaster?.(source.id)}
+                  disabled={isLocked && !source.isMaster}
+                  className={`h-6 w-6 flex-shrink-0 transition-all ${source.isMaster ? 'opacity-100' : isLocked ? 'opacity-0' : 'opacity-0 group-hover:opacity-40'}`}
                 >
                   <Pin className={`w-3.5 h-3.5 ${source.isMaster ? 'text-blue-500 stroke-[3px]' : 'text-muted-foreground'}`} />
                 </Button>

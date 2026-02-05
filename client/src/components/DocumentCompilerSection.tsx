@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSources } from "@/contexts/SourcesContext";
+import { useCompiler } from "@/contexts/CompilerContext";
 import { Slider } from "@/components/ui/slider";
 // import {
 //   DropdownMenu,
@@ -222,9 +223,25 @@ export function DocumentCompilerSection({
   onModelProviderChange,
   onCompile
 }: DocumentCompilerSectionProps = {}) {
+  const {
+    templateContent, setTemplateContent,
+    compiledContent, setCompiledContent,
+    isRefiningMode, setIsRefiningMode,
+    isReviewing, setIsReviewing,
+    pendingContent, setPendingContent,
+    lastCompileContext, setLastCompileContext,
+    notes, setNotes,
+    temperature, setTemperature,
+    webResearch, setWebResearch,
+    detailedAnalysis, setDetailedAnalysis,
+    formalTone, setFormalTone,
+    isLocked, setIsLocked,
+    currentMode, setCurrentMode,
+    frozenColor, setFrozenColor,
+    resetSession
+  } = useCompiler();
+
   const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof templates | "">("");
-  const [templateContent, setTemplateContent] = useState("");
-  const [compiledContent, setCompiledContent] = useState("");
   const [isCompiledView, setIsCompiledView] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const { toast } = useToast();
@@ -235,23 +252,13 @@ export function DocumentCompilerSection({
   const [generatePrompt, setGeneratePrompt] = useState("");
   const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
 
-  // Model settings
-  const [notes, setNotes] = useState("");
-  const [temperature, setTemperature] = useState(0.7);
-  const [webResearch, setWebResearch] = useState(false);
-  const [detailedAnalysis, setDetailedAnalysis] = useState(true);
-  const [formalTone, setFormalTone] = useState(true);
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>(initialModelProvider);
   const [studioFontSize, setStudioFontSize] = useState<number>(14);
 
-  // PDF Mode
-  const [isPdfMode, setIsPdfMode] = useState(false);
+  // PDF Mode is now handled by currentMode in context
+  const isPdfMode = currentMode === 'fillable';
+  const setIsPdfMode = (val: boolean) => setCurrentMode(val ? 'fillable' : 'standard');
 
-  // Refine / Review Mode State
-  const [isRefiningMode, setIsRefiningMode] = useState(false);
-  const [isReviewing, setIsReviewing] = useState(false);
-  const [pendingContent, setPendingContent] = useState<string | null>(null);
-  const [lastCompileContext, setLastCompileContext] = useState<any>(null);
   const [pendingMention, setPendingMention] = useState<{ text: string; id: string; start?: number; end?: number } | null>(null);
   const [mentionCounts, setMentionCounts] = useState({ template: 0, copilot: 0 });
 
@@ -267,18 +274,25 @@ export function DocumentCompilerSection({
 
 
   useEffect(() => {
-    // AUTO-ACTIVATE PDF STUDIO if master is fillable AND not in bypass mode
-    // ONLY AUTO-ACTIVATE IF NOT ALREADY COMPILED
-    if (isCompiledView) return;
+    // 1. AUTO-ACTIVATE PDF STUDIO if master is fillable AND not in bypass mode
+    // ONLY if not already locked by a compile
+    if (isLocked) return;
 
     if (masterSource?.isFillable && !masterSource?.isBypass) {
       if (!isPdfMode) {
         setIsPdfMode(true);
       }
     } else {
-      setIsPdfMode(false);
+      if (isPdfMode) setIsPdfMode(false);
     }
-  }, [masterSource?.id, masterSource?.isFillable, masterSource?.isBypass, isCompiledView]);
+  }, [masterSource?.id, masterSource?.isFillable, masterSource?.isBypass, isLocked]);
+
+  useEffect(() => {
+    // 2. UNLOCK if masterSource is removed
+    if (!masterSource && isLocked) {
+      setIsLocked(false);
+    }
+  }, [masterSource, isLocked]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
   //   try {
@@ -433,8 +447,21 @@ export function DocumentCompilerSection({
         setCompiledContent(sanitizedContent);
         setTemplateContent(sanitizedContent);
         setIsCompiledView(true);
-        // REMOVED: setIsPdfMode(false); // Do NOT force mode switch after compile
         setIsRefiningMode(true); // Auto-trigger Copilot Mode
+
+        // FREEZE UI if master pin is active
+        if (masterSource) {
+          setIsLocked(true);
+          // Calculate the color to freeze
+          let color = 'text-muted-foreground';
+          if (!masterSource.isBypass) {
+            if (masterSource.isXfa) color = 'text-red-500 fill-red-500/20';
+            else if (masterSource.isAlreadyFilled) color = 'text-orange-500 fill-orange-500/20';
+            else if (masterSource.isFillable) color = 'text-green-500 fill-green-500/20';
+          }
+          setFrozenColor(color);
+        }
+
         if (onCompile) onCompile(sanitizedContent); // Notify parent of compilation
 
         toast({
@@ -969,7 +996,7 @@ export function DocumentCompilerSection({
                     setCompiledContent(val);
                   }
                 }}
-                title={isRefiningMode ? "Template Compilato" : "Template da Compilare"}
+                title={(currentMode as string) === 'fillable' ? "Template PDF" : "Template da Compilare"}
                 placeholder="Inserisci qui il testo o il template..."
                 enableMentions={isRefiningMode}
                 onMention={(text, start, end) => handleMention(text, 'template', start, end)}
