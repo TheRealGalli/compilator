@@ -110,19 +110,30 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         }
 
         // 1. Detect Tables (| col | col ...)
-        if (line.startsWith('|')) {
+        // More lenient detection: line starts with | or contains at least two pipes
+        const isTableLine = (str: string) => str.trim().startsWith('|') || (str.split('|').length > 2);
+
+        if (isTableLine(line)) {
             const tableRows: string[][] = [];
             let j = i;
 
-            while (j < lines.length && lines[j].trim().startsWith('|')) {
+            while (j < lines.length) {
                 const rawLine = lines[j].trim();
-                // Skip separator lines (| --- | --- |) 
-                if (!rawLine.match(/^[|\s\-:.]+$/)) {
-                    let cells = rawLine.split('|').slice(1);
-                    // If it ends with |, the last element is empty, so remove it
-                    if (rawLine.endsWith('|')) {
-                        cells = cells.slice(0, -1);
-                    }
+                if (!isTableLine(rawLine)) break;
+
+                // Skip separator lines (| --- | --- | or --- | ---)
+                // Also skip lines that are just dashes/colon inside pipes
+                if (rawLine.match(/^[|\s\-:.]+$/)) {
+                    j++;
+                    continue;
+                }
+
+                let cells = rawLine.split('|');
+                // Remove first and last empty elements if they exist (standard |cell| format)
+                if (cells[0] === '') cells.shift();
+                if (cells[cells.length - 1] === '') cells.pop();
+
+                if (cells.length > 0) {
                     tableRows.push(cells.map(c => c.trim()));
                 }
                 j++;

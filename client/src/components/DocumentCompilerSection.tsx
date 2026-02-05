@@ -616,70 +616,67 @@ export function DocumentCompilerSection({
       const docChildren: any[] = [];
 
       for (let i = 0; i < lines.length; i++) {
-        let line = lines[i].trim();
+        const line = lines[i].trim();
+        if (!line) {
+          docChildren.push(new Paragraph({ text: "" }));
+          continue;
+        }
 
-        // 0. Detect Tables Strictly (Must have header + separator + rows)
-        if (line.startsWith('|')) {
+        // 0. Detect Tables (More lenient: starts with | or contains >= 2 pipes)
+        const isTableLine = (str: string) => str.trim().startsWith('|') || (str.split('|').length > 2);
+
+        if (isTableLine(line)) {
           const tableRowsData: string[][] = [];
           let j = i;
-          let isTable = false;
 
-          // Check next line for separator |---|
-          if (j + 1 < lines.length) {
-            const nextLine = lines[j + 1].trim();
-            if (nextLine.match(/^[|\s\-:.]+$/) && nextLine.includes('-')) {
-              isTable = true;
-            }
-          }
-
-          if (isTable) {
-            // Buffer table lines
-            while (j < lines.length && lines[j].trim().startsWith('|')) {
-              const rowLine = lines[j].trim();
-              // Skip separator lines
-              if (!rowLine.match(/^[|\s\-:.]+$/)) {
-                let cells = rowLine.split('|');
-                if (rowLine.startsWith('|')) cells.shift();
-                if (rowLine.endsWith('|')) cells.pop();
-                tableRowsData.push(cells.map(c => c.trim()));
-              }
+          // Buffer table lines
+          while (j < lines.length && isTableLine(lines[j])) {
+            const rowLine = lines[j].trim();
+            // Skip separator lines (| --- | --- | or --- | ---)
+            if (rowLine.match(/^[|\s\-:.]+$/)) {
               j++;
-            }
-
-            // Create Table
-            if (tableRowsData.length > 0) {
-              const tableRows = tableRowsData.map((row, rowIndex) => {
-                const isHeader = rowIndex === 0;
-                return new TableRow({
-                  children: row.map(cellText => new TableCell({
-                    children: [new Paragraph({
-                      children: parseInline(unescapeMarkdown(cellText), { size: 22, bold: isHeader }),
-                      alignment: AlignmentType.LEFT
-                    })],
-                    width: { size: 100 / row.length, type: WidthType.PERCENTAGE },
-                    shading: isHeader ? { fill: "F3F4F6" } : undefined,
-                    margins: { top: 100, bottom: 100, left: 100, right: 100 },
-                  }))
-                });
-              });
-
-              docChildren.push(new Table({
-                rows: tableRows,
-                width: { size: 100, type: WidthType.PERCENTAGE },
-              }));
-
-              i = j - 1;
               continue;
             }
+
+            let cells = rowLine.split('|');
+            // Remove first and last empty elements if they exist
+            if (cells[0] === '') cells.shift();
+            if (cells[cells.length - 1] === '') cells.pop();
+
+            if (cells.length > 0) {
+              tableRowsData.push(cells.map(c => c.trim()));
+            }
+            j++;
+          }
+
+          if (tableRowsData.length > 0) {
+            const tableRows = tableRowsData.map((row, rowIndex) => {
+              const isHeader = rowIndex === 0;
+              return new TableRow({
+                children: row.map(cellText => new TableCell({
+                  children: [new Paragraph({
+                    children: parseInline(unescapeMarkdown(cellText), { size: 22, bold: isHeader }),
+                    alignment: AlignmentType.LEFT
+                  })],
+                  width: { size: 100 / row.length, type: WidthType.PERCENTAGE },
+                  shading: isHeader ? { fill: "F3F4F6" } : undefined,
+                  margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                }))
+              });
+            });
+
+            docChildren.push(new Table({
+              rows: tableRows,
+              width: { size: 100, type: WidthType.PERCENTAGE },
+            }));
+
+            i = j - 1;
+            continue;
           }
         }
 
         // Clean text for normal paragraphs *after* failing table check
         const rawText = unescapeMarkdown(cleanText(line));
-        if (!rawText) {
-          docChildren.push(new Paragraph({ text: "" }));
-          continue;
-        }
 
         // 1. Detect Headers (# Header)
         if (rawText.startsWith('# ')) {
