@@ -915,7 +915,7 @@ export function DocumentCompilerSection({
           /* PDF STUDIO UNIFIED VIEW */
           <div className="h-full grid grid-cols-12 gap-4">
             {/* COLUMN 1: Settings OR Chat (col-span-3) */}
-            <div className="lg:col-span-3 min-h-[400px] lg:min-h-[600px] lg:h-full flex flex-col overflow-hidden">
+            <div className="col-span-3 h-full flex flex-col overflow-hidden">
               <ModelSettings
                 className="flex-1"
                 notes={notes}
@@ -953,7 +953,7 @@ export function DocumentCompilerSection({
             </div>
 
             {/* COLUMN 2: PDF Preview (col-span-9) */}
-            <div className="lg:col-span-9 flex flex-col min-h-0 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+            <div className="col-span-9 flex flex-col min-h-0 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
               <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
                 <PdfPreview
                   fileBase64={masterSource?.base64 || ""}
@@ -1002,7 +1002,7 @@ export function DocumentCompilerSection({
           <div className="h-full grid grid-cols-12 gap-4">
 
             {/* COLUMN 1: Settings OR Chat (col-span-3) */}
-            <div className="lg:col-span-3 min-h-[400px] lg:min-h-[600px] lg:h-full flex flex-col overflow-hidden">
+            <div className="col-span-3 h-full flex flex-col overflow-hidden">
               <ModelSettings
                 className="flex-1"
                 notes={notes}
@@ -1040,7 +1040,7 @@ export function DocumentCompilerSection({
             </div>
 
             {/* COLUMN 2: Template Editor (col-span-5) */}
-            <div className="lg:col-span-5 min-h-[400px] lg:min-h-[600px] lg:h-full overflow-hidden">
+            <div className="col-span-5 h-full overflow-hidden">
               <TemplateEditor
                 key={`editor-${isReviewing}-${isLocked}`}
                 value={isReviewing ? (pendingContent || templateContent) : templateContent}
@@ -1087,7 +1087,7 @@ export function DocumentCompilerSection({
               />
             </div>
 
-            <div className="lg:col-span-4 min-h-[400px] lg:min-h-[600px] lg:h-full overflow-hidden flex flex-col">
+            <div className="col-span-4 h-full overflow-hidden flex flex-col">
               <CompiledOutput
                 content={compiledContent}
                 onCopy={() => {
