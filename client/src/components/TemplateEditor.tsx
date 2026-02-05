@@ -51,6 +51,7 @@ export function TemplateEditor({
   onMention
 }: TemplateEditorProps) {
   const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [isMouseDown, setIsMouseDown] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
@@ -108,6 +109,8 @@ export function TemplateEditor({
       }
 
       try {
+        if (isMouseDown) return; // Wait for mouseup
+
         const { view } = editor;
         const { from, to } = editor.state.selection;
 
@@ -225,7 +228,33 @@ export function TemplateEditor({
       <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex justify-between items-center">
         <h3 className="text-sm font-medium">{title}</h3>
       </div>
-      <div className="flex-1 overflow-hidden relative" ref={containerRef}>
+      <div
+        className="flex-1 overflow-hidden relative"
+        ref={containerRef}
+        onMouseDown={() => setIsMouseDown(true)}
+        onMouseUp={() => {
+          setIsMouseDown(false);
+          // Manually trigger selection check after mouse up
+          if (editor) {
+            const { from, to, empty } = editor.state.selection;
+            if (!empty && from !== to) {
+              const { view } = editor;
+              const start = view.coordsAtPos(from);
+              const end = view.coordsAtPos(to);
+              if (containerRef.current) {
+                const rect = containerRef.current.getBoundingClientRect();
+                setSelection({
+                  text: editor.state.doc.textBetween(from, to, ' '),
+                  x: ((start.left + end.left) / 2) - rect.left,
+                  y: start.top - rect.top - 10
+                });
+              }
+            } else {
+              setSelection(null);
+            }
+          }
+        }}
+      >
         {selection && (
           <div
             className="absolute z-[99999]"

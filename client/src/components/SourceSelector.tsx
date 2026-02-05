@@ -78,16 +78,16 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
                     <Icon
                       onClick={() => !isLocked && onToggleBypass?.(source.id)}
                       className={`w-3.5 h-3.5 flex-shrink-0 transition-all ${isLocked ? 'cursor-default' : 'cursor-pointer hover:scale-110 active:scale-95'} ${isLocked && source.isMaster && frozenColor
-                          ? frozenColor
-                          : source.isBypass
-                            ? 'text-muted-foreground'
-                            : source.isXfa
-                              ? 'text-red-500 fill-red-500/20'
-                              : source.isAlreadyFilled
-                                ? 'text-orange-500 fill-orange-500/20'
-                                : source.isFillable
-                                  ? 'text-green-500 fill-green-500/20'
-                                  : 'text-muted-foreground'
+                        ? frozenColor
+                        : source.isBypass
+                          ? 'text-muted-foreground'
+                          : source.isXfa
+                            ? 'text-red-500 fill-red-500/20'
+                            : source.isAlreadyFilled
+                              ? 'text-orange-500 fill-orange-500/20'
+                              : source.isFillable
+                                ? 'text-green-500 fill-green-500/20'
+                                : 'text-muted-foreground'
                         }`}
                     />
                   </TooltipTrigger>
@@ -109,8 +109,7 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => !isLocked && onToggleMaster?.(source.id)}
-                  disabled={isLocked && !source.isMaster}
+                  onClick={() => onToggleMaster?.(source.id)}
                   className={`h-6 w-6 flex-shrink-0 transition-all ${source.isMaster ? 'opacity-100' : isLocked ? 'opacity-0' : 'opacity-0 group-hover:opacity-40'}`}
                 >
                   <Pin className={`w-3.5 h-3.5 ${source.isMaster ? 'text-blue-500 stroke-[3px]' : 'text-muted-foreground'}`} />
