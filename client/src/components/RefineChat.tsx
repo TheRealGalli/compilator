@@ -59,7 +59,8 @@ export function RefineChat({
 }: RefineChatProps) {
     const {
         messages, setMessages,
-        mentions, setMentions
+        mentions, setMentions,
+        mentionRegistry, setMentionRegistry
     } = useCompiler();
 
     const [input, setInput] = useState('');
@@ -126,9 +127,10 @@ export function RefineChat({
                 end: pendingMention.end
             };
             setMentions(prev => [...prev, newMention]);
+            setMentionRegistry(prev => [...prev, newMention]); // Persist to session registry
             onMentionConsumed?.();
         }
-    }, [pendingMention]);
+    }, [pendingMention, setMentions, setMentionRegistry, onMentionConsumed]);
 
     // Handle clicks to clear selection
     useEffect(() => {
@@ -196,7 +198,14 @@ export function RefineChat({
         }
 
         if (selection) {
-            onMentionCreated?.(selection.text, 'copilot'); // Chat selection doesn't have reliable document offsets easily
+            const newMention: MentionContext = {
+                id: `mention-${Date.now()}`,
+                text: selection.text,
+                label: `Selection-${Date.now().toString().slice(-4)}`, // Fallback label
+                source: 'copilot'
+            };
+            onMentionCreated?.(selection.text, 'copilot');
+            setMentionRegistry(prev => [...prev, newMention]); // Add to registry
             setSelection(null);
         }
     };
@@ -224,7 +233,8 @@ export function RefineChat({
                 compileContext,
                 currentContent,
                 userInstruction: userMsg.text,
-                mentions: mentions.map(m => ({ source: m.source, text: m.text })),
+                mentions: mentions.map(m => ({ source: m.source, text: m.text, label: m.label })),
+                mentionRegistry: mentionRegistry.map(m => ({ source: m.source, text: m.text, label: m.label })),
                 chatHistory: messages.map(m => ({ role: m.role, text: m.text }))
             });
 

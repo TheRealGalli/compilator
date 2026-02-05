@@ -671,7 +671,7 @@ export function DocumentCompilerSection({
                     children: parseInline(unescapeMarkdown(cellText), { size: 22, bold: isHeader }),
                     alignment: AlignmentType.LEFT
                   })],
-                  width: { size: (100 / row.length) * 50, type: WidthType.PERCENTAGE },
+                  width: { size: 9070 / row.length, type: WidthType.DXA },
                   shading: isHeader ? { fill: "F3F4F6" } : undefined,
                   margins: { top: 100, bottom: 100, left: 100, right: 100 },
                 }))
@@ -680,7 +680,7 @@ export function DocumentCompilerSection({
 
             docChildren.push(new Table({
               rows: tableRows,
-              width: { size: 5000, type: WidthType.PERCENTAGE },
+              width: { size: 9070, type: WidthType.DXA },
             }));
 
             i = j - 1;

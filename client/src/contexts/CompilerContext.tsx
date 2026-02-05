@@ -5,6 +5,7 @@ interface SessionState {
     compiledContent: string;
     messages: any[];
     frozenColor: string | null;
+    mentionRegistry: any[];
 }
 
 interface CompilerState {
@@ -24,6 +25,7 @@ interface CompilerState {
     currentMode: 'standard' | 'fillable';
     messages: any[];
     mentions: any[];
+    mentionRegistry: any[];
     frozenColor: string | null;
     standardSnapshot: SessionState | null;
     masterSnapshots: Record<string, SessionState>;
@@ -46,6 +48,7 @@ interface CompilerContextType extends CompilerState {
     setCurrentMode: (val: 'standard' | 'fillable') => void;
     setMessages: (val: any[] | ((prev: any[]) => any[])) => void;
     setMentions: (val: any[] | ((prev: any[]) => any[])) => void;
+    setMentionRegistry: (val: any[] | ((prev: any[]) => any[])) => void;
     setFrozenColor: (val: string | null) => void;
     takeStandardSnapshot: () => void;
     restoreStandardSnapshot: () => void;
@@ -74,6 +77,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
         currentMode: 'standard',
         messages: [],
         mentions: [],
+        mentionRegistry: [],
         frozenColor: null,
         standardSnapshot: null,
         masterSnapshots: {},
@@ -112,6 +116,13 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
         }));
     }, []);
 
+    const setMentionRegistry = useCallback((val: any[] | ((prev: any[]) => any[])) => {
+        setState(prev => ({
+            ...prev,
+            mentionRegistry: typeof val === 'function' ? val(prev.mentionRegistry) : val
+        }));
+    }, []);
+
     const takeStandardSnapshot = useCallback(() => {
         setState(prev => ({
             ...prev,
@@ -120,6 +131,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 compiledContent: prev.compiledContent,
                 messages: [...prev.messages],
                 frozenColor: null,
+                mentionRegistry: [...prev.mentionRegistry],
             }
         }));
     }, []);
@@ -134,7 +146,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                     templateContent: prev.templateContent,
                     compiledContent: prev.compiledContent,
                     messages: [...prev.messages],
-                    frozenColor: prev.frozenColor
+                    frozenColor: prev.frozenColor,
+                    mentionRegistry: [...prev.mentionRegistry]
                 };
             }
 
@@ -157,6 +170,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 templateContent: prev.standardSnapshot.templateContent,
                 compiledContent: prev.standardSnapshot.compiledContent,
                 messages: prev.standardSnapshot.messages,
+                mentionRegistry: prev.standardSnapshot.mentionRegistry,
                 isLocked: false,
                 frozenColor: null,
                 isRefiningMode: prev.standardSnapshot.compiledContent !== '',
@@ -174,7 +188,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                     templateContent: prev.templateContent,
                     compiledContent: prev.compiledContent,
                     messages: [...prev.messages],
-                    frozenColor: prev.frozenColor
+                    frozenColor: prev.frozenColor,
+                    mentionRegistry: [...prev.mentionRegistry]
                 }
             }
         }));
@@ -191,6 +206,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 templateContent: snapshot.templateContent,
                 compiledContent: snapshot.compiledContent,
                 messages: snapshot.messages,
+                mentionRegistry: snapshot.mentionRegistry || [],
                 frozenColor: snapshot.frozenColor,
                 isRefiningMode: snapshot.compiledContent !== '',
                 isLocked: true,
@@ -218,6 +234,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
             currentMode: 'standard',
             messages: [],
             mentions: [],
+            mentionRegistry: [],
             frozenColor: null,
             standardSnapshot: null,
             masterSnapshots: {},
@@ -243,6 +260,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
             setCurrentMode,
             setMessages,
             setMentions,
+            setMentionRegistry,
             setFrozenColor,
             takeStandardSnapshot,
             restoreStandardSnapshot,

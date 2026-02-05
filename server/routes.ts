@@ -1532,9 +1532,9 @@ ISTRUZIONI OUTPUT:
   // --- NEW: Refine / Chat Endpoint ---
   app.post('/api/refine', async (req: Request, res: Response) => {
     try {
-      const { compileContext, currentContent, userInstruction, chatHistory, mentions } = req.body;
+      const { compileContext, currentContent, userInstruction, chatHistory, mentions, mentionRegistry } = req.body;
 
-      console.log(`[API refine] Request: "${userInstruction.substring(0, 50)}..." | Mentions: ${mentions?.length || 0}`);
+      console.log(`[API refine] Request: "${userInstruction.substring(0, 50)}..." | Mentions: ${mentions?.length || 0} | Registry: ${mentionRegistry?.length || 0}`);
 
       // Reconstruct Context
       const multimodalFiles = compileContext.sources || [];
@@ -1564,7 +1564,12 @@ ISTRUZIONI OUTPUT:
       // Format mentions for the AI using the new label system (#C1, #T1) and position offsets
       const formattedMentions = (mentions || []).map((m: any) => {
         const positionInfo = (m.start !== undefined && m.end !== undefined) ? ` [pos: ${m.start}-${m.end}]` : '';
-        return `- MENZIONE ${m.label || m.source}${positionInfo}: "${m.text}"`;
+        return `- ATTIVA: MENZIONE ${m.label || m.source}${positionInfo}: "${m.text}"`;
+      }).join('\n');
+
+      // Format session-wide mention registry
+      const formattedRegistry = (mentionRegistry || []).map((m: any) => {
+        return `- SESSIONE: #${m.label} -> "${m.text}"`;
       }).join('\n');
 
       const refineInstructions = `
@@ -1579,7 +1584,9 @@ DOC ATTUALE:
 ${currentContent}
 """
 
-${formattedMentions ? `TESTO MENZIONATO (L'utente si riferisce a questi frammenti specifici):\n${formattedMentions}\n` : ''}
+${formattedMentions ? `TESTO MENZIONATO ATTUALMENTE (L'utente ha questi tag attivi ora):\n${formattedMentions}\n` : ''}
+
+${formattedRegistry ? `REGISTRO MENZIONI DELLA SESSIONE (Questi frammenti sono stati discussi in precedenza e sono ancora validi):\n${formattedRegistry}\n` : ''}
 
 STORICO CHAT:
 ${chatHistory.map((m: any) => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
