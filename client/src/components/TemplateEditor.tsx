@@ -121,8 +121,8 @@ export function TemplateEditor({
       const rect = container.getBoundingClientRect();
 
       // Calculate relative coordinates
-      // We want the button to be centered horizontally above the selection
-      const x = ((start.left + end.left) / 2) - rect.left;
+      // Align to the right edge of the selection
+      const x = end.left - rect.left;
       const y = start.top - rect.top - 8;
 
       // Visibility check: only hide if significantly out of bounds
@@ -284,7 +284,7 @@ export function TemplateEditor({
             style={{
               left: selection.x,
               top: selection.y,
-              transform: 'translate(-50%, -100%)'
+              transform: 'translate(-100%, -100%)'
             }}
           >
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden pointer-events-auto">

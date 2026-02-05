@@ -144,8 +144,8 @@ export function RefineChat({
             if (containerRef.current.contains(sel.anchorNode)) {
                 setSelection({
                     text: sel.toString().trim(),
-                    x: rect.left + rect.width / 2,
-                    y: rect.top - 10
+                    x: rect.right,
+                    y: rect.top - 8
                 });
             }
         } else {
@@ -338,7 +338,7 @@ export function RefineChat({
                         style={{
                             left: selection?.x,
                             top: selection?.y,
-                            transform: 'translate(-50%, -100%)'
+                            transform: 'translate(-100%, -100%)'
                         }}
                     >
                         <MentionButton onClick={handleMentionClick} />
@@ -545,7 +545,7 @@ export function RefineChat({
                     style={{
                         left: selection.x,
                         top: selection.y,
-                        transform: 'translate(-50%, -100%)'
+                        transform: 'translate(-100%, -100%)'
                     }}
                 >
                     <MentionButton onClick={handleMentionClick} />
