@@ -171,10 +171,13 @@ export function RefineChat({
     const handleSend = async () => {
         if (!input.trim() || isLoading || isReviewing || isAnalyzing) return;
 
+        const mentionLabels = mentions.map(m => m.label).join(' ');
+        const messageWithMentions = input + (mentionLabels ? ` (${mentionLabels})` : '');
+
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
             role: 'user',
-            text: input,
+            text: messageWithMentions,
             timestamp: new Date()
         };
 

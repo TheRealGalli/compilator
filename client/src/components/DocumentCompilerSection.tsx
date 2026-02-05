@@ -1007,7 +1007,7 @@ export function DocumentCompilerSection({
             <div className="lg:col-span-5 min-h-[400px] lg:min-h-[600px] lg:h-full overflow-hidden">
               <TemplateEditor
                 key="template-editor"
-                value={templateContent}
+                value={isReviewing ? (pendingContent || templateContent) : templateContent}
                 onChange={(val) => {
                   setTemplateContent(val);
                   // Sync with output ONLY if we are in "Template Compilato" mode (Copilot active)
@@ -1015,70 +1015,52 @@ export function DocumentCompilerSection({
                     setCompiledContent(val);
                   }
                 }}
-                title={(currentMode as string) === 'fillable'
-                  ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
-                  : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`}
+                title={isReviewing
+                  ? "Anteprima Modifiche AI"
+                  : ((currentMode as string) === 'fillable'
+                    ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
+                    : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`)
+                }
                 placeholder="Inserisci qui il testo o il template..."
-                enableMentions={true} // Keep enabled if compiledContent exists or by default
+                enableMentions={!isReviewing}
                 onMention={(text, start, end) => handleMention(text, 'template', start, end)}
+                headerRight={isReviewing ? (
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 w-7 p-0 border-slate-200 bg-white/50 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-none"
+                      onClick={handleRejectRefinement}
+                      title="Rifiuta modifiche"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 w-7 p-0 border-slate-200 bg-white/50 text-slate-500 hover:text-green-600 hover:bg-green-50 hover:border-green-200 shadow-none"
+                      onClick={handleAcceptRefinement}
+                      title="Accetta modifiche"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                ) : null}
               />
             </div>
 
             <div className="lg:col-span-4 min-h-[400px] lg:min-h-[600px] lg:h-full overflow-hidden flex flex-col">
-              {isReviewing ? (
-                // REVIEW MODE CARD
-                <Card className="flex-1 flex flex-col shadow-lg border-blue-200 bg-blue-50/10 overflow-hidden ring-2 ring-blue-500/20">
-                  <CardHeader className="py-3 px-4 border-b border-blue-100 bg-blue-50/50 flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-blue-100 text-blue-600 rounded-md">
-                        <Sparkles className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-sm font-semibold text-blue-900">Anteprima Modifica</CardTitle>
-                        <CardDescription className="text-xs text-blue-700">Conferma per applicare</CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
-                        onClick={handleRejectRefinement}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm"
-                        onClick={handleAcceptRefinement}
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        Applica
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
-                    <CompiledOutput
-                      content={pendingContent || ""}
-                      onCopy={() => { }}
-                      onDownload={() => { }}
-                      readOnly={true}
-                    />
-                  </CardContent>
-                </Card>
-              ) : (
-                <CompiledOutput
-                  content={compiledContent}
-                  onCopy={() => {
-                    navigator.clipboard.writeText(compiledContent);
-                    toast({
-                      title: "Copiato",
-                      description: "Il contenuto è stato copiato negli appunti.",
-                    });
-                  }}
-                  onDownload={handleDownload}
-                />
-              )}
+              <CompiledOutput
+                content={compiledContent}
+                onCopy={() => {
+                  navigator.clipboard.writeText(compiledContent);
+                  toast({
+                    title: "Copiato",
+                    description: "Il contenuto è stato copiato negli appunti.",
+                  });
+                }}
+                onDownload={handleDownload}
+              />
             </div>
 
           </div>

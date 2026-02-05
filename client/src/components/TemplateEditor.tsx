@@ -17,6 +17,7 @@ interface TemplateEditorProps {
   title?: string;
   enableMentions?: boolean;
   onMention?: (text: string, start: number, end: number) => void;
+  headerRight?: React.ReactNode;
 }
 
 // Helper to escape markdown characters so they appear as literals in Tiptap
@@ -48,7 +49,8 @@ export function TemplateEditor({
   className = "",
   title = "Template da Compilare",
   enableMentions = false,
-  onMention
+  onMention,
+  headerRight
 }: TemplateEditorProps) {
   const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
   const [isMouseDown, setIsMouseDown] = useState(false);
@@ -269,8 +271,9 @@ export function TemplateEditor({
             color: #ffffff !important;
         }
       `}</style>
-      <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex justify-between items-center">
+      <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex justify-between items-center h-10">
         <h3 className="text-sm font-medium">{title}</h3>
+        {headerRight && <div className="flex items-center gap-1">{headerRight}</div>}
       </div>
       <div
         className="flex-1 overflow-hidden relative"
