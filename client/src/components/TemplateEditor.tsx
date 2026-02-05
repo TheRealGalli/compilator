@@ -99,7 +99,7 @@ export function TemplateEditor({
   });
 
   const updateSelectionPosition = useCallback(() => {
-    if (!editor || isMouseDown || !enableMentions) {
+    if (!editor || !enableMentions) {
       setSelection(null);
       return;
     }
@@ -107,6 +107,11 @@ export function TemplateEditor({
     const { from, to, empty } = editor.state.selection;
     if (empty || from === to) {
       setSelection(null);
+      return;
+    }
+
+    if (isMouseDown) {
+      // Don't update while mouse is down (dragging)
       return;
     }
 
@@ -118,12 +123,12 @@ export function TemplateEditor({
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
 
-        // Visibility check: coordinates should be within container bounds
+        // Visibility check relative to container
         const x = ((start.left + end.left) / 2) - rect.left;
         const y = start.top - rect.top - 10;
 
-        // Don't show if scrolled off-view
-        if (y < -30 || y > rect.height + 10) {
+        // Wider margin for visibility
+        if (y < -100 || y > rect.height + 50) {
           setSelection(null);
           return;
         }
@@ -137,7 +142,7 @@ export function TemplateEditor({
     } catch (e) {
       setSelection(null);
     }
-  }, [editor, isMouseDown, enableMentions]);
+  }, [editor, enableMentions, isMouseDown]);
 
   // Handle tiptap selection updates
   useEffect(() => {

@@ -1,5 +1,12 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
+interface SessionState {
+    templateContent: string;
+    compiledContent: string;
+    messages: any[];
+    frozenColor: string | null;
+}
+
 interface CompilerState {
     templateContent: string;
     compiledContent: string;
@@ -13,11 +20,13 @@ interface CompilerState {
     detailedAnalysis: boolean;
     formalTone: boolean;
     pinnedSourceId: string | null;
-    isLocked: boolean; // For Master Pin "frozen" state
+    isLocked: boolean;
     currentMode: 'standard' | 'fillable';
     messages: any[];
     mentions: any[];
-    frozenColor: string | null; // Stores the color of the master icon when locked
+    frozenColor: string | null;
+    standardSnapshot: SessionState | null;
+    masterSnapshots: Record<string, SessionState>;
 }
 
 interface CompilerContextType extends CompilerState {
@@ -38,6 +47,10 @@ interface CompilerContextType extends CompilerState {
     setMessages: (val: any[] | ((prev: any[]) => any[])) => void;
     setMentions: (val: any[] | ((prev: any[]) => any[])) => void;
     setFrozenColor: (val: string | null) => void;
+    takeStandardSnapshot: () => void;
+    restoreStandardSnapshot: () => void;
+    takeMasterSnapshot: (sourceId: string) => void;
+    restoreMasterSnapshot: (sourceId: string) => boolean;
     resetSession: () => void;
 }
 
@@ -62,10 +75,15 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
         messages: [],
         mentions: [],
         frozenColor: null,
+        standardSnapshot: null,
+        masterSnapshots: {},
     });
 
     const setTemplateContent = (val: string) => setState(prev => ({ ...prev, templateContent: val }));
-    const setCompiledContent = (val: string) => setState(prev => ({ ...prev, compiledContent: val }));
+    const setCompiledContent = (val: string) => setState(prev => {
+        const isNowRefining = val.trim() !== '';
+        return { ...prev, compiledContent: val, isRefiningMode: isNowRefining };
+    });
     const setIsRefiningMode = (val: boolean) => setState(prev => ({ ...prev, isRefiningMode: val }));
     const setIsReviewing = (val: boolean) => setState(prev => ({ ...prev, isReviewing: val }));
     const setPendingContent = (val: string | null) => setState(prev => ({ ...prev, pendingContent: val }));
@@ -94,8 +112,91 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
         }));
     }, []);
 
+    const takeStandardSnapshot = useCallback(() => {
+        setState(prev => ({
+            ...prev,
+            standardSnapshot: {
+                templateContent: prev.templateContent,
+                compiledContent: prev.compiledContent,
+                messages: [...prev.messages],
+                frozenColor: null,
+            }
+        }));
+    }, []);
+
+    const restoreStandardSnapshot = useCallback(() => {
+        setState(prev => {
+            const newSnapshots = { ...prev.masterSnapshots };
+            if (prev.pinnedSourceId && prev.isLocked) {
+                newSnapshots[prev.pinnedSourceId] = {
+                    templateContent: prev.templateContent,
+                    compiledContent: prev.compiledContent,
+                    messages: [...prev.messages],
+                    frozenColor: prev.frozenColor
+                };
+            }
+
+            if (!prev.standardSnapshot) {
+                return {
+                    ...prev,
+                    masterSnapshots: newSnapshots,
+                    templateContent: '',
+                    compiledContent: '',
+                    messages: [],
+                    isLocked: false,
+                    frozenColor: null,
+                    isRefiningMode: false,
+                };
+            }
+            return {
+                ...prev,
+                masterSnapshots: newSnapshots,
+                templateContent: prev.standardSnapshot.templateContent,
+                compiledContent: prev.standardSnapshot.compiledContent,
+                messages: prev.standardSnapshot.messages,
+                isLocked: false,
+                frozenColor: null,
+                isRefiningMode: prev.standardSnapshot.compiledContent !== '',
+            };
+        });
+    }, []);
+
+    const takeMasterSnapshot = useCallback((sourceId: string) => {
+        setState(prev => ({
+            ...prev,
+            masterSnapshots: {
+                ...prev.masterSnapshots,
+                [sourceId]: {
+                    templateContent: prev.templateContent,
+                    compiledContent: prev.compiledContent,
+                    messages: [...prev.messages],
+                    frozenColor: prev.frozenColor
+                }
+            }
+        }));
+    }, []);
+
+    const restoreMasterSnapshot = useCallback((sourceId: string) => {
+        let restored = false;
+        setState(prev => {
+            const snapshot = prev.masterSnapshots[sourceId];
+            if (!snapshot) return prev;
+            restored = true;
+            return {
+                ...prev,
+                templateContent: snapshot.templateContent,
+                compiledContent: snapshot.compiledContent,
+                messages: snapshot.messages,
+                frozenColor: snapshot.frozenColor,
+                isRefiningMode: snapshot.compiledContent !== '',
+                isLocked: true,
+            };
+        });
+        return restored;
+    }, []);
+
     const resetSession = useCallback(() => {
-        const initialState: CompilerState = {
+        setState({
             templateContent: '',
             compiledContent: '',
             isRefiningMode: false,
@@ -113,8 +214,9 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
             messages: [],
             mentions: [],
             frozenColor: null,
-        };
-        setState(initialState);
+            standardSnapshot: null,
+            masterSnapshots: {},
+        });
     }, []);
 
     return (
@@ -137,6 +239,10 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
             setMessages,
             setMentions,
             setFrozenColor,
+            takeStandardSnapshot,
+            restoreStandardSnapshot,
+            takeMasterSnapshot,
+            restoreMasterSnapshot,
             resetSession,
         }}>
             {children}

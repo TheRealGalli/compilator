@@ -238,6 +238,8 @@ export function DocumentCompilerSection({
     isLocked, setIsLocked,
     currentMode, setCurrentMode,
     frozenColor, setFrozenColor,
+    takeStandardSnapshot, restoreStandardSnapshot,
+    takeMasterSnapshot, restoreMasterSnapshot,
     resetSession
   } = useCompiler();
 
@@ -245,7 +247,7 @@ export function DocumentCompilerSection({
   const [isCompiledView, setIsCompiledView] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const { toast } = useToast();
-  const { selectedSources, masterSource } = useSources();
+  const { sources, selectedSources, masterSource, toggleMaster } = useSources();
 
   // Template Generation State
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -288,11 +290,11 @@ export function DocumentCompilerSection({
   }, [masterSource?.id, masterSource?.isFillable, masterSource?.isBypass, isLocked]);
 
   useEffect(() => {
-    // 2. UNLOCK & RESET if masterSource is removed
+    // 2. UNLOCK & RESTORE BASELINE if masterSource is removed
     if (!masterSource && isLocked) {
-      resetSession();
+      restoreStandardSnapshot();
     }
-  }, [masterSource, isLocked, resetSession]);
+  }, [masterSource, isLocked, restoreStandardSnapshot]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
   //   try {
@@ -367,7 +369,21 @@ export function DocumentCompilerSection({
     }
   };
 
-  // handleDiscoverFields removed as AI panel is gone
+  // 4. Handle Master Source Selection/Toggling
+  const handleToggleMaster = (sourceId: string) => {
+    const source = sources.find(s => s.id === sourceId);
+    if (!source) return;
+
+    if (source.isMaster) {
+      // Unpinning: The unpin logic is handled by useEffect [masterSource] in this component
+      // which calls restoreStandardSnapshot() when masterSource becomes undefined.
+      toggleMaster(sourceId);
+    } else {
+      // Pinning: Restore specific snapshot for this source if it exists
+      restoreMasterSnapshot(sourceId);
+      toggleMaster(sourceId);
+    }
+  };
 
   const handleCompile = async () => {
     if (isCompiling || isPdfMode) return;
@@ -460,6 +476,11 @@ export function DocumentCompilerSection({
             else if (masterSource.isFillable) color = 'text-green-500 fill-green-500/20';
           }
           setFrozenColor(color);
+          // Save this master compilation state
+          takeMasterSnapshot(masterSource.id);
+        } else {
+          // Take snapshot of this standard compilation to restore later on unpin
+          takeStandardSnapshot();
         }
 
         if (onCompile) onCompile(sanitizedContent); // Notify parent of compilation
@@ -998,7 +1019,7 @@ export function DocumentCompilerSection({
                 }}
                 title={(currentMode as string) === 'fillable' ? "Template PDF" : "Template da Compilare"}
                 placeholder="Inserisci qui il testo o il template..."
-                enableMentions={isRefiningMode}
+                enableMentions={true} // Keep enabled if compiledContent exists or by default
                 onMention={(text, start, end) => handleMention(text, 'template', start, end)}
               />
             </div>
