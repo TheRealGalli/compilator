@@ -141,30 +141,47 @@ export function RefineChat({
         return () => window.removeEventListener('mousedown', handleClickOutside);
     }, [selection]);
 
+    // Track mouse state at window level for reliability
+    const [isMouseDown, setIsMouseDown] = useState(false);
+    useEffect(() => {
+        const handleMouseDown = () => setIsMouseDown(true);
+        const handleMouseUp = () => {
+            setIsMouseDown(false);
+            // Small delay to allow range to stabilize
+            setTimeout(() => {
+                const sel = window.getSelection();
+                if (sel && sel.toString().trim().length > 0 && containerRef.current) {
+                    const range = sel.getRangeAt(0);
+                    const rects = range.getClientRects();
+                    if (rects.length === 0) return;
+
+                    const firstLineRect = rects[0];
+
+                    if (containerRef.current.contains(sel.anchorNode)) {
+                        setSelection({
+                            text: sel.toString().trim(),
+                            x: firstLineRect.right,
+                            y: firstLineRect.top - 8
+                        });
+                    }
+                } else if (!isMouseDown) {
+                    // Only clear if mouse is truly up and no selection
+                    setSelection(null);
+                }
+            }, 50);
+        };
+
+        window.addEventListener('mousedown', handleMouseDown);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousedown', handleMouseDown);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isMouseDown]);
+
     const handleMouseUp = (e: React.MouseEvent) => {
-        // Only process selection if we are NOT clicking inside the tag area or input area
-        const target = e.target as HTMLElement;
-        if (target.closest('.mentions-tag-area') || target.closest('textarea')) return;
-
-        const sel = window.getSelection();
-        if (sel && sel.toString().trim().length > 0 && containerRef.current) {
-            const range = sel.getRangeAt(0);
-            const rects = range.getClientRects();
-            if (rects.length === 0) return;
-
-            const firstLineRect = rects[0];
-
-            // Ensure the selection is actually within the chat container we care about
-            if (containerRef.current.contains(sel.anchorNode)) {
-                setSelection({
-                    text: sel.toString().trim(),
-                    x: firstLineRect.right,
-                    y: firstLineRect.top - 8
-                });
-            }
-        } else {
-            setSelection(null);
-        }
+        // This is now redundant with the window listener, but we keep it for safety 
+        // to prevent event bubbling issues if needed, or simply let window handle it.
     };
 
     const handleMentionClick = (e?: React.MouseEvent) => {

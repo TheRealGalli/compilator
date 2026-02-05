@@ -155,6 +155,25 @@ export function TemplateEditor({
     }
   }, [editor, enableMentions, isMouseDown]);
 
+  // Track mouse state at window level for reliability
+  useEffect(() => {
+    const handleMouseDown = () => setIsMouseDown(true);
+    const handleMouseUp = () => {
+      setIsMouseDown(false);
+      // Wait a tick for Tiptap/DOM selection to finalize
+      requestAnimationFrame(() => {
+        updateSelectionPosition();
+      });
+    };
+
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [updateSelectionPosition]);
+
   // Handle tiptap selection updates and blur
   useEffect(() => {
     if (!editor) return;
@@ -163,7 +182,7 @@ export function TemplateEditor({
       // Small delay to allow clicking the button itself
       setTimeout(() => {
         setSelection(null);
-      }, 150);
+      }, 200);
     });
     return () => {
       editor.off('selectionUpdate', updateSelectionPosition);

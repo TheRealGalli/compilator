@@ -178,7 +178,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             continue;
         }
 
-        // 2.5 Detect Task List Items (Standard or Escaped)
+        /* 2.5 Detect Task List Items (Standard or Escaped)
         // We match both `[ ]` and `\[ ]` because some models might escape them, 
         // and we want to render them as checkboxes regardless.
         const taskMatch = line.match(/^(\s*)([\-\*])\s+\\?\[([ xX])\\?\](.*)/);
@@ -202,7 +202,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             );
             i++;
             continue;
-        }
+        } */
         // 3. Detect Bullet Points
         const bulletMatch = line.match(/^(\s*)([\*\-\•])(\s+)(.*)/);
         if (bulletMatch) {
