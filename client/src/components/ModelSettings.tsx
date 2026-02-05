@@ -143,7 +143,7 @@ export function ModelSettings({
       isRefining ? "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800" : "bg-background",
       className
     )}>
-      <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex items-center gap-2">
+      <div className="border-b px-2 py-1.5 bg-muted/30 flex-shrink-0 flex items-center gap-2 h-10">
         <AnimatePresence mode="wait">
           {isRefining ? (
             <motion.div

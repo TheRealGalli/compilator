@@ -238,6 +238,7 @@ export function DocumentCompilerSection({
     isLocked, setIsLocked,
     currentMode, setCurrentMode,
     frozenColor, setFrozenColor,
+    pinnedSourceId, setPinnedSourceId,
     takeStandardSnapshot, restoreStandardSnapshot,
     takeMasterSnapshot, restoreMasterSnapshot,
     resetSession
@@ -281,15 +282,23 @@ export function DocumentCompilerSection({
     // 1. PINNING/UNPINNING Logic
     if (masterSource?.id !== prevMasterId.current) {
       if (masterSource) {
+        // Take snapshot of standard work if we are about to lock into a master
+        if (!isLocked) {
+          takeStandardSnapshot();
+        }
         // We just pinned a new document: restore its specific work if it exists
-        restoreMasterSnapshot(masterSource.id);
+        const restored = restoreMasterSnapshot(masterSource.id);
+        if (!restored) {
+          // If no snapshot, ensure context knows THIS is the pinned source
+          setPinnedSourceId(masterSource.id);
+        }
       } else if (isLocked) {
         // We just unpinned: restore the last standard work
         restoreStandardSnapshot();
       }
       prevMasterId.current = masterSource?.id;
     }
-  }, [masterSource?.id, isLocked, restoreMasterSnapshot, restoreStandardSnapshot]);
+  }, [masterSource?.id, isLocked, restoreMasterSnapshot, restoreStandardSnapshot, takeStandardSnapshot]);
 
   useEffect(() => {
     // 2. AUTO-ACTIVATE PDF STUDIO if master is fillable AND not in bypass mode
@@ -1019,9 +1028,11 @@ export function DocumentCompilerSection({
                 }}
                 title={isReviewing
                   ? "Anteprima Modifiche AI"
-                  : ((currentMode as string) === 'fillable'
-                    ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
-                    : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`)
+                  : (compiledContent
+                    ? `Template Compilato${masterSource ? ` (${masterSource.name})` : ''}`
+                    : ((currentMode as string) === 'fillable'
+                      ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
+                      : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`))
                 }
                 placeholder="Inserisci qui il testo o il template..."
                 enableMentions={!isReviewing}

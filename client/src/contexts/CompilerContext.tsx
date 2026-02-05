@@ -127,6 +127,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
     const restoreStandardSnapshot = useCallback(() => {
         setState(prev => {
             const newSnapshots = { ...prev.masterSnapshots };
+
+            // If we're unpinning, save the current work to that source's snapshot first
             if (prev.pinnedSourceId && prev.isLocked) {
                 newSnapshots[prev.pinnedSourceId] = {
                     templateContent: prev.templateContent,
@@ -146,6 +148,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                     isLocked: false,
                     frozenColor: null,
                     isRefiningMode: false,
+                    pinnedSourceId: null // Clear pinned ID
                 };
             }
             return {
@@ -157,6 +160,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 isLocked: false,
                 frozenColor: null,
                 isRefiningMode: prev.standardSnapshot.compiledContent !== '',
+                pinnedSourceId: null // Clear pinned ID
             };
         });
     }, []);
@@ -190,6 +194,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 frozenColor: snapshot.frozenColor,
                 isRefiningMode: snapshot.compiledContent !== '',
                 isLocked: true,
+                pinnedSourceId: sourceId, // Set the current pinned ID
             };
         });
         return restored;
