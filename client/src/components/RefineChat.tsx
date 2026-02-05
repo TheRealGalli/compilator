@@ -183,6 +183,7 @@ export function RefineChat({
 
         setMessages(prev => [...prev, userMsg]);
         setInput('');
+        setMentions([]); // Clear immediately for UX feedback
         setIsLoading(true);
 
         try {
@@ -210,9 +211,6 @@ export function RefineChat({
             if (data.newContent) {
                 onPreview(data.newContent);
             }
-
-            // Clear mentions after successful send
-            setMentions([]);
 
         } catch (error) {
             console.error("Refine error:", error);

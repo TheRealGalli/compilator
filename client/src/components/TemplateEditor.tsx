@@ -106,6 +106,12 @@ export function TemplateEditor({
       return;
     }
 
+    // If mouse is down, the user is still selecting; don't show the button yet
+    if (isMouseDown) {
+      setSelection(null);
+      return;
+    }
+
     const { from, to, empty } = editor.state.selection;
     if (empty || from === to) {
       setSelection(null);
@@ -113,7 +119,6 @@ export function TemplateEditor({
     }
 
     // Capture current view and container state
-    const { view } = editor;
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
 
@@ -148,7 +153,7 @@ export function TemplateEditor({
     } catch (e) {
       setSelection(null);
     }
-  }, [editor, enableMentions]);
+  }, [editor, enableMentions, isMouseDown]);
 
   // Handle tiptap selection updates
   useEffect(() => {
@@ -181,12 +186,9 @@ export function TemplateEditor({
 
   // Sync external value changes to editor
   useEffect(() => {
-    if (editor) {
+    if (editor && value !== undefined) {
       const currentRaw = unescapeMarkdown((editor.storage as any).markdown.getMarkdown());
       if (value !== currentRaw) {
-        // Only update if genuinely different to avoid cursor jumps
-        // Note: Cursor jumps might still happen if we transform. 
-        // Ideally we only update if *remote* change.
         editor.commands.setContent(escapeMarkdown(value));
       }
     }
@@ -207,7 +209,6 @@ export function TemplateEditor({
           margin: 0;
           overflow: hidden;
         }
-        /* ... existing styles ... */
         .ProseMirror td,
         .ProseMirror th {
           min-width: 1em;
@@ -230,8 +231,6 @@ export function TemplateEditor({
           background: rgba(200, 200, 255, 0.4);
           pointer-events: none;
         }
-        /* Checkbox / TaskList Styles - Keep purely CSS if needed, but we rely on text [ ] now */
-        
         /* Placeholder */
         .ProseMirror p.is-editor-empty:first-child::before {
           color: hsl(var(--muted-foreground));
@@ -240,15 +239,12 @@ export function TemplateEditor({
           height: 0;
           pointer-events: none;
         }
-        
-        /* ... styles ... */
         .dark .ProseMirror h1, 
         .dark .ProseMirror h2, 
         .dark .ProseMirror h3,
         .dark .ProseMirror h4 {
             color: hsl(var(--foreground));
         }
-        
         .ProseMirror p, 
         .ProseMirror span, 
         .ProseMirror div,
@@ -259,7 +255,6 @@ export function TemplateEditor({
           font-size: 13px !important;
           line-height: 2 !important; 
         }
-        
         .dark .ProseMirror h1, 
         .dark .ProseMirror h2, 
         .dark .ProseMirror h3,

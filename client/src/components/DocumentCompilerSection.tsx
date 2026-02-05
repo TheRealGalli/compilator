@@ -383,6 +383,11 @@ export function DocumentCompilerSection({
     toggleMaster(sourceId);
   };
 
+  const handlePreview = (content: string) => {
+    setPendingContent(content);
+    setIsReviewing(true);
+  };
+
   const handleCompile = async () => {
     if (isCompiling || isPdfMode) return;
 
