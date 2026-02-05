@@ -288,11 +288,11 @@ export function DocumentCompilerSection({
   }, [masterSource?.id, masterSource?.isFillable, masterSource?.isBypass, isLocked]);
 
   useEffect(() => {
-    // 2. UNLOCK if masterSource is removed
+    // 2. UNLOCK & RESET if masterSource is removed
     if (!masterSource && isLocked) {
-      setIsLocked(false);
+      resetSession();
     }
-  }, [masterSource, isLocked]);
+  }, [masterSource, isLocked, resetSession]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
   //   try {

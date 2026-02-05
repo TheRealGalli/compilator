@@ -6,7 +6,7 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { Markdown } from 'tiptap-markdown';
 import Placeholder from '@tiptap/extension-placeholder';
-import { useEffect, useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MentionButton } from './MentionButton';
 
 interface TemplateEditorProps {
@@ -95,43 +95,79 @@ export function TemplateEditor({
       // Unescape before sending back to parent
       onChange?.(unescapeMarkdown(markdown));
     },
-    onSelectionUpdate: ({ editor }) => {
-      if (!enableMentions) {
-        setSelection(null);
-        return;
-      }
-
-      const { from, to, empty } = editor.state.selection;
-
-      if (empty || from === to) {
-        setSelection(null);
-        return;
-      }
-
-      try {
-        if (isMouseDown) return; // Wait for mouseup
-
-        const { view } = editor;
-        const { from, to } = editor.state.selection;
-
-        const start = view.coordsAtPos(from);
-        const end = view.coordsAtPos(to);
-
-        // Convert to coordinates relative to containerRef
-        if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect();
-          setSelection({
-            text: editor.state.doc.textBetween(from, to, ' '),
-            x: ((start.left + end.left) / 2) - rect.left,
-            y: start.top - rect.top - 10
-          });
-        }
-      } catch (e) {
-        setSelection(null);
-      }
-    },
-    // REMOVED onBlur to prevent flickering when clicking button
+    // Handler moved to useEffect
   });
+
+  const updateSelectionPosition = useCallback(() => {
+    if (!editor || isMouseDown || !enableMentions) {
+      setSelection(null);
+      return;
+    }
+
+    const { from, to, empty } = editor.state.selection;
+    if (empty || from === to) {
+      setSelection(null);
+      return;
+    }
+
+    try {
+      const { view } = editor;
+      const start = view.coordsAtPos(from);
+      const end = view.coordsAtPos(to);
+
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+
+        // Visibility check: coordinates should be within container bounds
+        const x = ((start.left + end.left) / 2) - rect.left;
+        const y = start.top - rect.top - 10;
+
+        // Don't show if scrolled off-view
+        if (y < -30 || y > rect.height + 10) {
+          setSelection(null);
+          return;
+        }
+
+        setSelection({
+          text: editor.state.doc.textBetween(from, to, ' '),
+          x,
+          y
+        });
+      }
+    } catch (e) {
+      setSelection(null);
+    }
+  }, [editor, isMouseDown, enableMentions]);
+
+  // Handle tiptap selection updates
+  useEffect(() => {
+    if (!editor) return;
+    editor.on('selectionUpdate', updateSelectionPosition);
+    return () => {
+      editor.off('selectionUpdate', updateSelectionPosition);
+    };
+  }, [editor, updateSelectionPosition]);
+
+  // Handle scroll and resize to keep button anchored
+  useEffect(() => {
+    const scrollHandler = () => updateSelectionPosition();
+    const container = containerRef.current;
+    if (container) {
+      // Tiptap's scrollable area is inside .ProseMirror
+      const proseMirror = container.querySelector('.ProseMirror');
+      if (proseMirror) {
+        proseMirror.addEventListener('scroll', scrollHandler);
+      }
+      window.addEventListener('resize', scrollHandler);
+    }
+    return () => {
+      const proseMirror = container?.querySelector('.ProseMirror');
+      if (proseMirror) {
+        proseMirror.removeEventListener('scroll', scrollHandler);
+      }
+      window.removeEventListener('resize', scrollHandler);
+    };
+  }, [updateSelectionPosition]);
 
   // Sync external value changes to editor
   useEffect(() => {
@@ -234,25 +270,8 @@ export function TemplateEditor({
         onMouseDown={() => setIsMouseDown(true)}
         onMouseUp={() => {
           setIsMouseDown(false);
-          // Manually trigger selection check after mouse up
-          if (editor) {
-            const { from, to, empty } = editor.state.selection;
-            if (!empty && from !== to) {
-              const { view } = editor;
-              const start = view.coordsAtPos(from);
-              const end = view.coordsAtPos(to);
-              if (containerRef.current) {
-                const rect = containerRef.current.getBoundingClientRect();
-                setSelection({
-                  text: editor.state.doc.textBetween(from, to, ' '),
-                  x: ((start.left + end.left) / 2) - rect.left,
-                  y: start.top - rect.top - 10
-                });
-              }
-            } else {
-              setSelection(null);
-            }
-          }
+          // Small delay to let Tiptap internal state settle
+          setTimeout(updateSelectionPosition, 10);
         }}
       >
         {selection && (
