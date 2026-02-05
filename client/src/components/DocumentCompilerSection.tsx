@@ -10,7 +10,7 @@ import { PdfPreview } from "./PdfPreview";
 import { ModelSettings } from "./ModelSettings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { generatePDFScreenshot } from '@/utils/screenshot';
@@ -275,8 +275,24 @@ export function DocumentCompilerSection({
 
 
 
+  const prevMasterId = useRef<string | undefined>(undefined);
+
   useEffect(() => {
-    // 1. AUTO-ACTIVATE PDF STUDIO if master is fillable AND not in bypass mode
+    // 1. PINNING/UNPINNING Logic
+    if (masterSource?.id !== prevMasterId.current) {
+      if (masterSource) {
+        // We just pinned a new document: restore its specific work if it exists
+        restoreMasterSnapshot(masterSource.id);
+      } else if (isLocked) {
+        // We just unpinned: restore the last standard work
+        restoreStandardSnapshot();
+      }
+      prevMasterId.current = masterSource?.id;
+    }
+  }, [masterSource?.id, isLocked, restoreMasterSnapshot, restoreStandardSnapshot]);
+
+  useEffect(() => {
+    // 2. AUTO-ACTIVATE PDF STUDIO if master is fillable AND not in bypass mode
     // ONLY if not already locked by a compile
     if (isLocked) return;
 
@@ -287,14 +303,7 @@ export function DocumentCompilerSection({
     } else {
       if (isPdfMode) setIsPdfMode(false);
     }
-  }, [masterSource?.id, masterSource?.isFillable, masterSource?.isBypass, isLocked]);
-
-  useEffect(() => {
-    // 2. UNLOCK & RESTORE BASELINE if masterSource is removed
-    if (!masterSource && isLocked) {
-      restoreStandardSnapshot();
-    }
-  }, [masterSource, isLocked, restoreStandardSnapshot]);
+  }, [masterSource?.id, masterSource?.isFillable, masterSource?.isBypass, isLocked, isPdfMode]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
   //   try {
@@ -371,18 +380,7 @@ export function DocumentCompilerSection({
 
   // 4. Handle Master Source Selection/Toggling
   const handleToggleMaster = (sourceId: string) => {
-    const source = sources.find(s => s.id === sourceId);
-    if (!source) return;
-
-    if (source.isMaster) {
-      // Unpinning: The unpin logic is handled by useEffect [masterSource] in this component
-      // which calls restoreStandardSnapshot() when masterSource becomes undefined.
-      toggleMaster(sourceId);
-    } else {
-      // Pinning: Restore specific snapshot for this source if it exists
-      restoreMasterSnapshot(sourceId);
-      toggleMaster(sourceId);
-    }
+    toggleMaster(sourceId);
   };
 
   const handleCompile = async () => {
