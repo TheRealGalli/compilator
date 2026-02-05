@@ -106,14 +106,23 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
                   </TooltipContent>
                 </Tooltip>
 
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => onToggleMaster?.(source.id)}
-                  className={`h-6 w-6 flex-shrink-0 transition-all ${source.isMaster ? 'opacity-100' : isLocked ? 'opacity-0' : 'opacity-0 group-hover:opacity-40'}`}
-                >
-                  <Pin className={`w-3.5 h-3.5 ${source.isMaster ? 'text-blue-500 stroke-[3px]' : 'text-muted-foreground'}`} />
-                </Button>
+                {(() => {
+                  const ext = source.name.split('.').pop()?.toLowerCase() || '';
+                  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'heic'].includes(ext);
+                  const isAudio = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'webm'].includes(ext);
+                  const isPinnable = !isImage && !isAudio;
+
+                  return isPinnable && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => onToggleMaster?.(source.id)}
+                      className={`h-6 w-6 flex-shrink-0 transition-all ${source.isMaster ? 'opacity-100' : isLocked ? 'opacity-0' : 'opacity-0 group-hover:opacity-40'}`}
+                    >
+                      <Pin className={`w-3.5 h-3.5 ${source.isMaster ? 'text-blue-500 stroke-[3px]' : 'text-muted-foreground'}`} />
+                    </Button>
+                  );
+                })()}
               </div>
             );
           })}
