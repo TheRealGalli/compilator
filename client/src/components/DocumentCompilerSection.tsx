@@ -680,8 +680,7 @@ export function DocumentCompilerSection({
 
             docChildren.push(new Table({
               rows: tableRows,
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              layout: TableLayoutType.FIXED, // Force fixed layout to prevent "vertical" collapse
+              width: { size: 5000, type: WidthType.PERCENTAGE },
             }));
 
             i = j - 1;
