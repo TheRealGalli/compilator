@@ -110,39 +110,37 @@ export function TemplateEditor({
       return;
     }
 
-    if (isMouseDown) {
-      // Don't update while mouse is down (dragging)
-      return;
-    }
+    // Capture current view and container state
+    const { view } = editor;
+    const container = containerRef.current;
+    if (!container) return;
 
     try {
-      const { view } = editor;
       const start = view.coordsAtPos(from);
       const end = view.coordsAtPos(to);
+      const rect = container.getBoundingClientRect();
 
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
+      // Calculate relative coordinates
+      // We want the button to be centered horizontally above the selection
+      const x = ((start.left + end.left) / 2) - rect.left;
+      const y = start.top - rect.top - 8;
 
-        // Visibility check relative to container
-        const x = ((start.left + end.left) / 2) - rect.left;
-        const y = start.top - rect.top - 10;
-
-        // Wider margin for visibility
-        if (y < -100 || y > rect.height + 50) {
-          setSelection(null);
-          return;
-        }
-
-        setSelection({
-          text: editor.state.doc.textBetween(from, to, ' '),
-          x,
-          y
-        });
+      // Visibility check: only hide if significantly out of bounds
+      if (y < -150 || y > rect.height + 100) {
+        setSelection(null);
+        return;
       }
+
+      setSelection({
+        text: editor.state.doc.textBetween(from, to, ' '),
+        x,
+        y
+      });
     } catch (e) {
+      // Coords calculation might fail if selection is not in view
       setSelection(null);
     }
-  }, [editor, enableMentions, isMouseDown]);
+  }, [editor, enableMentions]);
 
   // Handle tiptap selection updates
   useEffect(() => {
@@ -155,24 +153,23 @@ export function TemplateEditor({
 
   // Handle scroll and resize to keep button anchored
   useEffect(() => {
-    const scrollHandler = () => updateSelectionPosition();
     const container = containerRef.current;
-    if (container) {
+    if (container && editor) {
       // Tiptap's scrollable area is inside .ProseMirror
       const proseMirror = container.querySelector('.ProseMirror');
       if (proseMirror) {
-        proseMirror.addEventListener('scroll', scrollHandler);
+        proseMirror.addEventListener('scroll', updateSelectionPosition);
       }
-      window.addEventListener('resize', scrollHandler);
+      window.addEventListener('resize', updateSelectionPosition);
+
+      return () => {
+        if (proseMirror) {
+          proseMirror.removeEventListener('scroll', updateSelectionPosition);
+        }
+        window.removeEventListener('resize', updateSelectionPosition);
+      };
     }
-    return () => {
-      const proseMirror = container?.querySelector('.ProseMirror');
-      if (proseMirror) {
-        proseMirror.removeEventListener('scroll', scrollHandler);
-      }
-      window.removeEventListener('resize', scrollHandler);
-    };
-  }, [updateSelectionPosition]);
+  }, [editor, updateSelectionPosition]);
 
   // Sync external value changes to editor
   useEffect(() => {
@@ -275,8 +272,10 @@ export function TemplateEditor({
         onMouseDown={() => setIsMouseDown(true)}
         onMouseUp={() => {
           setIsMouseDown(false);
-          // Small delay to let Tiptap internal state settle
-          setTimeout(updateSelectionPosition, 10);
+          // Wait a tick for Tiptap internal selection to finalize
+          requestAnimationFrame(() => {
+            updateSelectionPosition();
+          });
         }}
       >
         {selection && (

@@ -1015,7 +1015,9 @@ export function DocumentCompilerSection({
                     setCompiledContent(val);
                   }
                 }}
-                title={(currentMode as string) === 'fillable' ? "Template PDF" : "Template da Compilare"}
+                title={(currentMode as string) === 'fillable'
+                  ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
+                  : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`}
                 placeholder="Inserisci qui il testo o il template..."
                 enableMentions={true} // Keep enabled if compiledContent exists or by default
                 onMention={(text, start, end) => handleMention(text, 'template', start, end)}
