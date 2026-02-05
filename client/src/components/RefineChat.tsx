@@ -130,6 +130,17 @@ export function RefineChat({
         }
     }, [pendingMention]);
 
+    // Handle outside clicks to clear selection
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (selection && containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setSelection(null);
+            }
+        };
+        window.addEventListener('mousedown', handleClickOutside);
+        return () => window.removeEventListener('mousedown', handleClickOutside);
+    }, [selection]);
+
     const handleMouseUp = (e: React.MouseEvent) => {
         // Only process selection if we are NOT clicking inside the tag area or input area
         const target = e.target as HTMLElement;

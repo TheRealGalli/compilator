@@ -1011,7 +1011,7 @@ export function DocumentCompilerSection({
             {/* COLUMN 2: Template Editor (col-span-5) */}
             <div className="lg:col-span-5 min-h-[400px] lg:min-h-[600px] lg:h-full overflow-hidden">
               <TemplateEditor
-                key="template-editor"
+                key={`editor-${isReviewing}-${isLocked}`}
                 value={isReviewing ? (pendingContent || templateContent) : templateContent}
                 onChange={(val) => {
                   setTemplateContent(val);
@@ -1030,24 +1030,24 @@ export function DocumentCompilerSection({
                 enableMentions={!isReviewing}
                 onMention={(text, start, end) => handleMention(text, 'template', start, end)}
                 headerRight={isReviewing ? (
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 w-7 p-0 border-slate-200 bg-white/50 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-none"
+                      className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all"
                       onClick={handleRejectRefinement}
                       title="Rifiuta modifiche"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 w-7 p-0 border-slate-200 bg-white/50 text-slate-500 hover:text-green-600 hover:bg-green-50 hover:border-green-200 shadow-none"
+                      className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-green-600 hover:bg-green-50 hover:border-green-200 shadow-sm transition-all"
                       onClick={handleAcceptRefinement}
                       title="Accetta modifiche"
                     >
-                      <Check className="w-3.5 h-3.5" />
+                      <Check className="w-4 h-4" />
                     </Button>
                   </div>
                 ) : null}

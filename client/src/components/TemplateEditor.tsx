@@ -155,12 +155,19 @@ export function TemplateEditor({
     }
   }, [editor, enableMentions, isMouseDown]);
 
-  // Handle tiptap selection updates
+  // Handle tiptap selection updates and blur
   useEffect(() => {
     if (!editor) return;
     editor.on('selectionUpdate', updateSelectionPosition);
+    editor.on('blur', () => {
+      // Small delay to allow clicking the button itself
+      setTimeout(() => {
+        setSelection(null);
+      }, 150);
+    });
     return () => {
       editor.off('selectionUpdate', updateSelectionPosition);
+      editor.off('blur', () => setSelection(null));
     };
   }, [editor, updateSelectionPosition]);
 
