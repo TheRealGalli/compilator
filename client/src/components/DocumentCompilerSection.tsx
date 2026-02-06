@@ -681,6 +681,7 @@ export function DocumentCompilerSection({
             docChildren.push(new Table({
               rows: tableRows,
               width: { size: 9070, type: WidthType.DXA },
+              layout: TableLayoutType.FIXED,
             }));
 
             i = j - 1;

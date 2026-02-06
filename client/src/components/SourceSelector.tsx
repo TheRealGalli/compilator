@@ -63,21 +63,21 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
             return (
               <div
                 key={source.id}
-                className={`flex items-center gap-2 p-1.5 rounded-md group ${isLocked ? 'opacity-80' : 'hover-elevate active-elevate-2'}`}
+                className={`flex items-center gap-2 p-1.5 rounded-md group ${isLocked && source.isMaster ? 'opacity-80' : 'hover-elevate active-elevate-2'}`}
                 data-testid={`source-item-${source.id}`}
               >
                 <Checkbox
                   checked={source.selected}
-                  onCheckedChange={() => !isLocked && onToggle?.(source.id)}
-                  disabled={isLocked}
+                  onCheckedChange={() => !(isLocked && source.isMaster) && onToggle?.(source.id)}
+                  disabled={isLocked && source.isMaster}
                   data-testid={`checkbox-source-${source.id}`}
                   className="w-3.5 h-3.5"
                 />
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>
                     <Icon
-                      onClick={() => !isLocked && onToggleBypass?.(source.id)}
-                      className={`w-3.5 h-3.5 flex-shrink-0 transition-all ${isLocked ? 'cursor-default' : 'cursor-pointer hover:scale-110 active:scale-95'} ${isLocked && source.isMaster && frozenColor
+                      onClick={() => !(isLocked && source.isMaster) && onToggleBypass?.(source.id)}
+                      className={`w-3.5 h-3.5 flex-shrink-0 transition-all ${isLocked && source.isMaster ? 'cursor-default' : 'cursor-pointer hover:scale-110 active:scale-95'} ${isLocked && source.isMaster && frozenColor
                         ? frozenColor
                         : source.isBypass
                           ? 'text-muted-foreground'
@@ -92,7 +92,7 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    <p>{isLocked ? 'Fonte congelata dalla sessione' : source.isBypass ? 'Ripristina analisi intelligente' : 'Forza modalità standard (Grigio)'}</p>
+                    <p>{isLocked && source.isMaster ? 'Fonte congelata dalla sessione' : source.isBypass ? 'Ripristina analisi intelligente' : 'Forza modalità standard (Grigio)'}</p>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip delayDuration={300}>
