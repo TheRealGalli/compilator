@@ -263,7 +263,7 @@ export function DocumentCompilerSection({
   const setIsPdfMode = (val: boolean) => setCurrentMode(val ? 'fillable' : 'standard');
 
   const [pendingMention, setPendingMention] = useState<{ text: string; id: string; start?: number; end?: number } | null>(null);
-  const [isOutputVisible, setIsOutputVisible] = useState(true);
+  const [isOutputVisible, setIsOutputVisible] = useState(false);
   const [mentionCounts, setMentionCounts] = useState({ template: 0, copilot: 0 });
 
   const handleMention = (text: string, source: 'template' | 'copilot', start?: number, end?: number) => {
@@ -1053,7 +1053,7 @@ export function DocumentCompilerSection({
             {/* FLEXIBLE CONTAINER FOR EDITOR & OUTPUT (75% approx col-span-9) */}
             <div className="flex-1 h-full min-w-0 flex relative overflow-hidden">
               {/* COLUMN 2: Template Editor (flexible) */}
-              <div className="flex-1 h-full min-w-0 flex flex-col overflow-hidden relative">
+              <div className="flex-1 h-full min-w-0 flex flex-col overflow-visible relative">
                 <TemplateEditor
                   key={`editor-${isReviewing}-${isLocked}`}
                   value={isReviewing ? (pendingContent || templateContent) : templateContent}
@@ -1099,9 +1099,9 @@ export function DocumentCompilerSection({
                   ) : null}
                 />
 
-                {/* CUSTOM TOGGLE HANDLE (Perfectly centered or docked) */}
+                {/* CUSTOM TOGGLE HANDLE (Docked to the edge, visible even when editor is overflow-hidden) */}
                 <div
-                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[100] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[11px]' : 'translate-x-0'}`}
+                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[100] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[11px]' : 'translate-x-[2.5px]'}`}
                 >
                   <button
                     onClick={() => setIsOutputVisible(!isOutputVisible)}
