@@ -1052,7 +1052,7 @@ export function DocumentCompilerSection({
             </div>
 
             {/* FLEXIBLE CONTAINER FOR EDITOR & OUTPUT (75% approx col-span-9) */}
-            <div className="flex-1 h-full min-w-0 flex relative overflow-visible mr-2">
+            <div className="flex-1 h-full min-w-0 flex relative overflow-visible">
               {/* COLUMN 2: Template Editor (flexible) */}
               <div className="flex-1 h-full min-w-0 flex flex-col overflow-visible relative">
                 <TemplateEditor
@@ -1102,7 +1102,7 @@ export function DocumentCompilerSection({
 
                 {/* CUSTOM TOGGLE HANDLE (Dynamically centered in gutter or gap) */}
                 <div
-                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[200] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[10.5px]' : 'translate-x-[6.5px]'}`}
+                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[200] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[10.5px]' : 'translate-x-[20px]'}`}
                 >
                   <button
                     onClick={() => setIsOutputVisible(!isOutputVisible)}
