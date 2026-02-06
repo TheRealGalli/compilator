@@ -1565,12 +1565,14 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
         minute: '2-digit'
       });
 
-      // --- URL FETCHING LOGIC ---
+      // --- URL FETCHING LOGIC (Explicit links in notes) ---
       let fetchedCompilerContext = '';
+      let hasManualUrls = false;
       if (webResearch && notes) {
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const urls = notes.match(urlRegex);
         if (urls && urls.length > 0) {
+          hasManualUrls = true;
           console.log(`[DEBUG Compile] Found URLs in notes: ${urls.join(', ')}`);
           for (const url of urls) {
             const content = await fetchUrlContent(url);
@@ -1582,6 +1584,8 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
       }
 
       const hasExternalSources = fetchedCompilerContext.length > 0;
+      // If webResearch is ON but no manual URLs, we trigger autonomous Google Search
+      const useAutonomousWebSearch = webResearch && !hasManualUrls;
       // Check for memory file
       const hasMemory = multimodalFiles?.some((s: any) => s.isMemory);
 
@@ -1632,22 +1636,26 @@ ISTRUZIONI OUTPUT:
         masterSource ? aiService.processMultimodalParts([masterSource]) : Promise.resolve([])
       ]);
 
-      console.log('[DEBUG Compile] Calling AiService.compileDocument (Unified Pass: Content + Layout)...');
-      const { content: finalContent } = await aiService.compileDocument({
+      console.log(`[DEBUG Compile] Calling AiService.compileDocument (Unified Pass, AutonomousSearch: ${useAutonomousWebSearch})...`);
+      const { content: finalContent, groundingMetadata } = await aiService.compileDocument({
         systemPrompt,
         userPrompt,
         multimodalFiles: multimodalFiles || [],
         masterSource: masterSource || null,
-        preProcessedParts: preProcessedSourceParts
+        preProcessedParts: preProcessedSourceParts,
+        webResearch: useAutonomousWebSearch // Trigger Google Search if no manual URLs
       });
 
       console.log('[DEBUG Compile] AI Compilation complete.');
 
-      // Extra: Since the user wants an "explanation" even in the first pass (implied by "dopo l'invio della prima compilazione"),
-      // we could generate it here, but typically we want the document first.
-      // The user said: "La sezione degli strumenti... diventa una mini chat che ti da tutti gli avvertimenti".
-      // We might want to generate this metadata here or in a parallel step.
-      // For now, let's stick to returning just content to avoid breaking existing frontend expectations,
+      // Return compiled content and grounding metadata
+      res.json({
+        compiledContent: finalContent,
+        groundingMetadata,
+        fetchedCompilerContext: fetchedCompilerContext, // For tracing
+        extractedFields,
+        manualAnnotations
+      });
       // and let the frontend trigger a "Review" call or just assume "Done" until user asks something.
       // Actually, the user asked for: "dopo la prima compilazione... diventa una mini chat che ti da tutti gli avvertimenti".
       // This implies the AI should return metadata about the compilation.
@@ -1673,7 +1681,7 @@ ISTRUZIONI OUTPUT:
   // --- NEW: Refine / Chat Endpoint ---
   app.post('/api/refine', async (req: Request, res: Response) => {
     try {
-      const { compileContext, currentContent, userInstruction, chatHistory, mentions, mentionRegistry } = req.body;
+      const { compileContext, currentContent, userInstruction, chatHistory, mentions, mentionRegistry, webResearch } = req.body;
 
       console.log(`[API refine] Request: "${userInstruction.substring(0, 50)}..." | Mentions: ${mentions?.length || 0} | Registry: ${mentionRegistry?.length || 0}`);
 
@@ -1758,12 +1766,13 @@ ISTRUZIONI OPERATIVE:
 `;
 
       // Call AI
-      const { content: jsonResponse } = await aiService.compileDocument({
+      const { content: jsonResponse, groundingMetadata } = await aiService.compileDocument({
         systemPrompt: systemPrompt + refineInstructions,
         userPrompt: userInstruction, // The actual instruction/query from the user
         multimodalFiles: multimodalFiles || [],
         masterSource: masterSource || null,
-        preProcessedParts: []
+        preProcessedParts: [],
+        webResearch: webResearch // Enable Autonomous Google Search if active
       });
 
       // Parse JSON safely
@@ -1785,7 +1794,8 @@ ISTRUZIONI OPERATIVE:
       res.json({
         success: true,
         newContent: parsed.newContent,
-        explanation: parsed.explanation
+        explanation: parsed.explanation,
+        groundingMetadata: groundingMetadata
       });
 
     } catch (error: any) {

@@ -466,7 +466,8 @@ export function DocumentCompilerSection({
           modelProvider,
           fetchedCompilerContext: data.fetchedCompilerContext,
           extractedFields: data.extractedFields,
-          manualAnnotations: data.manualAnnotations
+          manualAnnotations: data.manualAnnotations,
+          groundingMetadata: data.groundingMetadata
         };
 
         setLastCompileContext(context);

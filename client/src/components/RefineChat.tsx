@@ -17,6 +17,7 @@ interface ChatMessage {
     role: 'user' | 'ai';
     text: string;
     timestamp: Date;
+    groundingMetadata?: any;
 }
 
 interface RefineChatProps {
@@ -85,7 +86,8 @@ export function RefineChat({
                 compileContext,
                 currentContent,
                 userInstruction: analysisPrompt,
-                chatHistory: []
+                chatHistory: [],
+                webResearch: compileContext.webResearch
             });
 
             const data = await response.json();
@@ -95,7 +97,8 @@ export function RefineChat({
                 id: 'init-analysis',
                 role: 'ai',
                 text: data.explanation || "Analisi completata. Pronti per le tue modifiche.",
-                timestamp: new Date()
+                timestamp: new Date(),
+                groundingMetadata: data.groundingMetadata
             };
             setMessages(prev => {
                 if (prev.length > 0) {
@@ -239,7 +242,8 @@ export function RefineChat({
                 userInstruction: userMsg.text,
                 mentions: mentions.map(m => ({ source: m.source, text: m.text, label: m.label })),
                 mentionRegistry: mentionRegistry.map(m => ({ source: m.source, text: m.text, label: m.label })),
-                chatHistory: messages.map(m => ({ role: m.role, text: m.text }))
+                chatHistory: messages.map(m => ({ role: m.role, text: m.text })),
+                webResearch: compileContext.webResearch
             });
 
             const data = await response.json();
@@ -251,7 +255,8 @@ export function RefineChat({
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
                 text: data.explanation || "Ecco la bozza modificata. Controlla e conferma.",
-                timestamp: new Date()
+                timestamp: new Date(),
+                groundingMetadata: data.groundingMetadata
             };
             setMessages(prev => [...prev, aiMsg]);
 
@@ -326,6 +331,30 @@ export function RefineChat({
                                             >
                                                 {msg.text}
                                             </ReactMarkdown>
+
+                                            {/* Grounding Sources (Google Search) for Minimal Mode */}
+                                            {msg.groundingMetadata?.groundingChunks && msg.groundingMetadata.groundingChunks.length > 0 && (
+                                                <div className="mt-2 pt-2 border-t border-slate-200 w-full">
+                                                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                                        {msg.groundingMetadata.groundingChunks.map((chunk: any, i: number) => (
+                                                            <a
+                                                                key={i}
+                                                                href={chunk.web?.uri || '#'}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-1 group/link opacity-80 hover:opacity-100"
+                                                            >
+                                                                <div className="w-3.5 h-3.5 flex items-center justify-center rounded-sm bg-blue-50 text-[8px] font-bold text-blue-600 border border-blue-100">
+                                                                    {i + 1}
+                                                                </div>
+                                                                <span className="text-[10px] text-blue-600 font-medium hover:underline line-clamp-1 max-w-[120px]">
+                                                                    {chunk.web?.title || 'Fonte Web'}
+                                                                </span>
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -493,6 +522,31 @@ export function RefineChat({
                                             >
                                                 {msg.text}
                                             </ReactMarkdown>
+
+                                            {/* Grounding Sources (Google Search) for Standard Mode */}
+                                            {msg.groundingMetadata?.groundingChunks && msg.groundingMetadata.groundingChunks.length > 0 && (
+                                                <div className="mt-4 pt-3 border-t border-slate-300 dark:border-slate-600 w-full">
+                                                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-2">Fonti di Ricerca</span>
+                                                    <div className="flex flex-wrap gap-x-4 gap-y-2">
+                                                        {msg.groundingMetadata.groundingChunks.map((chunk: any, i: number) => (
+                                                            <a
+                                                                key={i}
+                                                                href={chunk.web?.uri || '#'}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-1.5 group/link"
+                                                            >
+                                                                <div className="w-4 h-4 flex items-center justify-center rounded-sm bg-blue-100 dark:bg-blue-900/30 text-[9px] font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 transition-colors">
+                                                                    {i + 1}
+                                                                </div>
+                                                                <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium hover:underline line-clamp-1 max-w-[200px]">
+                                                                    {chunk.web?.title || 'Fonte Web'}
+                                                                </span>
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

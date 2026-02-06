@@ -72,16 +72,14 @@ export class AiService {
         })).then(parts => parts.filter(p => p !== null));
     }
 
-    /**
-     * Compiles the document using strict context from sources.
-     */
     async compileDocument(params: {
         systemPrompt: string,
         userPrompt: string,
         multimodalFiles: any[],
         masterSource?: any,
-        preProcessedParts?: any[]
-    }): Promise<{ content: string, parts?: any[] }> {
+        preProcessedParts?: any[],
+        webResearch?: boolean
+    }): Promise<{ content: string, groundingMetadata?: any, parts?: any[] }> {
         try {
             const model = this.vertex_ai.getGenerativeModel({
                 model: this.modelId,
@@ -92,7 +90,6 @@ export class AiService {
             });
 
             // Use pre-processed parts if provided to save latency
-            // Parallel pre-processing
             const [multimodalParts, masterParts] = await Promise.all([
                 params.preProcessedParts ? Promise.resolve(params.preProcessedParts) : this.processMultimodalParts(params.multimodalFiles),
                 (params.masterSource && params.masterSource.base64) ? this.processMultimodalParts([params.masterSource]) : Promise.resolve([])
@@ -100,16 +97,22 @@ export class AiService {
 
             const messageParts: any[] = [{ text: params.userPrompt }, ...multimodalParts, ...masterParts];
 
+            const tools: any[] = params.webResearch ? [{ googleSearch: {} }] : [];
+
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
+                tools,
                 generationConfig: {
                     maxOutputTokens: 50000,
                     temperature: 0.2
                 }
             });
 
-            const content = result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '';
-            return { content, parts: multimodalParts };
+            const candidate = result.response.candidates?.[0];
+            const content = candidate?.content?.parts?.map((p: any) => p.text || '').join('') || '';
+            const groundingMetadata = candidate?.groundingMetadata;
+
+            return { content, groundingMetadata, parts: multimodalParts };
 
         } catch (error) {
             console.error('[AiService] compileDocument error:', error);
