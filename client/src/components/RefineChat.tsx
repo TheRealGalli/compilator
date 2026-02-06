@@ -218,7 +218,8 @@ export function RefineChat({
     };
 
     const handleSend = async () => {
-        if (!input.trim() || isLoading || isReviewing || isAnalyzing) return;
+        const hasAntepremaMention = mentions.some(m => m.source === 'anteprema');
+        if (!input.trim() || isLoading || (isReviewing && !hasAntepremaMention) || isAnalyzing) return;
 
         const mentionLabels = mentions.map(m => m.label).join(' ');
         const messageWithMentions = input + (mentionLabels ? ` (${mentionLabels})` : '');
@@ -402,7 +403,7 @@ export function RefineChat({
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            disabled={isReviewing || isLoading || isAnalyzing}
+                            disabled={(isReviewing && !mentions.some(m => m.source === 'anteprema')) || isLoading || isAnalyzing}
                             placeholder="Scrivi qui..."
                             className="pr-12 min-h-[60px] max-h-[150px] resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent text-sm shadow-none"
                             rows={1}
@@ -626,7 +627,7 @@ export function RefineChat({
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            disabled={isReviewing || isLoading || isAnalyzing}
+                            disabled={(isReviewing && !mentions.some(m => m.source === 'anteprema')) || isLoading || isAnalyzing}
                             placeholder={isReviewing ? "Conferma o rifiuta la modifica corrente..." : "Chiedi modifiche (es. 'Cambia la data')..."}
                             className="pr-12 min-h-[50px] max-h-[120px] resize-none border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent shadow-none text-sm"
                             rows={1}
@@ -634,7 +635,7 @@ export function RefineChat({
                         <Button
                             size="icon"
                             onClick={handleSend}
-                            disabled={!input.trim() || isLoading || isReviewing || isAnalyzing}
+                            disabled={!input.trim() || isLoading || (isReviewing && !mentions.some(m => m.source === 'anteprema')) || isAnalyzing}
                             className="absolute right-2 bottom-2 h-8 w-8 rounded-xl bg-blue-600 hover:bg-blue-700 transition-colors disabled:bg-slate-300 text-white shadow-lg shadow-blue-500/20"
                         >
                             <Send className="w-4 h-4" />
