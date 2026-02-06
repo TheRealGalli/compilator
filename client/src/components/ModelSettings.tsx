@@ -285,19 +285,20 @@ export function ModelSettings({
                               className="w-[24px] h-[24px] flex items-center justify-center rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors overflow-hidden"
                             >
                               {i === 1 && (
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M12 2a10 10 0 0 1 10 10v9l-2-1-2 1-2-1-2 1-2-1-2 1-2-1-2 1V12A10 10 0 0 1 12 2z" />
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="translate-y-[1px]">
+                                  <path d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8v8l-2-2-2 2-2-2-2 2-2-2-2 2-2-2-2 2V12z" />
                                   <circle cx="9" cy="11" r="1" fill="#2563eb" />
                                   <circle cx="15" cy="11" r="1" fill="#2563eb" />
                                 </svg>
                               )}
                               {i === 2 && (
-                                <div className="flex flex-col items-center justify-center gap-[2px]">
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="m15 5 4 4" />
-                                    <path d="M21.5 12 11.5 22 2 12.5l10-10 9.5 9.5Z" />
-                                  </svg>
-                                  <div className="border-[0.5px] border-[#2563eb] text-[#2563eb] text-[5px] px-[1px] font-bold leading-none uppercase">IT</div>
+                                <div className="flex flex-col items-center justify-center -translate-y-[2px]">
+                                  <div className="flex flex-col items-center">
+                                    <div className="border-[1.2px] border-[#2563eb] text-[#2563eb] text-[5px] px-[1.5px] py-[0.5px] font-bold leading-none uppercase rounded-[1px] bg-white shadow-[0_0_2px_rgba(37,99,235,0.1)]">
+                                      IT
+                                    </div>
+                                    <div className="w-[1.2px] h-[5px] bg-[#2563eb] rounded-full -translate-y-[0.5px]" />
+                                  </div>
                                 </div>
                               )}
                             </div>
