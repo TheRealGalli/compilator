@@ -99,9 +99,17 @@ export class AiService {
 
             const tools: any[] = params.webResearch ? [{ googleSearch: {} }] : [];
 
+            // Add toolConfig to explicitly allow/force tool use if appropriate
+            const toolConfig: any = tools.length > 0 ? {
+                functionCallingConfig: {
+                    mode: 'AUTO',
+                }
+            } : undefined;
+
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
                 tools,
+                toolConfig,
                 generationConfig: {
                     maxOutputTokens: 50000,
                     temperature: 0.2
@@ -111,6 +119,13 @@ export class AiService {
             const candidate = result.response.candidates?.[0];
             const content = candidate?.content?.parts?.map((p: any) => p.text || '').join('') || '';
             const groundingMetadata = candidate?.groundingMetadata;
+
+            if (params.webResearch) {
+                console.log(`[AiService] Grounding Metadata returned:`, groundingMetadata ? 'YES' : 'NONE');
+                if (groundingMetadata?.searchEntryPoint) {
+                    console.log(`[AiService] Search Entry Point detected.`);
+                }
+            }
 
             return { content, groundingMetadata, parts: multimodalParts };
 

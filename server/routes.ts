@@ -1522,9 +1522,10 @@ MODALITÀ ANALISI DETTAGLIATA ATTIVA:
 
 ${webResearch ? `
 MODALITÀ WEB RESEARCH ATTIVA:
-- Usa i link forniti nelle note per il contesto e l'argomento (adatta il contenuto al link).
-- **PRIORITÀ DATI:** Se un dato è presente sia nel LINK che nelle FONTI CARICATE (PDF/Doc), usa SEMPRE il dato delle FONTI CARICATE.
-- I link servono per arricchire, non per sovrascrivere i documenti ufficiali.` : ''}
+- Puoi e DEVI usare lo strumento Google Search per cercare informazioni che non trovi nei documenti caricati (es. leggi aggiornate, dati aziendali pubblici, termini tecnici, indirizzi).
+- Se un dato è assente nei documenti ma disponibile via Google Search: **USALO**. In questo caso il dato non è considerato "allucinazione".
+- **PRIORITÀ DATI:** Se un dato è presente sia nei risultati di ricerca che nelle FONTI CARICATE (PDF/Doc), usa SEMPRE il dato delle FONTI CARICATE.
+- Usa i risultati della ricerca per arricchire il documento e renderlo professionale e aggiornato.` : ''}
 
 ${(multimodalFiles.length > 0 || masterSource || hasExternalSources) ? `
 Hai accesso a ${multimodalFiles.length + (masterSource ? 1 : 0) + (hasExternalSources ? 1 : 0)} fonti.
@@ -1616,7 +1617,8 @@ ISTRUZIONI OUTPUT:
 - Restituisci il DOCUMENTO COMPLETAMENTE COMPILATO.
 - Sostituisci i placeholder nel testo.
 - Non restituire JSON.
-- Non dire "Ecco il documento compilato", restituisci SOLO il testo del documento.
+- NON dire "Ecco il documento compilato", restituisci SOLO il testo del documento.
+- **DATO MANCANTE**: Se un dato è assente ma è di natura pubblica o comune (es. leggi, indirizzi di aziende), **USA Google Search** per trovarlo invece di scrivere [DATO MANCANTE].
 ` : `Genera un documento completo basandoti sulle note dell'utente e seguendo ESATTAMENTE la struttura e lo stile del documento MASTER fornito.
 
 ${notes ? `NOTE UTENTE:\n${notes}` : ''}
@@ -1628,6 +1630,7 @@ ISTRUZIONI OUTPUT:
 - Includi tutte le sezioni necessarie basandoti sul MASTER SOURCE.
 - Non restituire JSON.
 - Non dire "Ecco il documento", restituisci SOLO il testo del documento.
+- **DATO MANCANTE**: Se un dato è assente ma è di natura pubblica o comune (es. leggi, indirizzi di aziende), **USA Google Search** per trovarlo invece di scrivere [DATO MANCANTE].
 `;
 
       console.log('[DEBUG Compile] Pre-processing multimodal parts in parallel...');
@@ -1748,7 +1751,8 @@ ISTRUZIONI OPERATIVE:
    - Restituisci JSON: { "newContent": null, "explanation": "Tua risposta/analisi" }
 
 **ZERO HALLUCINATION & CONSISTENCY**: 
-- Non inventare mai dati.
+- Non inventare mai dati non presenti nelle fonti (Documenti Caricati o Risultati Google Search).
+- **MODALITÀ SEARCH**: Se l'utente chiede informazioni "esterne" o "aggiornate" e la Web Research è attiva, **USA Google Search** per fornire risposte precise basate su fatti reali.
 - Se la richiesta è ambigua, chiedi chiarimenti nell'explanation senza modificare il documento.
 - **INTEGRITÀ STRUTTURALE**: Se il documento contiene tabelle Markdown, preservane la struttura. Non spezzare tabelle esistenti in più blocchi a meno che non sia esplicitamente richiesto di dividerle.
 `;
