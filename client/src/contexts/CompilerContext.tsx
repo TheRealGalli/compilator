@@ -199,7 +199,20 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
         let restored = false;
         setState(prev => {
             const snapshot = prev.masterSnapshots[sourceId];
-            if (!snapshot) return prev;
+            if (!snapshot) {
+                // If it's a new pin, reset compiled content and messages
+                return {
+                    ...prev,
+                    templateContent: '',
+                    compiledContent: '',
+                    messages: [],
+                    mentionRegistry: [],
+                    frozenColor: null,
+                    isRefiningMode: false,
+                    isLocked: true,
+                    pinnedSourceId: sourceId
+                };
+            }
             restored = true;
             return {
                 ...prev,
@@ -210,7 +223,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 frozenColor: snapshot.frozenColor,
                 isRefiningMode: snapshot.compiledContent !== '',
                 isLocked: true,
-                pinnedSourceId: sourceId, // Set the current pinned ID
+                pinnedSourceId: sourceId,
             };
         });
         return restored;

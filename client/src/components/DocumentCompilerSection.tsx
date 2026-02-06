@@ -278,30 +278,25 @@ export function DocumentCompilerSection({
 
   useEffect(() => {
     // 1. PINNING/UNPINNING Logic
-    // If the master source has changed compared to what we have in context, trigger logic.
     if (masterSource?.id !== pinnedSourceId) {
-      // If we HAD a pinned source, save its snapshot before switching/unpinning
       if (pinnedSourceId && isLocked) {
         takeMasterSnapshot(pinnedSourceId);
       }
 
       if (masterSource) {
-        // Take snapshot of standard work if we are about to lock into a master for the first time
         if (!isLocked) {
           takeStandardSnapshot();
         }
-        // We just pinned a new document: restore its specific work if it exists
-        const restored = restoreMasterSnapshot(masterSource.id);
-        if (!restored) {
-          // If no snapshot, ensure context knows THIS is the pinned source
-          setPinnedSourceId(masterSource.id);
-        }
+        restoreMasterSnapshot(masterSource.id);
+        // If it's a fresh pin (no content yet), show template view
+        setIsCompiledView(false);
       } else if (isLocked && !masterSource) {
-        // We just unpinned: restore the last standard work
         restoreStandardSnapshot();
+        // Return to where we were in standard mode (if it was compiled, show it)
+        setIsCompiledView(compiledContent !== "");
       }
     }
-  }, [masterSource?.id, pinnedSourceId, isLocked, restoreMasterSnapshot, restoreStandardSnapshot, takeStandardSnapshot, takeMasterSnapshot, setPinnedSourceId]);
+  }, [masterSource?.id, pinnedSourceId, isLocked, compiledContent, restoreMasterSnapshot, restoreStandardSnapshot, takeStandardSnapshot, takeMasterSnapshot, setPinnedSourceId]);
 
   useEffect(() => {
     // 2. AUTO-ACTIVATE PDF STUDIO if master is fillable AND not in bypass mode
