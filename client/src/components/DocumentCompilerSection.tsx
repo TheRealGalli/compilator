@@ -1011,7 +1011,7 @@ export function DocumentCompilerSection({
             </div>
           </div>
         ) : (
-          <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
+          <div className="flex-1 min-h-0 flex gap-4 overflow-visible">
             {/* COLUMN 1: Settings OR Chat (25% approx col-span-3) */}
             <div className="w-[25%] min-w-[280px] h-full flex flex-col overflow-hidden">
               <ModelSettings
@@ -1051,7 +1051,7 @@ export function DocumentCompilerSection({
             </div>
 
             {/* FLEXIBLE CONTAINER FOR EDITOR & OUTPUT (75% approx col-span-9) */}
-            <div className="flex-1 h-full min-w-0 flex relative overflow-hidden">
+            <div className="flex-1 h-full min-w-0 flex relative overflow-visible">
               {/* COLUMN 2: Template Editor (flexible) */}
               <div className="flex-1 h-full min-w-0 flex flex-col overflow-visible relative">
                 <TemplateEditor
@@ -1099,9 +1099,9 @@ export function DocumentCompilerSection({
                   ) : null}
                 />
 
-                {/* CUSTOM TOGGLE HANDLE (Docked to the edge, visible even when editor is overflow-hidden) */}
+                {/* CUSTOM TOGGLE HANDLE (Shifted 16px right of border, z-index 200) */}
                 <div
-                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[200] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[27px]' : 'translate-x-[18.5px]'}`}
+                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[200] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[18.5px]' : 'translate-x-[18.5px]'}`}
                 >
                   <button
                     onClick={() => setIsOutputVisible(!isOutputVisible)}
