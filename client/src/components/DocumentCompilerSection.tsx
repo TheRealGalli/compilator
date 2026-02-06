@@ -921,7 +921,7 @@ export function DocumentCompilerSection({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col overflow-visible">
         {isPdfMode ? (
           /* PDF STUDIO UNIFIED VIEW */
           <div className="flex-1 min-h-0 grid grid-cols-12 gap-4">
@@ -1051,7 +1051,7 @@ export function DocumentCompilerSection({
             </div>
 
             {/* FLEXIBLE CONTAINER FOR EDITOR & OUTPUT (75% approx col-span-9) */}
-            <div className="flex-1 h-full min-w-0 flex relative overflow-visible">
+            <div className="flex-1 h-full min-w-0 flex relative overflow-visible mr-4">
               {/* COLUMN 2: Template Editor (flexible) */}
               <div className="flex-1 h-full min-w-0 flex flex-col overflow-visible relative">
                 <TemplateEditor
@@ -1099,9 +1099,9 @@ export function DocumentCompilerSection({
                   ) : null}
                 />
 
-                {/* CUSTOM TOGGLE HANDLE (Shifted 16px right of border, z-index 200) */}
+                {/* CUSTOM TOGGLE HANDLE (Shifted 16px right of border into the gutter) */}
                 <div
-                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[200] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[18.5px]' : 'translate-x-[18.5px]'}`}
+                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[200] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[21px]' : 'translate-x-[21px]'}`}
                 >
                   <button
                     onClick={() => setIsOutputVisible(!isOutputVisible)}
