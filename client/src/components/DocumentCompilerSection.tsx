@@ -1051,7 +1051,7 @@ export function DocumentCompilerSection({
             </div>
 
             {/* FLEXIBLE AREA FOR COLUMN 2 AND COLUMN 3 */}
-            <div className="col-span-9 h-full flex gap-4 min-w-0">
+            <div className="col-span-9 h-full flex min-w-0">
               {/* COLUMN 2: Template Editor (flexible) */}
               <div className="flex-1 h-full min-w-0 transition-all duration-500 ease-in-out">
                 <TemplateEditor
@@ -1100,15 +1100,15 @@ export function DocumentCompilerSection({
                 />
               </div>
 
-              {/* CUSTOM BLUE TOGGLE HANDLE */}
-              <div className="flex flex-col justify-center shrink-0">
+              {/* CUSTOM BLUE TOGGLE HANDLE (Perfectly centered in 16px gap) */}
+              <div className="w-4 shrink-0 flex flex-col justify-center items-center relative z-[100]">
                 <button
                   onClick={() => setIsOutputVisible(!isOutputVisible)}
-                  className="w-[6px] h-[15px] rounded-full bg-[#2563eb] shadow-lg flex flex-col items-center justify-center gap-[2px] hover:scale-125 transition-transform z-[100]"
+                  className="w-[5px] h-[30px] rounded-full bg-[#2563eb] shadow-lg flex flex-col items-center justify-center gap-[3px] hover:scale-110 active:scale-95 transition-all"
                   title={isOutputVisible ? "Nascondi output" : "Mostra output"}
                 >
-                  <div className="w-[1px] h-[3px] bg-white/90 rounded-full" />
-                  <div className="w-[1px] h-[3px] bg-white/90 rounded-full" />
+                  <div className="w-[1.2px] h-[6px] bg-white/90 rounded-full" />
+                  <div className="w-[1.2px] h-[6px] bg-white/90 rounded-full" />
                 </button>
               </div>
 
@@ -1116,11 +1116,11 @@ export function DocumentCompilerSection({
               <AnimatePresence mode="popLayout">
                 {isOutputVisible && (
                   <motion.div
-                    initial={{ x: 50, opacity: 0, width: 0, marginLeft: -16 }}
-                    animate={{ x: 0, opacity: 1, width: '44.44%', marginLeft: 0 }} // 4/9 of col-span-9 = 44.44%
-                    exit={{ x: 50, opacity: 0, width: 0, marginLeft: -16 }}
+                    initial={{ x: '100%', opacity: 0, width: 0 }}
+                    animate={{ x: 0, opacity: 1, width: '44.44%' }}
+                    exit={{ x: '100%', opacity: 0, width: 0 }}
                     transition={{
-                      duration: 0.4,
+                      duration: 0.5,
                       ease: [0.32, 0.72, 0, 1]
                     }}
                     className="h-full flex flex-col min-w-0"
