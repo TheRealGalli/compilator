@@ -921,10 +921,10 @@ export function DocumentCompilerSection({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {isPdfMode ? (
           /* PDF STUDIO UNIFIED VIEW */
-          <div className="h-full grid grid-cols-12 gap-4">
+          <div className="flex-1 min-h-0 grid grid-cols-12 gap-4">
             {/* COLUMN 1: Settings OR Chat (col-span-3) */}
             <div className="col-span-3 h-full flex flex-col overflow-hidden">
               <ModelSettings
@@ -1011,9 +1011,9 @@ export function DocumentCompilerSection({
             </div>
           </div>
         ) : (
-          <div className="h-full grid grid-cols-12 gap-4 overflow-hidden relative">
-            {/* COLUMN 1: Settings OR Chat (col-span-3) */}
-            <div className="col-span-3 h-full flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
+            {/* COLUMN 1: Settings OR Chat (25% approx col-span-3) */}
+            <div className="w-[25%] min-w-[280px] h-full flex flex-col overflow-hidden">
               <ModelSettings
                 className="flex-1"
                 notes={notes}
@@ -1050,10 +1050,10 @@ export function DocumentCompilerSection({
               />
             </div>
 
-            {/* FLEXIBLE AREA FOR COLUMN 2 AND COLUMN 3 */}
-            <div className="col-span-9 h-full flex min-w-0">
+            {/* FLEXIBLE CONTAINER FOR EDITOR & OUTPUT (75% approx col-span-9) */}
+            <div className="flex-1 h-full min-w-0 flex relative overflow-hidden">
               {/* COLUMN 2: Template Editor (flexible) */}
-              <div className="flex-1 h-full min-w-0 transition-all duration-500 ease-in-out">
+              <div className="flex-1 h-full min-w-0 flex flex-col overflow-hidden relative">
                 <TemplateEditor
                   key={`editor-${isReviewing}-${isLocked}`}
                   value={isReviewing ? (pendingContent || templateContent) : templateContent}
@@ -1098,32 +1098,35 @@ export function DocumentCompilerSection({
                     </div>
                   ) : null}
                 />
-              </div>
 
-              {/* CUSTOM BLUE TOGGLE HANDLE (Perfectly centered in 16px gap) */}
-              <div className="w-4 shrink-0 flex flex-col justify-center items-center relative z-[100]">
-                <button
-                  onClick={() => setIsOutputVisible(!isOutputVisible)}
-                  className="w-[5px] h-[30px] rounded-full bg-[#2563eb] shadow-lg flex flex-col items-center justify-center gap-[3px] hover:scale-110 active:scale-95 transition-all"
-                  title={isOutputVisible ? "Nascondi output" : "Mostra output"}
+                {/* CUSTOM TOGGLE HANDLE (Perfectly centered or docked) */}
+                <div
+                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[100] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[11px]' : 'translate-x-0'}`}
                 >
-                  <div className="w-[1.2px] h-[6px] bg-white/90 rounded-full" />
-                  <div className="w-[1.2px] h-[6px] bg-white/90 rounded-full" />
-                </button>
+                  <button
+                    onClick={() => setIsOutputVisible(!isOutputVisible)}
+                    className="w-[5px] h-[30px] rounded-full bg-[#2563eb] shadow-lg flex flex-col items-center justify-center gap-[4px] hover:scale-110 active:scale-95 transition-all outline-none p-0"
+                    title={isOutputVisible ? "Nascondi output" : "Mostra output"}
+                  >
+                    <div className="w-[1.2px] h-[7px] bg-white rounded-full flex-shrink-0" />
+                    <div className="w-[1.2px] h-[7px] bg-white rounded-full flex-shrink-0" />
+                  </button>
+                </div>
               </div>
 
               {/* COLUMN 3: Compiled Output (Animated Sidebar) */}
-              <AnimatePresence mode="popLayout">
+              <AnimatePresence mode="popLayout" initial={false}>
                 {isOutputVisible && (
                   <motion.div
-                    initial={{ x: '100%', opacity: 0, width: 0 }}
-                    animate={{ x: 0, opacity: 1, width: '44.44%' }}
-                    exit={{ x: '100%', opacity: 0, width: 0 }}
+                    key="output-sidebar"
+                    initial={{ width: 0, opacity: 0, x: 20 }}
+                    animate={{ width: '44.44%', opacity: 1, x: 0 }}
+                    exit={{ width: 0, opacity: 0, x: 20 }}
                     transition={{
                       duration: 0.5,
                       ease: [0.32, 0.72, 0, 1]
                     }}
-                    className="h-full flex flex-col min-w-0"
+                    className="h-full flex flex-col min-w-0 pl-4 overflow-hidden"
                   >
                     <CompiledOutput
                       content={compiledContent}
