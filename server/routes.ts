@@ -1488,9 +1488,10 @@ ${masterSource ? `
     Testo del paragrafo...
   - **TITOLI LUNGHI:** Non spezzare MAI un titolo lungo con un ritorno a capo all'interno del grassetto. Il grassetto deve racchiudere l'INTERA riga.
   - **ARCHITETTURA VISIVA:** Usa **DOPPI A CAPO** per separare ogni singolo paragrafo, clausola o sezione. Il testo non deve mai essere un muro di parole.
-  - **TABELLE E LISTE (CRITICO - ORDINE TASSATIVO):**
+- **TABELLE E LISTE (CRITICO - UNICITÀ E STABILITÀ):**
     - **DIVIETO ASSOLUTO** di replicare la struttura tabellare usando spazi, tabulazioni o elenchi verticali.
-    - Se il dato ha una struttura a griglia o "Chiave - Valore" (es. Riga 50, 51 del Form 5472), DEVI usare una **TABELLA MARKDOWN**.
+    - Se il dato ha una struttura a griglia o "Chiave - Valore" (es. Righe di un modulo), DEVI usare una **TABELLA MARKDOWN**.
+    - **REGOLA DI UNICITÀ**: Se più campi appartengono logicamente alla stessa sezione o tabella (es. Part I, Part II), usa una **SINGOLA TABELLA**. NON spezzare la tabella in più blocchi se il contenuto è contiguo.
     - Esempio Corretto:
       | Part | Description | Value |
       |---|---|---|
@@ -1656,7 +1657,9 @@ ISTRUZIONI OUTPUT:
       res.json({
         success: true,
         compiledContent: finalContent,
-        fetchedCompilerContext // Return this context so frontend can pass it back to refine!
+        fetchedCompilerContext, // Return this context so frontend can pass it back to refine!
+        extractedFields,       // Pass back metadata for Copilot
+        manualAnnotations      // Pass back metadata for Copilot
       });
 
     } catch (error: any) {
@@ -1751,6 +1754,7 @@ ISTRUZIONI OPERATIVE:
 **ZERO HALLUCINATION & CONSISTENCY**: 
 - Non inventare mai dati.
 - Se la richiesta è ambigua, chiedi chiarimenti nell'explanation senza modificare il documento.
+- **INTEGRITÀ STRUTTURALE**: Se il documento contiene tabelle Markdown, preservane la struttura. Non spezzare tabelle esistenti in più blocchi a meno che non sia esplicitamente richiesto di dividerle.
 `;
 
       // Call AI

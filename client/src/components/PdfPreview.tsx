@@ -38,7 +38,7 @@ interface PdfPreviewProps {
     notes?: string;
     webResearch?: boolean;
     modelProvider?: string;
-    onCompile?: (content: string) => void;
+    onCompile?: (content: string, metadata?: { extractedFields?: any[], manualAnnotations?: any[], fetchedCompilerContext?: string }) => void;
 }
 
 export function PdfPreview({
@@ -157,7 +157,6 @@ export function PdfPreview({
                         setIsXfaAdobe(false);
                     }
                 } catch (err) {
-                    console.warn('[PdfPreview] Adobe DNA check failed:', err);
                 }
             });
 
@@ -209,7 +208,6 @@ export function PdfPreview({
                     }
                     fillCount++;
                 } catch (e) {
-                    console.warn(`[PdfPreview] Error filling field ${p.name}:`, e);
                 }
             }
         });
@@ -271,8 +269,10 @@ export function PdfPreview({
             });
 
             if (onCompile) {
-                // Return something that represents the state, though for PDF it's the proposals
-                onCompile(JSON.stringify(newProposals));
+                onCompile(JSON.stringify(newProposals), {
+                    extractedFields: fields,
+                    fetchedCompilerContext: newCacheKey
+                });
             }
 
         } catch (err: any) {

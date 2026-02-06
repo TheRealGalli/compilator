@@ -981,7 +981,7 @@ export function DocumentCompilerSection({
                   notes={notes}
                   webResearch={webResearch}
                   modelProvider={modelProvider}
-                  onCompile={(content) => {
+                  onCompile={(content, metadata) => {
                     // Synchronize state when PDF is compiled via AI assist
                     setIsCompiledView(true);
                     setCompiledContent(content);
@@ -1005,7 +1005,8 @@ export function DocumentCompilerSection({
                       webResearch,
                       detailedAnalysis,
                       formalTone,
-                      modelProvider
+                      modelProvider,
+                      ...metadata
                     });
                   }}
                 />
