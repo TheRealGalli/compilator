@@ -264,12 +264,13 @@ export function DocumentCompilerSection({
 
   const [pendingMention, setPendingMention] = useState<{ text: string; id: string; start?: number; end?: number } | null>(null);
   const [isOutputVisible, setIsOutputVisible] = useState(false);
-  const [mentionCounts, setMentionCounts] = useState({ template: 0, copilot: 0 });
+  const [mentionCounts, setMentionCounts] = useState({ template: 0, copilot: 0, anteprema: 0 });
 
-  const handleMention = (text: string, source: 'template' | 'copilot', start?: number, end?: number) => {
+  const handleMention = (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => {
     setMentionCounts(prev => {
       const newCount = prev[source] + 1;
-      const mentionId = `#${source === 'template' ? 'T' : 'C'}${newCount}`;
+      const tagMap = { template: 'T', copilot: 'C', anteprema: 'A' };
+      const mentionId = `#${tagMap[source]}${newCount}`;
       setPendingMention({ text, id: mentionId, start, end });
       return { ...prev, [source]: newCount };
     });
@@ -1073,8 +1074,8 @@ export function DocumentCompilerSection({
                         : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`))
                   }
                   placeholder="Inserisci qui il testo o il template..."
-                  enableMentions={!isReviewing}
-                  onMention={(text, start, end) => handleMention(text, 'template', start, end)}
+                  enableMentions={isReviewing || !!compiledContent}
+                  onMention={(text, start, end) => handleMention(text, isReviewing ? 'anteprema' : 'template', start, end)}
                   headerRight={isReviewing ? (
                     <div className="flex gap-1 items-center">
                       <Button

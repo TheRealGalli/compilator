@@ -32,14 +32,14 @@ interface RefineChatProps {
     minimal?: boolean;
     pendingMention?: { text: string; id: string; start?: number; end?: number } | null;
     onMentionConsumed?: () => void;
-    onMentionCreated?: (text: string, source: 'copilot' | 'template', start?: number, end?: number) => void;
+    onMentionCreated?: (text: string, source: 'copilot' | 'template' | 'anteprema', start?: number, end?: number) => void;
 }
 
 interface MentionContext {
     id: string;
     text: string;
     label: string;
-    source: 'copilot' | 'template';
+    source: 'copilot' | 'template' | 'anteprema';
     start?: number;
     end?: number;
 }
@@ -129,7 +129,7 @@ export function RefineChat({
                 id: `mention-${Date.now()}`,
                 text: pendingMention.text,
                 label: pendingMention.id,
-                source: 'template',
+                source: pendingMention.id.startsWith('#A') ? 'anteprema' : 'template',
                 start: pendingMention.start,
                 end: pendingMention.end
             };
@@ -209,9 +209,9 @@ export function RefineChat({
                 id: `mention-${Date.now()}`,
                 text: selection.text,
                 label: `Selection-${Date.now().toString().slice(-4)}`, // Fallback label
-                source: 'copilot'
+                source: isReviewing ? 'anteprema' : 'copilot'
             };
-            onMentionCreated?.(selection.text, 'copilot');
+            onMentionCreated?.(selection.text, isReviewing ? 'anteprema' : 'copilot');
             setMentionRegistry(prev => [...prev, newMention]); // Add to registry
             setSelection(null);
         }
