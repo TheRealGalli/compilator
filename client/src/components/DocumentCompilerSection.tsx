@@ -1102,7 +1102,7 @@ export function DocumentCompilerSection({
 
                 {/* CUSTOM TOGGLE HANDLE (Dynamically centered in gutter or gap) */}
                 <div
-                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[200] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[10.5px]' : 'translate-x-[20px]'}`}
+                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[200] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[10.5px]' : 'translate-x-[15px]'}`}
                 >
                   <button
                     onClick={() => setIsOutputVisible(!isOutputVisible)}
