@@ -1101,7 +1101,7 @@ export function DocumentCompilerSection({
 
                 {/* CUSTOM TOGGLE HANDLE (Docked to the edge, visible even when editor is overflow-hidden) */}
                 <div
-                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[100] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[11px]' : 'translate-x-[2.5px]'}`}
+                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[200] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[27px]' : 'translate-x-[18.5px]'}`}
                 >
                   <button
                     onClick={() => setIsOutputVisible(!isOutputVisible)}
