@@ -263,6 +263,7 @@ export function DocumentCompilerSection({
   const setIsPdfMode = (val: boolean) => setCurrentMode(val ? 'fillable' : 'standard');
 
   const [pendingMention, setPendingMention] = useState<{ text: string; id: string; start?: number; end?: number } | null>(null);
+  const [isOutputVisible, setIsOutputVisible] = useState(true);
   const [mentionCounts, setMentionCounts] = useState({ template: 0, copilot: 0 });
 
   const handleMention = (text: string, source: 'template' | 'copilot', start?: number, end?: number) => {
@@ -1010,8 +1011,7 @@ export function DocumentCompilerSection({
             </div>
           </div>
         ) : (
-          <div className="h-full grid grid-cols-12 gap-4">
-
+          <div className="h-full grid grid-cols-12 gap-4 overflow-hidden relative">
             {/* COLUMN 1: Settings OR Chat (col-span-3) */}
             <div className="col-span-3 h-full flex flex-col overflow-hidden">
               <ModelSettings
@@ -1050,68 +1050,96 @@ export function DocumentCompilerSection({
               />
             </div>
 
-            {/* COLUMN 2: Template Editor (col-span-5) */}
-            <div className="col-span-5 h-full overflow-hidden">
-              <TemplateEditor
-                key={`editor-${isReviewing}-${isLocked}`}
-                value={isReviewing ? (pendingContent || templateContent) : templateContent}
-                onChange={(val) => {
-                  setTemplateContent(val);
-                  // Sync with output ONLY if we are in "Template Compilato" mode (Copilot active)
-                  if (isRefiningMode && !isReviewing) {
-                    setCompiledContent(val);
+            {/* FLEXIBLE AREA FOR COLUMN 2 AND COLUMN 3 */}
+            <div className="col-span-9 h-full flex gap-4 min-w-0">
+              {/* COLUMN 2: Template Editor (flexible) */}
+              <div className="flex-1 h-full min-w-0 transition-all duration-500 ease-in-out">
+                <TemplateEditor
+                  key={`editor-${isReviewing}-${isLocked}`}
+                  value={isReviewing ? (pendingContent || templateContent) : templateContent}
+                  onChange={(val) => {
+                    setTemplateContent(val);
+                    // Sync with output ONLY if we are in "Template Compilato" mode (Copilot active)
+                    if (isRefiningMode && !isReviewing) {
+                      setCompiledContent(val);
+                    }
+                  }}
+                  title={isReviewing
+                    ? "Anteprima Modifiche AI"
+                    : (compiledContent
+                      ? `Template Compilato${masterSource ? ` (${masterSource.name})` : ''}`
+                      : ((currentMode as string) === 'fillable'
+                        ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
+                        : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`))
                   }
-                }}
-                title={isReviewing
-                  ? "Anteprima Modifiche AI"
-                  : (compiledContent
-                    ? `Template Compilato${masterSource ? ` (${masterSource.name})` : ''}`
-                    : ((currentMode as string) === 'fillable'
-                      ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
-                      : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`))
-                }
-                placeholder="Inserisci qui il testo o il template..."
-                enableMentions={!isReviewing}
-                onMention={(text, start, end) => handleMention(text, 'template', start, end)}
-                headerRight={isReviewing ? (
-                  <div className="flex gap-1 items-center">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all"
-                      onClick={handleRejectRefinement}
-                      title="Rifiuta modifiche"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-green-600 hover:bg-green-50 hover:border-green-200 shadow-sm transition-all"
-                      onClick={handleAcceptRefinement}
-                      title="Accetta modifiche"
-                    >
-                      <Check className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ) : null}
-              />
-            </div>
+                  placeholder="Inserisci qui il testo o il template..."
+                  enableMentions={!isReviewing}
+                  onMention={(text, start, end) => handleMention(text, 'template', start, end)}
+                  headerRight={isReviewing ? (
+                    <div className="flex gap-1 items-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all"
+                        onClick={handleRejectRefinement}
+                        title="Rifiuta modifiche"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-green-600 hover:bg-green-50 hover:border-green-200 shadow-sm transition-all"
+                        onClick={handleAcceptRefinement}
+                        title="Accetta modifiche"
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : null}
+                />
+              </div>
 
-            <div className="col-span-4 h-full overflow-hidden flex flex-col">
-              <CompiledOutput
-                content={compiledContent}
-                onCopy={() => {
-                  navigator.clipboard.writeText(compiledContent);
-                  toast({
-                    title: "Copiato",
-                    description: "Il contenuto è stato copiato negli appunti.",
-                  });
-                }}
-                onDownload={handleDownload}
-              />
-            </div>
+              {/* CUSTOM BLUE TOGGLE HANDLE */}
+              <div className="flex flex-col justify-center shrink-0">
+                <button
+                  onClick={() => setIsOutputVisible(!isOutputVisible)}
+                  className="w-[6px] h-[15px] rounded-full bg-[#2563eb] shadow-lg flex flex-col items-center justify-center gap-[2px] hover:scale-125 transition-transform z-[100]"
+                  title={isOutputVisible ? "Nascondi output" : "Mostra output"}
+                >
+                  <div className="w-[1px] h-[3px] bg-white/90 rounded-full" />
+                  <div className="w-[1px] h-[3px] bg-white/90 rounded-full" />
+                </button>
+              </div>
 
+              {/* COLUMN 3: Compiled Output (Animated Sidebar) */}
+              <AnimatePresence mode="popLayout">
+                {isOutputVisible && (
+                  <motion.div
+                    initial={{ x: 50, opacity: 0, width: 0, marginLeft: -16 }}
+                    animate={{ x: 0, opacity: 1, width: '44.44%', marginLeft: 0 }} // 4/9 of col-span-9 = 44.44%
+                    exit={{ x: 50, opacity: 0, width: 0, marginLeft: -16 }}
+                    transition={{
+                      duration: 0.4,
+                      ease: [0.32, 0.72, 0, 1]
+                    }}
+                    className="h-full flex flex-col min-w-0"
+                  >
+                    <CompiledOutput
+                      content={compiledContent}
+                      onCopy={() => {
+                        navigator.clipboard.writeText(compiledContent);
+                        toast({
+                          title: "Copiato",
+                          description: "Il contenuto è stato copiato negli appunti.",
+                        });
+                      }}
+                      onDownload={handleDownload}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         )}
 
