@@ -174,7 +174,7 @@ export function PdfPreview({
     const applyProposalsToDom = (propsList: any[]) => {
         if (!propsList || propsList.length === 0) return;
 
-        console.log(`[PdfPreview] Applying ${propsList.length} proposals to DOM for page ${pageNumber}...`);
+
 
         let fillCount = 0;
         propsList.forEach((p: any) => {
@@ -214,7 +214,7 @@ export function PdfPreview({
             }
         });
 
-        console.log(`[PdfPreview] Local Page Fill: Success for ${fillCount} fields.`);
+
     };
 
     const handleEyeClick = async () => {
@@ -225,7 +225,7 @@ export function PdfPreview({
         setIsCompiling(true);
 
         try {
-            console.log("[PdfPreview] Starting discovery...");
+
             // 1. Discover Fields
             const discoverRes = await apiRequest('POST', '/api/pdf/discover-fields', {
                 masterSource: {
@@ -246,7 +246,7 @@ export function PdfPreview({
                 return;
             }
 
-            console.log(`[PdfPreview] Fields discovered: ${fields.length}. Requesting proposals...`);
+
 
             // 2. Propose Values
             const proposeRes = await apiRequest('POST', '/api/pdf/propose-values', {
@@ -259,7 +259,7 @@ export function PdfPreview({
             });
             const { proposals: newProposals } = await proposeRes.json();
 
-            console.log(`[PdfPreview] Proposals received: ${newProposals?.length}`);
+
             setProposals(newProposals || []);
 
             // Immediate apply for the current page
@@ -493,7 +493,7 @@ export function PdfPreview({
                                 renderForms={true}
                                 renderTextLayer={false}
                                 onRenderSuccess={() => {
-                                    console.log(`[PdfPreview] Page ${pageNumber} rendered. Applying proposals...`);
+
                                     applyProposalsToDom(proposals);
                                     // Small delay to ensure browser layout is stable
                                     setTimeout(() => setIsLoading(false), 50);

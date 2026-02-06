@@ -9,24 +9,40 @@ import path from 'path';
 function parseInline(text: string, options: { size?: number, color?: string, bold?: boolean } = {}) {
     // Unescape markdown first
     const unescaped = text.replace(/\\([#*_\[\]\-|])/g, '$1');
-    const boldRegex = /\*\*(.+?)\*\*/g;
+    const boldAndCheckRegex = /\*\*(.+?)\*\*|\[([ xX])\]/g;
     const runs: any[] = [];
     let lastIndex = 0;
     let match;
 
-    while ((match = boldRegex.exec(unescaped)) !== null) {
+    while ((match = boldAndCheckRegex.exec(unescaped)) !== null) {
         if (match.index > lastIndex) {
             runs.push(new TextRun({
                 text: unescaped.substring(lastIndex, match.index),
                 size: options.size || 24,
-                bold: options.bold || false
+                bold: options.bold || false,
+                font: "Arial"
             }));
         }
-        runs.push(new TextRun({
-            text: match[1],
-            bold: true,
-            size: options.size || 24
-        }));
+
+        if (match[1]) {
+            // Bold match
+            runs.push(new TextRun({
+                text: match[1],
+                bold: true,
+                size: options.size || 24,
+                font: "Arial"
+            }));
+        } else if (match[2] !== undefined) {
+            // Checkbox match
+            const isChecked = match[2].toLowerCase() === 'x';
+            runs.push(new TextRun({
+                text: isChecked ? " ☒ " : " ☐ ",
+                bold: true,
+                size: options.size || 24,
+                font: "Arial", // Standard font supports these symbols on Mac/Win
+                color: isChecked ? "1D4ED8" : "37352F"
+            }));
+        }
         lastIndex = match.index + match[0].length;
     }
 
@@ -34,11 +50,12 @@ function parseInline(text: string, options: { size?: number, color?: string, bol
         runs.push(new TextRun({
             text: unescaped.substring(lastIndex),
             size: options.size || 24,
-            bold: options.bold || false
+            bold: options.bold || false,
+            font: "Arial"
         }));
     }
 
-    return runs.length > 0 ? runs : [new TextRun({ text: unescaped, size: options.size || 24, bold: options.bold || false })];
+    return runs.length > 0 ? runs : [new TextRun({ text: unescaped, size: options.size || 24, bold: options.bold || false, font: "Arial" })];
 }
 
 /**

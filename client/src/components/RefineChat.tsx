@@ -73,10 +73,7 @@ export function RefineChat({
     // Initial Analysis Trigger
     useEffect(() => {
         if (compileContext && messages.length === 0 && !isAnalyzing) {
-            console.log("[RefineChat] Triggering initial analysis. compileContext present, messages empty.");
             performInitialAnalysis();
-        } else if (messages.length > 0) {
-            console.log("[RefineChat] Component mounted with history. Length:", messages.length);
         }
     }, [compileContext]);
 
@@ -84,7 +81,6 @@ export function RefineChat({
         setIsAnalyzing(true);
         try {
             const analysisPrompt = "Effettua un'analisi iniziale del documento appena compilato. Riassumi brevemente il contenuto, identifica chiaramente quale documento è stato usato come Master Pin (se presente) e quali fonti hai consultato. Concludi chiedendo come posso aiutarti oggi.";
-            console.log("[RefineChat] Triggering initial analysis...");
             const response = await apiRequest('POST', '/api/refine', {
                 compileContext,
                 currentContent,
@@ -103,7 +99,6 @@ export function RefineChat({
             };
             setMessages(prev => {
                 if (prev.length > 0) {
-                    console.log("[RefineChat] Skipping initial analysis, history already exists:", prev.length);
                     return prev;
                 }
                 return [aiMsg];

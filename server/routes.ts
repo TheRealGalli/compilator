@@ -86,24 +86,40 @@ async function generateProfessionalDocxBase64(content: string): Promise<string> 
   // Re-use the inline parser logic
   const parseInlineRuns = (text: string, options: { size?: number, bold?: boolean } = {}) => {
     const unescaped = text.replace(/\\([#*_\[\]\-|])/g, '$1');
-    const boldRegex = /\*\*(.+?)\*\*/g;
+    const boldAndCheckRegex = /\*\*(.+?)\*\*|\[([ xX])\]/g;
     const runs: any[] = [];
     let lastIndex = 0;
     let match;
 
-    while ((match = boldRegex.exec(unescaped)) !== null) {
+    while ((match = boldAndCheckRegex.exec(unescaped)) !== null) {
       if (match.index > lastIndex) {
         runs.push(new TextRun({
           text: unescaped.substring(lastIndex, match.index),
           size: options.size || 24,
-          bold: options.bold || false
+          bold: options.bold || false,
+          font: "Arial"
         }));
       }
-      runs.push(new TextRun({
-        text: match[1],
-        bold: true,
-        size: options.size || 24
-      }));
+
+      if (match[1]) {
+        // Bold
+        runs.push(new TextRun({
+          text: match[1],
+          bold: true,
+          size: options.size || 24,
+          font: "Arial"
+        }));
+      } else if (match[2] !== undefined) {
+        // Checkbox
+        const isChecked = match[2].toLowerCase() === 'x';
+        runs.push(new TextRun({
+          text: isChecked ? " ☒ " : " ☐ ",
+          bold: true,
+          size: options.size || 24,
+          font: "Arial",
+          color: isChecked ? "1D4ED8" : "37352F"
+        }));
+      }
       lastIndex = match.index + match[0].length;
     }
 
@@ -111,11 +127,12 @@ async function generateProfessionalDocxBase64(content: string): Promise<string> 
       runs.push(new TextRun({
         text: unescaped.substring(lastIndex),
         size: options.size || 24,
-        bold: options.bold || false
+        bold: options.bold || false,
+        font: "Arial"
       }));
     }
 
-    return runs.length > 0 ? runs : [new TextRun({ text: unescaped, size: options.size || 24, bold: options.bold || false })];
+    return runs.length > 0 ? runs : [new TextRun({ text: unescaped, size: options.size || 24, bold: options.bold || false, font: "Arial" })];
   };
 
   for (let i = 0; i < lines.length; i++) {

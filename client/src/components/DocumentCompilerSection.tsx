@@ -276,13 +276,17 @@ export function DocumentCompilerSection({
 
 
 
-  const prevMasterId = useRef<string | undefined>(undefined);
-
   useEffect(() => {
     // 1. PINNING/UNPINNING Logic
-    if (masterSource?.id !== prevMasterId.current) {
+    // If the master source has changed compared to what we have in context, trigger logic.
+    if (masterSource?.id !== pinnedSourceId) {
+      // If we HAD a pinned source, save its snapshot before switching/unpinning
+      if (pinnedSourceId && isLocked) {
+        takeMasterSnapshot(pinnedSourceId);
+      }
+
       if (masterSource) {
-        // Take snapshot of standard work if we are about to lock into a master
+        // Take snapshot of standard work if we are about to lock into a master for the first time
         if (!isLocked) {
           takeStandardSnapshot();
         }
@@ -292,13 +296,12 @@ export function DocumentCompilerSection({
           // If no snapshot, ensure context knows THIS is the pinned source
           setPinnedSourceId(masterSource.id);
         }
-      } else if (isLocked) {
+      } else if (isLocked && !masterSource) {
         // We just unpinned: restore the last standard work
         restoreStandardSnapshot();
       }
-      prevMasterId.current = masterSource?.id;
     }
-  }, [masterSource?.id, isLocked, restoreMasterSnapshot, restoreStandardSnapshot, takeStandardSnapshot]);
+  }, [masterSource?.id, pinnedSourceId, isLocked, restoreMasterSnapshot, restoreStandardSnapshot, takeStandardSnapshot, takeMasterSnapshot, setPinnedSourceId]);
 
   useEffect(() => {
     // 2. AUTO-ACTIVATE PDF STUDIO if master is fillable AND not in bypass mode
@@ -436,7 +439,7 @@ export function DocumentCompilerSection({
       });
 
       const data = await response.json();
-      console.log("DEBUG: Raw Compiled Content from API:", data.compiledContent);
+      // Log removed to clean up console
 
       if (data.compiledContent) {
         // Sanitize escaped brackets
@@ -599,7 +602,7 @@ export function DocumentCompilerSection({
           runs.push(new TextRun({
             text: isChecked ? " ☒ " : " ☐ ",
             bold: true,
-            font: "Segoe UI Symbol", // More standard symbol font fallback
+            font: "Arial", // Standard font to avoid replacement warnings on Mac
             size: options.size || 24,
             color: isChecked ? "1D4ED8" : "37352F"
           }));
