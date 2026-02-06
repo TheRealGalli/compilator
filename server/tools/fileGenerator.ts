@@ -120,15 +120,22 @@ export async function generateDOCX(content: string, filename: string): Promise<s
             }
 
             if (tableRowsData.length > 0) {
+                const maxCols = Math.max(...tableRowsData.map(r => r.length));
+                const baseWidth = 9070;
+                const cellWidth = Math.floor(baseWidth / maxCols);
+
                 const tableRows = tableRowsData.map((row, rowIndex) => {
                     const isHeader = rowIndex === 0;
+                    const standardRow = [...row];
+                    while (standardRow.length < maxCols) standardRow.push("");
+
                     return new TableRow({
-                        children: row.map(cellText => new TableCell({
+                        children: standardRow.map(cellText => new TableCell({
                             children: [new Paragraph({
                                 children: parseInline(cellText, { size: 22, bold: isHeader }),
                                 alignment: AlignmentType.LEFT
                             })],
-                            width: { size: 9070 / row.length, type: WidthType.DXA },
+                            width: { size: cellWidth, type: WidthType.DXA },
                             shading: isHeader ? { fill: "F3F4F6" } : undefined,
                             margins: { top: 100, bottom: 100, left: 100, right: 100 },
                         }))
@@ -137,7 +144,8 @@ export async function generateDOCX(content: string, filename: string): Promise<s
 
                 docChildren.push(new Table({
                     rows: tableRows,
-                    width: { size: 9070, type: WidthType.DXA },
+                    width: { size: baseWidth, type: WidthType.DXA },
+                    columnWidths: Array(maxCols).fill(cellWidth),
                     layout: TableLayoutType.FIXED,
                 }));
 

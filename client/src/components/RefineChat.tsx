@@ -73,7 +73,10 @@ export function RefineChat({
     // Initial Analysis Trigger
     useEffect(() => {
         if (compileContext && messages.length === 0 && !isAnalyzing) {
+            console.log("[RefineChat] Triggering initial analysis. compileContext present, messages empty.");
             performInitialAnalysis();
+        } else if (messages.length > 0) {
+            console.log("[RefineChat] Component mounted with history. Length:", messages.length);
         }
     }, [compileContext]);
 
@@ -98,7 +101,13 @@ export function RefineChat({
                 text: data.explanation || "Analisi completata. Pronti per le tue modifiche.",
                 timestamp: new Date()
             };
-            setMessages([aiMsg]);
+            setMessages(prev => {
+                if (prev.length > 0) {
+                    console.log("[RefineChat] Skipping initial analysis, history already exists:", prev.length);
+                    return prev;
+                }
+                return [aiMsg];
+            });
 
         } catch (error) {
             console.error("Initial analysis error:", error);

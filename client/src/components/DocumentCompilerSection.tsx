@@ -663,15 +663,24 @@ export function DocumentCompilerSection({
           }
 
           if (tableRowsData.length > 0) {
+            // Find max columns to ensure consistency
+            const maxCols = Math.max(...tableRowsData.map(r => r.length));
+            const baseWidth = 9070;
+            const cellWidth = Math.floor(baseWidth / maxCols);
+
             const tableRows = tableRowsData.map((row, rowIndex) => {
               const isHeader = rowIndex === 0;
+              // Ensure row has maxCols cells
+              const standardRow = [...row];
+              while (standardRow.length < maxCols) standardRow.push("");
+
               return new TableRow({
-                children: row.map(cellText => new TableCell({
+                children: standardRow.map(cellText => new TableCell({
                   children: [new Paragraph({
                     children: parseInline(unescapeMarkdown(cellText), { size: 22, bold: isHeader }),
                     alignment: AlignmentType.LEFT
                   })],
-                  width: { size: 9070 / row.length, type: WidthType.DXA },
+                  width: { size: cellWidth, type: WidthType.DXA },
                   shading: isHeader ? { fill: "F3F4F6" } : undefined,
                   margins: { top: 100, bottom: 100, left: 100, right: 100 },
                 }))
@@ -680,7 +689,8 @@ export function DocumentCompilerSection({
 
             docChildren.push(new Table({
               rows: tableRows,
-              width: { size: 9070, type: WidthType.DXA },
+              width: { size: baseWidth, type: WidthType.DXA },
+              columnWidths: Array(maxCols).fill(cellWidth),
               layout: TableLayoutType.FIXED,
             }));
 
