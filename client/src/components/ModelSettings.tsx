@@ -316,6 +316,9 @@ export function ModelSettings({
                                 <TooltipContent>
                                   <p className="text-[10px] font-bold">{piece.label}</p>
                                   <p className="text-[10px] max-w-[150px] leading-tight mt-1">{piece.description}</p>
+                                  {piece.id === 'pawn' && (
+                                    <p className="text-[9px] text-blue-500 font-medium mt-1">powered by DLP di Google</p>
+                                  )}
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
