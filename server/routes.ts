@@ -416,42 +416,37 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
   try {
     console.log(`[DEBUG extractText] Processing ${mimeType}, buffer size: ${buffer.length}`);
     if (mimeType === 'application/pdf') {
-      let pdfParse: any;
       try {
-        // Try multiple ways to get the function (ESM/CJS compatibility)
-        const mod = require("pdf-parse");
-        if (typeof mod === 'function') {
-          pdfParse = mod;
-        } else if (mod && typeof mod.default === 'function') {
-          pdfParse = mod.default;
-        } else if (mod && typeof mod.pdf === 'function') {
-          pdfParse = mod.pdf;
+        console.log('[DEBUG extractText] Using pdfjs-dist for extraction...');
+        // Import pdfjs-dist (using legacy build for better Node.js compatibility)
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
+        const loadingTask = pdfjs.getDocument({
+          data: new Uint8Array(buffer),
+          useWorkerFetch: false,
+          isEvalSupported: false,
+          useSystemFonts: true,
+          disableFontFace: true,
+        });
+
+        const doc = await loadingTask.promise;
+        let fullText = "";
+
+        for (let i = 1; i <= doc.numPages; i++) {
+          const page = await doc.getPage(i);
+          const content = await page.getTextContent();
+          const pageText = content.items
+            .map((item: any) => item.str)
+            .join(' ');
+          fullText += pageText + "\n";
         }
 
-        if (!pdfParse) {
-          const dMod = await import("pdf-parse");
-          const potential = dMod.default || dMod;
-          if (typeof potential === 'function') {
-            pdfParse = potential;
-          } else if (potential && typeof (potential as any).default === 'function') {
-            pdfParse = (potential as any).default;
-          }
-        }
-      } catch (e) {
-        console.warn("[DEBUG extractText] Failed to load pdf-parse via require/import, trying direct fallback...");
+        console.log(`[DEBUG extractText] PDF parsed successfully via pdfjs-dist, characters: ${fullText.length}, pages: ${doc.numPages}`);
+        return fullText;
+      } catch (pdfError) {
+        console.error(`[ERROR extractText] pdfjs-dist extraction failed:`, pdfError);
+        throw pdfError;
       }
-
-      if (typeof pdfParse !== "function") {
-        console.error(`[ERROR extractText] pdf-parse NOT FOUND as function. Found: ${typeof pdfParse}`);
-        throw new Error("Libreria per il parsing dei PDF (pdf-parse) non caricata correttamente.");
-      }
-
-      console.log('[DEBUG extractText] Calling pdfParse function...');
-      const data = await pdfParse(buffer);
-      const textContent = data && typeof data.text === 'string' ? data.text : "";
-      const pageCount = data && data.numpages ? data.numpages : 0;
-      console.log(`[DEBUG extractText] PDF parsed successfully, characters: ${textContent.length}, pages: ${pageCount}`);
-      return textContent;
     } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       const result = await mammoth.extractRawText({ buffer });
       console.log(`[DEBUG extractText] DOCX parsed, text length: ${result.value.length}`);
