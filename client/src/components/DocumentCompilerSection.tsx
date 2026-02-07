@@ -1247,23 +1247,29 @@ export function DocumentCompilerSection({
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[300px] mt-4 border rounded-md">
+          <ScrollArea className="max-h-[300px] mt-4 border rounded-md overflow-hidden">
             <div className="p-0">
               <table className="w-full text-xs">
-                <thead className="bg-muted/50 sticky top-0">
+                <thead className="bg-slate-50 sticky top-0 z-10">
                   <tr>
-                    <th className="text-left py-2 px-3 font-semibold border-b">Token IA</th>
-                    <th className="text-left py-2 px-3 font-semibold border-b">Dato Reale</th>
+                    <th className="text-left py-2 px-3 font-semibold border-b bg-slate-50">Token IA</th>
+                    <th className="text-left py-2 px-3 font-semibold border-b bg-slate-50">Dato Reale</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y bg-white">
                   {Object.entries(reportVault).length > 0 ? (
-                    Object.entries(reportVault).map(([token, value]) => (
-                      <tr key={token} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-2 px-3 align-top font-mono text-indigo-600 font-bold">{token}</td>
-                        <td className="py-2 px-3 align-top break-all">{value}</td>
-                      </tr>
-                    ))
+                    (() => {
+                      // Deduplicate values for display: if multiple tokens point to same value, keep them but show grouped?
+                      // Actually, the backend now ensures 1 Token per 1 Value. 
+                      // Let's just make sure we sort them for better readability.
+                      const sortedEntries = Object.entries(reportVault).sort((a, b) => a[0].localeCompare(b[0]));
+                      return sortedEntries.map(([token, value]) => (
+                        <tr key={token} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2 px-3 align-top font-mono text-indigo-600 font-bold whitespace-nowrap">{token}</td>
+                          <td className="py-2 px-3 align-top break-all">{value}</td>
+                        </tr>
+                      ));
+                    })()
                   ) : (
                     <tr>
                       <td colSpan={2} className="py-8 text-center text-muted-foreground italic">

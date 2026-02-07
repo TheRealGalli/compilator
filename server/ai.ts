@@ -75,9 +75,15 @@ export class AiService {
         })).then(parts => parts.filter(p => p !== null));
     }
 
+    private italianBlacklist = new Set([
+        'allora', 'dato', 'tuttavia', 'però', 'infatti', 'quindi', 'ossia', 'ovvero', 'ora',
+        'purtroppo', 'sicuramente', 'probabilmente', 'chiaramente', 'ovviamente', 'anche',
+        'perché', 'poiché', 'mentre', 'invece', 'oltretutto', 'inoltre'
+    ]);
+
     /**
      * Professional PII Anonymization using Google Cloud DLP (Sensitive Data Protection).
-     * This method bypasses LLM-based NER for privacy and accuracy.
+     * Enhanced with smart merging and local deduplication.
      */
     async anonymizeWithDLP(text: string, vault: Map<string, string>): Promise<string> {
         if (!text || text.trim() === "") return text;
@@ -103,11 +109,13 @@ export class AiService {
                 },
             });
 
-            const findings = response.result?.findings || [];
+            let findings = response.result?.findings || [];
             if (findings.length === 0) return text;
 
+            // 1. SMART MERGING: Join fragmented entities (e.g. "Colle Val" + "d'Elsa")
+            findings = this.smartMergeFindings(findings, text);
+
             // Sort findings by start offset descending to avoid index shifts during replacement
-            // Note: DLP uses byte offsets. We convert text to Buffer to handle this correctly.
             const sortedFindings = [...findings].sort((a, b) => {
                 const aOffset = Number(a.location?.byteRange?.start || 0);
                 const bOffset = Number(b.location?.byteRange?.start || 0);
@@ -121,17 +129,26 @@ export class AiService {
             for (const finding of sortedFindings) {
                 const start = Number(finding.location?.byteRange?.start || 0);
                 const end = Number(finding.location?.byteRange?.end || 0);
-                const value = finding.quote;
+                let value = (finding.quote || "").trim();
                 const infoType = finding.infoType?.name;
 
                 if (!value || !infoType) continue;
 
+                // 2. BLACKLIST FILTER: Skip common Italian words misidentified as PII
+                if (value.length < 15 && this.italianBlacklist.has(value.toLowerCase())) {
+                    console.log(`[AiService] Skipping blacklisted finding: "${value}" (${infoType})`);
+                    continue;
+                }
+
                 const typeKey = this.mapDlpTypeToInternal(infoType);
 
-                // Vault check
+                // 3. SECURE DE-DUPLICATION: Check if this value already exists in the vault (case neutral)
                 let token = "";
+                const normalizedValue = value.toLowerCase().replace(/\s+/g, ' ');
+
                 for (const [t, v] of vault.entries()) {
-                    if (v.toLowerCase() === value.toLowerCase() && t.includes(typeKey)) {
+                    const normalizedExisting = v.toLowerCase().replace(/\s+/g, ' ');
+                    if (normalizedExisting === normalizedValue && t.includes(typeKey)) {
                         token = t;
                         break;
                     }
@@ -144,6 +161,7 @@ export class AiService {
                     }
                     token = `[${typeKey}_${count + 1}]`;
                     vault.set(token, value);
+                    console.log(`[AiService] Created new token: ${token} -> ${value}`);
                 }
 
                 // Add text after the finding
@@ -165,6 +183,71 @@ export class AiService {
             console.error('[AiService] DLP Anonymization Error:', error);
             return text;
         }
+    }
+
+    /**
+     * Join adjacent or very close findings of same or compatible types to reduce fragmentation.
+     */
+    private smartMergeFindings(findings: any[], text: string): any[] {
+        if (findings.length <= 1) return findings;
+
+        // Sort ASCENDING for merging
+        const sorted = [...findings].sort((a, b) => {
+            const aStart = Number(a.location?.byteRange?.start || 0);
+            const bStart = Number(b.location?.byteRange?.start || 0);
+            return aStart - bStart;
+        });
+
+        const merged: any[] = [];
+        let current = sorted[0];
+        const textBuffer = Buffer.from(text, 'utf-8');
+
+        for (let i = 1; i < sorted.length; i++) {
+            const next = sorted[i];
+            const currentEnd = Number(current.location?.byteRange?.end || 0);
+            const nextStart = Number(next.location?.byteRange?.start || 0);
+
+            const gap = nextStart - currentEnd;
+            const sameType = current.infoType?.name === next.infoType?.name;
+            const compatibleType = (
+                (current.infoType?.name === 'LOCATION' || current.infoType?.name === 'PERSON_NAME' || current.infoType?.name === 'ORGANIZATION_NAME') &&
+                (next.infoType?.name === 'LOCATION' || next.infoType?.name === 'PERSON_NAME' || next.infoType?.name === 'ORGANIZATION_NAME')
+            );
+
+            // Check if characters in between are just "soft" characters (spaces, punctuation, etc.)
+            const gapText = textBuffer.subarray(currentEnd, nextStart).toString('utf-8');
+            const isSoftGap = gapText === "" || /^[\s,.\-\/()&'’]+$/.test(gapText);
+
+            // Allow merging if gap is small and consists of punctuation/spaces
+            if (gap <= 8 && isSoftGap && compatibleType) {
+                const newEnd = Number(next.location?.byteRange?.end || 0);
+                const combinedQuote = textBuffer.subarray(Number(current.location?.byteRange?.start || 0), newEnd).toString('utf-8');
+
+                // Keep the "best" infoType (prefer LOCATION or ORG over PERSON for mixed merge if it looks like an address)
+                let bestType = current.infoType;
+                if (current.infoType?.name === 'PERSON_NAME' && (next.infoType?.name === 'LOCATION' || next.infoType?.name === 'ORGANIZATION_NAME')) {
+                    bestType = next.infoType;
+                }
+
+                current = {
+                    ...current,
+                    quote: combinedQuote,
+                    infoType: bestType,
+                    location: {
+                        ...current.location,
+                        byteRange: {
+                            ...current.location.byteRange,
+                            end: newEnd
+                        }
+                    }
+                };
+            } else {
+                merged.push(current);
+                current = next;
+            }
+        }
+        merged.push(current);
+        return merged;
     }
 
     private mapDlpTypeToInternal(dlpType: string): string {
