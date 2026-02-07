@@ -2,17 +2,20 @@ import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertex
 import mammoth from 'mammoth';
 import * as fs from 'fs';
 import * as path from 'path';
+import { DlpServiceClient } from '@google-cloud/dlp';
 
 export class AiService {
     private vertex_ai: VertexAI;
     private projectId: string;
     private location: string;
     private modelId = 'gemini-2.5-flash';
+    private dlpClient: DlpServiceClient;
 
     constructor(projectId: string, location: string = 'europe-west1') {
         this.projectId = projectId;
         this.location = location;
         this.vertex_ai = new VertexAI({ project: projectId, location: location });
+        this.dlpClient = new DlpServiceClient();
 
         console.log(`[AiService] Initialized with model: ${this.modelId} in ${location}`);
     }
@@ -70,6 +73,112 @@ export class AiService {
                 }
             }
         })).then(parts => parts.filter(p => p !== null));
+    }
+
+    /**
+     * Professional PII Anonymization using Google Cloud DLP (Sensitive Data Protection).
+     * This method bypasses LLM-based NER for privacy and accuracy.
+     */
+    async anonymizeWithDLP(text: string, vault: Map<string, string>): Promise<string> {
+        if (!text || text.trim() === "") return text;
+
+        try {
+            console.log(`[AiService] Calling Cloud DLP for anonymization (Text length: ${text.length})...`);
+
+            const [response] = await this.dlpClient.inspectContent({
+                parent: `projects/${this.projectId}/locations/global`,
+                item: { value: text },
+                inspectConfig: {
+                    infoTypes: [
+                        { name: 'PERSON_NAME' },
+                        { name: 'ORGANIZATION' },
+                        { name: 'LOCATION' },
+                        { name: 'EMAIL_ADDRESS' },
+                        { name: 'PHONE_NUMBER' },
+                        { name: 'ITALY_FISCAL_CODE' },
+                        { name: 'VAT_NUMBER' },
+                        { name: 'DATE_OF_BIRTH' }
+                    ],
+                    includeQuote: true,
+                },
+            });
+
+            const findings = response.result?.findings || [];
+            if (findings.length === 0) return text;
+
+            // Sort findings by start offset descending to avoid index shifts during replacement
+            // Note: DLP uses byte offsets. We convert text to Buffer to handle this correctly.
+            const sortedFindings = [...findings].sort((a, b) => {
+                const aOffset = Number(a.location?.byteRange?.start || 0);
+                const bOffset = Number(b.location?.byteRange?.start || 0);
+                return bOffset - aOffset;
+            });
+
+            const textBuffer = Buffer.from(text, 'utf-8');
+            let lastByteOffset = textBuffer.length;
+            const parts: Buffer[] = [];
+
+            for (const finding of sortedFindings) {
+                const start = Number(finding.location?.byteRange?.start || 0);
+                const end = Number(finding.location?.byteRange?.end || 0);
+                const value = finding.quote;
+                const infoType = finding.infoType?.name;
+
+                if (!value || !infoType) continue;
+
+                const typeKey = this.mapDlpTypeToInternal(infoType);
+
+                // Vault check
+                let token = "";
+                for (const [t, v] of vault.entries()) {
+                    if (v.toLowerCase() === value.toLowerCase() && t.includes(typeKey)) {
+                        token = t;
+                        break;
+                    }
+                }
+
+                if (!token) {
+                    let count = 0;
+                    for (const t of vault.keys()) {
+                        if (t.startsWith(`[${typeKey}_`)) count++;
+                    }
+                    token = `[${typeKey}_${count + 1}]`;
+                    vault.set(token, value);
+                }
+
+                // Add text after the finding
+                if (lastByteOffset > end) {
+                    parts.unshift(textBuffer.subarray(end, lastByteOffset));
+                }
+                // Add the token
+                parts.unshift(Buffer.from(token, 'utf-8'));
+                lastByteOffset = start;
+            }
+
+            // Add text before the first finding
+            if (lastByteOffset > 0) {
+                parts.unshift(textBuffer.subarray(0, lastByteOffset));
+            }
+
+            return Buffer.concat(parts).toString('utf-8');
+        } catch (error) {
+            console.error('[AiService] DLP Anonymization Error:', error);
+            return text;
+        }
+    }
+
+    private mapDlpTypeToInternal(dlpType: string): string {
+        const mapping: Record<string, string> = {
+            'PERSON_NAME': 'NOME_PERSONA',
+            'ORGANIZATION': 'ORGANIZZAZIONE',
+            'LOCATION': 'INDIRIZZO',
+            'EMAIL_ADDRESS': 'EMAIL',
+            'PHONE_NUMBER': 'TELEFONO',
+            'ITALY_FISCAL_CODE': 'CODICE_FISCALE',
+            'VAT_NUMBER': 'PARTITA_IVA',
+            'DATE_OF_BIRTH': 'DATA_NASCITA'
+        };
+        return mapping[dlpType] || dlpType;
     }
 
     async compileDocument(params: {

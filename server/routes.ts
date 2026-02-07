@@ -58,57 +58,7 @@ setInterval(() => {
     if (now - val.timestamp > 30 * 60 * 1000) pdfCache.delete(key);
   }
 }, 5 * 60 * 1000);
-// --- ZERO-DATA GUARDRAIL UTILITIES ---
-const PI_REGEX = {
-  P_IVA: /\b\d{11}\b/g,
-  CF: /\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/g,
-  IBAN: /\b[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}\b/g,
-  NAME_ESTIMATION: /\b(Sig\.|Dott\.|Sig\.ra|Ing\.)\s+([A-Z][a-z]+)\s+([A-Z][a-z]+)\b/g, // "Sig. Mario Rossi"
-  CRIME_KEYWORDS: /\b(furto|rapina|truffa|omicidio|spaccio|estorsione|riciclaggio|abuso|violenza)\b/gi
-};
-
-function sanitizeText(text: string, vault: Map<string, string>): string {
-  if (!text) return text;
-  let sanitized = text;
-
-  const replaceWithType = (regex: RegExp, type: string) => {
-    sanitized = sanitized.replace(regex, (match) => {
-      const value = match; // Mantieni la formattazione originale
-      const valueLower = value.toLowerCase(); // Per ricerca case-insensitive su certi tipi
-
-      // Tipi che richiedono ricerca case-insensitive (es: nomi, reati)
-      const isCaseInsensitive = ['NOME_PERSONA', 'RIFERIMENTO_REATO'].includes(type);
-
-      // Cerca se il valore è già presente nella vault
-      for (const [t, v] of vault.entries()) {
-        const vToCompare = isCaseInsensitive ? v.toLowerCase() : v;
-        const mToCompare = isCaseInsensitive ? valueLower : value;
-        if (vToCompare === mToCompare && t.startsWith(`[${type}_`)) {
-          return t;
-        }
-      }
-
-      // Se non presente, conta quanti di questo tipo ci sono per determinare il prossimo numero
-      let count = 0;
-      for (const t of vault.keys()) {
-        if (t.startsWith(`[${type}_`)) count++;
-      }
-
-      const newToken = `[${type}_${count + 1}]`;
-      vault.set(newToken, value);
-      return newToken;
-    });
-  };
-
-  // Ordine di applicazione importante
-  replaceWithType(PI_REGEX.P_IVA, 'PARTITA_IVA');
-  replaceWithType(PI_REGEX.CF, 'CODICE_FISCALE');
-  replaceWithType(PI_REGEX.IBAN, 'IBAN');
-  replaceWithType(PI_REGEX.NAME_ESTIMATION, 'NOME_PERSONA');
-  replaceWithType(PI_REGEX.CRIME_KEYWORDS, 'RIFERIMENTO_REATO');
-
-  return sanitized;
-}
+// --------------------------------------
 
 function desanitizeText(text: string, vault: Map<string, string>): string {
   if (!text) return text;
@@ -1672,20 +1622,20 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
       }
 
       // Sanitize Notes and Template if Pawn is active
-      const processedNotes = isPawnActive ? sanitizeText(notes, vault) : notes;
-      const processedTemplate = isPawnActive ? sanitizeText(template, vault) : template;
+      const processedNotes = isPawnActive ? await aiService.anonymizeWithDLP(notes, vault) : notes;
+      const processedTemplate = isPawnActive ? await aiService.anonymizeWithDLP(template, vault) : template;
 
       // Extract and Sanitize Source Text if Pawn is active
       let preProcessedParts: any[] = [];
       if (isPawnActive && multimodalFiles && multimodalFiles.length > 0) {
         console.log(`[API compile] Pawn Guardrail active: Sanitizing ${multimodalFiles.length} sources...`);
         const extractionResults = await aiService.processMultimodalParts(multimodalFiles);
-        preProcessedParts = extractionResults.map(part => {
+        preProcessedParts = await Promise.all(extractionResults.map(async (part) => {
           if (part.text) {
-            return { text: sanitizeText(part.text, vault) };
+            return { text: await aiService.anonymizeWithDLP(part.text, vault) };
           }
           return part;
-        });
+        }));
       }
 
       const systemPrompt = buildSystemPrompt({
@@ -1741,14 +1691,14 @@ ISTRUZIONI OUTPUT:
 
       // Apply sanitization if Pawn is active
       if (isPawnActive) {
-        preProcessedSourceParts = preProcessedSourceParts.map(part => {
-          if (part.text) return { text: sanitizeText(part.text, vault) };
+        preProcessedSourceParts = await Promise.all(preProcessedSourceParts.map(async (part) => {
+          if (part.text) return { text: await aiService.anonymizeWithDLP(part.text, vault) };
           return part;
-        });
-        preProcessedMasterParts = preProcessedMasterParts.map(part => {
-          if (part.text) return { text: sanitizeText(part.text, vault) };
+        }));
+        preProcessedMasterParts = await Promise.all(preProcessedMasterParts.map(async (part) => {
+          if (part.text) return { text: await aiService.anonymizeWithDLP(part.text, vault) };
           return part;
-        });
+        }));
       }
 
       console.log(`[DEBUG Compile] Calling AiService.compileDocument (Unified Pass, AutonomousSearch: ${useAutonomousWebSearch})...`);
@@ -1816,9 +1766,20 @@ ISTRUZIONI OUTPUT:
       }
 
       // Sanitize instruction and current content if Pawn is active
-      const processedInstruction = isPawnActive ? sanitizeText(userInstruction, vault) : userInstruction;
-      const processedContent = isPawnActive ? sanitizeText(currentContent, vault) : currentContent;
-      const processedNotes = isPawnActive ? sanitizeText(notes, vault) : notes;
+      const processedInstruction = isPawnActive ? await aiService.anonymizeWithDLP(userInstruction, vault) : userInstruction;
+      const processedContent = isPawnActive ? await aiService.anonymizeWithDLP(currentContent, vault) : currentContent;
+      const processedNotes = isPawnActive ? await aiService.anonymizeWithDLP(notes, vault) : notes;
+
+      // Sanitize mentions and chat history as well
+      const processedChatHistory = isPawnActive ? await Promise.all((chatHistory || []).map(async (m: any) => ({
+        ...m,
+        text: await aiService.anonymizeWithDLP(m.text, vault)
+      }))) : chatHistory;
+
+      const processedMentions = isPawnActive ? await Promise.all((mentions || []).map(async (m: any) => ({
+        ...m,
+        text: await aiService.anonymizeWithDLP(m.text, vault)
+      }))) : mentions;
 
       const systemPrompt = buildSystemPrompt({
         dateTimeIT,
@@ -1834,7 +1795,7 @@ ISTRUZIONI OUTPUT:
       });
 
       // Format mentions for the AI using the new label system (#C1, #T1) and position offsets
-      const formattedMentions = (mentions || []).map((m: any) => {
+      const formattedMentions = (processedMentions || []).map((m: any) => {
         const positionInfo = (m.start !== undefined && m.end !== undefined) ? ` [pos: ${m.start}-${m.end}]` : '';
         return `- ATTIVA: MENZIONE ${m.label || m.source}${positionInfo}: "${m.text}"`;
       }).join('\n');
@@ -1870,7 +1831,7 @@ ${formattedRegistry}
 (Usa questo registro per capire di cosa si è parlato in precedenza, ma dai priorità alle MENZIONI ATTIVE sopra).` : ''}
 
 STORICO CHAT:
-${chatHistory.map((m: any) => `${m.role.toUpperCase()}: ${isPawnActive ? sanitizeText(m.text, vault) : m.text}`).join('\n')}
+${(processedChatHistory || []).map((m: any) => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
 
 ISTRUZIONI OPERATIVE:
 1. Se l'utente chiede una MODIFICA:
