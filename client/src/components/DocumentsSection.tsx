@@ -1,7 +1,8 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2, Brain, Send } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2, Send } from "lucide-react";
+import { FaChessKing } from "react-icons/fa6";
 import {
   Popover,
   PopoverContent,
@@ -587,7 +588,7 @@ export function DocumentsSection() {
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className={`gap-2 shrink-0 ${memoryFile ? 'border-blue-500/50 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10' : ''}`}>
-                <Brain className="w-4 h-4" />
+                <FaChessKing className="w-4 h-4 text-blue-500" />
                 Gromit Memory
                 {memoryFile && <span className="flex h-2 w-2 rounded-full bg-green-500" />}
               </Button>
@@ -595,7 +596,7 @@ export function DocumentsSection() {
             <PopoverContent className="w-80 p-4" align="end">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border-b pb-3">
-                  <Brain className="w-5 h-5 text-blue-600" />
+                  <FaChessKing className="w-5 h-5 text-blue-500" />
                   <h4 className="font-semibold">Gromit Memory</h4>
                 </div>
 
