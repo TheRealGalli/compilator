@@ -1556,6 +1556,58 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
 `;
   };
 
+  // --- NEW: Pawn Guardrail Check Endpoint ---
+  app.post('/api/pawn-check', async (req: Request, res: Response) => {
+    try {
+      const { template, notes, sources, masterSource, guardrailVault: existingVault } = req.body;
+      const vault = new Map<string, string>(Object.entries(existingVault || {}));
+
+      console.log(`[API pawn-check] Inspecting data for anonymization...`);
+
+      // 1. Anonymize Template and Notes
+      let processedTemplate = template;
+      let processedNotes = notes;
+
+      if (template) {
+        processedTemplate = await aiService.anonymizeWithDLP(template, vault);
+      }
+      if (notes) {
+        processedNotes = await aiService.anonymizeWithDLP(notes, vault);
+      }
+
+      // 2. Anonymize Sources
+      const multimodalFiles = sources || [];
+      let preProcessedSourceParts = [];
+      let preProcessedMasterParts = [];
+
+      if (multimodalFiles.length > 0) {
+        const results = await aiService.processMultimodalParts(multimodalFiles);
+        preProcessedSourceParts = await Promise.all(results.map(async (part) => {
+          if (part.text) return { text: await aiService.anonymizeWithDLP(part.text, vault) };
+          return part;
+        }));
+      }
+
+      if (masterSource) {
+        const result = await aiService.processMultimodalParts([masterSource]);
+        preProcessedMasterParts = await Promise.all(result.map(async (part) => {
+          if (part.text) return { text: await aiService.anonymizeWithDLP(part.text, vault) };
+          return part;
+        }));
+      }
+
+      console.log(`[API pawn-check] Inspection complete. Vault size: ${vault.size}`);
+
+      res.json({
+        success: true,
+        guardrailVault: Object.fromEntries(vault)
+      });
+    } catch (error: any) {
+      console.error('Errore durante Pawn Check:', error);
+      res.status(500).json({ error: error.message || 'Errore durante ispezione dati' });
+    }
+  });
+
   app.post('/api/compile', async (req: Request, res: Response) => {
     try {
       const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations, activeGuardrails, guardrailVault } = req.body;

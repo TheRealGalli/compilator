@@ -272,6 +272,7 @@ export function DocumentCompilerSection({
 
   const [isAnonymizationReportOpen, setIsAnonymizationReportOpen] = useState(false);
   const [reportVault, setReportVault] = useState<Record<string, string>>({});
+  const [isWaitingForPawnApproval, setIsWaitingForPawnApproval] = useState(false);
 
   const handleMention = (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => {
     setMentionCounts(prev => {
@@ -422,6 +423,37 @@ export function DocumentCompilerSection({
       const { apiRequest } = await import("@/lib/queryClient");
       const { getApiUrl } = await import("@/lib/api-config");
 
+      // --- NEW: PREVENTIVE PAWN CHECK ---
+      if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval) {
+        console.log('[DocumentCompiler] Preventive Pawn Check triggered...');
+        const checkResponse = await apiRequest('POST', '/api/pawn-check', {
+          template: templateContent,
+          notes,
+          sources: selectedSources.map(s => ({
+            name: s.name,
+            type: s.type,
+            base64: s.base64
+          })),
+          masterSource: masterSource ? {
+            name: masterSource.name,
+            type: masterSource.type,
+            base64: masterSource.base64
+          } : null,
+          guardrailVault
+        });
+
+        const checkData = await checkResponse.json();
+        if (checkData.guardrailVault) {
+          setGuardrailVault(checkData.guardrailVault);
+          setReportVault(checkData.guardrailVault);
+          setIsWaitingForPawnApproval(true);
+          setIsAnonymizationReportOpen(true);
+          setIsCompiling(false);
+          return; // STOP HERE, wait for user confirmation
+        }
+      }
+
+      // If we reach here, either Pawn is not active OR it's already approved
       const response = await apiRequest('POST', '/api/compile', {
         template: templateContent,
         notes,
@@ -509,12 +541,10 @@ export function DocumentCompilerSection({
 
         if (data.guardrailVault) {
           setGuardrailVault(data.guardrailVault);
-          // Show report if Pawn was active and new data was anonymized
-          if (activeGuardrails.includes('pawn')) {
-            setReportVault(data.guardrailVault);
-            setIsAnonymizationReportOpen(true);
-          }
         }
+
+        // Reset the approval state after successful compilation
+        setIsWaitingForPawnApproval(false);
 
         toast({
           title: "Documento compilato con successo",
@@ -1246,9 +1276,25 @@ export function DocumentCompilerSection({
             </div>
           </ScrollArea>
 
-          <DialogFooter>
-            <Button onClick={() => setIsAnonymizationReportOpen(false)}>
-              Ho Capito
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAnonymizationReportOpen(false);
+                setIsWaitingForPawnApproval(false);
+              }}
+            >
+              Annulla
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => {
+                setIsAnonymizationReportOpen(false);
+                // The state isWaitingForPawnApproval is still true, so the next handleCompile will bypass the check
+                handleCompile();
+              }}
+            >
+              {isWaitingForPawnApproval ? "Conferma e Compila con AI" : "Chiudi"}
             </Button>
           </DialogFooter>
         </DialogContent>
