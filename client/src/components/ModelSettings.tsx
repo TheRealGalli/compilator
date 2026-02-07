@@ -17,6 +17,7 @@ import { getApiUrl } from "@/lib/api-config";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useCompiler } from "@/contexts/CompilerContext";
+import { useOllama } from "@/contexts/OllamaContext";
 
 interface ModelSettingsProps {
   notes?: string;
@@ -54,6 +55,7 @@ export function ModelSettings({
   className
 }: ModelSettingsProps) {
   const { activeGuardrails, toggleGuardrail } = useCompiler();
+  const { status: ollamaStatus } = useOllama();
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -257,7 +259,7 @@ export function ModelSettings({
 
               {/* Tools */}
               <div className="space-y-2">
-                <Label className="text-xs font-medium">Strumenti AI</Label> {/* ... existing tools ... */}
+                <Label className="text-xs font-medium">Strumenti AI</Label>
 
 
                 <div className="space-y-2">
@@ -296,12 +298,25 @@ export function ModelSettings({
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div
-                                    onClick={() => piece.id === 'pawn' && toggleGuardrail(piece.id)}
+                                    onClick={() => {
+                                      if (piece.id === 'pawn') {
+                                        if (ollamaStatus === 'connected') {
+                                          toggleGuardrail(piece.id);
+                                        } else {
+                                          toast({
+                                            title: "Ollama non rilevato",
+                                            description: "Collega il connettore con Ollama nella sezione Connettori per attivare il Filtro Zero-Data.",
+                                            variant: "destructive"
+                                          });
+                                        }
+                                      }
+                                    }}
                                     className={cn(
                                       "w-[24px] h-[24px] flex items-center justify-center rounded-[1px] border cursor-pointer transition-colors overflow-hidden",
                                       activeGuardrails.includes(piece.id)
                                         ? "border-blue-500 bg-blue-500/20"
                                         : "border-muted-foreground/30 bg-muted-foreground/10 hover:bg-blue-500/10",
+                                      piece.id === 'pawn' && ollamaStatus !== 'connected' && "opacity-40 grayscale-[0.5]",
                                       piece.id !== 'pawn' && "opacity-50 cursor-not-allowed"
                                     )}
                                   >
@@ -317,7 +332,12 @@ export function ModelSettings({
                                   <p className="text-[10px] font-bold">{piece.label}</p>
                                   <p className="text-[10px] max-w-[150px] leading-tight mt-1">{piece.description}</p>
                                   {piece.id === 'pawn' && (
-                                    <p className="text-[9px] text-blue-500 font-medium mt-1">powered by Ollama (Gemma 3 1B) - 100% Locale</p>
+                                    <>
+                                      <p className="text-[9px] text-blue-500 font-medium mt-1">powered by Ollama (Gemma 3 1B) - 100% Locale</p>
+                                      {ollamaStatus !== 'connected' && (
+                                        <p className="text-[9px] text-red-500 font-bold mt-1 uppercase italic">⚠️ Disconnesso</p>
+                                      )}
+                                    </>
                                   )}
                                 </TooltipContent>
                               </Tooltip>

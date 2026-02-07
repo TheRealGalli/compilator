@@ -12,6 +12,7 @@ import { GmailProvider } from "@/contexts/GmailContext";
 import { GoogleDriveProvider } from "@/contexts/GoogleDriveContext";
 import { ChatProvider } from "@/contexts/ChatContext";
 import { CompilerProvider } from "@/contexts/CompilerContext";
+import { OllamaProvider } from "@/contexts/OllamaContext";
 import { checkDeviceSync } from "@/utils/device";
 
 // Ottieni il base path da import.meta.env.BASE_URL (impostato da Vite)
@@ -31,23 +32,25 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <GmailProvider>
-        <SourcesProvider>
-          <ChatProvider>
-            <CompilerProvider>
-              <GoogleDriveProvider>
-                <TooltipProvider>
-                  <ThemeProvider>
-                    <Toaster />
-                    <MobileBlocker />
-                    {!checkDeviceSync() && <Router />}
-                  </ThemeProvider>
-                </TooltipProvider>
-              </GoogleDriveProvider>
-            </CompilerProvider>
-          </ChatProvider>
-        </SourcesProvider>
-      </GmailProvider>
+      <OllamaProvider>
+        <GmailProvider>
+          <SourcesProvider>
+            <ChatProvider>
+              <CompilerProvider>
+                <GoogleDriveProvider>
+                  <TooltipProvider>
+                    <ThemeProvider>
+                      <Toaster />
+                      <MobileBlocker />
+                      {!checkDeviceSync() && <Router />}
+                    </ThemeProvider>
+                  </TooltipProvider>
+                </GoogleDriveProvider>
+              </CompilerProvider>
+            </ChatProvider>
+          </SourcesProvider>
+        </GmailProvider>
+      </OllamaProvider>
     </QueryClientProvider>
   );
 }

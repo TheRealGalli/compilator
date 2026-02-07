@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Loader2, Cpu } from "lucide-react";
 import { useGmail } from "@/contexts/GmailContext";
-import { useState, useEffect } from "react";
+import { useOllama } from "@/contexts/OllamaContext";
+import { useEffect } from "react";
 
 export const GmailLogo = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
@@ -24,21 +25,7 @@ export const DriveLogo = ({ className }: { className?: string }) => (
 
 export function ConnectorsSection() {
     const { isConnected, isLoading, isFetchingMessages, connect, logout, fetchMessages } = useGmail();
-    const [ollamaStatus, setOllamaStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading');
-
-    const checkOllama = async () => {
-        setOllamaStatus('loading');
-        try {
-            const res = await fetch('/api/ollama-health');
-            if (res.ok) {
-                setOllamaStatus('connected');
-            } else {
-                setOllamaStatus('disconnected');
-            }
-        } catch (err) {
-            setOllamaStatus('disconnected');
-        }
-    };
+    const { status: ollamaStatus, checkStatus: checkOllama } = useOllama();
 
     useEffect(() => {
         checkOllama();
