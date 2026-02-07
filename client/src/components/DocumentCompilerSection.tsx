@@ -424,7 +424,7 @@ export function DocumentCompilerSection({
       const { getApiUrl } = await import("@/lib/api-config");
 
       // --- NEW: PREVENTIVE PAWN CHECK ---
-      if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval) {
+      if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval && !webResearch) {
         console.log('[DocumentCompiler] Preventive Pawn Check triggered...');
         const checkResponse = await apiRequest('POST', '/api/pawn-check', {
           template: templateContent,
@@ -1276,7 +1276,12 @@ export function DocumentCompilerSection({
             </div>
           </ScrollArea>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <p className="text-[10px] text-muted-foreground px-1 mt-2 leading-relaxed">
+            I dati originali non vengono inviati all&apos;intelligenza artificiale. Verranno salvati solo in questa sessione
+            nel tuo browser per essere riaggiunti automaticamente al documento finale, garantendo la tua privacy.
+          </p>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
             <Button
               variant="outline"
               onClick={() => {

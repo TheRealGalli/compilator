@@ -91,7 +91,7 @@ export class AiService {
                 inspectConfig: {
                     infoTypes: [
                         { name: 'PERSON_NAME' },
-                        { name: 'ORGANIZATION' },
+                        { name: 'ORGANIZATION_NAME' },
                         { name: 'LOCATION' },
                         { name: 'EMAIL_ADDRESS' },
                         { name: 'PHONE_NUMBER' },
@@ -170,7 +170,7 @@ export class AiService {
     private mapDlpTypeToInternal(dlpType: string): string {
         const mapping: Record<string, string> = {
             'PERSON_NAME': 'NOME_PERSONA',
-            'ORGANIZATION': 'ORGANIZZAZIONE',
+            'ORGANIZATION_NAME': 'ORGANIZZAZIONE',
             'LOCATION': 'INDIRIZZO',
             'EMAIL_ADDRESS': 'EMAIL',
             'PHONE_NUMBER': 'TELEFONO',
