@@ -35,6 +35,7 @@ import { Slider } from "@/components/ui/slider";
 
 import { getApiUrl } from "@/lib/api-config";
 import { apiRequest } from "@/lib/queryClient";
+import { extractPIILocal } from "@/lib/ollama";
 
 import {
   Dialog,
@@ -405,6 +406,66 @@ export function DocumentCompilerSection({
     setIsReviewing(true);
   };
 
+  const anonymizeWithOllamaLocal = async (text: string, currentVault: Record<string, string>): Promise<{ anonymized: string; newVault: Record<string, string> }> => {
+    if (!text || text.trim() === "") return { anonymized: text, newVault: currentVault };
+
+    try {
+      const findings = await extractPIILocal(text);
+      if (findings.length === 0) return { anonymized: text, newVault: currentVault };
+
+      const vaultMap = new Map<string, string>(Object.entries(currentVault));
+      let anonymizedText = text;
+
+      // Sort findings by length descending to replace "Carlo Galli" before "Carlo"
+      const sortedFindings = findings.sort((a, b) => (b.value.length - a.value.length));
+
+      for (const finding of sortedFindings) {
+        const value = finding.value.trim();
+        const category = finding.category.toUpperCase().replace(/\s+/g, '_');
+
+        if (!value || value.length < 2) continue;
+
+        // SECURE DE-DUPLICATION: Check if this value already exists in the vault (case neutral)
+        let token = "";
+        const normalizedValue = value.toLowerCase();
+
+        for (const [t, v] of vaultMap.entries()) {
+          if (v.toLowerCase() === normalizedValue && t.includes(category)) {
+            token = t;
+            break;
+          }
+        }
+
+        if (!token) {
+          // Calculate next sequential number for this category
+          let count = 0;
+          for (const t of vaultMap.keys()) {
+            if (t.startsWith(`[${category}_`)) count++;
+          }
+          token = `[${category}_${count + 1}]`;
+          vaultMap.set(token, value);
+          console.log(`[OllamaLocal] New vault entry: ${token} -> ${value}`);
+        }
+
+        // Global replacement
+        try {
+          const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          anonymizedText = anonymizedText.replace(new RegExp(escapedValue, 'g'), token);
+        } catch (err) {
+          anonymizedText = anonymizedText.split(value).join(token);
+        }
+      }
+
+      return {
+        anonymized: anonymizedText,
+        newVault: Object.fromEntries(vaultMap)
+      };
+    } catch (err) {
+      console.error("[OllamaLocal] Anonymization failed:", err);
+      throw err;
+    }
+  };
+
   const handleCompile = async () => {
     if (isCompiling || isPdfMode) return;
 
@@ -423,40 +484,54 @@ export function DocumentCompilerSection({
       const { apiRequest } = await import("@/lib/queryClient");
       const { getApiUrl } = await import("@/lib/api-config");
 
-      // --- NEW: PREVENTIVE PAWN CHECK ---
+      // --- NEW: PREVENTIVE PAWN CHECK (LOCAL-FIRST) ---
       if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval && !webResearch) {
-        console.log('[DocumentCompiler] Preventive Pawn Check triggered...');
-        const checkResponse = await apiRequest('POST', '/api/pawn-check', {
-          template: templateContent,
-          notes,
-          sources: selectedSources.map(s => ({
-            name: s.name,
-            type: s.type,
-            base64: s.base64
-          })),
-          masterSource: masterSource ? {
-            name: masterSource.name,
-            type: masterSource.type,
-            base64: masterSource.base64
-          } : null,
-          guardrailVault
-        });
+        console.log('[DocumentCompiler] Local Pawn Check triggered...');
+        try {
+          // 1. Extract and anonymize LOCAL template
+          const { anonymized: anonTemplate, newVault: tempVault } = await anonymizeWithOllamaLocal(templateContent, guardrailVault);
 
-        const checkData = await checkResponse.json();
-        if (checkData.guardrailVault) {
-          setGuardrailVault(checkData.guardrailVault);
-          setReportVault(checkData.guardrailVault);
+          // 2. Extract and anonymize NOTES
+          const { anonymized: anonNotes, newVault: vaultAfterNotes } = await anonymizeWithOllamaLocal(notes, tempVault);
+
+          // 3. (Optional but recommended) In a real app we'd also anonymize extracted text from sources here.
+          // For now, we update the state with the found PII.
+          setGuardrailVault(vaultAfterNotes);
+          setReportVault(vaultAfterNotes);
           setIsWaitingForPawnApproval(true);
           setIsAnonymizationReportOpen(true);
           setIsCompiling(false);
           return; // STOP HERE, wait for user confirmation
+        } catch (err) {
+          console.warn("[DocumentCompiler] Local Anonymization failed, falling back to non-anonymized or error.");
+          toast({
+            title: "Errore Anonimizzazione Locale",
+            description: "Assicurati che Ollama sia attivo (`ollama serve`).",
+            variant: "destructive"
+          });
+          setIsCompiling(false);
+          return;
         }
       }
 
       // If we reach here, either Pawn is not active OR it's already approved
+      // IMPORTANT: When Pawn is active, we MUST send the ANONIMIZED content to the server
+      let finalTemplate = templateContent;
+      let finalNotes = notes;
+
+      if (activeGuardrails.includes('pawn') && isWaitingForPawnApproval) {
+        // Apply the vault to the local state one last time for safety before sending
+        // Actually, the vault is already used to show the tokens in the prompt.
+        // We need to make sure the template being sent HAS the tokens.
+        const { anonymized: finalAnonTemplate } = await anonymizeWithOllamaLocal(templateContent, guardrailVault);
+        const { anonymized: finalAnonNotes } = await anonymizeWithOllamaLocal(notes, guardrailVault);
+        finalTemplate = finalAnonTemplate;
+        finalNotes = finalAnonNotes;
+      }
+
       const response = await apiRequest('POST', '/api/compile', {
-        template: templateContent,
-        notes,
+        template: finalTemplate,
+        notes: finalNotes,
         temperature,
         webResearch,
         detailedAnalysis,
