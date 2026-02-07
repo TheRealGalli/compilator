@@ -1666,6 +1666,11 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
       const isPawnActive = activeGuardrails?.includes('pawn');
       const vault = new Map<string, string>(Object.entries(guardrailVault || {}));
 
+      console.log(`[GUARDIAN] Pawn Status: ${isPawnActive ? 'ACTIVE' : 'INACTIVE'}`);
+      if (isPawnActive) {
+        console.log(`[GUARDIAN] Initial Vault size: ${vault.size}`);
+      }
+
       // Sanitize Notes and Template if Pawn is active
       const processedNotes = isPawnActive ? sanitizeText(notes, vault) : notes;
       const processedTemplate = isPawnActive ? sanitizeText(template, vault) : template;
@@ -1757,6 +1762,9 @@ ISTRUZIONI OUTPUT:
       });
 
       console.log('[DEBUG Compile] AI Compilation complete.');
+      if (isPawnActive) {
+        console.log(`[GUARDIAN] Final Vault size: ${vault.size}`);
+      }
 
       // De-sanitize response if Pawn was active
       const restoredContent = isPawnActive ? desanitizeText(finalContent, vault) : finalContent;
@@ -1801,6 +1809,11 @@ ISTRUZIONI OUTPUT:
       const isPawnActive = compileContext.activeGuardrails?.includes('pawn');
       // Priorità alla vault inviata specificamente per il refine, fallback a quella del contesto
       const vault = new Map<string, string>(Object.entries(refinementVault || compileContext.guardrailVault || {}));
+
+      console.log(`[GUARDIAN] Refine Pawn Status: ${isPawnActive ? 'ACTIVE' : 'INACTIVE'}`);
+      if (isPawnActive) {
+        console.log(`[GUARDIAN] Refine Vault size: ${vault.size}`);
+      }
 
       // Sanitize instruction and current content if Pawn is active
       const processedInstruction = isPawnActive ? sanitizeText(userInstruction, vault) : userInstruction;

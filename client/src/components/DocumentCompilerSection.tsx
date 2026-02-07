@@ -10,6 +10,9 @@ import { PdfPreview } from "./PdfPreview";
 import { ModelSettings } from "./ModelSettings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+import {
+  FaChessPawn
+} from "react-icons/fa6";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -267,6 +270,9 @@ export function DocumentCompilerSection({
   const [isOutputVisible, setIsOutputVisible] = useState(false);
   const [mentionCounts, setMentionCounts] = useState({ template: 0, copilot: 0, anteprema: 0 });
 
+  const [isAnonymizationReportOpen, setIsAnonymizationReportOpen] = useState(false);
+  const [reportVault, setReportVault] = useState<Record<string, string>>({});
+
   const handleMention = (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => {
     setMentionCounts(prev => {
       const newCount = prev[source] + 1;
@@ -503,6 +509,11 @@ export function DocumentCompilerSection({
 
         if (data.guardrailVault) {
           setGuardrailVault(data.guardrailVault);
+          // Show report if Pawn was active and new data was anonymized
+          if (activeGuardrails.includes('pawn')) {
+            setReportVault(data.guardrailVault);
+            setIsAnonymizationReportOpen(true);
+          }
         }
 
         toast({
@@ -1190,6 +1201,58 @@ export function DocumentCompilerSection({
           </DialogContent >
         </Dialog>
       </div>
+
+      {/* Anonymization Report Dialog */}
+      <Dialog open={isAnonymizationReportOpen} onOpenChange={setIsAnonymizationReportOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600">
+                <FaChessPawn size={16} />
+              </div>
+              Report Anonimizzazione (Zero-Data)
+            </DialogTitle>
+            <DialogDescription>
+              I seguenti dati sensibili sono stati sostituiti con dei token prima dell&apos;invio all&apos;intelligenza artificiale.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[300px] mt-4 border rounded-md">
+            <div className="p-0">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50 sticky top-0">
+                  <tr>
+                    <th className="text-left py-2 px-3 font-semibold border-b">Token IA</th>
+                    <th className="text-left py-2 px-3 font-semibold border-b">Dato Reale</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {Object.entries(reportVault).length > 0 ? (
+                    Object.entries(reportVault).map(([token, value]) => (
+                      <tr key={token} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2 px-3 align-top font-mono text-indigo-600 font-bold">{token}</td>
+                        <td className="py-2 px-3 align-top break-all">{value}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={2} className="py-8 text-center text-muted-foreground italic">
+                        Nessun dato anonimizzato rilevato.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </ScrollArea>
+
+          <DialogFooter>
+            <Button onClick={() => setIsAnonymizationReportOpen(false)}>
+              Ho Capito
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
