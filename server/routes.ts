@@ -405,6 +405,13 @@ async function fetchUrlContent(url: string, retryCount = 0): Promise<string | nu
   }
 }
 
+function cleanBase64(base64: string): string {
+  if (!base64) return "";
+  // Removes "data:image/png;base64," or "data:application/pdf;base64," etc.
+  const base64Data = base64.includes(",") ? base64.split(",")[1] : base64;
+  return base64Data.replace(/\s/g, ''); // Remove any whitespace
+}
+
 async function extractText(buffer: Buffer, mimeType: string, driveId?: string): Promise<string> {
   try {
     console.log(`[DEBUG extractText] Processing ${mimeType}, buffer size: ${buffer.length}`);
@@ -1577,30 +1584,45 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
 
       // 2. Anonymize Sources
       const multimodalFiles = sources || [];
-      let preProcessedSourceParts = [];
+      const preProcessedSourceParts = [];
       let preProcessedMasterParts = [];
 
       if (multimodalFiles.length > 0) {
-        preProcessedSourceParts = await Promise.all(multimodalFiles.map(async (file: any) => {
-          const buffer = Buffer.from(file.base64, 'base64');
-          const text = await extractText(buffer, file.mimeType || file.type);
+        console.log(`[API pawn-check] Found ${multimodalFiles.length} sources. Processing...`);
+        for (const file of multimodalFiles) {
+          const cleanedB64 = cleanBase64(file.base64);
+          const buffer = Buffer.from(cleanedB64, 'base64');
+          const mime = file.mimeType || file.type;
+
+          console.log(`[API pawn-check] Processing source: "${file.name}" | Type: ${mime} | Buffer: ${buffer.length}`);
+
+          const text = await extractText(buffer, mime);
           if (text) {
+            console.log(`[API pawn-check] Extracted ${text.length} chars from "${file.name}". Anonymizing...`);
             const label = `[FONTE: ${file.name}]\n`;
             const anonymized = await aiService.anonymizeWithDLP(text, vault);
-            return { text: label + anonymized };
+            preProcessedSourceParts.push({ text: label + anonymized });
+          } else {
+            console.warn(`[API pawn-check] FAILED to extract text from "${file.name}"`);
           }
-          return null;
-        }));
-        preProcessedSourceParts = preProcessedSourceParts.filter(p => p !== null);
+        }
       }
 
       if (masterSource) {
-        const buffer = Buffer.from(masterSource.base64, 'base64');
-        const text = await extractText(buffer, masterSource.mimeType || masterSource.type);
+        const cleanedB64 = cleanBase64(masterSource.base64);
+        const buffer = Buffer.from(cleanedB64, 'base64');
+        const mime = masterSource.mimeType || masterSource.type;
+
+        console.log(`[API pawn-check] Processing MASTER: "${masterSource.name}" | Type: ${mime} | Buffer: ${buffer.length}`);
+
+        const text = await extractText(buffer, mime);
         if (text) {
+          console.log(`[API pawn-check] Extracted ${text.length} chars from MASTER. Anonymizing...`);
           const label = `[MASTER: ${masterSource.name}]\n`;
           const anonymized = await aiService.anonymizeWithDLP(text, vault);
           preProcessedMasterParts = [{ text: label + anonymized }];
+        } else {
+          console.warn(`[API pawn-check] FAILED to extract text from MASTER "${masterSource.name}"`);
         }
       }
 
@@ -1692,27 +1714,39 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
       if (isPawnActive) {
         if (multimodalFiles && multimodalFiles.length > 0) {
           console.log(`[API compile] Pawn Guardrail active: Extracting and Sanitizing ${multimodalFiles.length} sources...`);
-          preProcessedParts = await Promise.all(multimodalFiles.map(async (s: any) => {
-            const buffer = Buffer.from(s.base64, 'base64');
-            const text = await extractText(buffer, s.mimeType || s.type);
+          for (const s of multimodalFiles) {
+            const cleanedB64 = cleanBase64(s.base64);
+            const buffer = Buffer.from(cleanedB64, 'base64');
+            const mime = s.mimeType || s.type;
+
+            console.log(`[API compile] Processing source: "${s.name}" | Type: ${mime} | Buffer: ${buffer.length}`);
+
+            const text = await extractText(buffer, mime);
             if (text) {
+              console.log(`[API compile] Extracted ${text.length} chars from "${s.name}". Anonymizing...`);
               const label = `[FONTE: ${s.name}]\n`;
               const anonymized = await aiService.anonymizeWithDLP(text, vault);
-              return { text: label + anonymized };
+              preProcessedParts.push({ text: label + anonymized });
+            } else {
+              console.warn(`[API compile] FAILED to extract text from "${s.name}"`);
             }
-            return null;
-          }));
-          preProcessedParts = preProcessedParts.filter(p => p !== null);
+          }
         }
 
         if (masterSource) {
           console.log(`[API compile] Pawn Guardrail active: Extracting and Sanitizing MASTER source...`);
-          const buffer = Buffer.from(masterSource.base64, 'base64');
-          const text = await extractText(buffer, masterSource.mimeType || masterSource.type);
+          const cleanedB64 = cleanBase64(masterSource.base64);
+          const buffer = Buffer.from(cleanedB64, 'base64');
+          const mime = masterSource.mimeType || masterSource.type;
+
+          const text = await extractText(buffer, mime);
           if (text) {
+            console.log(`[API compile] Extracted ${text.length} chars from MASTER. Anonymizing...`);
             const label = `[MASTER: ${masterSource.name}]\n`;
             const anonymized = await aiService.anonymizeWithDLP(text, vault);
             preProcessedMasterParts = [{ text: label + anonymized }];
+          } else {
+            console.warn(`[API compile] FAILED to extract text from MASTER "${masterSource.name}"`);
           }
         }
       }
