@@ -1581,19 +1581,27 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
       let preProcessedMasterParts = [];
 
       if (multimodalFiles.length > 0) {
-        const results = await aiService.processMultimodalParts(multimodalFiles);
-        preProcessedSourceParts = await Promise.all(results.map(async (part) => {
-          if (part.text) return { text: await aiService.anonymizeWithDLP(part.text, vault) };
-          return part;
+        preProcessedSourceParts = await Promise.all(multimodalFiles.map(async (file: any) => {
+          const buffer = Buffer.from(file.base64, 'base64');
+          const text = await extractText(buffer, file.mimeType || file.type);
+          if (text) {
+            const label = `[FONTE: ${file.name}]\n`;
+            const anonymized = await aiService.anonymizeWithDLP(text, vault);
+            return { text: label + anonymized };
+          }
+          return null;
         }));
+        preProcessedSourceParts = preProcessedSourceParts.filter(p => p !== null);
       }
 
       if (masterSource) {
-        const result = await aiService.processMultimodalParts([masterSource]);
-        preProcessedMasterParts = await Promise.all(result.map(async (part) => {
-          if (part.text) return { text: await aiService.anonymizeWithDLP(part.text, vault) };
-          return part;
-        }));
+        const buffer = Buffer.from(masterSource.base64, 'base64');
+        const text = await extractText(buffer, masterSource.mimeType || masterSource.type);
+        if (text) {
+          const label = `[MASTER: ${masterSource.name}]\n`;
+          const anonymized = await aiService.anonymizeWithDLP(text, vault);
+          preProcessedMasterParts = [{ text: label + anonymized }];
+        }
       }
 
       console.log(`[API pawn-check] Inspection complete. Vault size: ${vault.size}`);
@@ -1679,15 +1687,34 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
 
       // Extract and Sanitize Source Text if Pawn is active
       let preProcessedParts: any[] = [];
-      if (isPawnActive && multimodalFiles && multimodalFiles.length > 0) {
-        console.log(`[API compile] Pawn Guardrail active: Sanitizing ${multimodalFiles.length} sources...`);
-        const extractionResults = await aiService.processMultimodalParts(multimodalFiles);
-        preProcessedParts = await Promise.all(extractionResults.map(async (part) => {
-          if (part.text) {
-            return { text: await aiService.anonymizeWithDLP(part.text, vault) };
+      let preProcessedMasterParts: any[] = [];
+
+      if (isPawnActive) {
+        if (multimodalFiles && multimodalFiles.length > 0) {
+          console.log(`[API compile] Pawn Guardrail active: Extracting and Sanitizing ${multimodalFiles.length} sources...`);
+          preProcessedParts = await Promise.all(multimodalFiles.map(async (s: any) => {
+            const buffer = Buffer.from(s.base64, 'base64');
+            const text = await extractText(buffer, s.mimeType || s.type);
+            if (text) {
+              const label = `[FONTE: ${s.name}]\n`;
+              const anonymized = await aiService.anonymizeWithDLP(text, vault);
+              return { text: label + anonymized };
+            }
+            return null;
+          }));
+          preProcessedParts = preProcessedParts.filter(p => p !== null);
+        }
+
+        if (masterSource) {
+          console.log(`[API compile] Pawn Guardrail active: Extracting and Sanitizing MASTER source...`);
+          const buffer = Buffer.from(masterSource.base64, 'base64');
+          const text = await extractText(buffer, masterSource.mimeType || masterSource.type);
+          if (text) {
+            const label = `[MASTER: ${masterSource.name}]\n`;
+            const anonymized = await aiService.anonymizeWithDLP(text, vault);
+            preProcessedMasterParts = [{ text: label + anonymized }];
           }
-          return part;
-        }));
+        }
       }
 
       const systemPrompt = buildSystemPrompt({
@@ -1735,22 +1762,15 @@ ISTRUZIONI OUTPUT:
 - **DATO MANCANTE**: Se un dato è assente ma è di natura pubblica o comune (es. leggi, indirizzi di aziende), **USA Google Search** per trovarlo invece di scrivere [DATO MANCANTE].
 `;
 
-      console.log('[DEBUG Compile] Pre-processing multimodal parts in parallel...');
-      let [preProcessedSourceParts, preProcessedMasterParts] = await Promise.all([
-        multimodalFiles?.length > 0 ? aiService.processMultimodalParts(multimodalFiles) : Promise.resolve([]),
-        masterSource ? aiService.processMultimodalParts([masterSource]) : Promise.resolve([])
-      ]);
-
-      // Apply sanitization if Pawn is active
-      if (isPawnActive) {
-        preProcessedSourceParts = await Promise.all(preProcessedSourceParts.map(async (part) => {
-          if (part.text) return { text: await aiService.anonymizeWithDLP(part.text, vault) };
-          return part;
-        }));
-        preProcessedMasterParts = await Promise.all(preProcessedMasterParts.map(async (part) => {
-          if (part.text) return { text: await aiService.anonymizeWithDLP(part.text, vault) };
-          return part;
-        }));
+      // Use already pre-processed parts if Pawn is active, otherwise generate them
+      if (!isPawnActive) {
+        console.log('[DEBUG Compile] Pre-processing multimodal parts in parallel...');
+        const [genSourceParts, genMasterParts] = await Promise.all([
+          multimodalFiles?.length > 0 ? aiService.processMultimodalParts(multimodalFiles) : Promise.resolve([]),
+          masterSource ? aiService.processMultimodalParts([masterSource]) : Promise.resolve([])
+        ]);
+        preProcessedParts = genSourceParts;
+        preProcessedMasterParts = genMasterParts;
       }
 
       console.log(`[DEBUG Compile] Calling AiService.compileDocument (Unified Pass, AutonomousSearch: ${useAutonomousWebSearch})...`);
@@ -1759,7 +1779,8 @@ ISTRUZIONI OUTPUT:
         userPrompt,
         multimodalFiles: multimodalFiles || [],
         masterSource: masterSource || null,
-        preProcessedParts: preProcessedSourceParts,
+        preProcessedParts,
+        preProcessedMasterParts,
         webResearch: useAutonomousWebSearch // Trigger Google Search if no manual URLs
       });
 

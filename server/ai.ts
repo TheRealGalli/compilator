@@ -187,6 +187,7 @@ export class AiService {
         multimodalFiles: any[],
         masterSource?: any,
         preProcessedParts?: any[],
+        preProcessedMasterParts?: any[],
         webResearch?: boolean
     }): Promise<{ content: string, groundingMetadata?: any, parts?: any[] }> {
         try {
@@ -201,7 +202,8 @@ export class AiService {
             // Use pre-processed parts if provided to save latency
             const [multimodalParts, masterParts] = await Promise.all([
                 params.preProcessedParts ? Promise.resolve(params.preProcessedParts) : this.processMultimodalParts(params.multimodalFiles),
-                (params.masterSource && params.masterSource.base64) ? this.processMultimodalParts([params.masterSource]) : Promise.resolve([])
+                params.preProcessedMasterParts ? Promise.resolve(params.preProcessedMasterParts) :
+                    ((params.masterSource && params.masterSource.base64) ? this.processMultimodalParts([params.masterSource]) : Promise.resolve([]))
             ]);
 
             const messageParts: any[] = [{ text: params.userPrompt }, ...multimodalParts, ...masterParts];
