@@ -6,6 +6,8 @@ interface SessionState {
     messages: any[];
     frozenColor: string | null;
     mentionRegistry: any[];
+    activeGuardrails: string[];
+    guardrailVault: Record<string, string>;
 }
 
 interface CompilerState {
@@ -27,6 +29,8 @@ interface CompilerState {
     mentions: any[];
     mentionRegistry: any[];
     frozenColor: string | null;
+    activeGuardrails: string[];
+    guardrailVault: Record<string, string>;
     standardSnapshot: SessionState | null;
     masterSnapshots: Record<string, SessionState>;
 }
@@ -50,6 +54,8 @@ interface CompilerContextType extends CompilerState {
     setMentions: (val: any[] | ((prev: any[]) => any[])) => void;
     setMentionRegistry: (val: any[] | ((prev: any[]) => any[])) => void;
     setFrozenColor: (val: string | null) => void;
+    setGuardrailVault: (val: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
+    toggleGuardrail: (id: string) => void;
     takeStandardSnapshot: () => void;
     restoreStandardSnapshot: () => void;
     takeMasterSnapshot: (sourceId: string) => void;
@@ -79,6 +85,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
         mentions: [],
         mentionRegistry: [],
         frozenColor: null,
+        activeGuardrails: [],
+        guardrailVault: {},
         standardSnapshot: null,
         masterSnapshots: {},
     });
@@ -101,6 +109,25 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
     const setIsLocked = (val: boolean) => setState(prev => ({ ...prev, isLocked: val }));
     const setCurrentMode = (val: 'standard' | 'fillable') => setState(prev => ({ ...prev, currentMode: val }));
     const setFrozenColor = (val: string | null) => setState(prev => ({ ...prev, frozenColor: val }));
+
+    const setGuardrailVault = useCallback((val: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => {
+        setState(prev => ({
+            ...prev,
+            guardrailVault: typeof val === 'function' ? val(prev.guardrailVault) : val
+        }));
+    }, []);
+
+    const toggleGuardrail = useCallback((id: string) => {
+        setState(prev => {
+            const isActive = prev.activeGuardrails.includes(id);
+            return {
+                ...prev,
+                activeGuardrails: isActive
+                    ? prev.activeGuardrails.filter(g => g !== id)
+                    : [...prev.activeGuardrails, id]
+            };
+        });
+    }, []);
 
     const setMessages = useCallback((val: any[] | ((prev: any[]) => any[])) => {
         setState(prev => ({
@@ -132,6 +159,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 messages: [...prev.messages],
                 frozenColor: null,
                 mentionRegistry: [...prev.mentionRegistry],
+                activeGuardrails: [...prev.activeGuardrails],
+                guardrailVault: { ...prev.guardrailVault },
             }
         }));
     }, []);
@@ -147,7 +176,9 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                     compiledContent: prev.compiledContent,
                     messages: [...prev.messages],
                     frozenColor: prev.frozenColor,
-                    mentionRegistry: [...prev.mentionRegistry]
+                    mentionRegistry: [...prev.mentionRegistry],
+                    activeGuardrails: [...prev.activeGuardrails],
+                    guardrailVault: { ...prev.guardrailVault }
                 };
             }
 
@@ -171,6 +202,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 compiledContent: prev.standardSnapshot.compiledContent,
                 messages: prev.standardSnapshot.messages,
                 mentionRegistry: prev.standardSnapshot.mentionRegistry,
+                activeGuardrails: prev.standardSnapshot.activeGuardrails,
+                guardrailVault: prev.standardSnapshot.guardrailVault,
                 isLocked: false,
                 frozenColor: null,
                 isRefiningMode: prev.standardSnapshot.compiledContent !== '',
@@ -189,7 +222,9 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                     compiledContent: prev.compiledContent,
                     messages: [...prev.messages],
                     frozenColor: prev.frozenColor,
-                    mentionRegistry: [...prev.mentionRegistry]
+                    mentionRegistry: [...prev.mentionRegistry],
+                    activeGuardrails: [...prev.activeGuardrails],
+                    guardrailVault: { ...prev.guardrailVault }
                 }
             }
         }));
@@ -220,6 +255,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 compiledContent: snapshot.compiledContent,
                 messages: snapshot.messages,
                 mentionRegistry: snapshot.mentionRegistry || [],
+                activeGuardrails: snapshot.activeGuardrails || [],
+                guardrailVault: snapshot.guardrailVault || {},
                 frozenColor: snapshot.frozenColor,
                 isRefiningMode: snapshot.compiledContent !== '',
                 isLocked: true,
@@ -249,6 +286,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
             mentions: [],
             mentionRegistry: [],
             frozenColor: null,
+            activeGuardrails: [],
+            guardrailVault: {},
             standardSnapshot: null,
             masterSnapshots: {},
         });
@@ -275,6 +314,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
             setMentions,
             setMentionRegistry,
             setFrozenColor,
+            setGuardrailVault,
+            toggleGuardrail,
             takeStandardSnapshot,
             restoreStandardSnapshot,
             takeMasterSnapshot,

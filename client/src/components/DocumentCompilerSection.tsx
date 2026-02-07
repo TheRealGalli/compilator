@@ -237,6 +237,7 @@ export function DocumentCompilerSection({
     formalTone, setFormalTone,
     isLocked, setIsLocked,
     currentMode, setCurrentMode,
+    activeGuardrails, guardrailVault, setGuardrailVault,
     frozenColor, setFrozenColor,
     pinnedSourceId, setPinnedSourceId,
     takeStandardSnapshot, restoreStandardSnapshot,
@@ -423,6 +424,8 @@ export function DocumentCompilerSection({
         detailedAnalysis,
         formalTone,
         modelProvider,
+        activeGuardrails,
+        guardrailVault,
         sources: selectedSources.map(s => ({
           name: s.name,
           type: s.type,
@@ -497,6 +500,10 @@ export function DocumentCompilerSection({
         }
 
         if (onCompile) onCompile(sanitizedContent); // Notify parent of compilation
+
+        if (data.guardrailVault) {
+          setGuardrailVault(data.guardrailVault);
+        }
 
         toast({
           title: "Documento compilato con successo",

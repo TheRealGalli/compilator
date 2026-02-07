@@ -58,6 +58,74 @@ setInterval(() => {
     if (now - val.timestamp > 30 * 60 * 1000) pdfCache.delete(key);
   }
 }, 5 * 60 * 1000);
+// --- ZERO-DATA GUARDRAIL UTILITIES ---
+const PI_REGEX = {
+  P_IVA: /\b\d{11}\b/g,
+  CF: /\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/g,
+  IBAN: /\b[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}\b/g,
+  NAME_ESTIMATION: /\b(Sig\.|Dott\.|Sig\.ra|Ing\.)\s+([A-Z][a-z]+)\s+([A-Z][a-z]+)\b/g, // "Sig. Mario Rossi"
+  CRIME_KEYWORDS: /\b(furto|rapina|truffa|omicidio|spaccio|estorsione|riciclaggio|abuso|violenza)\b/gi
+};
+
+function sanitizeText(text: string, vault: Map<string, string>): string {
+  if (!text) return text;
+  let sanitized = text;
+
+  const replaceWithType = (regex: RegExp, type: string) => {
+    sanitized = sanitized.replace(regex, (match) => {
+      const value = match; // Mantieni la formattazione originale
+      const valueLower = value.toLowerCase(); // Per ricerca case-insensitive su certi tipi
+
+      // Tipi che richiedono ricerca case-insensitive (es: nomi, reati)
+      const isCaseInsensitive = ['NOME_PERSONA', 'RIFERIMENTO_REATO'].includes(type);
+
+      // Cerca se il valore è già presente nella vault
+      for (const [t, v] of vault.entries()) {
+        const vToCompare = isCaseInsensitive ? v.toLowerCase() : v;
+        const mToCompare = isCaseInsensitive ? valueLower : value;
+        if (vToCompare === mToCompare && t.startsWith(`[${type}_`)) {
+          return t;
+        }
+      }
+
+      // Se non presente, conta quanti di questo tipo ci sono per determinare il prossimo numero
+      let count = 0;
+      for (const t of vault.keys()) {
+        if (t.startsWith(`[${type}_`)) count++;
+      }
+
+      const newToken = `[${type}_${count + 1}]`;
+      vault.set(newToken, value);
+      return newToken;
+    });
+  };
+
+  // Ordine di applicazione importante
+  replaceWithType(PI_REGEX.P_IVA, 'PARTITA_IVA');
+  replaceWithType(PI_REGEX.CF, 'CODICE_FISCALE');
+  replaceWithType(PI_REGEX.IBAN, 'IBAN');
+  replaceWithType(PI_REGEX.NAME_ESTIMATION, 'NOME_PERSONA');
+  replaceWithType(PI_REGEX.CRIME_KEYWORDS, 'RIFERIMENTO_REATO');
+
+  return sanitized;
+}
+
+function desanitizeText(text: string, vault: Map<string, string>): string {
+  if (!text) return text;
+  let restored = text;
+
+  // Ordiniamo i token per lunghezza decrescente per evitare sostituzioni parziali se i nomi dei token si sovrapponessero (anche se meno probabile con numerazione)
+  const tokens = Array.from(vault.keys()).sort((a, b) => b.length - a.length);
+
+  tokens.forEach((token) => {
+    const originalValue = vault.get(token)!;
+    const escapedToken = token.replace(/[\[\]]/g, '\\$&');
+    restored = restored.replace(new RegExp(escapedToken, 'g'), originalValue);
+  });
+  return restored;
+}
+// --------------------------------------
+
 
 // --- TUNED MODEL CONFIGURATION (ANALYZER ONLY) ---
 const ANALYZER_LOCATION = 'europe-west1';
@@ -1540,7 +1608,7 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
 
   app.post('/api/compile', async (req: Request, res: Response) => {
     try {
-      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations } = req.body;
+      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations, activeGuardrails, guardrailVault } = req.body;
 
       console.log('[API compile] Request received:', {
         modelProvider,
@@ -1595,6 +1663,26 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
       // Check for memory file
       const hasMemory = multimodalFiles?.some((s: any) => s.isMemory);
 
+      const isPawnActive = activeGuardrails?.includes('pawn');
+      const vault = new Map<string, string>(Object.entries(guardrailVault || {}));
+
+      // Sanitize Notes and Template if Pawn is active
+      const processedNotes = isPawnActive ? sanitizeText(notes, vault) : notes;
+      const processedTemplate = isPawnActive ? sanitizeText(template, vault) : template;
+
+      // Extract and Sanitize Source Text if Pawn is active
+      let preProcessedParts: any[] = [];
+      if (isPawnActive && multimodalFiles && multimodalFiles.length > 0) {
+        console.log(`[API compile] Pawn Guardrail active: Sanitizing ${multimodalFiles.length} sources...`);
+        const extractionResults = await aiService.processMultimodalParts(multimodalFiles);
+        preProcessedParts = extractionResults.map(part => {
+          if (part.text) {
+            return { text: sanitizeText(part.text, vault) };
+          }
+          return part;
+        });
+      }
+
       const systemPrompt = buildSystemPrompt({
         dateTimeIT,
         hasMemory,
@@ -1609,12 +1697,13 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
       });
 
       // Build User Prompt
-      const userPrompt = template ? `Compila il seguente template:
+      const userPrompt = processedTemplate ? `Compila il seguente template:
+${isPawnActive ? "⚠️ NOTA: Alcuni nomi o identificativi sono stati anonimizzati con dei tag (es: [NOME_PERSONA_1]). Mantieni questi tag NELLE CASELLA DI RIFERIMENTO E NEI CAMPI DI TESTO dell'output così come sono." : ""}
 
 TEMPLATE:
-${template}
+${processedTemplate}
 
-${notes ? `NOTE UTENTE:\n${notes}` : ''}
+${processedNotes ? `NOTE UTENTE:\n${processedNotes}` : ''}
 
 ${formalTone ? 'Usa un tono formale.' : ''}
 
@@ -1625,8 +1714,9 @@ ISTRUZIONI OUTPUT:
 - NON dire "Ecco il documento compilato", restituisci SOLO il testo del documento.
 - **DATO MANCANTE**: Se un dato è assente ma è di natura pubblica o comune (es. leggi, indirizzi di aziende), **USA Google Search** per trovarlo invece di scrivere [DATO MANCANTE].
 ` : `Genera un documento completo basandoti sulle note dell'utente e seguendo ESATTAMENTE la struttura e lo stile del documento MASTER fornito.
+${isPawnActive ? "⚠️ NOTA: Alcuni nomi o identificativi sono stati anonimizzati con dei tag (es: [NOME_PERSONA_1]). Mantieni questi tag NELLE CASELLA DI RIFERIMENTO E NEI CAMPI DI TESTO dell'output così come sono." : ""}
 
-${notes ? `NOTE UTENTE:\n${notes}` : ''}
+${processedNotes ? `NOTE UTENTE:\n${processedNotes}` : ''}
 
 ${formalTone ? 'Usa un tono formale.' : ''}
 
@@ -1639,10 +1729,22 @@ ISTRUZIONI OUTPUT:
 `;
 
       console.log('[DEBUG Compile] Pre-processing multimodal parts in parallel...');
-      const [preProcessedSourceParts, preProcessedMasterParts] = await Promise.all([
+      let [preProcessedSourceParts, preProcessedMasterParts] = await Promise.all([
         multimodalFiles?.length > 0 ? aiService.processMultimodalParts(multimodalFiles) : Promise.resolve([]),
         masterSource ? aiService.processMultimodalParts([masterSource]) : Promise.resolve([])
       ]);
+
+      // Apply sanitization if Pawn is active
+      if (isPawnActive) {
+        preProcessedSourceParts = preProcessedSourceParts.map(part => {
+          if (part.text) return { text: sanitizeText(part.text, vault) };
+          return part;
+        });
+        preProcessedMasterParts = preProcessedMasterParts.map(part => {
+          if (part.text) return { text: sanitizeText(part.text, vault) };
+          return part;
+        });
+      }
 
       console.log(`[DEBUG Compile] Calling AiService.compileDocument (Unified Pass, AutonomousSearch: ${useAutonomousWebSearch})...`);
       const { content: finalContent, groundingMetadata } = await aiService.compileDocument({
@@ -1656,14 +1758,17 @@ ISTRUZIONI OUTPUT:
 
       console.log('[DEBUG Compile] AI Compilation complete.');
 
-      // Return compiled content and grounding metadata
+      // De-sanitize response if Pawn was active
+      const restoredContent = isPawnActive ? desanitizeText(finalContent, vault) : finalContent;
+
       res.json({
         success: true,
-        compiledContent: finalContent,
+        compiledContent: restoredContent,
         groundingMetadata,
         fetchedCompilerContext, // For tracing
         extractedFields,
-        manualAnnotations
+        manualAnnotations,
+        guardrailVault: Object.fromEntries(vault)
       });
 
     } catch (error: any) {
@@ -1677,7 +1782,7 @@ ISTRUZIONI OUTPUT:
   // --- NEW: Refine / Chat Endpoint ---
   app.post('/api/refine', async (req: Request, res: Response) => {
     try {
-      const { compileContext, currentContent, userInstruction, chatHistory, mentions, mentionRegistry, webResearch } = req.body;
+      const { compileContext, currentContent, userInstruction, chatHistory, mentions, mentionRegistry, webResearch, guardrailVault: refinementVault } = req.body;
 
       console.log(`[API refine] Request: "${userInstruction.substring(0, 50)}..." | Mentions: ${mentions?.length || 0} | Registry: ${mentionRegistry?.length || 0}`);
 
@@ -1692,6 +1797,15 @@ ISTRUZIONI OUTPUT:
 
       const now = new Date();
       const dateTimeIT = now.toLocaleString('it-IT', { timeZone: 'Europe/Rome', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+      const isPawnActive = compileContext.activeGuardrails?.includes('pawn');
+      // Priorità alla vault inviata specificamente per il refine, fallback a quella del contesto
+      const vault = new Map<string, string>(Object.entries(refinementVault || compileContext.guardrailVault || {}));
+
+      // Sanitize instruction and current content if Pawn is active
+      const processedInstruction = isPawnActive ? sanitizeText(userInstruction, vault) : userInstruction;
+      const processedContent = isPawnActive ? sanitizeText(currentContent, vault) : currentContent;
+      const processedNotes = isPawnActive ? sanitizeText(notes, vault) : notes;
 
       const systemPrompt = buildSystemPrompt({
         dateTimeIT,
@@ -1726,7 +1840,7 @@ ${compileContext.notes || 'Nessuna nota specifica.'}
 
 DOC ATTUALE:
 """
-${currentContent}
+${processedContent}
 """
 
 ${formattedMentions ? `### ⚠️ FOCUS ATTUALE: PARTI MENZIONATE
@@ -1743,7 +1857,7 @@ ${formattedRegistry}
 (Usa questo registro per capire di cosa si è parlato in precedenza, ma dai priorità alle MENZIONI ATTIVE sopra).` : ''}
 
 STORICO CHAT:
-${chatHistory.map((m: any) => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
+${chatHistory.map((m: any) => `${m.role.toUpperCase()}: ${isPawnActive ? sanitizeText(m.text, vault) : m.text}`).join('\n')}
 
 ISTRUZIONI OPERATIVE:
 1. Se l'utente chiede una MODIFICA:
@@ -1765,10 +1879,10 @@ ISTRUZIONI OPERATIVE:
       // Call AI
       const { content: jsonResponse, groundingMetadata } = await aiService.compileDocument({
         systemPrompt: systemPrompt + refineInstructions,
-        userPrompt: userInstruction, // The actual instruction/query from the user
+        userPrompt: processedInstruction + (isPawnActive ? "\n⚠️ NOTA: Alcuni nomi o identificativi sono stati anonimizzati. Mantieni i tag (es: [NOME_PERSONA_1]) invariati." : ""),
         multimodalFiles: multimodalFiles || [],
         masterSource: masterSource || null,
-        preProcessedParts: [],
+        preProcessedParts: [], // Refinement usually doesn't need pre-processed sources in the same way, but we could add them if needed
         webResearch: webResearch // Enable Autonomous Google Search if active
       });
 
@@ -1788,11 +1902,19 @@ ISTRUZIONI OPERATIVE:
         };
       }
 
+      // De-sanitize response if Pawn was active
+      let finalParsed = parsed;
+      if (isPawnActive) {
+        if (finalParsed.newContent) finalParsed.newContent = desanitizeText(finalParsed.newContent, vault);
+        if (finalParsed.explanation) finalParsed.explanation = desanitizeText(finalParsed.explanation, vault);
+      }
+
       res.json({
         success: true,
-        newContent: parsed.newContent,
-        explanation: parsed.explanation,
-        groundingMetadata: groundingMetadata
+        newContent: finalParsed.newContent,
+        explanation: finalParsed.explanation,
+        groundingMetadata: groundingMetadata,
+        guardrailVault: Object.fromEntries(vault)
       });
 
     } catch (error: any) {

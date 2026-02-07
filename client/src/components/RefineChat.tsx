@@ -61,7 +61,8 @@ export function RefineChat({
     const {
         messages, setMessages,
         mentions, setMentions,
-        mentionRegistry, setMentionRegistry
+        mentionRegistry, setMentionRegistry,
+        guardrailVault, setGuardrailVault
     } = useCompiler();
 
     const [input, setInput] = useState('');
@@ -87,7 +88,8 @@ export function RefineChat({
                 currentContent,
                 userInstruction: analysisPrompt,
                 chatHistory: [],
-                webResearch: compileContext.webResearch
+                webResearch: compileContext.webResearch,
+                guardrailVault: guardrailVault // Use session vault
             });
 
             const data = await response.json();
@@ -100,6 +102,11 @@ export function RefineChat({
                 timestamp: new Date(),
                 groundingMetadata: data.groundingMetadata
             };
+
+            if (data.guardrailVault) {
+                setGuardrailVault(data.guardrailVault);
+            }
+
             setMessages(prev => {
                 if (prev.length > 0) {
                     return prev;
@@ -244,7 +251,8 @@ export function RefineChat({
                 mentions: mentions.map(m => ({ source: m.source, text: m.text, label: m.label })),
                 mentionRegistry: mentionRegistry.map(m => ({ source: m.source, text: m.text, label: m.label })),
                 chatHistory: messages.map(m => ({ role: m.role, text: m.text })),
-                webResearch: compileContext.webResearch
+                webResearch: compileContext.webResearch,
+                guardrailVault: guardrailVault // Use current session vault
             });
 
             const data = await response.json();
@@ -259,6 +267,11 @@ export function RefineChat({
                 timestamp: new Date(),
                 groundingMetadata: data.groundingMetadata
             };
+
+            if (data.guardrailVault) {
+                setGuardrailVault(data.guardrailVault);
+            }
+
             setMessages(prev => [...prev, aiMsg]);
 
             if (data.newContent) {

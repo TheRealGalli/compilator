@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getApiUrl } from "@/lib/api-config";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useCompiler } from "@/contexts/CompilerContext";
 
 interface ModelSettingsProps {
   notes?: string;
@@ -52,6 +53,7 @@ export function ModelSettings({
   chatInterface,
   className
 }: ModelSettingsProps) {
+  const { activeGuardrails, toggleGuardrail } = useCompiler();
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -283,17 +285,40 @@ export function ModelSettings({
                           Guardrail
                         </Label>
                         <div className="ml-auto flex gap-3">
-                          {[1, 2, 3, 4, 5].map((i) => (
-                            <div
-                              key={i}
-                              className="w-[24px] h-[24px] flex items-center justify-center rounded-[1px] border border-muted-foreground/30 bg-muted-foreground/10 cursor-pointer hover:bg-blue-500/30 transition-colors overflow-hidden"
-                            >
-                              {i === 1 && <FaChessPawn className="text-blue-600" size={12} />}
-                              {i === 2 && <FaChessKnight className="text-blue-600" size={13} />}
-                              {i === 3 && <FaChessBishop className="text-blue-600" size={13} />}
-                              {i === 4 && <FaChessRook className="text-blue-600" size={13} />}
-                              {i === 5 && <FaChessQueen className="text-blue-600" size={14} />}
-                            </div>
+                          {[
+                            { id: 'pawn', icon: FaChessPawn, size: 12, label: 'Pedone', description: 'Filtro Zero-Data: Anonymizza dati personali (Nomi, P.IVA, CF, Reati) prima dell\'invio all\'IA.' },
+                            { id: 'knight', icon: FaChessKnight, size: 13, label: 'Cavallo', description: 'Prossimamente' },
+                            { id: 'bishop', icon: FaChessBishop, size: 13, label: 'Alfiere', description: 'Prossimamente' },
+                            { id: 'rook', icon: FaChessRook, size: 13, label: 'Torre', description: 'Prossimamente' },
+                            { id: 'queen', icon: FaChessQueen, size: 14, label: 'Regina', description: 'Prossimamente' }
+                          ].map((piece) => (
+                            <TooltipProvider key={piece.id}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div
+                                    onClick={() => piece.id === 'pawn' && toggleGuardrail(piece.id)}
+                                    className={cn(
+                                      "w-[24px] h-[24px] flex items-center justify-center rounded-[1px] border cursor-pointer transition-colors overflow-hidden",
+                                      activeGuardrails.includes(piece.id)
+                                        ? "border-blue-500 bg-blue-500/20"
+                                        : "border-muted-foreground/30 bg-muted-foreground/10 hover:bg-blue-500/10",
+                                      piece.id !== 'pawn' && "opacity-50 cursor-not-allowed"
+                                    )}
+                                  >
+                                    <piece.icon
+                                      className={cn(
+                                        activeGuardrails.includes(piece.id) ? "text-blue-600" : "text-muted-foreground/60"
+                                      )}
+                                      size={piece.size}
+                                    />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-[10px] font-bold">{piece.label}</p>
+                                  <p className="text-[10px] max-w-[150px] leading-tight mt-1">{piece.description}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           ))}
                         </div>
                       </div>
