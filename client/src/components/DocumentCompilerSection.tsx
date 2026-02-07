@@ -1106,7 +1106,7 @@ export function DocumentCompilerSection({
                 >
                   <button
                     onClick={() => setIsOutputVisible(!isOutputVisible)}
-                    className="w-[5px] h-[30px] rounded-full bg-[#2563eb] shadow-lg flex flex-col items-center justify-center gap-[4px] hover:scale-110 active:scale-95 transition-all outline-none p-0"
+                    className="w-[8px] h-[33px] rounded-full bg-[#2563eb] shadow-lg flex flex-col items-center justify-center gap-[4px] hover:scale-110 active:scale-95 transition-all outline-none p-0"
                     title={isOutputVisible ? "Nascondi output" : "Mostra output"}
                   >
                     <div className="w-[1.2px] h-[7px] bg-white rounded-full flex-shrink-0" />
