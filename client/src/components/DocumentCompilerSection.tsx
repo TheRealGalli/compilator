@@ -485,25 +485,64 @@ export function DocumentCompilerSection({
       const { getApiUrl } = await import("@/lib/api-config");
 
       // --- NEW: PREVENTIVE PAWN CHECK (LOCAL-FIRST) ---
+      // --- NEW: PREVENTIVE PAWN CHECK (LOCAL-FIRST) ---
       if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval && !webResearch) {
-        console.log('[DocumentCompiler] Local Pawn Check triggered...');
+        console.log('[DocumentCompiler] Hybrid Pawn Check triggered...');
         try {
+          let currentVault = { ...guardrailVault };
+
           // 1. Extract and anonymize LOCAL template
-          const { anonymized: anonTemplate, newVault: tempVault } = await anonymizeWithOllamaLocal(templateContent, guardrailVault);
+          const { anonymized: anonTemplate, newVault: vaultAfterTemplate } = await anonymizeWithOllamaLocal(templateContent, currentVault);
+          currentVault = vaultAfterTemplate;
 
           // 2. Extract and anonymize NOTES
-          const { anonymized: anonNotes, newVault: vaultAfterNotes } = await anonymizeWithOllamaLocal(notes, tempVault);
+          const { anonymized: anonNotes, newVault: vaultAfterNotes } = await anonymizeWithOllamaLocal(notes, currentVault);
+          currentVault = vaultAfterNotes;
 
-          // 3. (Optional but recommended) In a real app we'd also anonymize extracted text from sources here.
-          // For now, we update the state with the found PII.
-          setGuardrailVault(vaultAfterNotes);
-          setReportVault(vaultAfterNotes);
+          // 3. EXTRACT TEXT FROM SOURCES (via backend privacy-safe endpoint)
+          const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
+            sources: selectedSources.map(s => ({
+              name: s.name,
+              type: s.type,
+              base64: s.base64
+            })),
+            masterSource: masterSource ? {
+              name: masterSource.name,
+              type: masterSource.type,
+              base64: masterSource.base64
+            } : null
+          });
+
+          const extractData = await extractResponse.json();
+
+          // 4. Anonymize Extracted Text from Sources
+          if (extractData.success) {
+            // Anonymize standard sources
+            if (extractData.extractedSources) {
+              for (const source of extractData.extractedSources) {
+                const { anonymized, newVault } = await anonymizeWithOllamaLocal(source.text, currentVault);
+                currentVault = newVault;
+
+                // Store the anonymized text back in selectedSources (we'll need it for /api/compile)
+                // We don't want to mutate state directly here, but we need to track this.
+                // We'll calculate it again in the second phase or store it temporarily.
+              }
+            }
+            // Anonymize master source
+            if (extractData.extractedMaster) {
+              const { anonymized, newVault } = await anonymizeWithOllamaLocal(extractData.extractedMaster.text, currentVault);
+              currentVault = newVault;
+            }
+          }
+
+          setGuardrailVault(currentVault);
+          setReportVault(currentVault);
           setIsWaitingForPawnApproval(true);
           setIsAnonymizationReportOpen(true);
           setIsCompiling(false);
           return; // STOP HERE, wait for user confirmation
         } catch (err) {
-          console.warn("[DocumentCompiler] Local Anonymization failed, falling back to non-anonymized or error.");
+          console.error("[DocumentCompiler] Hybrid Anonymization failed:", err);
           toast({
             title: "Errore Anonimizzazione Locale",
             description: "Assicurati che Ollama sia attivo (`ollama serve`).",
@@ -518,15 +557,36 @@ export function DocumentCompilerSection({
       // IMPORTANT: When Pawn is active, we MUST send the ANONIMIZED content to the server
       let finalTemplate = templateContent;
       let finalNotes = notes;
+      let finalSources = selectedSources.map(s => ({ ...s }));
+      let finalMasterSource = masterSource ? { ...masterSource } : null;
 
       if (activeGuardrails.includes('pawn') && isWaitingForPawnApproval) {
-        // Apply the vault to the local state one last time for safety before sending
-        // Actually, the vault is already used to show the tokens in the prompt.
-        // We need to make sure the template being sent HAS the tokens.
-        const { anonymized: finalAnonTemplate } = await anonymizeWithOllamaLocal(templateContent, guardrailVault);
-        const { anonymized: finalAnonNotes } = await anonymizeWithOllamaLocal(notes, guardrailVault);
-        finalTemplate = finalAnonTemplate;
-        finalNotes = finalAnonNotes;
+        // Apply the vault to everything one last time to get the tokens
+        const { anonymized: anonT } = await anonymizeWithOllamaLocal(templateContent, guardrailVault);
+        const { anonymized: anonN } = await anonymizeWithOllamaLocal(notes, guardrailVault);
+        finalTemplate = anonT;
+        finalNotes = anonN;
+
+        // Anonymize sources too for the final request
+        const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
+          sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
+          masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
+        });
+        const extractData = await extractResponse.json();
+
+        if (extractData.success) {
+          for (let i = 0; i < finalSources.length; i++) {
+            const extracted = extractData.extractedSources?.find((e: any) => e.name === finalSources[i].name);
+            if (extracted) {
+              const { anonymized } = await anonymizeWithOllamaLocal(extracted.text, guardrailVault);
+              (finalSources[i] as any).anonymizedText = anonymized;
+            }
+          }
+          if (finalMasterSource && extractData.extractedMaster) {
+            const { anonymized } = await anonymizeWithOllamaLocal(extractData.extractedMaster.text, guardrailVault);
+            (finalMasterSource as any).anonymizedText = anonymized;
+          }
+        }
       }
 
       const response = await apiRequest('POST', '/api/compile', {
@@ -539,15 +599,17 @@ export function DocumentCompilerSection({
         modelProvider,
         activeGuardrails,
         guardrailVault,
-        sources: selectedSources.map(s => ({
+        sources: finalSources.map(s => ({
           name: s.name,
           type: s.type,
-          base64: s.base64
+          base64: s.base64,
+          anonymizedText: (s as any).anonymizedText
         })),
-        masterSource: masterSource ? {
-          name: masterSource.name,
-          type: masterSource.type,
-          base64: masterSource.base64
+        masterSource: finalMasterSource ? {
+          name: finalMasterSource.name,
+          type: finalMasterSource.type,
+          base64: finalMasterSource.base64,
+          anonymizedText: (finalMasterSource as any).anonymizedText
         } : null
       });
 
@@ -1319,6 +1381,9 @@ export function DocumentCompilerSection({
             </DialogTitle>
             <DialogDescription>
               I seguenti dati sensibili sono stati sostituiti con dei token prima dell&apos;invio all&apos;intelligenza artificiale.
+              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-700 text-[10px] leading-tight">
+                <strong>NOTA:</strong> Le immagini e le foto non sono attualmente coperte dall&apos;anonimizzazione automatica.
+              </div>
             </DialogDescription>
           </DialogHeader>
 

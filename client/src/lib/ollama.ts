@@ -11,10 +11,46 @@ export interface PIIFinding {
 const OLLAMA_URL = 'http://localhost:11434/api/generate';
 const OLLAMA_MODEL = 'gemma3:1b';
 
+const CHUNK_SIZE = 1500;
+const CHUNK_OVERLAP = 200;
+
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
-    console.log(`[OllamaLocal] Calling local Ollama for PII Extraction...`);
+    // If text is short, process directly
+    if (text.length <= CHUNK_SIZE) {
+        return _extractSingleChunk(text);
+    }
+
+    // Handle long documents via chunking
+    console.log(`[OllamaLocal] Long document detected (${text.length} chars). Using chunking...`);
+    const allFindings: PIIFinding[] = [];
+    const processedValues = new Set<string>();
+
+    for (let i = 0; i < text.length; i += (CHUNK_SIZE - CHUNK_OVERLAP)) {
+        const chunk = text.substring(i, i + CHUNK_SIZE);
+        try {
+            const findings = await _extractSingleChunk(chunk);
+            for (const f of findings) {
+                const key = `${f.value.toLowerCase()}|${f.category}`;
+                if (!processedValues.has(key)) {
+                    allFindings.push(f);
+                    processedValues.add(key);
+                }
+            }
+        } catch (err) {
+            console.warn(`[OllamaLocal] Chunk processing failed at offset ${i}, skipping...`);
+        }
+
+        // Safety break
+        if (i + CHUNK_SIZE >= text.length) break;
+    }
+
+    return allFindings;
+}
+
+async function _extractSingleChunk(text: string): Promise<PIIFinding[]> {
+    console.log(`[OllamaLocal] Extracting PII from chunk (${text.length} chars)...`);
 
     const systemPrompt = `[INST] Sei un Agente di Estrazione Dati. Identifica TUTTI i dati sensibili.
 Categorie: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA.

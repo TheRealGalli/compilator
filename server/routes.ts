@@ -1549,88 +1549,58 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
 `;
   };
 
-  // --- NEW: Pawn Guardrail Check Endpoint ---
-  app.post('/api/pawn-check', async (req: Request, res: Response) => {
+  // --- NEW: Pawn Extraction Endpoint (Privacy-Safe) ---
+  app.post('/api/pawn-extract', async (req: Request, res: Response) => {
     try {
-      const { template, notes, sources, masterSource, guardrailVault: existingVault } = req.body;
-      const vault = new Map<string, string>(Object.entries(existingVault || {}));
+      const { sources, masterSource } = req.body;
+      const extractedSources: any[] = [];
+      let extractedMaster: any = null;
 
-      console.log(`[API pawn-check] Inspecting data for anonymization...`);
+      console.log(`[API pawn-extract] Extracting raw text from sources...`);
 
-      // 1. Anonymize Template and Notes
-      let processedTemplate = template;
-      let processedNotes = notes;
-
-      const useOllama = true; // Forziamo Ollama per garantire la Zero-Data Policy locale
-
-      if (template) {
-        processedTemplate = useOllama
-          ? await aiService.anonymizeWithOllama(template, vault)
-          : await aiService.anonymizeWithDLP(template, vault);
-      }
-      if (notes) {
-        processedNotes = useOllama
-          ? await aiService.anonymizeWithOllama(notes, vault)
-          : await aiService.anonymizeWithDLP(notes, vault);
-      }
-
-      // 2. Anonymize Sources
+      // 1. Extract from standard sources
       const multimodalFiles = sources || [];
-      const preProcessedSourceParts = [];
-      let preProcessedMasterParts = [];
-
       if (multimodalFiles.length > 0) {
-        console.log(`[API pawn-check] Found ${multimodalFiles.length} sources. Processing...`);
         for (const file of multimodalFiles) {
           const cleanedB64 = cleanBase64(file.base64);
           const buffer = Buffer.from(cleanedB64, 'base64');
           const mime = file.mimeType || file.type;
 
-          console.log(`[API pawn-check] Processing source: "${file.name}" | Type: ${mime} | Buffer: ${buffer.length}`);
+          // SKIP IMAGES based on user request "escludiamo le immagini dal guardrail per ora"
+          if (mime.startsWith('image/')) {
+            console.log(`[API pawn-extract] Skipping image source: "${file.name}"`);
+            continue;
+          }
 
           const text = await extractText(buffer, mime);
           if (text) {
-            console.log(`[API pawn-check] Extracted ${text.length} chars from "${file.name}". Anonymizing...`);
-            const label = `[FONTE: ${file.name}]\n`;
-            const anonymized = useOllama
-              ? await aiService.anonymizeWithOllama(text, vault)
-              : await aiService.anonymizeWithDLP(text, vault);
-            preProcessedSourceParts.push({ text: label + anonymized });
-          } else {
-            console.warn(`[API pawn-check] FAILED to extract text from "${file.name}"`);
+            extractedSources.push({ name: file.name, text });
           }
         }
       }
 
+      // 2. Extract from master source
       if (masterSource) {
         const cleanedB64 = cleanBase64(masterSource.base64);
         const buffer = Buffer.from(cleanedB64, 'base64');
         const mime = masterSource.mimeType || masterSource.type;
 
-        console.log(`[API pawn-check] Processing MASTER: "${masterSource.name}" | Type: ${mime} | Buffer: ${buffer.length}`);
-
-        const text = await extractText(buffer, mime);
-        if (text) {
-          console.log(`[API pawn-check] Extracted ${text.length} chars from MASTER. Anonymizing...`);
-          const label = `[MASTER: ${masterSource.name}]\n`;
-          const anonymized = useOllama
-            ? await aiService.anonymizeWithOllama(text, vault)
-            : await aiService.anonymizeWithDLP(text, vault);
-          preProcessedMasterParts = [{ text: label + anonymized }];
-        } else {
-          console.warn(`[API pawn-check] FAILED to extract text from MASTER "${masterSource.name}"`);
+        if (!mime.startsWith('image/')) {
+          const text = await extractText(buffer, mime);
+          if (text) {
+            extractedMaster = { name: masterSource.name, text };
+          }
         }
       }
 
-      console.log(`[API pawn-check] Inspection complete. Vault size: ${vault.size}`);
-
       res.json({
         success: true,
-        guardrailVault: Object.fromEntries(vault)
+        extractedSources,
+        extractedMaster
       });
     } catch (error: any) {
-      console.error('Errore durante Pawn Check:', error);
-      res.status(500).json({ error: error.message || 'Errore durante ispezione dati' });
+      console.error('Errore durante Pawn Extract:', error);
+      res.status(500).json({ error: error.message || 'Errore durante estrazione dati' });
     }
   });
 
@@ -1710,18 +1680,11 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
       const vault = new Map<string, string>(Object.entries(guardrailVault || {}));
 
       console.log(`[GUARDIAN] Pawn Status: ${isPawnActive ? 'ACTIVE' : 'INACTIVE'}`);
-      if (isPawnActive) {
-        console.log(`[GUARDIAN] Initial Vault size: ${vault.size}`);
-      }
 
-      const useOllama = true;
-      // Sanitize Notes and Template if Pawn is active
-      const processedNotes = isPawnActive
-        ? (useOllama ? await aiService.anonymizeWithOllama(notes, vault) : await aiService.anonymizeWithDLP(notes, vault))
-        : notes;
-      const processedTemplate = isPawnActive
-        ? (useOllama ? await aiService.anonymizeWithOllama(template, vault) : await aiService.anonymizeWithDLP(template, vault))
-        : template;
+      // If Pawn is active, we expect the client to have ALREADY anonymized the template and notes
+      // We use them directly (server-side Ollama might fail on Cloud Run)
+      const processedNotes = notes;
+      const processedTemplate = template;
 
       // Extract and Sanitize Source Text if Pawn is active
       let preProcessedParts: any[] = [];
@@ -1729,44 +1692,56 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
 
       if (isPawnActive) {
         if (multimodalFiles && multimodalFiles.length > 0) {
-          console.log(`[API compile] Pawn Guardrail active: Extracting and Sanitizing ${multimodalFiles.length} sources...`);
+          console.log(`[API compile] Pawn Guardrail active: Processing ${multimodalFiles.length} sources...`);
           for (const s of multimodalFiles) {
+            // Priority 1: Client provided pre-anonymized text
+            if (s.anonymizedText) {
+              preProcessedParts.push({ text: `[FONTE: ${s.name}]\n` + s.anonymizedText });
+              continue;
+            }
+
             const cleanedB64 = cleanBase64(s.base64);
-            const buffer = Buffer.from(cleanedB64, 'base64');
             const mime = s.mimeType || s.type;
 
-            console.log(`[API compile] Processing source: "${s.name}" | Type: ${mime} | Buffer: ${buffer.length}`);
+            // Priority 2: Images (excluded from Pawn for now)
+            if (mime.startsWith('image/')) {
+              preProcessedParts.push({
+                fileData: { mimeType: mime, data: cleanedB64 }
+              });
+              continue;
+            }
 
-            const text = await extractText(buffer, mime);
-            if (text) {
-              console.log(`[API compile] Extracted ${text.length} chars from "${s.name}". Anonymizing...`);
-              const label = `[FONTE: ${s.name}]\n`;
-              const anonymized = useOllama
-                ? await aiService.anonymizeWithOllama(text, vault)
-                : await aiService.anonymizeWithDLP(text, vault);
-              preProcessedParts.push({ text: label + anonymized });
-            } else {
-              console.warn(`[API compile] FAILED to extract text from "${s.name}"`);
+            // Priority 3: Try server-side extraction/anonymization (fallback/local only)
+            try {
+              const buffer = Buffer.from(cleanedB64, 'base64');
+              const text = await extractText(buffer, mime);
+              if (text) {
+                // This might fail if Ollama is not local
+                const anonymized = await aiService.anonymizeWithOllama(text, vault);
+                preProcessedParts.push({ text: `[FONTE: ${s.name}]\n` + anonymized });
+              }
+            } catch (err) {
+              console.warn(`[API compile] Skip source "${s.name}" due to pawn extraction/anonymization error.`);
             }
           }
         }
 
         if (masterSource) {
-          console.log(`[API compile] Pawn Guardrail active: Extracting and Sanitizing MASTER source...`);
-          const cleanedB64 = cleanBase64(masterSource.base64);
-          const buffer = Buffer.from(cleanedB64, 'base64');
-          const mime = masterSource.mimeType || masterSource.type;
-
-          const text = await extractText(buffer, mime);
-          if (text) {
-            console.log(`[API compile] Extracted ${text.length} chars from MASTER. Anonymizing...`);
-            const label = `[MASTER: ${masterSource.name}]\n`;
-            const anonymized = useOllama
-              ? await aiService.anonymizeWithOllama(text, vault)
-              : await aiService.anonymizeWithDLP(text, vault);
-            preProcessedMasterParts = [{ text: label + anonymized }];
+          if (masterSource.anonymizedText) {
+            preProcessedMasterParts = [{ text: `[MASTER: ${masterSource.name}]\n` + masterSource.anonymizedText }];
           } else {
-            console.warn(`[API compile] FAILED to extract text from MASTER "${masterSource.name}"`);
+            const cleanedB64 = cleanBase64(masterSource.base64);
+            const mime = masterSource.mimeType || masterSource.type;
+            if (!mime.startsWith('image/')) {
+              try {
+                const buffer = Buffer.from(cleanedB64, 'base64');
+                const text = await extractText(buffer, mime);
+                if (text) {
+                  const anonymized = await aiService.anonymizeWithOllama(text, vault);
+                  preProcessedMasterParts = [{ text: `[MASTER: ${masterSource.name}]\n` + anonymized }];
+                }
+              } catch (err) { }
+            }
           }
         }
       }
