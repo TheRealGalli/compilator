@@ -588,7 +588,7 @@ export function DocumentsSection() {
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className={`gap-2 shrink-0 ${memoryFile ? 'border-blue-500/50 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10' : ''}`}>
-                <FaChessKing className="w-4 h-4 text-blue-500" />
+                <FaChessKing className="w-4 h-4 text-blue-500 -translate-y-[1.5px]" />
                 Gromit Memory
                 {memoryFile && <span className="flex h-2 w-2 rounded-full bg-green-500" />}
               </Button>
