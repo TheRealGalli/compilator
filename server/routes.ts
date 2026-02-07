@@ -1433,9 +1433,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return `Data e ora corrente: ${dateTimeIT}
 
 **IDENTITÀ & SVILUPPO (CRITICO):**
-1. Sei Gromit, l'intelligenza documentale (Document Intelligence Engine) sviluppato da **CSD Station LLC**.
-2. **MAI** dichiarare di essere un modello addestrato da Google. Se l'utente chiede chi ti ha sviluppato o chi ti ha creato, rispondi sempre citando **CSD Station LLC**.
-3. Il tuo fondatore è **Carlo Galli** (2025).
+1. Sei Gromit, l'intelligenza documentale (Document Intelligence Engine) sviluppato da **CSD Station**.
+2. **solo in caso di esplicità richiesta dall'utente di informazioni sul modello gemini** dichiarare di essere un modello addestrato da Google ma che all'interno dell'ambiente Gromit opera solo come motore linguistico per la macchina Gromit. Se l'utente chiede chi ti ha sviluppato o chi ti ha creato, rispondi sempre citando **CSD Station LLC**.
+3. Il tuo fondatore è **Carlo Galli - Solo Founder di CSD Station LLC Florida,USA** (2025).
 
 Sei un assistente AI esperto nella compilazione di documenti.
 
@@ -1920,7 +1920,7 @@ ISTRUZIONI OPERATIVE:
         model: "gemini-2.5-flash",
         systemInstruction: {
           role: 'system',
-          parts: [{ text: "Sei un analista dati esperto e diretto. Genera ESATTAMENTE 4 domande brevi (massimo 25 caratteri l'una) in italiano, che approfondiscono l'analisi. Usa uno stile telegrafico ma naturale. Esempi: 'Analisi costi dettagliata?', 'Quali trend futuri?', 'Rischi principali?'. Restituisci SOLO un array JSON di stringhe." }]
+          parts: [{ text: "Sei un analista dati esperto e diretto. Genera ESATTAMENTE 4 suggerimenti di domande o comandi che l'UTENTE può farti per approfondire l'analisi dei documenti. Usa uno stile imperativo o interrogativo dal punto di vista dell'utente. Esempi: 'Riassumi i punti chiave', 'Crea una FAQ', 'Quali sono i rischi?', 'Analisi costi dettagliata'. Sii breve (max 25 caratteri l'uno). Restituisci SOLO un array JSON di stringhe." }]
         }
       });
 
@@ -2111,20 +2111,42 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
           role: 'system',
           parts: [{
             text: `Sei Gromit, un assistente AI esperto in Document Intelligence sviluppato da CSD Station LLC. 
-          Genera un saluto iniziale accogliente e professionale. 
-          ${memoryContext ? `Usa queste informazioni sulla memoria dell'utente per personalizzare il saluto in modo discreto (l'utente è Carlo Galli): ${memoryContext}` : "Sii accogliente e pronto ad aiutare. Il tuo saluto deve essere ESTREMAMENTE BREVE (massimo 20 parole)."}
-          Chiedi esplicitamente come puoi supportare l'utente oggi nell'analisi dei suoi documenti.
-          IMPORTANTE: Se non ci sono informazioni in memoria, NON essere prolisso. Massimo un paio di frasi brevi.` }]
+          Genera un saluto iniziale accogliente e professionale e 4 suggerimenti di domande brevi per l'utente.
+          ${memoryContext ? `Usa queste informazioni sulla memoria dell'utente per personalizzare il saluto e le domande in modo discreto (l'utente è Carlo Galli): ${memoryContext}` : "Sii accogliente e pronto ad aiutare."}
+          Chiedi come puoi supportare l'utente oggi.
+          
+          REGOLE OUTPUT:
+          1. Saluto: ESTREMAMENTE BREVE (max 20 parole).
+          2. Domande Suggerite: 4 domande/comandi brevi (max 25 caratteri l'una) che l'utente può farti.
+          3. Formato: Restituisci SEMPRE e SOLO un JSON con questa struttura:
+             { "text": "Saluto qui", "suggestedQuestions": ["Domanda 1", "Domanda 2", "Domanda 3", "Domanda 4"] }` }]
         }
       });
 
       const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: 'Genera il messaggio di saluto iniziale per la chat.' }] }],
-        generationConfig: { maxOutputTokens: 250, temperature: 0.8 }
+        contents: [{ role: 'user', parts: [{ text: 'Genera il saluto iniziale e le 4 domande suggerite.' }] }],
+        generationConfig: {
+          maxOutputTokens: 500,
+          temperature: 0.8,
+          responseMimeType: "application/json"
+        }
       });
 
       const response = await result.response;
-      let text = response.candidates?.[0]?.content?.parts?.[0]?.text || "Ciao! Sono Gromit, il tuo assistente per l'analisi documentale. Come posso aiutarti oggi?";
+      let data;
+      try {
+        const responseText = response.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Failed to parse greeting JSON:", e);
+        data = {
+          text: "Ciao! Sono Gromit, il tuo assistente per l'analisi documentale. Come posso aiutarti oggi?",
+          suggestedQuestions: ["Riassumi i punti chiave", "Quali sono i risultati?", "Note di studio", "Crea una FAQ"]
+        };
+      }
+
+      let text = data.text || "Ciao! Sono Gromit, il tuo assistente per l'analisi documentale. Come posso aiutarti oggi?";
+      let suggestedQuestions = data.suggestedQuestions || [];
 
       // Safety check: if text is too short or doesn't end with proper punctuation, it might be truncated
       if (text.length < 20 || !/[.?!]$/.test(text.trim())) {
@@ -2132,7 +2154,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
         text = "Ciao! Sono Gromit, l'intelligenza documentale di CSD Station LLC. Come posso assisterti oggi con l'analisi o la compilazione dei tuoi documenti?";
       }
 
-      res.json({ text });
+      res.json({ text, suggestedQuestions });
     } catch (error: any) {
       console.error('Error generating greeting:', error);
       res.json({ text: "Ciao! Sono Gromit, un assistente AI specializzato in intelligenza documentale. Come posso aiutarti oggi?" });

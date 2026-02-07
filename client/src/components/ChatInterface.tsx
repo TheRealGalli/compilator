@@ -25,7 +25,7 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) {
-  const { messages, setMessages, isGreetingLoading } = useChat();
+  const { messages, setMessages, isGreetingLoading, suggestedPrompts, setSuggestedPrompts } = useChat();
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [webResearch, setWebResearch] = useState(false);
@@ -131,12 +131,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     }
   };
 
-  const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([
-    "Riassumi i punti chiave",
-    "Quali sono i risultati?",
-    "Note di studio",
-    "Crea una FAQ",
-  ]);
 
   // Extract fields from master source for context (optional but consistent)
   const [extractedFields, setExtractedFields] = useState<Array<{ name: string; type: string }>>([]);

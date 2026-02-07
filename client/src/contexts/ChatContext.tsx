@@ -18,6 +18,8 @@ interface ChatContextType {
     messages: Message[];
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
     isGreetingLoading: boolean;
+    suggestedPrompts: string[];
+    setSuggestedPrompts: React.Dispatch<React.SetStateAction<string[]>>;
     refreshGreeting: () => Promise<void>;
 }
 
@@ -26,6 +28,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isGreetingLoading, setIsGreetingLoading] = useState(false);
+    const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
     const { selectedSources } = useSources();
 
     const refreshGreeting = useCallback(async () => {
@@ -47,15 +50,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             }
 
             const res = await fetch(url.toString());
-            if (!res.ok) throw new Error('Failed to fetch greeting');
-            const data = await res.json();
-
-            setMessages([{
-                id: "greeting",
-                role: "assistant",
-                content: data.text,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            }]);
+            if (res.ok) {
+                const data = await res.json();
+                setMessages([{
+                    id: "greeting",
+                    role: "assistant",
+                    content: data.text,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                }]);
+                if (data.suggestedQuestions) {
+                    setSuggestedPrompts(data.suggestedQuestions);
+                }
+            } else {
+                throw new Error('Failed to fetch greeting');
+            }
         } catch (error) {
             console.error('Error fetching greeting:', error);
             // Fallback greeting if it's the first time
@@ -65,6 +73,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 content: "Ciao! Sono Gromit, il tuo assistente per l'analisi documentale. Come posso aiutarti oggi?",
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             }]);
+            setSuggestedPrompts(["Riassumi i punti chiave", "Quali sono i risultati?", "Note di studio", "Crea una FAQ"]);
         } finally {
             setIsGreetingLoading(false);
         }
@@ -82,6 +91,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             messages,
             setMessages,
             isGreetingLoading,
+            suggestedPrompts,
+            setSuggestedPrompts,
             refreshGreeting
         }}>
             {children}
