@@ -12,6 +12,7 @@ export class AiService {
     private dlpClient: DlpServiceClient;
     private ollamaUrl = 'http://localhost:11434/api/generate';
     private ollamaModel = 'gemma3:1b';
+    private categoryCounters: Record<string, number> = {};
 
     constructor(projectId: string, location: string = 'europe-west1') {
         this.projectId = projectId;
@@ -196,29 +197,26 @@ export class AiService {
         if (!text || text.trim() === "") return text;
 
         try {
-            console.log(`[AiService] Calling Local Ollama for anonymization (Text length: ${text.length})...`);
+            console.log(`[AiService] Calling Local Ollama for PII Extraction (Text length: ${text.length})...`);
 
-            const systemPrompt = `Sei l'Agente Guardian di Gromit, esperto in Cyber-Security e Data Privacy.
-Il tuo compito è individuare e ANONIMIZZARE OGNI DATO SENSIBILE nel testo ricevuto.
+            const systemPrompt = `[INST] Sei un Agente di Estrazione Dati. Identifica TUTTI i dati sensibili.
+Categorie: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA.
 
-REGOLE DI SOSTITUZIONE (USA QUESTI TAG):
-- Nomi di Persona -> [NOME_PERSONA_N]
-- Aziende/Organizzazioni -> [ORGANIZZAZIONE_N]
-- Indirizzi, Città, CAP -> [INDIRIZZO_N]
-- Email -> [EMAIL_N]
-- Numeri di Telefono -> [TELEFONO_N]
-- Codici Fiscali -> [CODICE_FISCALE_N]
-- Partite IVA -> [PARTITA_IVA_N]
-- Date di Nascita -> [DATA_NASCITA_N]
+ESEMPIO 1:
+TESTO: Mi chiamo Carlo Galli e lavoro per CSD Station. Mail: carlo@galli.it
+JSON: {"findings": [{"value": "Carlo Galli", "category": "NOME_PERSONA"}, {"value": "CSD Station", "category": "ORGANIZZAZIONE"}, {"value": "carlo@galli.it", "category": "EMAIL"}]}
 
-REGOLE TASSATIVE:
-1. MANTENIMENTO STRUTTURA: Restituisci l'intero testo originale mantenendo punteggiatura, spazi e formattazione.
-2. PRECISIONE: Sostituisci solo i dati sensibili reali. Non anonimizzare termini generici (es: "Azienda" resta "Azienda", ma "Gromit SRL" diventa "[ORGANIZZAZIONE_1]").
-3. ZERO CHAT: Non aggiungere saluti, spiegazioni o conclusioni. Restituisci SOLO il testo anonimizzato.
-4. LINGUA: Mantieni la lingua originale del testo.
+ESEMPIO 2:
+TESTO: L'ufficio è in Via Roma 10, Milano. Tel: 02 1234567. P.IVA 12345678901.
+JSON: {"findings": [{"value": "Via Roma 10, Milano", "category": "INDIRIZZO"}, {"value": "02 1234567", "category": "TELEFONO"}, {"value": "12345678901", "category": "PARTITA_IVA"}]}
 
-TESTO DA ELABORARE:
-${text}`;
+REGOLE:
+- Copia il valore ESATTAMENTE come nel testo.
+- Includi i nomi completi.
+- Restituisci SOLO il JSON.
+
+TESTO:
+${text} [/INST]`;
 
             const response = await fetch(this.ollamaUrl, {
                 method: 'POST',
@@ -226,32 +224,92 @@ ${text}`;
                 body: JSON.stringify({
                     model: this.ollamaModel,
                     prompt: systemPrompt,
+                    format: 'json',
                     stream: false,
                     options: {
                         temperature: 0.1,
-                        top_p: 0.9,
-                        num_keep: 2000,
-                        stop: ["\n\n\n"]
                     }
                 })
             });
 
             if (!response.ok) {
-                console.warn(`[AiService] Ollama unreachable on port 11434. Check if Ollama is running.`);
+                console.warn(`[AiService] Ollama unreachable on port 11434.`);
                 return text;
             }
 
             const data = await response.json() as any;
-            const anonymizedText = data.response?.trim();
+            let rawResponse = data.response || "";
 
-            if (!anonymizedText || anonymizedText === "") {
+            if (!rawResponse || rawResponse.trim() === "") {
                 console.warn("[AiService] Ollama returned empty response.");
                 return text;
             }
 
-            // Sync with local vault logic (partial implementation as LLM returns raw text)
-            // For now, we return the LLM text directly as requested by the Zero-Data promise.
-            console.log(`[AiService] Ollama anonymization successful.`);
+            let findings: any[] = [];
+            try {
+                // Try to parse the JSON response
+                const parsed = JSON.parse(rawResponse);
+                findings = parsed.findings || [];
+            } catch (e) {
+                console.error("[AiService] FAILED to parse Ollama JSON:", rawResponse);
+                // Simple regex fallback if JSON parsing fails
+                const regex = /"value":\s*"([^"]+)",\s*"category":\s*"([^"]+)"/g;
+                let match;
+                while ((match = regex.exec(rawResponse)) !== null) {
+                    findings.push({ value: match[1], category: match[2] });
+                }
+            }
+
+            if (findings.length === 0) {
+                console.log(`[AiService] Ollama found no PII.`);
+                return text;
+            }
+
+            // --- CODE-ASSISTED REPLACEMENT & VAULTING ---
+            let anonymizedText = text;
+
+            // Sort findings by length descending to replace "Carlo Galli" before "Carlo"
+            const sortedFindings = findings.sort((a, b) => (b.value.length - a.value.length));
+
+            for (const finding of sortedFindings) {
+                const value = finding.value.trim();
+                const category = finding.category.toUpperCase().replace(/\s+/g, '_');
+
+                if (!value || value.length < 2) continue;
+
+                // SECURE DE-DUPLICATION: Check if this value already exists in the vault (case neutral)
+                let token = "";
+                const normalizedValue = value.toLowerCase();
+
+                for (const [t, v] of vault.entries()) {
+                    if (v.toLowerCase() === normalizedValue && t.includes(category)) {
+                        token = t;
+                        break;
+                    }
+                }
+
+                if (!token) {
+                    // Calculate next sequential number for this category
+                    let count = 0;
+                    for (const t of vault.keys()) {
+                        if (t.startsWith(`[${category}_`)) count++;
+                    }
+                    token = `[${category}_${count + 1}]`;
+                    vault.set(token, value);
+                    console.log(`[AiService] New vault entry (Ollama + Code): ${token} -> ${value}`);
+                }
+
+                // Global replacement of the value with the token
+                // Using regex for word boundaries if it's text, but carefully
+                try {
+                    const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    anonymizedText = anonymizedText.replace(new RegExp(escapedValue, 'g'), token);
+                } catch (err) {
+                    anonymizedText = anonymizedText.split(value).join(token);
+                }
+            }
+
+            console.log(`[AiService] Code-Assisted Anonymization successful. Vault Size: ${vault.size}`);
             return anonymizedText;
 
         } catch (error) {
