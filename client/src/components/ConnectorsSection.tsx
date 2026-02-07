@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Loader2 } from "lucide-react";
+import { RefreshCw, Loader2, Cpu } from "lucide-react";
 import { useGmail } from "@/contexts/GmailContext";
+import { useState, useEffect } from "react";
 
 export const GmailLogo = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
@@ -23,6 +24,25 @@ export const DriveLogo = ({ className }: { className?: string }) => (
 
 export function ConnectorsSection() {
     const { isConnected, isLoading, isFetchingMessages, connect, logout, fetchMessages } = useGmail();
+    const [ollamaStatus, setOllamaStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading');
+
+    const checkOllama = async () => {
+        setOllamaStatus('loading');
+        try {
+            const res = await fetch('/api/ollama-health');
+            if (res.ok) {
+                setOllamaStatus('connected');
+            } else {
+                setOllamaStatus('disconnected');
+            }
+        } catch (err) {
+            setOllamaStatus('disconnected');
+        }
+    };
+
+    useEffect(() => {
+        checkOllama();
+    }, []);
 
     if (isLoading) {
         return (
@@ -146,6 +166,42 @@ export function ConnectorsSection() {
                         <div className="mt-auto">
                             <Button variant="outline" className="w-full" disabled>
                                 Coming Soon
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Ollama Card */}
+                <Card className={`border-2 transition-all flex flex-col ${ollamaStatus === 'connected' ? 'border-blue-200 bg-blue-50/10' : 'opacity-60 border-dashed hover:opacity-100'}`}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-900 border border-slate-700 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
+                                <Cpu className="w-6 h-6 text-white" />
+                            </div>
+                            <div className="min-w-0">
+                                <CardTitle className="text-lg truncate">Ollama</CardTitle>
+                                <CardDescription className="truncate">Local AI Engine</CardDescription>
+                            </div>
+                        </div>
+                        <div className="shrink-0 ml-2">
+                            {ollamaStatus === 'connected' ? (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                                    Rilevato
+                                </Badge>
+                            ) : ollamaStatus === 'loading' ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                            ) : (
+                                <Badge variant="outline">Non rilevato</Badge>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent className="pt-4 flex-1 flex flex-col">
+                        <p className="text-sm text-muted-foreground mb-6">
+                            Motore locale per la protezione della privacy e sanitizzazione "Zero-Data".
+                        </p>
+                        <div className="mt-auto">
+                            <Button variant="outline" className="w-full" onClick={checkOllama} disabled={ollamaStatus === 'loading'}>
+                                {ollamaStatus === 'connected' ? 'Riconnetti' : 'Rileva Localmente'}
                             </Button>
                         </div>
                     </CardContent>

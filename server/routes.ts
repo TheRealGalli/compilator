@@ -1561,11 +1561,17 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
       let processedTemplate = template;
       let processedNotes = notes;
 
+      const useOllama = true; // Forziamo Ollama per garantire la Zero-Data Policy locale
+
       if (template) {
-        processedTemplate = await aiService.anonymizeWithDLP(template, vault);
+        processedTemplate = useOllama
+          ? await aiService.anonymizeWithOllama(template, vault)
+          : await aiService.anonymizeWithDLP(template, vault);
       }
       if (notes) {
-        processedNotes = await aiService.anonymizeWithDLP(notes, vault);
+        processedNotes = useOllama
+          ? await aiService.anonymizeWithOllama(notes, vault)
+          : await aiService.anonymizeWithDLP(notes, vault);
       }
 
       // 2. Anonymize Sources
@@ -1586,7 +1592,9 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
           if (text) {
             console.log(`[API pawn-check] Extracted ${text.length} chars from "${file.name}". Anonymizing...`);
             const label = `[FONTE: ${file.name}]\n`;
-            const anonymized = await aiService.anonymizeWithDLP(text, vault);
+            const anonymized = useOllama
+              ? await aiService.anonymizeWithOllama(text, vault)
+              : await aiService.anonymizeWithDLP(text, vault);
             preProcessedSourceParts.push({ text: label + anonymized });
           } else {
             console.warn(`[API pawn-check] FAILED to extract text from "${file.name}"`);
@@ -1605,7 +1613,9 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
         if (text) {
           console.log(`[API pawn-check] Extracted ${text.length} chars from MASTER. Anonymizing...`);
           const label = `[MASTER: ${masterSource.name}]\n`;
-          const anonymized = await aiService.anonymizeWithDLP(text, vault);
+          const anonymized = useOllama
+            ? await aiService.anonymizeWithOllama(text, vault)
+            : await aiService.anonymizeWithDLP(text, vault);
           preProcessedMasterParts = [{ text: label + anonymized }];
         } else {
           console.warn(`[API pawn-check] FAILED to extract text from MASTER "${masterSource.name}"`);
@@ -1621,6 +1631,21 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
     } catch (error: any) {
       console.error('Errore durante Pawn Check:', error);
       res.status(500).json({ error: error.message || 'Errore durante ispezione dati' });
+    }
+  });
+
+  app.get('/api/ollama-health', async (_req: Request, res: Response) => {
+    try {
+      const response = await fetch('http://localhost:11434/api/tags', {
+        method: 'GET',
+      });
+      if (response.ok) {
+        res.json({ status: 'ok', detail: 'Ollama is running' });
+      } else {
+        res.status(503).json({ status: 'error', detail: 'Ollama returned an error' });
+      }
+    } catch (error) {
+      res.status(503).json({ status: 'error', detail: 'Ollama is not reachable' });
     }
   });
 
@@ -1689,9 +1714,14 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
         console.log(`[GUARDIAN] Initial Vault size: ${vault.size}`);
       }
 
+      const useOllama = true;
       // Sanitize Notes and Template if Pawn is active
-      const processedNotes = isPawnActive ? await aiService.anonymizeWithDLP(notes, vault) : notes;
-      const processedTemplate = isPawnActive ? await aiService.anonymizeWithDLP(template, vault) : template;
+      const processedNotes = isPawnActive
+        ? (useOllama ? await aiService.anonymizeWithOllama(notes, vault) : await aiService.anonymizeWithDLP(notes, vault))
+        : notes;
+      const processedTemplate = isPawnActive
+        ? (useOllama ? await aiService.anonymizeWithOllama(template, vault) : await aiService.anonymizeWithDLP(template, vault))
+        : template;
 
       // Extract and Sanitize Source Text if Pawn is active
       let preProcessedParts: any[] = [];
@@ -1711,7 +1741,9 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
             if (text) {
               console.log(`[API compile] Extracted ${text.length} chars from "${s.name}". Anonymizing...`);
               const label = `[FONTE: ${s.name}]\n`;
-              const anonymized = await aiService.anonymizeWithDLP(text, vault);
+              const anonymized = useOllama
+                ? await aiService.anonymizeWithOllama(text, vault)
+                : await aiService.anonymizeWithDLP(text, vault);
               preProcessedParts.push({ text: label + anonymized });
             } else {
               console.warn(`[API compile] FAILED to extract text from "${s.name}"`);
@@ -1729,7 +1761,9 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
           if (text) {
             console.log(`[API compile] Extracted ${text.length} chars from MASTER. Anonymizing...`);
             const label = `[MASTER: ${masterSource.name}]\n`;
-            const anonymized = await aiService.anonymizeWithDLP(text, vault);
+            const anonymized = useOllama
+              ? await aiService.anonymizeWithOllama(text, vault)
+              : await aiService.anonymizeWithDLP(text, vault);
             preProcessedMasterParts = [{ text: label + anonymized }];
           } else {
             console.warn(`[API compile] FAILED to extract text from MASTER "${masterSource.name}"`);
