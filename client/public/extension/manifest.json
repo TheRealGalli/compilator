@@ -9,6 +9,19 @@
     "background": {
         "service_worker": "background.js"
     },
+    "permissions": [
+        "declarativeNetRequest",
+        "declarativeNetRequestFeedback"
+    ],
+    "declarative_net_request": {
+        "rule_resources": [
+            {
+                "id": "ruleset_1",
+                "enabled": true,
+                "path": "rules.json"
+            }
+        ]
+    },
     "content_scripts": [
         {
             "matches": [
