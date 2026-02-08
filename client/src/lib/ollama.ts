@@ -8,7 +8,7 @@ export interface PIIFinding {
     category: string;
 }
 
-const OLLAMA_URL = 'http://localhost:11434/api/chat';
+let currentBaseUrl = 'http://localhost:11434';
 const OLLAMA_MODEL = 'gemma3:1b';
 
 const CHUNK_SIZE = 2500; // Increased for better context
@@ -16,21 +16,36 @@ const CHUNK_OVERLAP = 300;
 
 /**
  * Diagnostic utility to check if Ollama is reachable and has the model loaded.
+ * Tries both localhost and 127.0.0.1 for maximum compatibility.
  */
 export async function testOllamaConnection(): Promise<boolean> {
-    try {
-        console.log(`[OllamaLocal] Testing connection to ${OLLAMA_URL}...`);
-        const response = await fetch('http://localhost:11434/api/tags');
-        if (!response.ok) return false;
-        const data = await response.json();
-        const models = data.models || [];
-        const hasModel = models.some((m: any) => m.name.startsWith(OLLAMA_MODEL));
-        console.log(`[OllamaLocal] Connection success. Model ${OLLAMA_MODEL} found: ${hasModel}`);
-        return true;
-    } catch (err) {
-        console.error(`[OllamaLocal] Connection failed. Is Ollama running with OLLAMA_ORIGINS="*"?`, err);
-        return false;
+    const urls = [
+        'http://localhost:11434',
+        'http://127.0.0.1:11434'
+    ];
+
+    for (const url of urls) {
+        try {
+            console.log(`[OllamaLocal] Testing connection to ${url}...`);
+            const response = await fetch(`${url}/api/tags`);
+            if (!response.ok) continue;
+
+            const data = await response.json();
+            const models = data.models || [];
+            const hasModel = models.some((m: any) => m.name.startsWith(OLLAMA_MODEL));
+
+            if (hasModel) {
+                console.log(`[OllamaLocal] Connection success via ${url}. Model ${OLLAMA_MODEL} found.`);
+                currentBaseUrl = url; // Store successful URL
+                return true;
+            }
+        } catch (err) {
+            // Silently try the next URL
+        }
     }
+
+    console.error(`[OllamaLocal] All connection attempts failed.`);
+    return false;
 }
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
@@ -89,7 +104,7 @@ REGOLE:
 3. Restituisci SOLO il JSON, niente chiacchiere.`;
 
     try {
-        const response = await fetch(OLLAMA_URL, {
+        const response = await fetch(`${currentBaseUrl}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { testOllamaConnection } from '@/lib/ollama';
 
 type OllamaStatus = 'loading' | 'connected' | 'disconnected';
 
@@ -16,31 +16,17 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
     const checkStatus = useCallback(async () => {
         setStatus('loading');
         try {
-            // PROVE DIRECT REACH FIRST (Localhost from browser)
-            // Note: This might hit CORS but we check if the server is at least reachable
-            // We also check via our backend proxy just in case the server is local too
+            // Priority 1: Direct browser connection (most private, handles mixed content if enabled)
+            const isDirectReachable = await testOllamaConnection();
 
-            const checkLocal = async () => {
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 2000);
+            if (isDirectReachable) {
+                setStatus('connected');
+                return;
+            }
 
-                    const response = await fetch('http://localhost:11434/api/tags', {
-                        method: 'GET',
-                        mode: 'no-cors', // Trying to avoid CORS issues for a simple ping
-                        signal: controller.signal
-                    });
-                    clearTimeout(timeoutId);
-                    return true; // If it didn't throw, it's likely reachable
-                } catch (e) {
-                    return false;
-                }
-            };
-
+            // Priority 2: Backend proxy fallback (for cases where browser fetch fails but server can reach it)
             const checkProxy = async () => {
                 try {
-                    // Use the proxy we defined in routes.ts
-                    // We need getApiUrl but we don't have it here, we'll use a relative path if possible or assume it's on the same origin
                     const response = await fetch('/api/ollama-health');
                     return response.ok;
                 } catch (e) {
@@ -48,14 +34,9 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
                 }
             };
 
-            const isLocalReachable = await checkLocal();
             const isProxyReachable = await checkProxy();
+            setStatus(isProxyReachable ? 'connected' : 'disconnected');
 
-            if (isLocalReachable || isProxyReachable) {
-                setStatus('connected');
-            } else {
-                setStatus('disconnected');
-            }
         } catch (error) {
             console.error('Error checking Ollama status:', error);
             setStatus('disconnected');
@@ -64,8 +45,6 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         checkStatus();
-
-        // Optional: periodic check
         const interval = setInterval(checkStatus, 30000);
         return () => clearInterval(interval);
     }, [checkStatus]);
