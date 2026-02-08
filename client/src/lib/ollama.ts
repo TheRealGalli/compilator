@@ -1,6 +1,6 @@
 /**
  * Ollama Client Utility (Local-First)
- * Used to call localhost:11434 directly from the browser for Zero-Data privacy.
+ * Utilizzato per chiamare direttamente localhost:11434 dal browser per Zero-Data privacy.
  */
 
 export interface PIIFinding {
@@ -11,12 +11,12 @@ export interface PIIFinding {
 let currentBaseUrl = 'http://localhost:11434';
 const OLLAMA_MODEL = 'gemma3:1b';
 
-const CHUNK_SIZE = 2500; // Increased for better context
+const CHUNK_SIZE = 2500;
 const CHUNK_OVERLAP = 300;
 
 /**
- * Diagnostic utility to check if Ollama is reachable and has the model loaded.
- * Tries both localhost and 127.0.0.1 for maximum compatibility.
+ * Utility di diagnostica per verificare se Ollama è raggiungibile e ha il modello caricato.
+ * Prova sia localhost che 127.0.0.1 per massima compatibilità.
  */
 export async function testOllamaConnection(): Promise<boolean> {
     const urls = [
@@ -24,52 +24,75 @@ export async function testOllamaConnection(): Promise<boolean> {
         'http://127.0.0.1:11434'
     ];
 
+    let lastError: any = null;
+    let anySuccess = false;
+
     for (const url of urls) {
         try {
-            console.log(`[OllamaLocal] Testing connection to ${url}/api/tags...`);
-            const response = await fetch(`${url}/api/tags`);
-            if (!response.ok) continue;
+            console.log(`[OllamaLocal] Prova connessione a ${url}/api/tags...`);
+
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), 2000);
+
+            const response = await fetch(`${url}/api/tags`, { signal: controller.signal });
+            clearTimeout(id);
+
+            if (!response.ok) {
+                console.warn(`[OllamaLocal] ${url} risponde, ma con errore ${response.status}`);
+                continue;
+            }
 
             const data = await response.json();
-            const models = (data.models || []).map((m: any) => m.name);
+            const models = (data.models || []).map((m: any) => m.name.toLowerCase());
+            anySuccess = true;
 
-            // Precise check for gemma3:1b
+            // Controllo per gemma3:1b con varianti di tag o latest
             const hasModel = models.some((name: string) =>
                 name === OLLAMA_MODEL ||
                 name.startsWith(`${OLLAMA_MODEL}:`) ||
-                name === 'gemma3:latest' // Fallback if they pulled without tag
+                name === 'gemma3:latest' ||
+                (name.includes('gemma3') && name.includes('1b'))
             );
 
             if (hasModel) {
-                console.log(`[OllamaLocal] Connection SUCCESS via ${url}. Model ${OLLAMA_MODEL} found.`);
-                currentBaseUrl = url; // Store successful URL
+                console.log(`[OllamaLocal] PRONTO! Modello ${OLLAMA_MODEL} trovato su ${url}.`);
+                currentBaseUrl = url;
                 return true;
             } else {
-                console.warn(`[OllamaLocal] Ollama reachable at ${url} but model '${OLLAMA_MODEL}' not found.`);
-                if (models.length > 0) {
-                    console.log(`[OllamaLocal] Models found instead:`, models);
-                }
-                console.info(`[OllamaLocal] HINT: Run 'ollama pull ${OLLAMA_MODEL}' in your terminal.`);
+                console.warn(`[OllamaLocal] Ollama attivo su ${url}, ma il modello '${OLLAMA_MODEL}' non è stato trovato.`);
+                console.log(`[OllamaLocal] Modelli installati:`, models);
+                console.info(`[OllamaLocal] SOLUZIONE: Esegui 'ollama pull ${OLLAMA_MODEL}' nel terminale.`);
             }
         } catch (err) {
-            // Silently try the next URL
+            lastError = err;
         }
     }
 
-    console.error(`[OllamaLocal] All connection attempts failed. Ensure Ollama is running and OLLAMA_ORIGINS="*" is set.`);
+    if (!anySuccess && lastError) {
+        if (lastError.name === 'AbortError') {
+            console.error('[OllamaLocal] Timeout connessione. Ollama è aperto?');
+        } else if (lastError instanceof TypeError && lastError.message.includes('fetch')) {
+            console.error('[OllamaLocal] BLOCCO DEL BROWSER RILEVATO (Mixed Content o CORS).');
+            console.error('[OllamaLocal] 1. Clicca sul LUCCHETTO nella barra degli indirizzi di Chrome.');
+            console.error('[OllamaLocal] 2. Vai in "Impostazioni Sito".');
+            console.error('[OllamaLocal] 3. Trova "Contenuti non sicuri" e impostalo su "CONSENTI".');
+            console.error('[OllamaLocal] 4. Assicurati di aver impostato OLLAMA_ORIGINS="*" se Ollama è su un PC diverso.');
+        } else {
+            console.error('[OllamaLocal] Errore di connessione:', lastError);
+        }
+    }
+
     return false;
 }
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
-    // If text is short, process directly
     if (text.length <= CHUNK_SIZE) {
         return _extractSingleChunk(text);
     }
 
-    // Handle long documents via chunking
-    console.log(`[OllamaLocal] Long document detected (${text.length} chars). Using chunking...`);
+    console.log(`[OllamaLocal] Documento lungo (${text.length} caratteri). Uso lo splitting...`);
     const allFindings: PIIFinding[] = [];
     const processedValues = new Set<string>();
 
@@ -85,10 +108,8 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
                 }
             }
         } catch (err) {
-            console.warn(`[OllamaLocal] Chunk processing failed at offset ${i}, skipping...`);
+            console.warn(`[OllamaLocal] Errore durante il chunking a offset ${i}, salto...`);
         }
-
-        // Safety break
         if (i + CHUNK_SIZE >= text.length) break;
     }
 
@@ -96,7 +117,7 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
 }
 
 async function _extractSingleChunk(text: string): Promise<PIIFinding[]> {
-    console.log(`[OllamaLocal] Extracting PII from chunk (${text.length} chars)...`);
+    console.log(`[OllamaLocal] Estrazione PII dal chunk (${text.length} caratteri)...`);
 
     const systemPrompt = `Sei un esperto di data privacy e protezione dati (DLP).
 Identifica TUTTI i dati sensibili (PII) nel testo fornito.
@@ -106,14 +127,9 @@ ESEMPIO 1:
 TESTO: Mi chiamo Carlo Galli e lavoro per CSD Station. Mail: carlo@galli.it
 JSON: {"findings": [{"value": "Carlo Galli", "category": "NOME_PERSONA"}, {"value": "CSD Station", "category": "ORGANIZZAZIONE"}, {"value": "carlo@galli.it", "category": "EMAIL"}]}
 
-ESEMPIO 2:
-TESTO: L'ufficio è in Via Roma 10, Milano. Tel: 02 1234567. P.IVA 12345678901.
-JSON: {"findings": [{"value": "Via Roma 10, Milano", "category": "INDIRIZZO"}, {"value": "02 1234567", "category": "TELEFONO"}, {"value": "12345678901", "category": "PARTITA_IVA"}]}
-
 REGOLE:
-1. Sostituisci i placeholder [DATO] con i valori reali estratti.
-2. Se non trovi nulla, restituisci {"findings": []}.
-3. Restituisci SOLO il JSON, niente chiacchiere.`;
+1. Restituisci SOLO il JSON, niente chiacchiere.
+2. Se non trovi nulla, restituisci {"findings": []}.`;
 
     try {
         const response = await fetch(`${currentBaseUrl}/api/chat`, {
@@ -134,60 +150,34 @@ REGOLE:
         });
 
         if (!response.ok) {
-            throw new Error(`Ollama unreachable (Status: ${response.status})`);
+            throw new Error(`Ollama non raggiungibile (Status: ${response.status})`);
         }
 
         const data = await response.json();
         let rawResponse = data.message?.content || "";
 
-        if (!rawResponse || rawResponse.trim() === "") {
-            console.warn("[OllamaLocal] Empty response from model.");
-            return [];
-        }
-
-        console.log(`[OllamaLocal] Raw model response:`, rawResponse);
-
-        // Try to find JSON block if it's there
-        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-        const jsonToParse = jsonMatch ? jsonMatch[0] : rawResponse;
-
         try {
+            const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+            const jsonToParse = jsonMatch ? jsonMatch[0] : rawResponse;
             const parsed = JSON.parse(jsonToParse);
-            const findings = parsed.findings || [];
-            console.log(`[OllamaLocal] Found ${findings.length} findings via JSON parse.`);
-            return findings;
+            return parsed.findings || [];
         } catch (e) {
-            console.warn("[OllamaLocal] JSON parse failed, falling back to fuzzy regex.");
-            // Fuzzy regex fallback: Extract ANYTHING that looks like a value/category pair
+            console.warn("[OllamaLocal] Parse JSON fallito, provo fallback regex.");
             const findings: PIIFinding[] = [];
-
-            // Look for "value": "..." and "category": "..." even if not in the same object
             const valReg = /"value":\s*"([^"]+)"/g;
             const catReg = /"category":\s*"([^"]+)"/g;
-
             const values = [];
             const categories = [];
-
-            let vMatch;
+            let vMatch, cMatch;
             while ((vMatch = valReg.exec(rawResponse)) !== null) values.push(vMatch[1]);
-
-            let cMatch;
             while ((cMatch = catReg.exec(rawResponse)) !== null) categories.push(cMatch[1]);
-
-            // Re-pair values and categories
             for (let i = 0; i < Math.min(values.length, categories.length); i++) {
                 findings.push({ value: values[i], category: categories[i] });
             }
-
-            console.log(`[OllamaLocal] Found ${findings.length} findings via Fuzzy Regex.`);
             return findings;
         }
     } catch (error) {
-        console.error('[OllamaLocal] Extraction Error:', error);
-        // Special check for connection errors (likely CORS or Ollama not running)
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-            console.error('[OllamaLocal] Potential CORS or connection issue! Ensure OLLAMA_ORIGINS="*" is set if running outside localhost.');
-        }
+        console.error('[OllamaLocal] Errore estrazione:', error);
         throw error;
     }
 }

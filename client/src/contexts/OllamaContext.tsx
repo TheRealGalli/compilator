@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { testOllamaConnection } from '@/lib/ollama';
-import { getApiUrl } from '@/lib/api-config';
 
 type OllamaStatus = 'loading' | 'connected' | 'disconnected';
 
@@ -17,40 +16,30 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
     const checkStatus = useCallback(async () => {
         setStatus('loading');
         try {
-            console.log('[OllamaContext] Checking status...');
-            // Priority 1: Direct browser connection (most private, handles mixed content if enabled)
+            console.log('[OllamaContext] Avvio verifica connessione locale...');
+
+            // Usiamo solo la connessione diretta del browser (Zero-Data Privacy e Performance)
+            // Il proxy lato server viene rimosso perché non può vedere il localhost dell'utente
             const isDirectReachable = await testOllamaConnection();
 
             if (isDirectReachable) {
-                console.log('[OllamaContext] Direct connection reachable.');
+                console.log('[OllamaContext] Connessione locale riuscita.');
                 setStatus('connected');
                 return;
             }
 
-            console.log('[OllamaContext] Direct connection failed, trying proxy fallback...');
-            // Priority 2: Backend proxy fallback (for cases where browser fetch fails but server can reach it)
-            const checkProxy = async () => {
-                try {
-                    const url = getApiUrl('/api/ollama-health');
-                    const response = await fetch(url);
-                    return response.ok;
-                } catch (e) {
-                    return false;
-                }
-            };
-
-            const isProxyReachable = await checkProxy();
-            console.log('[OllamaContext] Proxy reachable:', isProxyReachable);
-            setStatus(isProxyReachable ? 'connected' : 'disconnected');
+            console.log('[OllamaContext] Connessione locale fallita. Controlla la console per istruzioni su come sbloccare il browser.');
+            setStatus('disconnected');
 
         } catch (error) {
-            console.error('[OllamaContext] Error checking Ollama status:', error);
+            console.error('[OllamaContext] Errore critico durante la verifica:', error);
             setStatus('disconnected');
         }
     }, []);
 
     useEffect(() => {
         checkStatus();
+        // Controllo ogni 30 secondi
         const interval = setInterval(checkStatus, 30000);
         return () => clearInterval(interval);
     }, [checkStatus]);
