@@ -1,3 +1,6 @@
+// Segnala la presenza dell'estensione alla pagina web
+document.documentElement.setAttribute('data-gromit-bridge-active', 'true');
+
 // In ascolto di eventi dalla pagina web
 window.addEventListener('GROMIT_BRIDGE_REQUEST', (event) => {
     const { detail, requestId } = event.detail;
@@ -11,4 +14,4 @@ window.addEventListener('GROMIT_BRIDGE_REQUEST', (event) => {
     });
 });
 
-console.log('[GromitBridge] Content Script attivo.');
+console.log('[GromitBridge] Content Script attivo e pronto.');

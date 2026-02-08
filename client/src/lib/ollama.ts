@@ -15,8 +15,14 @@ const CHUNK_SIZE = 2500;
 const CHUNK_OVERLAP = 300;
 
 /**
- * Helper per eseguire fetch tramite l'estensione "Gromit Bridge" se installata.
- * Questo supera CORS e Mixed Content senza configurazioni di sistema.
+ * Rileva se l'estensione "Gromit Bridge" è caricata tramite un flag nel DOM.
+ */
+function isBridgeAvailable(): boolean {
+    return document.documentElement.getAttribute('data-gromit-bridge-active') === 'true';
+}
+
+/**
+ * Helper per eseguire fetch tramite l'estensione "Gromit Bridge".
  */
 async function fetchViaBridge(url: string, options: any): Promise<any> {
     return new Promise((resolve) => {
@@ -42,21 +48,26 @@ async function fetchViaBridge(url: string, options: any): Promise<any> {
 }
 
 /**
- * Esegue una fetch intelligente che prova prima l'estensione, poi la fetch diretta.
+ * Esegue una fetch intelligente:
+ * 1. Se l'estensione è presente, usa SOLO quella (evita CORS errors).
+ * 2. Se non c'è, prova fetch diretta (funzionerà solo se OLLAMA_ORIGINS è settato).
  */
 async function smartFetch(url: string, options: any = {}): Promise<any> {
-    // Prova prima tramite l'estensione (il bridge è più potente)
-    const bridgeResult = await fetchViaBridge(url, options);
-    if (bridgeResult && bridgeResult.success) {
-        console.log('[OllamaLocal] Richiesta completata tramite Gromit Bridge.');
-        return {
-            ok: bridgeResult.ok,
-            status: bridgeResult.status,
-            json: async () => bridgeResult.data
-        };
+    if (isBridgeAvailable()) {
+        const bridgeResult = await fetchViaBridge(url, options);
+        if (bridgeResult && bridgeResult.success) {
+            return {
+                ok: bridgeResult.ok,
+                status: bridgeResult.status,
+                json: async () => bridgeResult.data
+            };
+        }
+        // Se il bridge è presente ma fallisce (es. Ollama spento), non ripieghiamo su fetch diretta
+        // per evitare di sporcare i log con errori CORS inutili.
+        return { ok: false, status: 503, json: async () => ({ error: 'Ollama unreachable via bridge' }) };
     }
 
-    // Se l'estensione non c'è, procedi con fetch classica (soggetta a CORS/Mixed Content)
+    // Solo se l'estensione manca, proviamo la fetch standard
     return fetch(url, options);
 }
 
@@ -87,7 +98,7 @@ export async function testOllamaConnection(): Promise<boolean> {
             const models = (data.models || []).map((m: any) => m.name.toLowerCase());
             anySuccess = true;
 
-            // Controllo per gemma3:1b con varianti di tag o latest
+            // Controllo per gemma3:1b
             const hasModel = models.some((name: string) =>
                 name === OLLAMA_MODEL ||
                 name.startsWith(`${OLLAMA_MODEL}:`) ||
@@ -100,25 +111,12 @@ export async function testOllamaConnection(): Promise<boolean> {
                 currentBaseUrl = url;
                 return true;
             } else {
-                console.warn(`[OllamaLocal] Ollama attivo su ${url}, ma il modello '${OLLAMA_MODEL}' non è stato trovato.`);
-                console.log(`[OllamaLocal] Modelli installati:`, models);
-                console.info(`[OllamaLocal] SOLUZIONE: Esegui 'ollama pull ${OLLAMA_MODEL}' nel terminale.`);
+                console.warn(`[OllamaLocal] Ollama attivo su ${url}, ma il modello '${OLLAMA_MODEL}' non trovato.`);
+                console.info(`[OllamaLocal] SOLUZIONE: Esegui 'ollama pull ${OLLAMA_MODEL}'`);
             }
         } catch (err) {
             lastError = err;
         }
-    }
-
-    if (!anySuccess && lastError) {
-        console.error('[OllamaLocal] BLOCCO RILEVATO. Soluzioni:');
-        console.group('Opzione A: Gromit Bridge (Consigliata)');
-        console.info('Scarica e installa l\'estensione "Gromit Bridge" dalla cartella del progetto per saltare ogni configurazione.');
-        console.groupEnd();
-
-        console.group('Opzione B: Configurazione Manuale (Mac)');
-        console.info('1. launchctl setenv OLLAMA_ORIGINS "https://therealgalli.github.io"');
-        console.info('2. Riavvia Ollama.');
-        console.groupEnd();
     }
 
     return false;
