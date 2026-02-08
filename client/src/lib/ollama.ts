@@ -11,7 +11,7 @@ export interface PIIFinding {
 let currentBaseUrl = 'http://localhost:11434';
 const OLLAMA_MODEL = 'gemma3:1b';
 
-const CHUNK_SIZE = 8000; // Large context to distinguish labels from values
+const CHUNK_SIZE = 8000; // Large context for full-document mapping
 const CHUNK_OVERLAP = 1000;
 
 /**
@@ -224,25 +224,37 @@ async function _extractSingleChunk(text: string, knownValues: string[]): Promise
     console.log(`[OllamaLocal] Estrazione PII dal chunk (${text.length} caratteri)...`);
 
     const knownContext = knownValues.length > 0
-        ? `\n\nALREADY KNOWN DATA (DO NOT LIST THESE AGAIN):\n- ${knownValues.join('\n- ')}`
+        ? `\n\nALREADY IDENTIFIED DATA (DO NOT LIST THESE AGAIN):\n- ${knownValues.join('\n- ')}`
         : "";
 
-    const systemPrompt = `DLP Expert. Extract REAL personal data, names, and field values from <INPUT_DATA>.
-Rules:
-- Capture ONLY actual filled-in data (usernames, real people names, physical addresses, real phone numbers).
-- DO NOT EXTRACT form instructions, labels with no values, page numbers, or general legal text.
-- DO NOT GENERATE SYNTHETIC DATA. If no REAL data is found, output NOTHING.
-- CATEGORIES: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.
+    const systemPrompt = `MISSION: High-Precision PII Extraction.
+You are a Cyber-Security Expert specialized in Identity Discovery. Your task is to extract REAL personal and sensitive data from the <INPUT_DATA> provided.
 
-POSITIVE EXAMPLE:
-Input: "Name: Mario Rossi, Address: Via Roma 1" -> Output: [NOME_PERSONA] Mario Rossi
-[INDIRIZZO] Via Roma 1
+CORE DIRECTIVE:
+Identify only ACTUAL values that belong to a specific person or entity. 
+IGNORE all form instructions, boilerplate rules, general legal text, and non-personal field labels.
 
-NEGATIVE EXAMPLE (IGNORE THESE):
-Input: "Part IV must be completed", "Applicant fax number", "Base Erosion Payments" -> Output: (NOTHING)
+GROUNDING RULES:
+1. ONLY EXTRACT REAL DATA. If no personal info exists, output ABSOLUTELY NOTHING.
+2. NO HALLUCinations. Never invent names, phone numbers, or any example data.
+3. IGNORE instructions like "Part IV must be completed" or "Applicant fax number".
+4. CAPTURE actual filled-in values (e.g., "Mario Rossi", "IT12...").
+5. CATEGORIES: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.
 
-- Output format: One finding per line as [CATEGORY] Value.
-- NO JSON. NO prose. NO repetitions.${knownContext}`;
+ONE-SHOT POSITIVE EXAMPLE:
+Input: "...Taxpayer: John Doe, EIN: 12-345678, Address: 123 Main St, New York..."
+Output:
+[NOME_PERSONA] John Doe
+[CODICE_FISCALE] 12-345678
+[INDIRIZZO] 123 Main St, New York
+
+ONE-SHOT NEGATIVE EXAMPLE:
+Input: "...Part VIII - List of all foreign related parties. Cat. No. 16055N. Form SS-4 must be signed by applicant. Military/National Guard..."
+Output: (NOTHING)
+
+FINAL FORMATTING:
+Output exactly one finding per line in the format: [CATEGORY] Value
+No JSON. No prose. No explanations.${knownContext}`;
 
     try {
         const payload = {
@@ -255,7 +267,7 @@ Input: "Part IV must be completed", "Applicant fax number", "Base Erosion Paymen
             options: {
                 temperature: 0.1,
                 num_ctx: 16384, // Ensure enough context for 8k input
-                num_predict: 1024,
+                num_predict: 2048,
             }
         };
 
@@ -268,26 +280,16 @@ Input: "Part IV must be completed", "Applicant fax number", "Base Erosion Paymen
         const findings: PIIFinding[] = [];
         const lines = rawResponse.split('\n');
 
-        // Post-processing Noise Filter
-        const BOILERPLATE_KEYWORDS = [
-            'must be completed', 'attach a statement', 'tax year', 'reporting corporation',
-            'customs value', 'check here', 'if yes', 'if no', 'part iv', 'section',
-            'qualified derivative', 'base erosion', 'anticipated benefits', 'application for',
-            'information not', 'not specified', 'placeholder', 'synthetic'
-        ];
-
         for (const line of lines) {
             const match = line.trim().match(/^\[([A-Z_]+)\]\s*(.*)$/i);
             if (match) {
                 const category = match[1].toUpperCase();
                 const value = match[2].trim();
 
-                // Advanced Anti-Noise Filter
-                const isBoilerplate = BOILERPLATE_KEYWORDS.some(k => value.toLowerCase().includes(k));
-                const isTooLongToByPII = value.length > 150; // Real names/addresses are rarely > 150 chars
-                const isSynthetic = /NOME_PERSONA_\d+|ORGANIZZAZIONE_\d+/i.test(value);
+                // Final safety check against obvious synthetic placeholders
+                const isPlaceholder = /\[.*\]|example|not specified|information not|synthetic|NOME_PERSONA_\d+/i.test(value);
 
-                if (value && value.length > 2 && !isBoilerplate && !isTooLongToByPII && !isSynthetic) {
+                if (value && value.length > 2 && !isPlaceholder) {
                     findings.push({ value, category });
                 }
             }
