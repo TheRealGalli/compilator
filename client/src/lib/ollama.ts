@@ -176,35 +176,79 @@ async function getBridgeVersion(retries = 2): Promise<string> {
     return "0.0.0";
 }
 
-// Prompt unificato per massima precisione
-const SHARED_MISSION_PROMPT = `MISSION: High-Precision PII Extraction.
-You are a Cyber-Security Expert specialized in Identity Discovery. Your task is to extract REAL personal and sensitive data from the <INPUT_DATA> provided.
+// Prompt unificato per massima precisione (Surgical Precision 5.0)
+const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.0)
 
-CORE DIRECTIVE:
-Identify only ACTUAL values that belong to a specific person or entity. 
-IGNORE all form instructions, boilerplate rules, general legal text, and non-personal field labels.
+OBJECTIVE: Extract ONLY legitimate, human-entered identity data.
+ZERO TOLERANCE for system boilerplate, legal labels, or generic placeholders.
 
-GROUNDING RULES:
-1. ONLY EXTRACT REAL DATA. If no personal info exists, output ABSOLUTELY NOTHING.
-2. NO HALLUCinations. Never invent names, phone numbers, or any example data.
-3. IGNORE instructions like "Part IV must be completed" or "Applicant fax number".
-4. CAPTURE actual filled-in values (e.g., "Mario Rossi", "IT12...").
-5. CATEGORIES: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.
+JUDGMENT RULES:
+1. VALUE VS LABEL: A value is NOT real if it's identical or derivative of the field label (e.g., "Taxpayer Name: Taxpayer Name").
+2. SEMANTIC FILTRATION: Discard all generic placeholders and system-generated text:
+   * Status: N/A, None, Not Applicable, Unknown, Pending, Not Provided, Da compilare, Inserire qui.
+   * Examples: Example, yourname@example.com, john.doe, Mario Rossi (as a generic placeholder), Esempio, Sig./Sig.ra.
+   * Links: URLs starting with .gov, .edu, .org, example.com, or similar generic domains (e.g., irs.gov, agenziaentrate.it).
+   * Instructions/Boilerplate: Any text that instructs the user to fill in information, refers to legal sections, or describes the field rather than providing data.
+3. IDENTITY VALIDATION:
+   * NOME_PERSONA: Must contain 2+ words (first name and last name), no generic terms like "Officer," "Taxpayer," "Azienda," "Company," or "Ditta."
+   * COGNOME_PERSONA: Must contain at least one word, no generic terms.
+   * DATA_DI_NASCITA: Must be a valid date format (e.g., DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD-MMM-YYYY).
+   * LUOGO_DI_NASCITA: Must be a recognizable city, town, or country name.
+   * CODICE_FISCALE: Must be a 16-character alphanumeric string (Italian pattern).
+   * PARTITA_IVA: Must be an 11-digit numeric string (Italian pattern).
+   * INDIRIZZO_COMPLETO: Must contain street name and number, city, and postal code.
+   * CAP: Must be a 5-digit numeric string for Italian postal codes.
+   * NUMERO_TELEFONO: Must contain at least 7 digits.
+   * EMAIL: Must contain "@" and a valid domain.
+   * IBAN: Valid structure for an IBAN (e.g., starting with "IT").
+   * ORGANIZZAZIONE: Ignore generic business type labels (e.g., "Limited Liability Company," "S.r.l."). Focus on actual business name.
 
-ONE-SHOT POSITIVE EXAMPLE:
-Input: "...Taxpayer: John Doe, EIN: 12-345678, Address: 123 Main St, New York..."
-Output:
-[NOME_PERSONA] John Doe
-[CODICE_FISCALE] 12-345678
-[INDIRIZZO] 123 Main St, New York
+PERSONAL DATA LABELS:
+[NOME_PERSONA], [COGNOME_PERSONA], [DATA_DI_NASCITA], [LUOGO_DI_NASCITA], [CODICE_FISCALE], [PARTITA_IVA], [INDIRIZZO_COMPLETO], [VIA], [CITTA], [PROVINCIA], [CAP], [NAZIONE], [NUMERO_TELEFONO], [EMAIL], [NUMERO_DOCUMENTO], [TIPO_DOCUMENTO], [DATA_EMISSIONE_DOCUMENTO], [DATA_SCADENZA_DOCUMENTO], [ENTE_EMITTENTE_DOCUMENTO], [SESSO], [NAZIONALITA], [PROFESSIONE], [IBAN], [ORGANIZZAZIONE], [RUOLO]
 
-ONE-SHOT NEGATIVE EXAMPLE:
-Input: "...Part VIII - List of all foreign related parties. Cat. No. 16055N. Form SS-4 must be signed by applicant. Military/National Guard..."
+RESPONSE FORMAT:
+One finding per line in format: [LABEL] Value
+No JSON. No prose.
+
+CONTRASTIVE LEARNING:
+
+[CASE A: Boilerplate Noise]
+Input: "...Taxpayer Identification Number (TIN). See instructions for Part I. Number: Unknown. Nome del Cliente: Inserire qui."
 Output: (NOTHING)
 
-FINAL FORMATTING:
-Output exactly one finding per line in the format: [CATEGORY] Value
-No JSON. No prose. No explanations.`;
+[CASE B: Example Data]
+Input: "...Enter your email here (e.g., mario.rossi@example.com). Nome Cognome: John Doe. Indirizzo: Via Roma 1 (solo per test)..."
+Output: (NOTHING)
+
+[CASE C: Real Data Discovery]
+Input: "...Dati Anagrafici: Nome: Marco, Cognome: Bianchi, Data di Nascita: 15/03/1985, Luogo di Nascita: Roma, Italia, CF: BNCMCR85C15H501V, Indirizzo: Via Garibaldi 12, 20121 Milano (MI), Azienda: Tech Solutions S.r.l., P.IVA: 09876543210..."
+Output:
+[NOME_PERSONA] Marco Bianchi
+[COGNOME_PERSONA] Bianchi
+[DATA_DI_NASCITA] 15/03/1985
+[LUOGO_DI_NASCITA] Roma
+[NAZIONE] Italia
+[CODICE_FISCALE] BNCMCR85C15H501V
+[INDIRIZZO_COMPLETO] Via Garibaldi 12, 20121 Milano (MI), Italia
+[VIA] Via Garibaldi 12
+[CITTA] Milano
+[PROVINCIA] MI
+[CAP] 20121
+[ORGANIZZAZIONE] Tech Solutions
+[PARTITA_IVA] 09876543210
+
+[CASE D: Mixed Data & Global Context]
+Input: "...Application for Mr. David Miller (1980-07-22), Place of Birth: London, UK, Address: 10 Downing Street, London SW1A 2AA, UK. Phone: +44 20 7946 0123."
+Output:
+[NOME_PERSONA] David Miller
+[DATA_DI_NASCITA] 1980-07-22
+[LUOGO_DI_NASCITA] London
+[NAZIONE] UK
+[INDIRIZZO_COMPLETO] 10 Downing Street, London SW1A 2AA, United Kingdom
+[VIA] 10 Downing Street
+[CITTA] London
+[CAP] SW1A 2AA
+[NUMERO_TELEFONO] +44 20 7946 0123`;
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
