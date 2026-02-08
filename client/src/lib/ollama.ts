@@ -182,6 +182,11 @@ const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgic
 OBJECTIVE: Extract ONLY legitimate, human-entered identity data.
 ZERO TOLERANCE for system boilerplate, legal labels, or generic placeholders.
 
+[CRITICAL RULE: SOURCE-ONLY EXTRACTION]
+Your ONLY source of truth is the text provided within the <INPUT_DATA> tags. 
+The samples provided in "CONTRASTIVE LEARNING" (below) are for logic training ONLY. 
+NEVER extract or reuse names (e.g., Marco Bianchi, David Miller), addresses, or any values from the training examples.
+
 JUDGMENT RULES:
 1. VALUE VS LABEL: A value is NOT real if it's identical or derivative of the field label (e.g., "Taxpayer Name: Taxpayer Name").
 2. SEMANTIC FILTRATION: Discard all generic placeholders and system-generated text:
@@ -190,7 +195,7 @@ JUDGMENT RULES:
    * Links: URLs starting with .gov, .edu, .org, example.com, or similar generic domains (e.g., irs.gov, agenziaentrate.it).
    * Instructions/Boilerplate: Any text that instructs the user to fill in information, refers to legal sections, or describes the field rather than providing data.
 3. IDENTITY VALIDATION:
-   * NOME_PERSONA: Must contain 2+ words (first name and last name), no generic terms like "Officer," "Taxpayer," "Azienda," "Company," or "Ditta."
+   * NOME_PERSONA: Must contain 2+ words (first name and last name es Carlo Galli), no generic terms like "Officer," "Taxpayer," "Azienda," "Company," or "Ditta."
    * COGNOME_PERSONA: Must contain at least one word, no generic terms.
    * DATA_DI_NASCITA: Must be a valid date format (e.g., DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD-MMM-YYYY).
    * LUOGO_DI_NASCITA: Must be a recognizable city, town, or country name.
