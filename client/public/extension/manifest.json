@@ -1,0 +1,27 @@
+{
+    "manifest_version": 3,
+    "name": "Gromit Bridge",
+    "version": "1.2",
+    "description": "Collega Gromit all'AI locale (Ollama) superando i blocchi di sicurezza del browser.",
+    "icons": {
+        "128": "icon.png"
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://therealgalli.github.io/*",
+                "http://localhost:*/*"
+            ],
+            "js": [
+                "content.js"
+            ]
+        }
+    ],
+    "host_permissions": [
+        "http://localhost:11434/*",
+        "http://127.0.0.1:11434/*"
+    ]
+}

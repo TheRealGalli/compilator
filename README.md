@@ -57,35 +57,19 @@ Il modulo dedicato alla **Privacy Zero-Data**.
 - **Gmail**: Analizza i messaggi recenti per estrarre contesto utile.
 
 ### 🦙 Local AI (Ollama)
-Per abilitare il **Compilatore Guardrail** stabilmente sul tuo Mac, segui questi passaggi per superare le barriere di sicurezza (CORS) del browser:
+Per abilitare il **Compilatore Guardrail** stabilmente senza combattere con i blocchi del browser (CORS/Mixed Content), abbiamo creato l'estensione **Gromit Bridge**.
 
-#### Configurazione Permanente (macOS)
-1. Apri il **Terminale** e incolla questo comando per creare l'automatismo di avvio:
-   ```bash
-   cat <<EOF > ~/Library/LaunchAgents/setenv.ollama.plist
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-   <plist version="1.0">
-   <dict>
-     <key>Label</key>
-     <string>setenv.ollama</string>
-     <key>ProgramArguments</key>
-     <array>
-       <string>/bin/launchctl</string>
-       <string>setenv</string>
-       <string>OLLAMA_ORIGINS</string>
-       <string>https://therealgalli.github.io,http://localhost*,http://127.0.0.1*</string>
-     </array>
-     <key>RunAtLoad</key>
-     <true/>
-   </dict>
-   </plist>
-   EOF
-   ```
-2. Attiva l'automatismo:
-   ```bash
-   launchctl load ~/Library/LaunchAgents/setenv.ollama.plist
-   ```
+#### 🚀 Soluzione Consigliata: Gromit Bridge (Zero-Config)
+1. Scarica la cartella `client/public/extension` dal repository (o usa quella locale).
+2. Apri Chrome e vai su `chrome://extensions/`.
+3. Attiva la **Modalità sviluppatore** (Developer mode) in alto a destra.
+4. Clicca su **Carica estensione non impacchettata** (Load unpacked).
+5. Seleziona la cartella `extension` del progetto.
+6. Fatto! Gromit ora comunicherà con Ollama senza bisogno di altri comandi.
+
+#### 🛠️ Soluzione Alternativa: Configurazione Manuale (macOS)
+Se preferisci non installare l'estensione, devi autorizzare manualmente il dominio:
+... (seguono istruzioni launchctl esistenti)
 3. Assicurati di aver installato il modello specifico:
    ```bash
    ollama pull gemma3:1b

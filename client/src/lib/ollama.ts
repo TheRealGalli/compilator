@@ -15,8 +15,53 @@ const CHUNK_SIZE = 2500;
 const CHUNK_OVERLAP = 300;
 
 /**
+ * Helper per eseguire fetch tramite l'estensione "Gromit Bridge" se installata.
+ * Questo supera CORS e Mixed Content senza configurazioni di sistema.
+ */
+async function fetchViaBridge(url: string, options: any): Promise<any> {
+    return new Promise((resolve) => {
+        const requestId = Math.random().toString(36).substring(7);
+        const timeout = setTimeout(() => {
+            window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+            resolve({ success: false, error: 'TIMEOUT' });
+        }, 5000);
+
+        const handler = (event: any) => {
+            if (event.detail.requestId === requestId) {
+                clearTimeout(timeout);
+                window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+                resolve(event.detail.response);
+            }
+        };
+
+        window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+        window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
+            detail: { detail: { type: 'OLLAMA_FETCH', url, options }, requestId }
+        }));
+    });
+}
+
+/**
+ * Esegue una fetch intelligente che prova prima l'estensione, poi la fetch diretta.
+ */
+async function smartFetch(url: string, options: any = {}): Promise<any> {
+    // Prova prima tramite l'estensione (il bridge è più potente)
+    const bridgeResult = await fetchViaBridge(url, options);
+    if (bridgeResult && bridgeResult.success) {
+        console.log('[OllamaLocal] Richiesta completata tramite Gromit Bridge.');
+        return {
+            ok: bridgeResult.ok,
+            status: bridgeResult.status,
+            json: async () => bridgeResult.data
+        };
+    }
+
+    // Se l'estensione non c'è, procedi con fetch classica (soggetta a CORS/Mixed Content)
+    return fetch(url, options);
+}
+
+/**
  * Utility di diagnostica per verificare se Ollama è raggiungibile e ha il modello caricato.
- * Prova sia localhost che 127.0.0.1 per massima compatibilità.
  */
 export async function testOllamaConnection(): Promise<boolean> {
     const urls = [
@@ -31,11 +76,7 @@ export async function testOllamaConnection(): Promise<boolean> {
         try {
             console.log(`[OllamaLocal] Prova connessione a ${url}/api/tags...`);
 
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), 2000);
-
-            const response = await fetch(`${url}/api/tags`, { signal: controller.signal });
-            clearTimeout(id);
+            const response = await smartFetch(`${url}/api/tags`, { method: 'GET' });
 
             if (!response.ok) {
                 console.warn(`[OllamaLocal] ${url} risponde, ma con errore ${response.status}`);
@@ -69,20 +110,15 @@ export async function testOllamaConnection(): Promise<boolean> {
     }
 
     if (!anySuccess && lastError) {
-        if (lastError.name === 'AbortError') {
-            console.error('[OllamaLocal] Timeout connessione. Ollama è caricato e aperto?');
-        } else if (lastError instanceof TypeError && lastError.message.includes('fetch')) {
-            console.error('[OllamaLocal] BLOCCO CORS or MIXED CONTENT detector.');
-            console.group('--- COME RISOLVERE (Mac) ---');
-            console.info('1. Chiudi Ollama completamente (dalla barra menu).');
-            console.info('2. Esegui questo comando nel Terminale:');
-            console.info('   launchctl setenv OLLAMA_ORIGINS "https://therealgalli.github.io,http://localhost*,http://127.0.0.1*"');
-            console.info('3. Riavvia Ollama.');
-            console.info('4. Se ancora non va, clicca sul LUCCHETTO -> Impostazioni sito -> Contenuti non sicuri -> CONSENTI.');
-            console.groupEnd();
-        } else {
-            console.error('[OllamaLocal] Errore imprevisto di rete:', lastError);
-        }
+        console.error('[OllamaLocal] BLOCCO RILEVATO. Soluzioni:');
+        console.group('Opzione A: Gromit Bridge (Consigliata)');
+        console.info('Scarica e installa l\'estensione "Gromit Bridge" dalla cartella del progetto per saltare ogni configurazione.');
+        console.groupEnd();
+
+        console.group('Opzione B: Configurazione Manuale (Mac)');
+        console.info('1. launchctl setenv OLLAMA_ORIGINS "https://therealgalli.github.io"');
+        console.info('2. Riavvia Ollama.');
+        console.groupEnd();
     }
 
     return false;
@@ -135,7 +171,7 @@ REGOLE:
 2. Se non trovi nulla, restituisci {"findings": []}.`;
 
     try {
-        const response = await fetch(`${currentBaseUrl}/api/chat`, {
+        const response = await smartFetch(`${currentBaseUrl}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
