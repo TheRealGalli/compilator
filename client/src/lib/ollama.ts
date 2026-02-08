@@ -243,20 +243,34 @@ Rules:
         let rawResponse = data.message.content || "";
 
         try {
-            const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-            const jsonToParse = jsonMatch ? jsonMatch[0] : rawResponse;
-            const parsed = JSON.parse(jsonToParse);
+            // Tentativo 1: Parse diretto (spesso funziona se format: 'json' è attivo)
+            const parsed = JSON.parse(rawResponse);
             return (parsed.findings || []).filter((f: any) => f.value && f.value.length > 2);
         } catch (e) {
-            console.warn("[OllamaLocal] JSON parse failed, trying unified regex fallback.");
+            // Tentativo 2: Pulizia tramite regex (se c'è markdown o testo intorno)
+            try {
+                const jsonMatch = rawResponse.match(/[\{\[]([\s\S]*)[\}\]]/);
+                if (jsonMatch) {
+                    const parsed = JSON.parse(jsonMatch[0]);
+                    return (Array.isArray(parsed) ? parsed : (parsed.findings || [])).filter((f: any) => f.value && f.value.length > 2);
+                }
+            } catch (innerE) {
+                // Se fallisce anche la pulizia, usiamo il fallback regex ignorando la struttura JSON
+                console.debug("[OllamaLocal] JSON parse failed. Raw response for debugging:", rawResponse);
+            }
+
+            // Fallback: estrazione grezza tramite regex degli oggetti {"value": "...", "category": "..."}
             const findings: PIIFinding[] = [];
-            // Regex unificata per trovare l'oggetto completo
             const entryRegex = /\{\s*"value":\s*"([^"]+)"\s*,\s*"category":\s*"([^"]+)"\s*\}/g;
             let match;
             while ((match = entryRegex.exec(rawResponse)) !== null) {
                 if (match[1] && match[1].length > 2) {
                     findings.push({ value: match[1], category: match[2] });
                 }
+            }
+
+            if (findings.length > 0) {
+                console.log(`[OllamaLocal] Struttura JSON malformata, ma estratti ${findings.length} elementi tramite regex.`);
             }
             return findings;
         }
