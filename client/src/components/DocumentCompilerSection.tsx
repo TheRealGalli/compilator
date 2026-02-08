@@ -530,22 +530,23 @@ export function DocumentCompilerSection({
             if (!text || text.trim().length === 0) return;
             const findings = await extractPIILocal(text);
 
-            const ALLOWED = ['NOME_PERSONA', 'ORGANIZZAZIONE', 'INDIRIZZO', 'EMAIL', 'TELEFONO', 'CODICE_FISCALE', 'PARTITA_IVA', 'ALTRO'];
+            const ALLOWED = ['NOME_PERSONA', 'ORGANIZZAZIONE', 'INDIRIZZO', 'EMAIL', 'TELEFONO', 'CODICE_FISCALE', 'PARTITA_IVA', 'IBAN', 'ALTRO'];
 
             for (const f of findings) {
               const rawValue = f.value.trim();
               let category = f.category.toUpperCase().replace(/[^A-Z_]/g, '_');
 
-              // 1. Validazione base
+              // 1. Basic validation
               if (!rawValue || rawValue.length < 2) continue;
 
-              // 2. Normalizzazione categoria
+              // 2. Category normalization
               if (!ALLOWED.includes(category)) {
                 if (category.includes('NAME') || category.includes('PERSON')) category = 'NOME_PERSONA';
                 else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AGENT')) category = 'ORGANIZZAZIONE';
                 else if (category.includes('ADDR')) category = 'INDIRIZZO';
                 else if (category.includes('MAIL')) category = 'EMAIL';
                 else if (category.includes('TEL') || category.includes('PHONE')) category = 'TELEFONO';
+                else if (category.includes('BANK') || category.includes('IBAN')) category = 'IBAN';
                 else category = 'ALTRO';
               }
 
@@ -553,7 +554,7 @@ export function DocumentCompilerSection({
               let token = "";
               const normalizedValue = value.toLowerCase();
 
-              // GLOBAL DEDUPLICATION: Check if this EXACT value already exists in the vault (any category)
+              // GLOBAL DEDUPLICATION: If this EXACT value already exists in the vault, use that token.
               for (const [existingToken, existingValue] of vMap.entries()) {
                 if (existingValue.toLowerCase() === normalizedValue) {
                   token = existingToken;
@@ -562,16 +563,26 @@ export function DocumentCompilerSection({
               }
 
               if (!token) {
-                // Not in vault yet, create new token with detected category
-                let count = 0;
-                for (const t of vMap.keys()) {
-                  if (t.startsWith(`[${category}_`)) count++;
+                // VALUE IS NEW: Create a new token for this category.
+                // Find how many tokens already exist for THIS category to increment the index.
+                let nextIndex = 1;
+                const existingIndices = Array.from(vMap.keys())
+                  .filter(t => t.startsWith(`[${category}_`))
+                  .map(t => {
+                    const match = t.match(/_(\d+)\]$/);
+                    return match ? parseInt(match[1]) : 0;
+                  });
+
+                if (existingIndices.length > 0) {
+                  nextIndex = Math.max(...existingIndices) + 1;
                 }
-                token = `[${category}_${count + 1}]`;
+
+                token = `[${category}_${nextIndex}]`;
                 vMap.set(token, value);
-                console.log(`[DocumentCompiler] Vault updated (Aggressive): ${token} -> ${value}`);
+                console.log(`[DocumentCompiler] Vault registered: ${token} -> ${value}`);
               }
 
+              // Count total occurrences of this value (via its unique token)
               vCounts.set(token, (vCounts.get(token) || 0) + 1);
             }
           };
