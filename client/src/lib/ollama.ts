@@ -32,8 +32,8 @@ async function fetchViaBridge(url: string, options: any): Promise<any> {
         const requestId = Math.random().toString(36).substring(7);
         const timeout = setTimeout(() => {
             window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
-            resolve({ success: false, error: 'TIMEOUT' });
-        }, 5000);
+            resolve({ success: false, error: 'TIMEOUT', status: 408 });
+        }, 60000); // 60 secondi: l'inferenza locale richiede tempo!
 
         const handler = (event: any) => {
             if (event.detail.requestId === requestId) {
@@ -65,9 +65,13 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
                 json: async () => bridgeResult.data
             };
         }
-        // Se il bridge è presente ma fallisce (es. Ollama spento), non ripieghiamo su fetch diretta
-        // per evitare di sporcare i log con errori CORS inutili.
-        return { ok: false, status: 503, json: async () => ({ error: 'Ollama unreachable via bridge' }) };
+
+        // Se il bridge fallisce, restituiamo l'errore specifico (es. 408 Timeout o 503)
+        return {
+            ok: false,
+            status: bridgeResult?.status || 503,
+            json: async () => ({ error: bridgeResult?.error || 'Bridge error' })
+        };
     }
 
     // Solo se l'estensione manca, proviamo la fetch standard
@@ -195,6 +199,7 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promi
             await new Promise(r => setTimeout(r, delay));
         }
     }
+    throw new Error('Retries exhausted');
 }
 
 async function _extractSingleChunk(text: string): Promise<PIIFinding[]> {
@@ -230,7 +235,10 @@ Se non trovi nulla, restituisci {"findings": []}.`;
         };
 
         const data = await _extractWithRetry(payload);
-        let rawResponse = data.message?.content || "";
+        if (!data || !data.message) {
+            throw new Error("Risposta incompleta da Ollama");
+        }
+        let rawResponse = data.message.content || "";
 
         try {
             const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
