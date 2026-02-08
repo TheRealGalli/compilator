@@ -138,9 +138,73 @@ export async function testOllamaConnection(): Promise<boolean> {
     return false;
 }
 
+/**
+ * Recupera la versione della Gromit Bridge.
+ */
+async function getBridgeVersion(): Promise<string> {
+    if (!isBridgeAvailable()) return "0.0.0";
+    return new Promise((resolve) => {
+        const requestId = Math.random().toString(36).substring(7);
+        const timeout = setTimeout(() => {
+            window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+            resolve("0.0.0");
+        }, 2000);
+
+        const handler = (event: any) => {
+            if (event.detail.requestId === requestId) {
+                clearTimeout(timeout);
+                window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+                resolve(event.detail.response?.version || "1.0.0");
+            }
+        };
+
+        window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+        window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
+            detail: { detail: { type: 'GET_VERSION' }, requestId }
+        }));
+    });
+}
+
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
+    const version = await getBridgeVersion();
+    const isTurboAvailable = version.startsWith("3.");
+
+    if (isTurboAvailable) {
+        console.log(`[OllamaLocal] Bridge v${version} rilevata. Uso TURBO PIPELINE (Offload)...`);
+        return new Promise((resolve) => {
+            const requestId = Math.random().toString(36).substring(7);
+            const handler = (event: any) => {
+                if (event.detail.requestId === requestId) {
+                    window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+                    resolve(event.detail.response?.findings || []);
+                }
+            };
+            window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+
+            // Definiamo il prompt qui per coerenza
+            const systemPrompt = `MISSION: High-Precision PII Extraction.
+Identify only ACTUAL values that belong to a specific person or entity. 
+IGNORE all form instructions, boilerplate rules, general legal text, and non-personal field labels.
+Categories: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.`;
+
+            window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
+                detail: {
+                    detail: {
+                        type: 'OLLAMA_PII_TURBO',
+                        text,
+                        url: currentBaseUrl,
+                        model: OLLAMA_MODEL,
+                        systemPrompt
+                    },
+                    requestId
+                }
+            }));
+        });
+    }
+
+    // Fallback classico se il bridge è vecchio o assente
     if (text.length <= CHUNK_SIZE) {
         return _extractSingleChunk(text, []);
     }
