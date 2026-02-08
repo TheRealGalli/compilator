@@ -11,8 +11,8 @@ export interface PIIFinding {
 let currentBaseUrl = 'http://localhost:11434';
 const OLLAMA_MODEL = 'gemma3:1b';
 
-const CHUNK_SIZE = 4000; // Aumentato per Gemma 3, riduce il numero di chiamate
-const CHUNK_OVERLAP = 500;
+const CHUNK_SIZE = 8000; // Large context to distinguish labels from values
+const CHUNK_OVERLAP = 1000;
 
 /**
  * Rileva se l'estensione "Gromit Bridge" è caricata tramite flag nel DOM o window prop.
@@ -145,7 +145,7 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
         return _extractSingleChunk(text, []);
     }
 
-    console.log(`[OllamaLocal] Documento lungo (${text.length} caratteri). Uso splitting PARALLELO con MEMORIA...`);
+    console.log(`[OllamaLocal] Documento lungo (${text.length} caratteri). Uso splitting PARALLELO (Context: ${CHUNK_SIZE})...`);
     const allFindings: PIIFinding[] = [];
     const processedValues = new Set<string>();
 
@@ -156,13 +156,13 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
         if (i + CHUNK_SIZE >= text.length) break;
     }
 
-    // Esecuzione parallela a lotti (max 3 alla volta) con propagazione della memoria tra i lotti
-    const BATCH_SIZE = 3;
+    // Esecuzione parallela a lotti (max 2 alla volta per stabilità con chunk da 8k)
+    const BATCH_SIZE = 2;
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
         const currentBatch = chunks.slice(i, i + BATCH_SIZE);
-        const knownList = Array.from(processedValues).slice(-100); // Passiamo gli ultimi 100 per non intasare il contesto
+        const knownList = Array.from(processedValues).slice(-150);
 
-        console.log(`[OllamaLocal] Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)} (Memory: ${knownList.length} items)...`);
+        console.log(`[OllamaLocal] Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)}...`);
 
         const batchResults = await Promise.all(
             currentBatch.map(chunk => _extractSingleChunk(chunk, knownList).catch(err => {
@@ -227,13 +227,20 @@ async function _extractSingleChunk(text: string, knownValues: string[]): Promise
         ? `\n\nALREADY KNOWN DATA (DO NOT LIST THESE AGAIN):\n- ${knownValues.join('\n- ')}`
         : "";
 
-    const systemPrompt = `DLP Expert. Extract ALL possible personal data, names, phones, and form field values from <INPUT_DATA>.
+    const systemPrompt = `DLP Expert. Extract REAL personal data, names, and field values from <INPUT_DATA>.
 Rules:
-- Capture everything that looks like an input, an identity, or a specific value.
-- EXTRACT ONLY EXISTING DATA. DO NOT GENERATE SYNTHETIC OR EXAMPLE DATA.
-- If no PII is found, output NOTHING.
-- IGNORE form instructions, rules, or general labels if they don't have a specific value attached.
-- Focus on: Full Names, Organizations, Addresses, Emails, Phones, Codice Fiscale, Partita IVA, IBAN.
+- Capture ONLY actual filled-in data (usernames, real people names, physical addresses, real phone numbers).
+- DO NOT EXTRACT form instructions, labels with no values, page numbers, or general legal text.
+- DO NOT GENERATE SYNTHETIC DATA. If no REAL data is found, output NOTHING.
+- CATEGORIES: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.
+
+POSITIVE EXAMPLE:
+Input: "Name: Mario Rossi, Address: Via Roma 1" -> Output: [NOME_PERSONA] Mario Rossi
+[INDIRIZZO] Via Roma 1
+
+NEGATIVE EXAMPLE (IGNORE THESE):
+Input: "Part IV must be completed", "Applicant fax number", "Base Erosion Payments" -> Output: (NOTHING)
+
 - Output format: One finding per line as [CATEGORY] Value.
 - NO JSON. NO prose. NO repetitions.${knownContext}`;
 
@@ -244,11 +251,11 @@ Rules:
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: `<INPUT_DATA>\n${text}\n</INPUT_DATA>` }
             ],
-            // format: 'json', // Rimosso per estrazione testo semplice
             stream: false,
             options: {
                 temperature: 0.1,
-                num_predict: 512, // Sufficient for a list of findings
+                num_ctx: 16384, // Ensure enough context for 8k input
+                num_predict: 1024,
             }
         };
 
@@ -258,21 +265,29 @@ Rules:
         }
         let rawResponse = data.message.content || "";
 
-        // Semplificato Parser (Text Mode)
         const findings: PIIFinding[] = [];
         const lines = rawResponse.split('\n');
 
+        // Post-processing Noise Filter
+        const BOILERPLATE_KEYWORDS = [
+            'must be completed', 'attach a statement', 'tax year', 'reporting corporation',
+            'customs value', 'check here', 'if yes', 'if no', 'part iv', 'section',
+            'qualified derivative', 'base erosion', 'anticipated benefits', 'application for',
+            'information not', 'not specified', 'placeholder', 'synthetic'
+        ];
+
         for (const line of lines) {
-            // Cerca pattern [CATEGORIA] Valore
             const match = line.trim().match(/^\[([A-Z_]+)\]\s*(.*)$/i);
             if (match) {
                 const category = match[1].toUpperCase();
                 const value = match[2].trim();
 
-                // Anti-hallucination check: ensure value is not a generic placeholder
-                const isPlaceholder = /\[.*\]|example|not specified|information not|synthetic|NOME_PERSONA_\d+/i.test(value);
+                // Advanced Anti-Noise Filter
+                const isBoilerplate = BOILERPLATE_KEYWORDS.some(k => value.toLowerCase().includes(k));
+                const isTooLongToByPII = value.length > 150; // Real names/addresses are rarely > 150 chars
+                const isSynthetic = /NOME_PERSONA_\d+|ORGANIZZAZIONE_\d+/i.test(value);
 
-                if (value && value.length > 2 && !isPlaceholder) {
+                if (value && value.length > 2 && !isBoilerplate && !isTooLongToByPII && !isSynthetic) {
                     findings.push({ value, category });
                 }
             }
@@ -284,12 +299,6 @@ Rules:
 
         return findings;
     } catch (error) {
-        if (error instanceof Error && error.message.includes('403')) {
-            console.error('[OllamaLocal] ERRORE 403 in estrazione. Verifica l\'estensione bridge.');
-        } else if (error instanceof Error && error.message.includes('503')) {
-            console.error('[OllamaLocal] ERRORE 503: Ollama è sovraccarico o il modello sta crashando.');
-            console.info('[OllamaLocal] CONSIGLIO: Tieni l\'app Desktop di Ollama APERTA e visibile.');
-        }
         console.error('[OllamaLocal] Errore estrazione:', error);
         throw error;
     }
