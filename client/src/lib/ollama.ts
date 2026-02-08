@@ -11,8 +11,8 @@ export interface PIIFinding {
 let currentBaseUrl = 'http://localhost:11434';
 const OLLAMA_MODEL = 'gemma3:1b';
 
-const CHUNK_SIZE = 1800; // Ottimale per stabilità e velocità su M1 8GB
-const CHUNK_OVERLAP = 300;
+const CHUNK_SIZE = 4000; // Aumentato per Gemma 3, riduce il numero di chiamate
+const CHUNK_OVERLAP = 500;
 
 /**
  * Rileva se l'estensione "Gromit Bridge" è caricata tramite flag nel DOM o window prop.
@@ -145,14 +145,32 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
         return _extractSingleChunk(text);
     }
 
-    console.log(`[OllamaLocal] Documento lungo (${text.length} caratteri). Uso lo splitting...`);
+    console.log(`[OllamaLocal] Documento lungo (${text.length} caratteri). Uso splitting PARALLELO...`);
     const allFindings: PIIFinding[] = [];
     const processedValues = new Set<string>();
 
+    // Creazione dei chunk
+    const chunks: string[] = [];
     for (let i = 0; i < text.length; i += (CHUNK_SIZE - CHUNK_OVERLAP)) {
-        const chunk = text.substring(i, i + CHUNK_SIZE);
-        try {
-            const findings = await _extractSingleChunk(chunk);
+        chunks.push(text.substring(i, i + CHUNK_SIZE));
+        if (i + CHUNK_SIZE >= text.length) break;
+    }
+
+    // Esecuzione parallela a lotti (max 3 alla volta per stabilità M1/M2)
+    const BATCH_SIZE = 3;
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+        const currentBatch = chunks.slice(i, i + BATCH_SIZE);
+        console.log(`[OllamaLocal] Elaborazione batch chunk ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)}...`);
+
+        const batchResults = await Promise.all(
+            currentBatch.map(chunk => _extractSingleChunk(chunk).catch(err => {
+                console.warn("[OllamaLocal] Errore in un chunk parallelo, salto...", err);
+                return [] as PIIFinding[];
+            }))
+        );
+
+        // Unione risultati ed eliminazione duplicati
+        for (const findings of batchResults) {
             for (const f of findings) {
                 const key = `${f.value.toLowerCase()}|${f.category}`;
                 if (!processedValues.has(key)) {
@@ -160,12 +178,7 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
                     processedValues.add(key);
                 }
             }
-            // Piccolo delay tra i chunk per non saturare la GPU/RAM del Mac M1
-            await new Promise(r => setTimeout(r, 1000));
-        } catch (err) {
-            console.warn(`[OllamaLocal] Errore durante il chunking a offset ${i}, salto...`);
         }
-        if (i + CHUNK_SIZE >= text.length) break;
     }
 
     return allFindings;
