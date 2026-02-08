@@ -17,36 +17,51 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
     const checkStatus = useCallback(async () => {
         if (isChecking.current) return;
         isChecking.current = true;
-        setStatus('loading');
+
+        // Non resettiamo lo stato a 'loading' se siamo già connessi per evitare flickering UI
+        // Ma facciamo comunque il controllo in background
         try {
-            console.log('[OllamaContext] Avvio verifica connessione locale...');
+            console.log('[OllamaContext] Verifica connessione locale...');
             const isDirectReachable = await testOllamaConnection();
 
             if (isDirectReachable) {
-                console.log('[OllamaContext] Connessione locale riuscita.');
+                console.log('[OllamaContext] Connessione locale OK.');
                 setStatus('connected');
             } else {
-                console.log('[OllamaContext] Connessione locale fallita. Controlla la console.');
+                console.log('[OllamaContext] Connessione locale FALLITA.');
                 setStatus('disconnected');
             }
         } catch (error) {
-            console.error('[OllamaContext] Errore critico durante la verifica:', error);
+            console.error('[OllamaContext] Errore critico:', error);
             setStatus('disconnected');
         } finally {
             isChecking.current = false;
         }
     }, []);
 
+    // Primo controllo all'avvio
     useEffect(() => {
         checkStatus();
-        // Controllo periodico solo se disconnesso, per non disturbare l'inferenza
+    }, [checkStatus]);
+
+    // Controllo periodico separato (ogni 30 secondi)
+    // Usiamo una ref per accedere allo stato corrente senza triggerare l'effect
+    const statusRef = useRef(status);
+    useEffect(() => {
+        statusRef.current = status;
+    }, [status]);
+
+    useEffect(() => {
         const interval = setInterval(() => {
-            if (status !== 'connected') {
+            // Se siamo già connessi, controlliamo meno spesso o saltiamo se stiamo lavorando
+            // Per ora lo facciamo ogni 30s solo se non siamo già in "connected"
+            // o se vogliamo essere sicuri che la connessione regga.
+            if (statusRef.current !== 'connected') {
                 checkStatus();
             }
         }, 30000);
         return () => clearInterval(interval);
-    }, [checkStatus, status]);
+    }, [checkStatus]); // NOTA: status NON deve essere qui o causerà un loop infinito
 
     return (
         <OllamaContext.Provider value={{ status, checkStatus }}>
