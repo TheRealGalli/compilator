@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { testOllamaConnection } from '@/lib/ollama';
+import { getApiUrl } from '@/lib/api-config';
 
 type OllamaStatus = 'loading' | 'connected' | 'disconnected';
 
@@ -16,18 +17,22 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
     const checkStatus = useCallback(async () => {
         setStatus('loading');
         try {
+            console.log('[OllamaContext] Checking status...');
             // Priority 1: Direct browser connection (most private, handles mixed content if enabled)
             const isDirectReachable = await testOllamaConnection();
 
             if (isDirectReachable) {
+                console.log('[OllamaContext] Direct connection reachable.');
                 setStatus('connected');
                 return;
             }
 
+            console.log('[OllamaContext] Direct connection failed, trying proxy fallback...');
             // Priority 2: Backend proxy fallback (for cases where browser fetch fails but server can reach it)
             const checkProxy = async () => {
                 try {
-                    const response = await fetch('/api/ollama-health');
+                    const url = getApiUrl('/api/ollama-health');
+                    const response = await fetch(url);
                     return response.ok;
                 } catch (e) {
                     return false;
@@ -35,10 +40,11 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
             };
 
             const isProxyReachable = await checkProxy();
+            console.log('[OllamaContext] Proxy reachable:', isProxyReachable);
             setStatus(isProxyReachable ? 'connected' : 'disconnected');
 
         } catch (error) {
-            console.error('Error checking Ollama status:', error);
+            console.error('[OllamaContext] Error checking Ollama status:', error);
             setStatus('disconnected');
         }
     }, []);
