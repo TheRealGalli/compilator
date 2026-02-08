@@ -119,6 +119,27 @@ export async function testOllamaConnection(): Promise<boolean> {
             }
         } catch (err) {
             lastError = err;
+            if (lastError instanceof TypeError && lastError.message.includes('fetch')) {
+                console.error('[OllamaLocal] BLOCCO CORS or MIXED CONTENT detector.');
+                console.group('--- COME RISOLVERE (Mac) ---');
+                console.info('1. Chiudi Ollama completamente (dalla barra menu).');
+                console.info('2. Esegui questo comando nel Terminale:');
+                console.info('   launchctl setenv OLLAMA_ORIGINS "https://therealgalli.github.io,http://localhost*,http://127.0.0.1*,chrome-extension://*"');
+                console.info('3. Riavvia Ollama.');
+                console.info('4. Se ancora non va, clicca sul LUCCHETTO -> Impostazioni sito -> Contenuti non sicuri -> CONSENTI.');
+                console.groupEnd();
+            } else if (lastError instanceof Error && lastError.message.includes('403')) {
+                console.error('[OllamaLocal] ERRORE 403 (FORBIDDEN).');
+                console.group('--- COME RISOLVERE IL 403 (Mac) ---');
+                console.info('L\'estensione non ha i permessi per parlare con Ollama.');
+                console.info('1. Chiudi Ollama completamente.');
+                console.info('2. Esegui questo comando:');
+                console.info('   launchctl setenv OLLAMA_ORIGINS "https://therealgalli.github.io,http://localhost*,http://127.0.0.1*,chrome-extension://*"');
+                console.info('3. Riavvia Ollama.');
+                console.groupEnd();
+            } else {
+                console.error('[OllamaLocal] Errore imprevisto di rete:', lastError);
+            }
         }
     }
 
@@ -217,6 +238,16 @@ REGOLE:
             return findings;
         }
     } catch (error) {
+        if (error instanceof Error && error.message.includes('403')) {
+            console.error('[OllamaLocal] ERRORE 403 (FORBIDDEN) in estrazione.');
+            console.group('--- COME RISOLVERE (Mac) ---');
+            console.info('Ollama rifiuta la richiesta dell\'estensione.');
+            console.info('1. Chiudi Ollama completamente.');
+            console.info('2. Esegui questo comando correttivo:');
+            console.info('   launchctl setenv OLLAMA_ORIGINS "https://therealgalli.github.io,http://localhost*,http://127.0.0.1*,chrome-extension://*"');
+            console.info('3. Riavvia Ollama.');
+            console.groupEnd();
+        }
         console.error('[OllamaLocal] Errore estrazione:', error);
         throw error;
     }
