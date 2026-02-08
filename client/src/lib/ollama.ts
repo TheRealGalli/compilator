@@ -26,25 +26,37 @@ export async function testOllamaConnection(): Promise<boolean> {
 
     for (const url of urls) {
         try {
-            console.log(`[OllamaLocal] Testing connection to ${url}...`);
+            console.log(`[OllamaLocal] Testing connection to ${url}/api/tags...`);
             const response = await fetch(`${url}/api/tags`);
             if (!response.ok) continue;
 
             const data = await response.json();
-            const models = data.models || [];
-            const hasModel = models.some((m: any) => m.name.startsWith(OLLAMA_MODEL));
+            const models = (data.models || []).map((m: any) => m.name);
+
+            // Precise check for gemma3:1b
+            const hasModel = models.some((name: string) =>
+                name === OLLAMA_MODEL ||
+                name.startsWith(`${OLLAMA_MODEL}:`) ||
+                name === 'gemma3:latest' // Fallback if they pulled without tag
+            );
 
             if (hasModel) {
-                console.log(`[OllamaLocal] Connection success via ${url}. Model ${OLLAMA_MODEL} found.`);
+                console.log(`[OllamaLocal] Connection SUCCESS via ${url}. Model ${OLLAMA_MODEL} found.`);
                 currentBaseUrl = url; // Store successful URL
                 return true;
+            } else {
+                console.warn(`[OllamaLocal] Ollama reachable at ${url} but model '${OLLAMA_MODEL}' not found.`);
+                if (models.length > 0) {
+                    console.log(`[OllamaLocal] Models found instead:`, models);
+                }
+                console.info(`[OllamaLocal] HINT: Run 'ollama pull ${OLLAMA_MODEL}' in your terminal.`);
             }
         } catch (err) {
             // Silently try the next URL
         }
     }
 
-    console.error(`[OllamaLocal] All connection attempts failed.`);
+    console.error(`[OllamaLocal] All connection attempts failed. Ensure Ollama is running and OLLAMA_ORIGINS="*" is set.`);
     return false;
 }
 
