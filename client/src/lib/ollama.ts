@@ -11,7 +11,7 @@ export interface PIIFinding {
 let currentBaseUrl = 'http://localhost:11434';
 const OLLAMA_MODEL = 'gemma3:1b';
 
-const CHUNK_SIZE = 2500;
+const CHUNK_SIZE = 2000; // Ridotto per stabilità su Mac meno potenti
 const CHUNK_OVERLAP = 300;
 
 /**
@@ -165,6 +165,38 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     return allFindings;
 }
 
+/**
+ * Esegue l'estrazione con logica di retry per gestire errori 503 (Ollama sovraccarico o in caricamento)
+ */
+async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promise<any> {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await smartFetch(`${currentBaseUrl}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.status === 503) {
+                console.warn(`[OllamaLocal] Ollama occupato (503). Tentativo ${i + 1}/${retries} tra ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2; // Backoff esponenziale
+                continue;
+            }
+
+            if (!response.ok) {
+                throw new Error(`Ollama non raggiungibile (Status: ${response.status})`);
+            }
+
+            return await response.json();
+        } catch (err) {
+            if (i === retries - 1) throw err;
+            console.warn(`[OllamaLocal] Errore connessione, riprovo... (${i + 1}/${retries})`);
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+}
+
 async function _extractSingleChunk(text: string): Promise<PIIFinding[]> {
     console.log(`[OllamaLocal] Estrazione PII dal chunk (${text.length} caratteri)...`);
 
@@ -184,28 +216,20 @@ Restituisci SOLO un oggetto JSON con questa struttura: {"findings": [{"value": "
 Se non trovi nulla, restituisci {"findings": []}.`;
 
     try {
-        const response = await smartFetch(`${currentBaseUrl}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: OLLAMA_MODEL,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `<INPUT_DATA>\n${text}\n</INPUT_DATA>` }
-                ],
-                format: 'json',
-                stream: false,
-                options: {
-                    temperature: 0.1,
-                }
-            })
-        });
+        const payload = {
+            model: OLLAMA_MODEL,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `<INPUT_DATA>\n${text}\n</INPUT_DATA>` }
+            ],
+            format: 'json',
+            stream: false,
+            options: {
+                temperature: 0.1,
+            }
+        };
 
-        if (!response.ok) {
-            throw new Error(`Ollama non raggiungibile (Status: ${response.status})`);
-        }
-
-        const data = await response.json();
+        const data = await _extractWithRetry(payload);
         let rawResponse = data.message?.content || "";
 
         try {
@@ -231,6 +255,9 @@ Se non trovi nulla, restituisci {"findings": []}.`;
     } catch (error) {
         if (error instanceof Error && error.message.includes('403')) {
             console.error('[OllamaLocal] ERRORE 403 in estrazione. Verifica l\'estensione bridge.');
+        } else if (error instanceof Error && error.message.includes('503')) {
+            console.error('[OllamaLocal] ERRORE 503: Ollama è sovraccarico o il modello sta crashando.');
+            console.info('[OllamaLocal] CONSIGLIO: Tieni l\'app Desktop di Ollama APERTA e visibile.');
         }
         console.error('[OllamaLocal] Errore estrazione:', error);
         throw error;
