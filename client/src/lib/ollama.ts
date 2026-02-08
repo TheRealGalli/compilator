@@ -207,17 +207,17 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promi
 async function _extractSingleChunk(text: string): Promise<PIIFinding[]> {
     console.log(`[OllamaLocal] Estrazione PII dal chunk (${text.length} caratteri)...`);
 
-    const systemPrompt = `DLP Expert specialized in Italian data. Extract ALL possible personal data, names, phones, and form field values as JSON from <INPUT_DATA>.
+    const systemPrompt = `DLP Expert specialized in Italian data (primary target) but also trained for international contexts. Extract ALL possible personal data, names, phones, and form field values as JSON from <INPUT_DATA>.
 Rules:
-- Capture everything that looks like an input or an identity.
+- Capture everything that looks like an input or an identity, regardless of origin.
 - Output ONLY JSON: {"findings": [{"value": "...", "category": "..."}]}
 - Allowed categories: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.
-- Italian Patterns:
-  * NOME_PERSONA: Capture full Italian names/surnames.
-  * CODICE_FISCALE: 16 alphanumeric characters (e.g., RSSMRA80A01H501U).
-  * IBAN: 27 characters starting with "IT" (Italian bank account).
+- Italian Patterns (Primary):
+  * NOME_PERSONA: Capture full names (Italian and foreign).
+  * CODICE_FISCALE: 16 alphanumeric characters.
+  * IBAN: International Bank Account Numbers (all origins, primarily "IT").
   * PARTITA_IVA: 11-digit numeric strings.
-  * INDIRIZZO: Italian addresses (Via, Viale, Piazza, CAP, Province).
+  * INDIRIZZO: Addresses (Italian and international formats).
 - Be extremely thorough. Better to include too much than too little.
 - NO prose. NO repeating input.`;
 
