@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { testOllamaConnection } from '@/lib/ollama';
 
 type OllamaStatus = 'loading' | 'connected' | 'disconnected';
@@ -12,14 +12,15 @@ const OllamaContext = createContext<OllamaContextType | undefined>(undefined);
 
 export function OllamaProvider({ children }: { children: React.ReactNode }) {
     const [status, setStatus] = useState<OllamaStatus>('loading');
+    const isChecking = useRef(false);
 
     const checkStatus = useCallback(async () => {
+        if (isChecking.current) return;
+        isChecking.current = true;
         setStatus('loading');
         try {
             console.log('[OllamaContext] Avvio verifica connessione locale...');
 
-            // Usiamo solo la connessione diretta del browser (Zero-Data Privacy e Performance)
-            // Il proxy lato server viene rimosso perché non può vedere il localhost dell'utente
             const isDirectReachable = await testOllamaConnection();
 
             if (isDirectReachable) {
@@ -34,15 +35,21 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
             console.error('[OllamaContext] Errore critico durante la verifica:', error);
             setStatus('disconnected');
+        } finally {
+            isChecking.current = false;
         }
     }, []);
 
     useEffect(() => {
         checkStatus();
-        // Controllo ogni 30 secondi
-        const interval = setInterval(checkStatus, 30000);
+        // Controllo periodico solo se disconnesso, per non disturbare l'inferenza
+        const interval = setInterval(() => {
+            if (status !== 'connected') {
+                checkStatus();
+            }
+        }, 30000);
         return () => clearInterval(interval);
-    }, [checkStatus]);
+    }, [checkStatus, status]);
 
     return (
         <OllamaContext.Provider value={{ status, checkStatus }}>
