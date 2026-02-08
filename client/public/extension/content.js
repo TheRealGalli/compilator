@@ -1,15 +1,7 @@
-// Segnala la presenza dell'estensione alla pagina web (DOM + Window property)
+// Segnala la presenza dell'estensione alla pagina web tramite attributo DOM
+// Più sicuro e compatibile con le CSP restrittive
 document.documentElement.setAttribute('data-gromit-bridge-active', 'true');
-
-try {
-    // Tenta di iniettare uno script nella pagina per settare la window property
-    const script = document.createElement('script');
-    script.textContent = 'window.__GROMIT_BRIDGE_ACTIVE__ = true;';
-    (document.head || document.documentElement).appendChild(script);
-    script.remove();
-} catch (e) {
-    console.warn('[GromitBridge] Impossibile settare window property, uso fallback DOM.');
-}
+console.log('[GromitBridge] Content Script inizializzato.');
 
 // In ascolto di eventi dalla pagina web
 window.addEventListener('GROMIT_BRIDGE_REQUEST', (event) => {

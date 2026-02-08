@@ -4,8 +4,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         console.log('[GromitBridge] Eseguo fetch (Background):', url);
 
-        // La fetch fatta qui non è soggetta a CORS o Mixed Content
-        fetch(url, options)
+        // Puliamo le opzioni per evitare che headers come 'Origin' o 'Referer' 
+        // della pagina originale vengano passati a Ollama (causando 403)
+        const fetchOptions = {
+            method: options.method || 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: options.body,
+            mode: 'cors',
+            credentials: 'omit',
+            referrerPolicy: 'no-referrer'
+        };
+
+        // Eseguiamo la fetch dal contesto dell'estensione (privilegiato)
+        fetch(url, fetchOptions)
             .then(async response => {
                 const ok = response.ok;
                 const status = response.status;
@@ -17,6 +30,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse({ success: false, error: error.message });
             });
 
-        return true; // Mantiene il canale aperto per la risposta asincrona
+        return true; // Mantiene il canale aperto
     }
 });
