@@ -70,15 +70,18 @@ export async function testOllamaConnection(): Promise<boolean> {
 
     if (!anySuccess && lastError) {
         if (lastError.name === 'AbortError') {
-            console.error('[OllamaLocal] Timeout connessione. Ollama è aperto?');
+            console.error('[OllamaLocal] Timeout connessione. Ollama è caricato e aperto?');
         } else if (lastError instanceof TypeError && lastError.message.includes('fetch')) {
-            console.error('[OllamaLocal] BLOCCO DEL BROWSER RILEVATO (Mixed Content o CORS).');
-            console.error('[OllamaLocal] 1. Clicca sul LUCCHETTO nella barra degli indirizzi di Chrome.');
-            console.error('[OllamaLocal] 2. Vai in "Impostazioni Sito".');
-            console.error('[OllamaLocal] 3. Trova "Contenuti non sicuri" e impostalo su "CONSENTI".');
-            console.error('[OllamaLocal] 4. Assicurati di aver impostato OLLAMA_ORIGINS="*" se Ollama è su un PC diverso.');
+            console.error('[OllamaLocal] BLOCCO CORS or MIXED CONTENT detector.');
+            console.group('--- COME RISOLVERE (Mac) ---');
+            console.info('1. Chiudi Ollama completamente (dalla barra menu).');
+            console.info('2. Esegui questo comando nel Terminale:');
+            console.info('   launchctl setenv OLLAMA_ORIGINS "https://therealgalli.github.io,http://localhost*,http://127.0.0.1*"');
+            console.info('3. Riavvia Ollama.');
+            console.info('4. Se ancora non va, clicca sul LUCCHETTO -> Impostazioni sito -> Contenuti non sicuri -> CONSENTI.');
+            console.groupEnd();
         } else {
-            console.error('[OllamaLocal] Errore di connessione:', lastError);
+            console.error('[OllamaLocal] Errore imprevisto di rete:', lastError);
         }
     }
 
