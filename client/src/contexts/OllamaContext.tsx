@@ -20,18 +20,15 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
         setStatus('loading');
         try {
             console.log('[OllamaContext] Avvio verifica connessione locale...');
-
             const isDirectReachable = await testOllamaConnection();
 
             if (isDirectReachable) {
                 console.log('[OllamaContext] Connessione locale riuscita.');
                 setStatus('connected');
-                return;
+            } else {
+                console.log('[OllamaContext] Connessione locale fallita. Controlla la console.');
+                setStatus('disconnected');
             }
-
-            console.log('[OllamaContext] Connessione locale fallita. Controlla la console per istruzioni su come sbloccare il browser.');
-            setStatus('disconnected');
-
         } catch (error) {
             console.error('[OllamaContext] Errore critico durante la verifica:', error);
             setStatus('disconnected');
