@@ -415,22 +415,32 @@ export function DocumentCompilerSection({
    * Based on the "Global Sweep" strategy to ensure 100% consistency.
    */
   const performMechanicalGlobalSweep = (text: string, vault: Record<string, string>): string => {
-    if (!text || !vault || Object.keys(vault).length === 0) return text;
-
-    let sweptText = text;
-    // Sort vault values by length descending to replace "Carlo Galli" before "Carlo"
-    const entries = Object.entries(vault).sort((a, b) => b[1].length - a[1].length);
-
-    for (const [token, value] of entries) {
+    if (!text || Object.keys(vault).length === 0) return text;
+    let result = text;
+    // Order by value length descending to avoid partial matches
+    const sortedValues = Object.entries(vault).sort((a, b) => b[1].length - a[1].length);
+    for (const [token, value] of sortedValues) {
       if (!value || value.length < 2) continue;
-      try {
-        const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        sweptText = sweptText.replace(new RegExp(escapedValue, 'g'), token);
-      } catch (err) {
-        sweptText = sweptText.split(value).join(token);
-      }
+      // Escape for regex (simple version)
+      const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedValue, 'gi');
+      result = result.replace(regex, token);
     }
-    return sweptText;
+    return result;
+  };
+
+  // Restores original values from tokens.
+  const performMechanicalReverseSweep = (text: string, vault: Record<string, string>): string => {
+    if (!text || Object.keys(vault).length === 0) return text;
+    let result = text;
+    // Replaces tokens [CAT_X] with their values
+    for (const [token, value] of Object.entries(vault)) {
+      // Escape token for regex (they contain brackets)
+      const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedToken, 'g');
+      result = result.replace(regex, value);
+    }
+    return result;
   };
 
   const anonymizeWithOllamaLocal = async (text: string, currentVault: Record<string, string>): Promise<{ anonymized: string; newVault: Record<string, string> }> => {
@@ -519,19 +529,45 @@ export function DocumentCompilerSection({
           const extractAndVault = async (text: string, vMap: Map<string, string>, vCounts: Map<string, number>) => {
             if (!text || text.trim().length === 0) return;
             const findings = await extractPIILocal(text);
-            for (const f of findings) {
-              const value = f.value.trim();
-              const category = f.category.toUpperCase().replace(/\s+/g, '_');
-              if (!value || value.length < 2) continue;
 
+            const ALLOWED = ['NOME_PERSONA', 'ORGANIZZAZIONE', 'INDIRIZZO', 'EMAIL', 'TELEFONO', 'CODICE_FISCALE', 'PARTITA_IVA'];
+            const LABEL_BLACKLIST = ['name of reporting corporation', 'employer identification number', 'total assets', 'principal business activity', 'principal business activity code', 'country of incorporation'];
+
+            for (const f of findings) {
+              const rawValue = f.value.trim();
+              let category = f.category.toUpperCase().replace(/[^A-Z_]/g, '_');
+
+              // 1. Validazione base
+              if (!rawValue || rawValue.length < 2) continue;
+
+              // 2. Protezione contro Label-as-Value
+              if (LABEL_BLACKLIST.some(b => rawValue.toLowerCase().includes(b))) {
+                console.warn(`[DocumentCompiler] Filtrata label scambiata per valore: "${rawValue}"`);
+                continue;
+              }
+
+              // 3. Normalizzazione categoria
+              if (!ALLOWED.includes(category)) {
+                // Tentativo di mappatura intelligente
+                if (category.includes('NAME') || category.includes('PERSON')) category = 'NOME_PERSONA';
+                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AGENT')) category = 'ORGANIZZAZIONE';
+                else if (category.includes('ADDR')) category = 'INDIRIZZO';
+                else if (category.includes('MAIL')) category = 'EMAIL';
+                else if (category.includes('TEL') || category.includes('PHONE')) category = 'TELEFONO';
+                else category = 'ALTRO';
+              }
+
+              const value = rawValue;
               let token = "";
               const normalizedValue = value.toLowerCase();
+
               for (const [t, v] of vMap.entries()) {
                 if (v.toLowerCase() === normalizedValue && t.includes(category)) {
                   token = t;
                   break;
                 }
               }
+
               if (!token) {
                 let count = 0;
                 for (const t of vMap.keys()) {
@@ -539,9 +575,9 @@ export function DocumentCompilerSection({
                 }
                 token = `[${category}_${count + 1}]`;
                 vMap.set(token, value);
+                console.log(`[DocumentCompiler] Vault updated: ${token} -> ${value}`);
               }
 
-              // Increment occurrences for this token (meaning this value)
               vCounts.set(token, (vCounts.get(token) || 0) + 1);
             }
           };
@@ -705,9 +741,13 @@ export function DocumentCompilerSection({
           groundingMetadata: data.groundingMetadata
         };
 
+        // Restoration of original values for the user (Reverse Sweep)
+        const finalContent = performMechanicalReverseSweep(sanitizedContent, guardrailVault);
+        console.log('[DocumentCompiler] De-anonymization complete.');
+
         setLastCompileContext(context);
-        setCompiledContent(sanitizedContent);
-        setTemplateContent(sanitizedContent);
+        setCompiledContent(finalContent);
+        setTemplateContent(finalContent);
         setIsCompiledView(true);
         setIsRefiningMode(true); // Auto-trigger Copilot Mode
 
@@ -758,10 +798,11 @@ export function DocumentCompilerSection({
   // Handle Review Actions
   const handleAcceptRefinement = () => {
     if (pendingContent) {
-      setCompiledContent(pendingContent);
-      setTemplateContent(pendingContent); // Update template content as well
-      if (onCompile) onCompile(pendingContent);
-      toast({ title: "Modifica Accettata", description: "Il documento è stato aggiornato." });
+      const finalContent = performMechanicalReverseSweep(pendingContent, guardrailVault);
+      setCompiledContent(finalContent);
+      setTemplateContent(finalContent); // Update template content as well
+      if (onCompile) onCompile(finalContent);
+      toast({ title: "Modifica Accettata", description: "Il documento è stato aggiornato e de-anonimizzato." });
     }
     setIsReviewing(false);
     setPendingContent(null);
@@ -1426,42 +1467,58 @@ export function DocumentCompilerSection({
 
       {/* Anonymization Report Dialog */}
       <Dialog open={isAnonymizationReportOpen} onOpenChange={setIsAnonymizationReportOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600">
-                <FaChessPawn size={16} />
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="p-2 bg-blue-600 rounded-lg text-white">
+                <FaChessPawn size={20} />
               </div>
-              Report Anonimizzazione (Zero-Data)
+              Analisi Privacy Local (Zero-Data)
             </DialogTitle>
-            <DialogDescription>
-              I seguenti dati sensibili sono stati sostituiti con dei token prima dell&apos;invio all&apos;intelligenza artificiale.
+            <DialogDescription className="text-slate-600">
+              Abbiamo individuato i seguenti dati sensibili. Questi dati <strong>non lasceranno mai il tuo computer</strong> e verranno sostituiti con dei token durante l&apos;elaborazione AI.
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[300px] mt-4 border rounded-md overflow-hidden">
+          <ScrollArea className="max-h-[400px] mt-4 border rounded-xl overflow-hidden shadow-inner bg-slate-50/50">
             <div className="p-0">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 sticky top-0 z-10">
+              <table className="w-full text-sm border-collapse">
+                <thead className="bg-slate-100/80 backdrop-blur sticky top-0 z-10 border-b">
                   <tr>
-                    <th className="text-left py-2 px-3 font-semibold border-b bg-slate-50">Token IA</th>
-                    <th className="text-left py-2 px-3 font-semibold border-b bg-slate-50">Dato Reale</th>
+                    <th className="text-left py-3 px-4 font-bold text-slate-700 w-1/3">Token Privacy</th>
+                    <th className="text-left py-3 px-4 font-bold text-slate-700 w-2/3">Valore Originale</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y bg-white">
                   {Object.entries(reportVault).length > 0 ? (
                     (() => {
-                      // Deduplicate values for display: if multiple tokens point to same value, keep them but show grouped?
-                      // Actually, the backend now ensures 1 Token per 1 Value. 
-                      // Let's just make sure we sort them for better readability.
                       const sortedEntries = Object.entries(reportVault).sort((a, b) => a[0].localeCompare(b[0]));
                       return sortedEntries.map(([token, value]) => {
                         const count = reportVaultCounts[token] || 0;
+                        // Estrai la categoria dal token [CATEGORIA_X]
+                        const category = token.substring(1, token.lastIndexOf('_'));
+
                         return (
-                          <tr key={token} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-2 px-3 align-top font-mono text-indigo-600 font-bold whitespace-nowrap">{token}</td>
-                            <td className="py-2 px-3 align-top break-all font-medium">
-                              {value} {count > 1 && <span className="text-[10px] text-slate-400 font-normal ml-1">({count})</span>}
+                          <tr key={token} className="hover:bg-blue-50/30 transition-colors group">
+                            <td className="py-3 px-4 align-top">
+                              <div className="flex flex-col gap-1">
+                                <span className="font-mono text-xs text-blue-700 font-bold px-2 py-0.5 bg-blue-50 border border-blue-100 rounded inline-block w-fit">
+                                  {token}
+                                </span>
+                                <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold ml-1">
+                                  {category}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 align-top">
+                              <div className="text-slate-900 font-semibold break-words leading-relaxed">
+                                {value}
+                                {count > 1 && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border">
+                                    {count} occorrenze
+                                  </span>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1469,8 +1526,8 @@ export function DocumentCompilerSection({
                     })()
                   ) : (
                     <tr>
-                      <td colSpan={2} className="py-8 text-center text-muted-foreground italic">
-                        Nessun dato anonimizzato rilevato.
+                      <td colSpan={2} className="py-12 text-center text-slate-400 italic bg-white">
+                        Nessun dato sensibile rilevato nel documento.
                       </td>
                     </tr>
                   )}
