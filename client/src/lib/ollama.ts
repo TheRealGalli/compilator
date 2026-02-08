@@ -32,8 +32,9 @@ async function fetchViaBridge(url: string, options: any): Promise<any> {
         const requestId = Math.random().toString(36).substring(7);
         const timeout = setTimeout(() => {
             window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+            console.warn(`[GromitBridge] TIMEOUT su ${url} dopo 120s`);
             resolve({ success: false, error: 'TIMEOUT', status: 408 });
-        }, 60000); // 60 secondi: l'inferenza locale richiede tempo!
+        }, 120000); // Alzato a 120s per gestire chunk 8k su modelli pesanti
 
         const handler = (event: any) => {
             if (event.detail.requestId === requestId) {
@@ -139,31 +140,71 @@ export async function testOllamaConnection(): Promise<boolean> {
 }
 
 /**
- * Recupera la versione della Gromit Bridge.
+ * Recupera la versione della Gromit Bridge con un piccolo retry per evitare race conditions all'avvio.
  */
-async function getBridgeVersion(): Promise<string> {
-    if (!isBridgeAvailable()) return "0.0.0";
-    return new Promise((resolve) => {
-        const requestId = Math.random().toString(36).substring(7);
-        const timeout = setTimeout(() => {
-            window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
-            resolve("0.0.0");
-        }, 2000);
+async function getBridgeVersion(retries = 2): Promise<string> {
+    for (let i = 0; i <= retries; i++) {
+        if (!isBridgeAvailable()) {
+            if (i < retries) await new Promise(r => setTimeout(r, 500));
+            continue;
+        }
 
-        const handler = (event: any) => {
-            if (event.detail.requestId === requestId) {
-                clearTimeout(timeout);
+        const version = await new Promise<string>((resolve) => {
+            const requestId = Math.random().toString(36).substring(7);
+            const timeout = setTimeout(() => {
                 window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
-                resolve(event.detail.response?.version || "1.0.0");
-            }
-        };
+                resolve("0.0.0");
+            }, 2000);
 
-        window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
-        window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
-            detail: { detail: { type: 'GET_VERSION' }, requestId }
-        }));
-    });
+            const handler = (event: any) => {
+                if (event.detail.requestId === requestId) {
+                    clearTimeout(timeout);
+                    window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+                    resolve(event.detail.response?.version || "1.0.0");
+                }
+            };
+
+            window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+            window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
+                detail: { detail: { type: 'GET_VERSION' }, requestId }
+            }));
+        });
+
+        if (version !== "0.0.0") return version;
+        if (i < retries) await new Promise(r => setTimeout(r, 500));
+    }
+    return "0.0.0";
 }
+
+// Prompt unificato per massima precisione
+const SHARED_MISSION_PROMPT = `MISSION: High-Precision PII Extraction.
+You are a Cyber-Security Expert specialized in Identity Discovery. Your task is to extract REAL personal and sensitive data from the <INPUT_DATA> provided.
+
+CORE DIRECTIVE:
+Identify only ACTUAL values that belong to a specific person or entity. 
+IGNORE all form instructions, boilerplate rules, general legal text, and non-personal field labels.
+
+GROUNDING RULES:
+1. ONLY EXTRACT REAL DATA. If no personal info exists, output ABSOLUTELY NOTHING.
+2. NO HALLUCinations. Never invent names, phone numbers, or any example data.
+3. IGNORE instructions like "Part IV must be completed" or "Applicant fax number".
+4. CAPTURE actual filled-in values (e.g., "Mario Rossi", "IT12...").
+5. CATEGORIES: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.
+
+ONE-SHOT POSITIVE EXAMPLE:
+Input: "...Taxpayer: John Doe, EIN: 12-345678, Address: 123 Main St, New York..."
+Output:
+[NOME_PERSONA] John Doe
+[CODICE_FISCALE] 12-345678
+[INDIRIZZO] 123 Main St, New York
+
+ONE-SHOT NEGATIVE EXAMPLE:
+Input: "...Part VIII - List of all foreign related parties. Cat. No. 16055N. Form SS-4 must be signed by applicant. Military/National Guard..."
+Output: (NOTHING)
+
+FINAL FORMATTING:
+Output exactly one finding per line in the format: [CATEGORY] Value
+No JSON. No prose. No explanations.`;
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
@@ -178,16 +219,12 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
             const handler = (event: any) => {
                 if (event.detail.requestId === requestId) {
                     window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
-                    resolve(event.detail.response?.findings || []);
+                    const findings = event.detail.response?.findings || [];
+                    console.log(`[OllamaLocal] Turbo Pipeline completata: ${findings.length} elementi trovati.`);
+                    resolve(findings);
                 }
             };
             window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
-
-            // Definiamo il prompt qui per coerenza
-            const systemPrompt = `MISSION: High-Precision PII Extraction.
-Identify only ACTUAL values that belong to a specific person or entity. 
-IGNORE all form instructions, boilerplate rules, general legal text, and non-personal field labels.
-Categories: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.`;
 
             window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
                 detail: {
@@ -196,13 +233,15 @@ Categories: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FIS
                         text,
                         url: currentBaseUrl,
                         model: OLLAMA_MODEL,
-                        systemPrompt
+                        systemPrompt: SHARED_MISSION_PROMPT
                     },
                     requestId
                 }
             }));
         });
     }
+
+    console.warn(`[OllamaLocal] Bridge v${version} non supporta Turbo. Fallback su splitting manuale.`);
 
     // Fallback classico se il bridge è vecchio o assente
     if (text.length <= CHUNK_SIZE) {
@@ -285,52 +324,21 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promi
 }
 
 async function _extractSingleChunk(text: string, knownValues: string[]): Promise<PIIFinding[]> {
-    console.log(`[OllamaLocal] Estrazione PII dal chunk (${text.length} caratteri)...`);
-
     const knownContext = knownValues.length > 0
         ? `\n\nALREADY IDENTIFIED DATA (DO NOT LIST THESE AGAIN):\n- ${knownValues.join('\n- ')}`
         : "";
-
-    const systemPrompt = `MISSION: High-Precision PII Extraction.
-You are a Cyber-Security Expert specialized in Identity Discovery. Your task is to extract REAL personal and sensitive data from the <INPUT_DATA> provided.
-
-CORE DIRECTIVE:
-Identify only ACTUAL values that belong to a specific person or entity. 
-IGNORE all form instructions, boilerplate rules, general legal text, and non-personal field labels.
-
-GROUNDING RULES:
-1. ONLY EXTRACT REAL DATA. If no personal info exists, output ABSOLUTELY NOTHING.
-2. NO HALLUCinations. Never invent names, phone numbers, or any example data.
-3. IGNORE instructions like "Part IV must be completed" or "Applicant fax number".
-4. CAPTURE actual filled-in values (e.g., "Mario Rossi", "IT12...").
-5. CATEGORIES: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.
-
-ONE-SHOT POSITIVE EXAMPLE:
-Input: "...Taxpayer: John Doe, EIN: 12-345678, Address: 123 Main St, New York..."
-Output:
-[NOME_PERSONA] John Doe
-[CODICE_FISCALE] 12-345678
-[INDIRIZZO] 123 Main St, New York
-
-ONE-SHOT NEGATIVE EXAMPLE:
-Input: "...Part VIII - List of all foreign related parties. Cat. No. 16055N. Form SS-4 must be signed by applicant. Military/National Guard..."
-Output: (NOTHING)
-
-FINAL FORMATTING:
-Output exactly one finding per line in the format: [CATEGORY] Value
-No JSON. No prose. No explanations.${knownContext}`;
 
     try {
         const payload = {
             model: OLLAMA_MODEL,
             messages: [
-                { role: 'system', content: systemPrompt },
+                { role: 'system', content: SHARED_MISSION_PROMPT + knownContext },
                 { role: 'user', content: `<INPUT_DATA>\n${text}\n</INPUT_DATA>` }
             ],
             stream: false,
             options: {
                 temperature: 0.1,
-                num_ctx: 16384, // Ensure enough context for 8k input
+                num_ctx: 16384,
                 num_predict: 2048,
             }
         };
