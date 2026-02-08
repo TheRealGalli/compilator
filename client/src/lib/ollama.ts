@@ -15,10 +15,13 @@ const CHUNK_SIZE = 2500;
 const CHUNK_OVERLAP = 300;
 
 /**
- * Rileva se l'estensione "Gromit Bridge" è caricata tramite un flag nel DOM.
+ * Rileva se l'estensione "Gromit Bridge" è caricata tramite flag nel DOM o window prop.
  */
 function isBridgeAvailable(): boolean {
-    return document.documentElement.getAttribute('data-gromit-bridge-active') === 'true';
+    return (
+        document.documentElement.getAttribute('data-gromit-bridge-active') === 'true' ||
+        (window as any).__GROMIT_BRIDGE_ACTIVE__ === true
+    );
 }
 
 /**

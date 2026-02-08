@@ -36,6 +36,7 @@ import { Slider } from "@/components/ui/slider";
 import { getApiUrl } from "@/lib/api-config";
 import { apiRequest } from "@/lib/queryClient";
 import { extractPIILocal } from "@/lib/ollama";
+import { useOllama } from "@/contexts/OllamaContext";
 
 import {
   Dialog,
@@ -248,6 +249,8 @@ export function DocumentCompilerSection({
     takeMasterSnapshot, restoreMasterSnapshot,
     resetSession
   } = useCompiler();
+
+  const { status: ollamaStatus } = useOllama();
 
   const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof templates | "">("");
   const [isCompiledView, setIsCompiledView] = useState(false);
@@ -493,12 +496,11 @@ export function DocumentCompilerSection({
       // --- NEW: PREVENTIVE PAWN CHECK (LOCAL-FIRST) ---
       if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval && !webResearch) {
         console.log('[DocumentCompiler] Hybrid Pawn Check triggered...');
-        const { testOllamaConnection } = await import("@/lib/ollama");
-        const isOllamaReady = await testOllamaConnection();
-        if (!isOllamaReady) {
+
+        if (ollamaStatus !== 'connected') {
           toast({
-            title: "Ollama non raggiungibile",
-            description: "Assicurati che Ollama sia attivo (`ollama serve`) e che il modello 'gemma3:1b' sia installato.",
+            title: "Ollama non connesso",
+            description: "Assicurati che Ollama sia attivo e che l'estensione Gromit Bridge sia installata.",
             variant: "destructive"
           });
           setIsCompiling(false);
