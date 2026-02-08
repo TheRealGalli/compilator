@@ -406,29 +406,43 @@ export function DocumentCompilerSection({
     setIsReviewing(true);
   };
 
+  /**
+   * Performs a purely mechanical replacement of sensitive values with tokens.
+   * Based on the "Global Sweep" strategy to ensure 100% consistency.
+   */
+  const performMechanicalGlobalSweep = (text: string, vault: Record<string, string>): string => {
+    if (!text || !vault || Object.keys(vault).length === 0) return text;
+
+    let sweptText = text;
+    // Sort vault values by length descending to replace "Carlo Galli" before "Carlo"
+    const entries = Object.entries(vault).sort((a, b) => b[1].length - a[1].length);
+
+    for (const [token, value] of entries) {
+      if (!value || value.length < 2) continue;
+      try {
+        const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        sweptText = sweptText.replace(new RegExp(escapedValue, 'g'), token);
+      } catch (err) {
+        sweptText = sweptText.split(value).join(token);
+      }
+    }
+    return sweptText;
+  };
+
   const anonymizeWithOllamaLocal = async (text: string, currentVault: Record<string, string>): Promise<{ anonymized: string; newVault: Record<string, string> }> => {
     if (!text || text.trim() === "") return { anonymized: text, newVault: currentVault };
 
     try {
       const findings = await extractPIILocal(text);
-      if (findings.length === 0) return { anonymized: text, newVault: currentVault };
-
       const vaultMap = new Map<string, string>(Object.entries(currentVault));
-      let anonymizedText = text;
 
-      // Sort findings by length descending to replace "Carlo Galli" before "Carlo"
-      const sortedFindings = findings.sort((a, b) => (b.value.length - a.value.length));
-
-      for (const finding of sortedFindings) {
+      for (const finding of findings) {
         const value = finding.value.trim();
         const category = finding.category.toUpperCase().replace(/\s+/g, '_');
-
         if (!value || value.length < 2) continue;
 
-        // SECURE DE-DUPLICATION: Check if this value already exists in the vault (case neutral)
         let token = "";
         const normalizedValue = value.toLowerCase();
-
         for (const [t, v] of vaultMap.entries()) {
           if (v.toLowerCase() === normalizedValue && t.includes(category)) {
             token = t;
@@ -437,28 +451,19 @@ export function DocumentCompilerSection({
         }
 
         if (!token) {
-          // Calculate next sequential number for this category
           let count = 0;
           for (const t of vaultMap.keys()) {
             if (t.startsWith(`[${category}_`)) count++;
           }
           token = `[${category}_${count + 1}]`;
           vaultMap.set(token, value);
-          console.log(`[OllamaLocal] New vault entry: ${token} -> ${value}`);
-        }
-
-        // Global replacement
-        try {
-          const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          anonymizedText = anonymizedText.replace(new RegExp(escapedValue, 'g'), token);
-        } catch (err) {
-          anonymizedText = anonymizedText.split(value).join(token);
         }
       }
 
+      const updatedVault = Object.fromEntries(vaultMap);
       return {
-        anonymized: anonymizedText,
-        newVault: Object.fromEntries(vaultMap)
+        anonymized: performMechanicalGlobalSweep(text, updatedVault),
+        newVault: updatedVault
       };
     } catch (err) {
       console.error("[OllamaLocal] Anonymization failed:", err);
@@ -488,57 +493,76 @@ export function DocumentCompilerSection({
       if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval && !webResearch) {
         console.log('[DocumentCompiler] Hybrid Pawn Check triggered...');
         try {
-          let currentVault = { ...guardrailVault };
+          // --- PHASE 1: SURGICAL EXTRACTION ---
+          // Identify all PII findings from all texts to build a MASTER VAULT
+          console.log('[DocumentCompiler] Phase 1: Surgical Extraction starting...');
 
-          // 1. Extract and anonymize LOCAL template
-          const { anonymized: anonTemplate, newVault: vaultAfterTemplate } = await anonymizeWithOllamaLocal(templateContent, currentVault);
-          currentVault = vaultAfterTemplate;
+          const vaultMap = new Map<string, string>(Object.entries(guardrailVault));
 
-          // 2. Extract and anonymize NOTES
-          const { anonymized: anonNotes, newVault: vaultAfterNotes } = await anonymizeWithOllamaLocal(notes, currentVault);
-          currentVault = vaultAfterNotes;
+          // Helper to extract findings and update vaultMap
+          const extractAndVault = async (text: string, vMap: Map<string, string>) => {
+            if (!text || text.trim().length === 0) return;
+            const findings = await extractPIILocal(text);
+            for (const f of findings) {
+              const value = f.value.trim();
+              const category = f.category.toUpperCase().replace(/\s+/g, '_');
+              if (!value || value.length < 2) continue;
 
-          // 3. EXTRACT TEXT FROM SOURCES (via backend privacy-safe endpoint)
-          const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
-            sources: selectedSources.map(s => ({
-              name: s.name,
-              type: s.type,
-              base64: s.base64
-            })),
-            masterSource: masterSource ? {
-              name: masterSource.name,
-              type: masterSource.type,
-              base64: masterSource.base64
-            } : null
-          });
-
-          const extractData = await extractResponse.json();
-          console.log('[DocumentCompiler] Extracted text data from server:', extractData);
-
-          // 4. Anonymize Extracted Text from Sources
-          if (extractData.success) {
-            // Anonymize standard sources
-            if (extractData.extractedSources) {
-              for (const source of extractData.extractedSources) {
-                console.log(`[DocumentCompiler] Anonymizing source: ${source.name} (length: ${source.text.length})`);
-                const { anonymized, newVault } = await anonymizeWithOllamaLocal(source.text, currentVault);
-                currentVault = newVault;
+              let token = "";
+              const normalizedValue = value.toLowerCase();
+              for (const [t, v] of vMap.entries()) {
+                if (v.toLowerCase() === normalizedValue && t.includes(category)) {
+                  token = t;
+                  break;
+                }
+              }
+              if (!token) {
+                let count = 0;
+                for (const t of vMap.keys()) {
+                  if (t.startsWith(`[${category}_`)) count++;
+                }
+                token = `[${category}_${count + 1}]`;
+                vMap.set(token, value);
               }
             }
-            // Anonymize master source
-            if (extractData.extractedMaster) {
-              console.log(`[DocumentCompiler] Anonymizing master source: ${extractData.extractedMaster.name}`);
-              const { anonymized, newVault } = await anonymizeWithOllamaLocal(extractData.extractedMaster.text, currentVault);
-              currentVault = newVault;
+          };
+
+          // 1. Extract from Template & Notes
+          await extractAndVault(templateContent, vaultMap);
+          await extractAndVault(notes, vaultMap);
+
+          // 2. Extract from sources via server for text
+          const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
+            sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
+            masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
+          });
+          const extractData = await extractResponse.json();
+          if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
+
+          if (extractData.extractedSources) {
+            for (const source of extractData.extractedSources) {
+              console.log(`[DocumentCompiler] Extracting from source: ${source.name}`);
+              await extractAndVault(source.text, vaultMap);
             }
           }
+          if (extractData.extractedMaster) {
+            console.log(`[DocumentCompiler] Extracting from master source: ${extractData.extractedMaster.name}`);
+            await extractAndVault(extractData.extractedMaster.text, vaultMap);
+          }
 
-          console.log('[DocumentCompiler] Final Vault after all sources:', currentVault);
+          const masterVault = Object.fromEntries(vaultMap);
+          console.log('[DocumentCompiler] Phase 1 Complete. Master Vault size:', vaultMap.size);
 
-          setGuardrailVault(currentVault);
-          setReportVault(currentVault);
+          // --- PHASE 2: MECHANICAL GLOBAL SWEEP ---
+          // Now that we have the full vault, replace everything in everything
+          console.log('[DocumentCompiler] Phase 2: Mechanical Global Sweep starting...');
 
-          if (Object.keys(currentVault).length === 0) {
+          // No need to store anonymized text yet as we'll re-run /api/compile with the vault
+          // but we MUST show the report with the masterVault.
+          setGuardrailVault(masterVault);
+          setReportVault(masterVault);
+
+          if (vaultMap.size === 0) {
             console.warn('[DocumentCompiler] NO PII detected in any source.');
           }
           setIsWaitingForPawnApproval(true);
@@ -565,13 +589,14 @@ export function DocumentCompilerSection({
       let finalMasterSource = masterSource ? { ...masterSource } : null;
 
       if (activeGuardrails.includes('pawn') && isWaitingForPawnApproval) {
-        // Apply the vault to everything one last time to get the tokens
-        const { anonymized: anonT } = await anonymizeWithOllamaLocal(templateContent, guardrailVault);
-        const { anonymized: anonN } = await anonymizeWithOllamaLocal(notes, guardrailVault);
-        finalTemplate = anonT;
-        finalNotes = anonN;
+        console.log('[DocumentCompiler] Applying Deterministic Global Sweep to final payload...');
 
-        // Anonymize sources too for the final request
+        // 1. Mechanical sweep for Template & Notes
+        finalTemplate = performMechanicalGlobalSweep(templateContent, guardrailVault);
+        finalNotes = performMechanicalGlobalSweep(notes, guardrailVault);
+
+        // 2. Re-extract (or fetch) texts to apply sweep to sources
+        // Note: We need the text from sources to send "anonymizedText" to the backend
         const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
           sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
           masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
@@ -579,16 +604,18 @@ export function DocumentCompilerSection({
         const extractData = await extractResponse.json();
 
         if (extractData.success) {
-          for (let i = 0; i < finalSources.length; i++) {
-            const extracted = extractData.extractedSources?.find((e: any) => e.name === finalSources[i].name);
-            if (extracted) {
-              const { anonymized } = await anonymizeWithOllamaLocal(extracted.text, guardrailVault);
-              (finalSources[i] as any).anonymizedText = anonymized;
+          if (extractData.extractedSources) {
+            for (let i = 0; i < finalSources.length; i++) {
+              const extracted = extractData.extractedSources.find((e: any) => e.name === finalSources[i].name);
+              if (extracted) {
+                console.log(`[DocumentCompiler] Sweeping source: ${finalSources[i].name}`);
+                (finalSources[i] as any).anonymizedText = performMechanicalGlobalSweep(extracted.text, guardrailVault);
+              }
             }
           }
           if (finalMasterSource && extractData.extractedMaster) {
-            const { anonymized } = await anonymizeWithOllamaLocal(extractData.extractedMaster.text, guardrailVault);
-            (finalMasterSource as any).anonymizedText = anonymized;
+            console.log(`[DocumentCompiler] Sweeping master source: ${finalMasterSource.name}`);
+            (finalMasterSource as any).anonymizedText = performMechanicalGlobalSweep(extractData.extractedMaster.text, guardrailVault);
           }
         }
       }
@@ -632,16 +659,19 @@ export function DocumentCompilerSection({
         sanitizedContent = sanitizedContent.replace(/^(\s*)\[([ xX])\]/gm, '$1- [$2]');
 
         const context = {
-          sources: selectedSources.map(s => ({
+          sources: finalSources.map(s => ({
             name: s.name,
             type: s.type,
-            base64: s.base64
+            base64: s.base64,
+            anonymizedText: (s as any).anonymizedText
           })),
-          masterSource: masterSource ? {
-            name: masterSource.name,
-            type: masterSource.type,
-            base64: masterSource.base64
-          } : null,
+          masterSource: finalMasterSource ? {
+            name: finalMasterSource.name,
+            type: finalMasterSource.type,
+            base64: finalMasterSource.base64,
+            anonymizedText: (finalMasterSource as any).anonymizedText
+          } : null
+          ,
           notes,
           temperature,
           webResearch,
