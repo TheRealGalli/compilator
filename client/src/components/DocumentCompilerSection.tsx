@@ -530,8 +530,7 @@ export function DocumentCompilerSection({
             if (!text || text.trim().length === 0) return;
             const findings = await extractPIILocal(text);
 
-            const ALLOWED = ['NOME_PERSONA', 'ORGANIZZAZIONE', 'INDIRIZZO', 'EMAIL', 'TELEFONO', 'CODICE_FISCALE', 'PARTITA_IVA'];
-            const LABEL_BLACKLIST = ['name of reporting corporation', 'employer identification number', 'total assets', 'principal business activity', 'principal business activity code', 'country of incorporation'];
+            const ALLOWED = ['NOME_PERSONA', 'ORGANIZZAZIONE', 'INDIRIZZO', 'EMAIL', 'TELEFONO', 'CODICE_FISCALE', 'PARTITA_IVA', 'ALTRO'];
 
             for (const f of findings) {
               const rawValue = f.value.trim();
@@ -540,15 +539,8 @@ export function DocumentCompilerSection({
               // 1. Validazione base
               if (!rawValue || rawValue.length < 2) continue;
 
-              // 2. Protezione contro Label-as-Value
-              if (LABEL_BLACKLIST.some(b => rawValue.toLowerCase().includes(b))) {
-                console.warn(`[DocumentCompiler] Filtrata label scambiata per valore: "${rawValue}"`);
-                continue;
-              }
-
-              // 3. Normalizzazione categoria
+              // 2. Normalizzazione categoria
               if (!ALLOWED.includes(category)) {
-                // Tentativo di mappatura intelligente
                 if (category.includes('NAME') || category.includes('PERSON')) category = 'NOME_PERSONA';
                 else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AGENT')) category = 'ORGANIZZAZIONE';
                 else if (category.includes('ADDR')) category = 'INDIRIZZO';
@@ -561,21 +553,23 @@ export function DocumentCompilerSection({
               let token = "";
               const normalizedValue = value.toLowerCase();
 
-              for (const [t, v] of vMap.entries()) {
-                if (v.toLowerCase() === normalizedValue && t.includes(category)) {
-                  token = t;
+              // GLOBAL DEDUPLICATION: Check if this EXACT value already exists in the vault (any category)
+              for (const [existingToken, existingValue] of vMap.entries()) {
+                if (existingValue.toLowerCase() === normalizedValue) {
+                  token = existingToken;
                   break;
                 }
               }
 
               if (!token) {
+                // Not in vault yet, create new token with detected category
                 let count = 0;
                 for (const t of vMap.keys()) {
                   if (t.startsWith(`[${category}_`)) count++;
                 }
                 token = `[${category}_${count + 1}]`;
                 vMap.set(token, value);
-                console.log(`[DocumentCompiler] Vault updated: ${token} -> ${value}`);
+                console.log(`[DocumentCompiler] Vault updated (Aggressive): ${token} -> ${value}`);
               }
 
               vCounts.set(token, (vCounts.get(token) || 0) + 1);
