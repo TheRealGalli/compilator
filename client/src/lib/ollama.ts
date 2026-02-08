@@ -207,19 +207,15 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promi
 async function _extractSingleChunk(text: string): Promise<PIIFinding[]> {
     console.log(`[OllamaLocal] Estrazione PII dal chunk (${text.length} caratteri)...`);
 
-    const systemPrompt = `DLP Expert specialized in Italian data (primary target) but also trained for international contexts. Extract ALL possible personal data, names, phones, and form field values as JSON from <INPUT_DATA>.
+    const systemPrompt = `DLP Expert. Extract ALL possible personal data, names, phones, and form field values from <INPUT_DATA>.
 Rules:
-- Capture everything that looks like an input or an identity, regardless of origin.
-- Output ONLY JSON: {"findings": [{"value": "...", "category": "..."}]}
+- Capture everything that looks like an input or an identity.
+- Output format: One finding per line as [CATEGORY] Value.
+- Example: [NOME_PERSONA] Mario Rossi
+- Example: [IBAN] IT1234567890123456789012345
 - Allowed categories: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.
-- Italian Patterns (Primary):
-  * NOME_PERSONA: Capture full names (Italian and foreign).
-  * CODICE_FISCALE: 16 alphanumeric characters.
-  * IBAN: International Bank Account Numbers (all origins, primarily "IT").
-  * PARTITA_IVA: 11-digit numeric strings.
-  * INDIRIZZO: Addresses (Italian and international formats).
 - Be extremely thorough. Better to include too much than too little.
-- NO prose. NO repeating input.`;
+- NO JSON. NO prose. NO repeating input.`;
 
     try {
         const payload = {
@@ -228,7 +224,7 @@ Rules:
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: `<INPUT_DATA>\n${text}\n</INPUT_DATA>` }
             ],
-            format: 'json',
+            // format: 'json', // Rimosso per estrazione testo semplice
             stream: false,
             options: {
                 temperature: 0.1,
@@ -242,38 +238,28 @@ Rules:
         }
         let rawResponse = data.message.content || "";
 
-        try {
-            // Tentativo 1: Parse diretto (spesso funziona se format: 'json' è attivo)
-            const parsed = JSON.parse(rawResponse);
-            return (parsed.findings || []).filter((f: any) => f.value && f.value.length > 2);
-        } catch (e) {
-            // Tentativo 2: Pulizia tramite regex (se c'è markdown o testo intorno)
-            try {
-                const jsonMatch = rawResponse.match(/[\{\[]([\s\S]*)[\}\]]/);
-                if (jsonMatch) {
-                    const parsed = JSON.parse(jsonMatch[0]);
-                    return (Array.isArray(parsed) ? parsed : (parsed.findings || [])).filter((f: any) => f.value && f.value.length > 2);
-                }
-            } catch (innerE) {
-                // Se fallisce anche la pulizia, usiamo il fallback regex ignorando la struttura JSON
-                console.debug("[OllamaLocal] JSON parse failed. Raw response for debugging:", rawResponse);
-            }
+        // Nuovo Parser Semplificato (Aggressive Text Mode)
+        const findings: PIIFinding[] = [];
+        const lines = rawResponse.split('\n');
 
-            // Fallback: estrazione grezza tramite regex degli oggetti {"value": "...", "category": "..."}
-            const findings: PIIFinding[] = [];
-            const entryRegex = /\{\s*"value":\s*"([^"]+)"\s*,\s*"category":\s*"([^"]+)"\s*\}/g;
-            let match;
-            while ((match = entryRegex.exec(rawResponse)) !== null) {
-                if (match[1] && match[1].length > 2) {
-                    findings.push({ value: match[1], category: match[2] });
+        for (const line of lines) {
+            // Cerca pattern [CATEGORIA] Valore
+            const match = line.trim().match(/^\[([A-Z_]+)\]\s*(.*)$/i);
+            if (match) {
+                const category = match[1].toUpperCase();
+                const value = match[2].trim();
+
+                if (value && value.length > 2) {
+                    findings.push({ value, category });
                 }
             }
-
-            if (findings.length > 0) {
-                console.log(`[OllamaLocal] Struttura JSON malformata, ma estratti ${findings.length} elementi tramite regex.`);
-            }
-            return findings;
         }
+
+        if (findings.length > 0) {
+            console.log(`[OllamaLocal] Estratti ${findings.length} elementi (Text Mode).`);
+        }
+
+        return findings;
     } catch (error) {
         if (error instanceof Error && error.message.includes('403')) {
             console.error('[OllamaLocal] ERRORE 403 in estrazione. Verifica l\'estensione bridge.');
