@@ -142,10 +142,10 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
     if (text.length <= CHUNK_SIZE) {
-        return _extractSingleChunk(text);
+        return _extractSingleChunk(text, []);
     }
 
-    console.log(`[OllamaLocal] Documento lungo (${text.length} caratteri). Uso splitting PARALLELO...`);
+    console.log(`[OllamaLocal] Documento lungo (${text.length} caratteri). Uso splitting PARALLELO con MEMORIA...`);
     const allFindings: PIIFinding[] = [];
     const processedValues = new Set<string>();
 
@@ -156,14 +156,16 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
         if (i + CHUNK_SIZE >= text.length) break;
     }
 
-    // Esecuzione parallela a lotti (max 3 alla volta per stabilità M1/M2)
+    // Esecuzione parallela a lotti (max 3 alla volta) con propagazione della memoria tra i lotti
     const BATCH_SIZE = 3;
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
         const currentBatch = chunks.slice(i, i + BATCH_SIZE);
-        console.log(`[OllamaLocal] Elaborazione batch chunk ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)}...`);
+        const knownList = Array.from(processedValues).slice(-100); // Passiamo gli ultimi 100 per non intasare il contesto
+
+        console.log(`[OllamaLocal] Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)} (Memory: ${knownList.length} items)...`);
 
         const batchResults = await Promise.all(
-            currentBatch.map(chunk => _extractSingleChunk(chunk).catch(err => {
+            currentBatch.map(chunk => _extractSingleChunk(chunk, knownList).catch(err => {
                 console.warn("[OllamaLocal] Errore in un chunk parallelo, salto...", err);
                 return [] as PIIFinding[];
             }))
@@ -172,7 +174,8 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
         // Unione risultati ed eliminazione duplicati
         for (const findings of batchResults) {
             for (const f of findings) {
-                const key = `${f.value.toLowerCase()}|${f.category}`;
+                const valLower = f.value.toLowerCase();
+                const key = `${valLower}|${f.category}`;
                 if (!processedValues.has(key)) {
                     allFindings.push(f);
                     processedValues.add(key);
@@ -217,18 +220,22 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promi
     throw new Error('Retries exhausted');
 }
 
-async function _extractSingleChunk(text: string): Promise<PIIFinding[]> {
+async function _extractSingleChunk(text: string, knownValues: string[]): Promise<PIIFinding[]> {
     console.log(`[OllamaLocal] Estrazione PII dal chunk (${text.length} caratteri)...`);
+
+    const knownContext = knownValues.length > 0
+        ? `\n\nALREADY KNOWN DATA (DO NOT LIST THESE AGAIN):\n- ${knownValues.join('\n- ')}`
+        : "";
 
     const systemPrompt = `DLP Expert. Extract ALL possible personal data, names, phones, and form field values from <INPUT_DATA>.
 Rules:
-- Capture everything that looks like an input or an identity.
+- Capture everything that looks like an input, an identity, or a specific value.
+- EXTRACT ONLY EXISTING DATA. DO NOT GENERATE SYNTHETIC OR EXAMPLE DATA.
+- If no PII is found, output NOTHING.
+- IGNORE form instructions, rules, or general labels if they don't have a specific value attached.
+- Focus on: Full Names, Organizations, Addresses, Emails, Phones, Codice Fiscale, Partita IVA, IBAN.
 - Output format: One finding per line as [CATEGORY] Value.
-- Example: [NOME_PERSONA] Mario Rossi
-- Example: [IBAN] IT1234567890123456789012345
-- Allowed categories: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA, IBAN, ALTRO.
-- Be extremely thorough. Better to include too much than too little.
-- NO JSON. NO prose. NO repeating input.`;
+- NO JSON. NO prose. NO repetitions.${knownContext}`;
 
     try {
         const payload = {
@@ -251,7 +258,7 @@ Rules:
         }
         let rawResponse = data.message.content || "";
 
-        // Nuovo Parser Semplificato (Aggressive Text Mode)
+        // Semplificato Parser (Text Mode)
         const findings: PIIFinding[] = [];
         const lines = rawResponse.split('\n');
 
@@ -262,7 +269,10 @@ Rules:
                 const category = match[1].toUpperCase();
                 const value = match[2].trim();
 
-                if (value && value.length > 2) {
+                // Anti-hallucination check: ensure value is not a generic placeholder
+                const isPlaceholder = /\[.*\]|example|not specified|information not|synthetic|NOME_PERSONA_\d+/i.test(value);
+
+                if (value && value.length > 2 && !isPlaceholder) {
                     findings.push({ value, category });
                 }
             }
