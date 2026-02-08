@@ -273,6 +273,7 @@ export function DocumentCompilerSection({
 
   const [isAnonymizationReportOpen, setIsAnonymizationReportOpen] = useState(false);
   const [reportVault, setReportVault] = useState<Record<string, string>>({});
+  const [reportVaultCounts, setReportVaultCounts] = useState<Record<string, number>>({});
   const [isWaitingForPawnApproval, setIsWaitingForPawnApproval] = useState(false);
 
   const handleMention = (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => {
@@ -492,15 +493,28 @@ export function DocumentCompilerSection({
       // --- NEW: PREVENTIVE PAWN CHECK (LOCAL-FIRST) ---
       if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval && !webResearch) {
         console.log('[DocumentCompiler] Hybrid Pawn Check triggered...');
+        const { testOllamaConnection } = await import("@/lib/ollama");
+        const isOllamaReady = await testOllamaConnection();
+        if (!isOllamaReady) {
+          toast({
+            title: "Ollama non raggiungibile",
+            description: "Assicurati che Ollama sia attivo (`ollama serve`) e che il modello 'gemma3:1b' sia installato.",
+            variant: "destructive"
+          });
+          setIsCompiling(false);
+          return;
+        }
+
         try {
           // --- PHASE 1: SURGICAL EXTRACTION ---
           // Identify all PII findings from all texts to build a MASTER VAULT
           console.log('[DocumentCompiler] Phase 1: Surgical Extraction starting...');
 
           const vaultMap = new Map<string, string>(Object.entries(guardrailVault));
+          const vaultCounts = new Map<string, number>();
 
           // Helper to extract findings and update vaultMap
-          const extractAndVault = async (text: string, vMap: Map<string, string>) => {
+          const extractAndVault = async (text: string, vMap: Map<string, string>, vCounts: Map<string, number>) => {
             if (!text || text.trim().length === 0) return;
             const findings = await extractPIILocal(text);
             for (const f of findings) {
@@ -524,43 +538,48 @@ export function DocumentCompilerSection({
                 token = `[${category}_${count + 1}]`;
                 vMap.set(token, value);
               }
+
+              // Increment occurrences for this token (meaning this value)
+              vCounts.set(token, (vCounts.get(token) || 0) + 1);
             }
           };
 
           // 1. Extract from Template & Notes
-          await extractAndVault(templateContent, vaultMap);
-          await extractAndVault(notes, vaultMap);
+          console.log(`[DocumentCompiler] Extracting from Template...`);
+          await extractAndVault(templateContent, vaultMap, vaultCounts);
+          console.log(`[DocumentCompiler] Extracting from Notes...`);
+          await extractAndVault(notes, vaultMap, vaultCounts);
 
-          // 2. Extract from sources via server for text
+          // 2. Extract texts from sources via backend for Phase 1
           const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
             sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
             masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
           });
+
           const extractData = await extractResponse.json();
           if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
 
+          // Continue extracting from sources
           if (extractData.extractedSources) {
             for (const source of extractData.extractedSources) {
-              console.log(`[DocumentCompiler] Extracting from source: ${source.name}`);
-              await extractAndVault(source.text, vaultMap);
+              console.log(`[DocumentCompiler] Extracting PII from source: ${source.name}`);
+              await extractAndVault(source.text, vaultMap, vaultCounts);
             }
           }
           if (extractData.extractedMaster) {
-            console.log(`[DocumentCompiler] Extracting from master source: ${extractData.extractedMaster.name}`);
-            await extractAndVault(extractData.extractedMaster.text, vaultMap);
+            console.log(`[DocumentCompiler] Extracting PII from master source: ${extractData.extractedMaster.name}`);
+            await extractAndVault(extractData.extractedMaster.text, vaultMap, vaultCounts);
           }
 
           const masterVault = Object.fromEntries(vaultMap);
+          const masterCounts = Object.fromEntries(vaultCounts);
           console.log('[DocumentCompiler] Phase 1 Complete. Master Vault size:', vaultMap.size);
+          console.log('[DocumentCompiler] Vault Findings:', masterVault);
 
           // --- PHASE 2: MECHANICAL GLOBAL SWEEP ---
-          // Now that we have the full vault, replace everything in everything
-          console.log('[DocumentCompiler] Phase 2: Mechanical Global Sweep starting...');
-
-          // No need to store anonymized text yet as we'll re-run /api/compile with the vault
-          // but we MUST show the report with the masterVault.
           setGuardrailVault(masterVault);
           setReportVault(masterVault);
+          setReportVaultCounts(masterCounts);
 
           if (vaultMap.size === 0) {
             console.warn('[DocumentCompiler] NO PII detected in any source.');
@@ -1434,12 +1453,17 @@ export function DocumentCompilerSection({
                       // Actually, the backend now ensures 1 Token per 1 Value. 
                       // Let's just make sure we sort them for better readability.
                       const sortedEntries = Object.entries(reportVault).sort((a, b) => a[0].localeCompare(b[0]));
-                      return sortedEntries.map(([token, value]) => (
-                        <tr key={token} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-2 px-3 align-top font-mono text-indigo-600 font-bold whitespace-nowrap">{token}</td>
-                          <td className="py-2 px-3 align-top break-all">{value}</td>
-                        </tr>
-                      ));
+                      return sortedEntries.map(([token, value]) => {
+                        const count = reportVaultCounts[token] || 0;
+                        return (
+                          <tr key={token} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-2 px-3 align-top font-mono text-indigo-600 font-bold whitespace-nowrap">{token}</td>
+                            <td className="py-2 px-3 align-top break-all font-medium">
+                              {value} {count > 1 && <span className="text-[10px] text-slate-400 font-normal ml-1">({count})</span>}
+                            </td>
+                          </tr>
+                        );
+                      });
                     })()
                   ) : (
                     <tr>

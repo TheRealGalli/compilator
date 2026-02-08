@@ -11,8 +11,27 @@ export interface PIIFinding {
 const OLLAMA_URL = 'http://localhost:11434/api/chat';
 const OLLAMA_MODEL = 'gemma3:1b';
 
-const CHUNK_SIZE = 1500;
-const CHUNK_OVERLAP = 200;
+const CHUNK_SIZE = 2500; // Increased for better context
+const CHUNK_OVERLAP = 300;
+
+/**
+ * Diagnostic utility to check if Ollama is reachable and has the model loaded.
+ */
+export async function testOllamaConnection(): Promise<boolean> {
+    try {
+        console.log(`[OllamaLocal] Testing connection to ${OLLAMA_URL}...`);
+        const response = await fetch('http://localhost:11434/api/tags');
+        if (!response.ok) return false;
+        const data = await response.json();
+        const models = data.models || [];
+        const hasModel = models.some((m: any) => m.name.startsWith(OLLAMA_MODEL));
+        console.log(`[OllamaLocal] Connection success. Model ${OLLAMA_MODEL} found: ${hasModel}`);
+        return true;
+    } catch (err) {
+        console.error(`[OllamaLocal] Connection failed. Is Ollama running with OLLAMA_ORIGINS="*"?`, err);
+        return false;
+    }
+}
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
@@ -53,17 +72,21 @@ async function _extractSingleChunk(text: string): Promise<PIIFinding[]> {
     console.log(`[OllamaLocal] Extracting PII from chunk (${text.length} chars)...`);
 
     const systemPrompt = `Sei un esperto di data privacy e protezione dati (DLP).
-Identifica TUTTI i dati sensibili (PII) nel testo fornito dall'utente.
+Identifica TUTTI i dati sensibili (PII) nel testo fornito.
 Categorie: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA.
 
-Formatta la risposta ESCLUSIVAMENTE come JSON:
-{"findings": [{"value": "il dato", "category": "CATEGORIA"}]}
+ESEMPIO 1:
+TESTO: Mi chiamo Carlo Galli e lavoro per CSD Station. Mail: carlo@galli.it
+JSON: {"findings": [{"value": "Carlo Galli", "category": "NOME_PERSONA"}, {"value": "CSD Station", "category": "ORGANIZZAZIONE"}, {"value": "carlo@galli.it", "category": "EMAIL"}]}
+
+ESEMPIO 2:
+TESTO: L'ufficio è in Via Roma 10, Milano. Tel: 02 1234567. P.IVA 12345678901.
+JSON: {"findings": [{"value": "Via Roma 10, Milano", "category": "INDIRIZZO"}, {"value": "02 1234567", "category": "TELEFONO"}, {"value": "12345678901", "category": "PARTITA_IVA"}]}
 
 REGOLE:
-1. Estrai il valore esattamente come scritto.
-2. Identifica nomi e cognomi completi.
-3. Se non trovi nulla, restituisci {"findings": []}.
-4. Restituisci SOLO il JSON, niente chiacchiere o markdown.`;
+1. Sostituisci i placeholder [DATO] con i valori reali estratti.
+2. Se non trovi nulla, restituisci {"findings": []}.
+3. Restituisci SOLO il JSON, niente chiacchiere.`;
 
     try {
         const response = await fetch(OLLAMA_URL, {
@@ -95,27 +118,49 @@ REGOLE:
             return [];
         }
 
-        // Clean up markdown noise
-        rawResponse = rawResponse.replace(/```json/g, "").replace(/```/g, "").trim();
+        console.log(`[OllamaLocal] Raw model response:`, rawResponse);
+
+        // Try to find JSON block if it's there
+        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+        const jsonToParse = jsonMatch ? jsonMatch[0] : rawResponse;
 
         try {
-            const parsed = JSON.parse(rawResponse);
+            const parsed = JSON.parse(jsonToParse);
             const findings = parsed.findings || [];
-            console.log(`[OllamaLocal] Identified ${findings.length} sensitive fields.`);
+            console.log(`[OllamaLocal] Found ${findings.length} findings via JSON parse.`);
             return findings;
         } catch (e) {
-            console.error("[OllamaLocal] FAILED to parse JSON:", rawResponse);
-            // Regex fallback
+            console.warn("[OllamaLocal] JSON parse failed, falling back to fuzzy regex.");
+            // Fuzzy regex fallback: Extract ANYTHING that looks like a value/category pair
             const findings: PIIFinding[] = [];
-            const regex = /"value":\s*"([^"]+)",\s*"category":\s*"([^"]+)"/g;
-            let match;
-            while ((match = regex.exec(rawResponse)) !== null) {
-                findings.push({ value: match[1], category: match[2] });
+
+            // Look for "value": "..." and "category": "..." even if not in the same object
+            const valReg = /"value":\s*"([^"]+)"/g;
+            const catReg = /"category":\s*"([^"]+)"/g;
+
+            const values = [];
+            const categories = [];
+
+            let vMatch;
+            while ((vMatch = valReg.exec(rawResponse)) !== null) values.push(vMatch[1]);
+
+            let cMatch;
+            while ((cMatch = catReg.exec(rawResponse)) !== null) categories.push(cMatch[1]);
+
+            // Re-pair values and categories
+            for (let i = 0; i < Math.min(values.length, categories.length); i++) {
+                findings.push({ value: values[i], category: categories[i] });
             }
+
+            console.log(`[OllamaLocal] Found ${findings.length} findings via Fuzzy Regex.`);
             return findings;
         }
     } catch (error) {
         console.error('[OllamaLocal] Extraction Error:', error);
+        // Special check for connection errors (likely CORS or Ollama not running)
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+            console.error('[OllamaLocal] Potential CORS or connection issue! Ensure OLLAMA_ORIGINS="*" is set if running outside localhost.');
+        }
         throw error;
     }
 }
