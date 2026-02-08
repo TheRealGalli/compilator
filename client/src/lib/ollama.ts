@@ -52,24 +52,20 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
 async function _extractSingleChunk(text: string): Promise<PIIFinding[]> {
     console.log(`[OllamaLocal] Extracting PII from chunk (${text.length} chars)...`);
 
-    const systemPrompt = `[INST] Sei un Agente di Estrazione Dati. Identifica TUTTI i dati sensibili.
+    const systemPrompt = `Sei un esperto di privacy. Il tuo compito è identificare TUTTI i dati sensibili nel testo fornito.
 Categorie: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA.
 
-ESEMPIO 1:
-TESTO: Mi chiamo Carlo Galli e lavoro per CSD Station. Mail: carlo@galli.it
-JSON: {"findings": [{"value": "Carlo Galli", "category": "NOME_PERSONA"}, {"value": "CSD Station", "category": "ORGANIZZAZIONE"}, {"value": "carlo@galli.it", "category": "EMAIL"}]}
-
-ESEMPIO 2:
-TESTO: L'ufficio è in Via Roma 10, Milano. Tel: 02 1234567. P.IVA 12345678901.
-JSON: {"findings": [{"value": "Via Roma 10, Milano", "category": "INDIRIZZO"}, {"value": "02 1234567", "category": "TELEFONO"}, {"value": "12345678901", "category": "PARTITA_IVA"}]}
+Formatta la risposta ESCLUSIVAMENTE come un oggetto JSON:
+{"findings": [{"value": "valore", "category": "CATEGORIA"}]}
 
 REGOLE:
-- Copia il valore ESATTAMENTE come nel testo.
-- Includi i nomi completi.
-- Restituisci SOLO il JSON.
+1. Estrai il valore esattamente come appare nel testo.
+2. Includi nomi completi.
+3. Se non trovi nulla, restituisci {"findings": []}.
+4. NON aggiungere altro testo, solo il JSON.
 
 TESTO:
-${text} [/INST]`;
+${text}`;
 
     try {
         const response = await fetch(OLLAMA_URL, {
@@ -91,11 +87,14 @@ ${text} [/INST]`;
         }
 
         const data = await response.json();
-        const rawResponse = data.response || "";
+        let rawResponse = data.response || "";
 
         if (!rawResponse || rawResponse.trim() === "") {
             return [];
         }
+
+        // Remove markdown code blocks
+        rawResponse = rawResponse.replace(/```json/g, "").replace(/```/g, "").trim();
 
         try {
             const parsed = JSON.parse(rawResponse);

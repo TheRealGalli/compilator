@@ -288,7 +288,7 @@ export function ModelSettings({
                         </Label>
                         <div className="ml-auto flex gap-3">
                           {[
-                            { id: 'pawn', icon: FaChessPawn, size: 12, label: 'Pedone', description: 'Filtro Zero-Data: Anonymizza dati personali (Nomi, P.IVA, CF, Reati) prima dell\'invio all\'IA. (Nota: Immagini escluse)' },
+                            { id: 'pawn', icon: FaChessPawn, size: 12, label: 'Pedone', description: 'Filtro Zero-Data: Anonymizza dati personali (Nomi, P.IVA, CF, Reati) prima dell\'invio all\'IA. (Nota: Immagini e Audio esclusi)' },
                             { id: 'knight', icon: FaChessKnight, size: 13, label: 'Cavallo', description: 'Prossimamente' },
                             { id: 'bishop', icon: FaChessBishop, size: 13, label: 'Alfiere', description: 'Prossimamente' },
                             { id: 'rook', icon: FaChessRook, size: 13, label: 'Torre', description: 'Prossimamente' },

@@ -514,26 +514,27 @@ export function DocumentCompilerSection({
           });
 
           const extractData = await extractResponse.json();
+          console.log('[DocumentCompiler] Extracted text data from server:', extractData);
 
           // 4. Anonymize Extracted Text from Sources
           if (extractData.success) {
             // Anonymize standard sources
             if (extractData.extractedSources) {
               for (const source of extractData.extractedSources) {
+                console.log(`[DocumentCompiler] Anonymizing source: ${source.name} (length: ${source.text.length})`);
                 const { anonymized, newVault } = await anonymizeWithOllamaLocal(source.text, currentVault);
                 currentVault = newVault;
-
-                // Store the anonymized text back in selectedSources (we'll need it for /api/compile)
-                // We don't want to mutate state directly here, but we need to track this.
-                // We'll calculate it again in the second phase or store it temporarily.
               }
             }
             // Anonymize master source
             if (extractData.extractedMaster) {
+              console.log(`[DocumentCompiler] Anonymizing master source: ${extractData.extractedMaster.name}`);
               const { anonymized, newVault } = await anonymizeWithOllamaLocal(extractData.extractedMaster.text, currentVault);
               currentVault = newVault;
             }
           }
+
+          console.log('[DocumentCompiler] Final Vault after all sources:', currentVault);
 
           setGuardrailVault(currentVault);
           setReportVault(currentVault);
@@ -1381,9 +1382,6 @@ export function DocumentCompilerSection({
             </DialogTitle>
             <DialogDescription>
               I seguenti dati sensibili sono stati sostituiti con dei token prima dell&apos;invio all&apos;intelligenza artificiale.
-              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-700 text-[10px] leading-tight">
-                <strong>NOTA:</strong> Le immagini e le foto non sono attualmente coperte dall&apos;anonimizzazione automatica.
-              </div>
             </DialogDescription>
           </DialogHeader>
 
@@ -1426,6 +1424,10 @@ export function DocumentCompilerSection({
             I dati originali non vengono inviati all&apos;intelligenza artificiale. Verranno salvati solo in questa sessione
             nel tuo browser per essere riaggiunti automaticamente al documento finale, garantendo la tua privacy.
           </p>
+
+          <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-amber-700 text-[10px] leading-tight">
+            <strong>NOTA:</strong> Le immagini, le foto e i file audio non sono attualmente coperte dall&apos;anonimizzazione automatica, in quanto supportiamo soltanto il testo.
+          </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
             <Button
