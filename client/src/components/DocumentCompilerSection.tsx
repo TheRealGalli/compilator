@@ -485,7 +485,6 @@ export function DocumentCompilerSection({
       const { getApiUrl } = await import("@/lib/api-config");
 
       // --- NEW: PREVENTIVE PAWN CHECK (LOCAL-FIRST) ---
-      // --- NEW: PREVENTIVE PAWN CHECK (LOCAL-FIRST) ---
       if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval && !webResearch) {
         console.log('[DocumentCompiler] Hybrid Pawn Check triggered...');
         try {
@@ -538,6 +537,10 @@ export function DocumentCompilerSection({
 
           setGuardrailVault(currentVault);
           setReportVault(currentVault);
+
+          if (Object.keys(currentVault).length === 0) {
+            console.warn('[DocumentCompiler] NO PII detected in any source.');
+          }
           setIsWaitingForPawnApproval(true);
           setIsAnonymizationReportOpen(true);
           setIsCompiling(false);

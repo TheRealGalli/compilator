@@ -8,7 +8,7 @@ export interface PIIFinding {
     category: string;
 }
 
-const OLLAMA_URL = 'http://localhost:11434/api/generate';
+const OLLAMA_URL = 'http://localhost:11434/api/chat';
 const OLLAMA_MODEL = 'gemma3:1b';
 
 const CHUNK_SIZE = 1500;
@@ -52,20 +52,18 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
 async function _extractSingleChunk(text: string): Promise<PIIFinding[]> {
     console.log(`[OllamaLocal] Extracting PII from chunk (${text.length} chars)...`);
 
-    const systemPrompt = `Sei un esperto di privacy. Il tuo compito è identificare TUTTI i dati sensibili nel testo fornito.
+    const systemPrompt = `Sei un esperto di data privacy e protezione dati (DLP).
+Identifica TUTTI i dati sensibili (PII) nel testo fornito dall'utente.
 Categorie: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA.
 
-Formatta la risposta ESCLUSIVAMENTE come un oggetto JSON:
-{"findings": [{"value": "valore", "category": "CATEGORIA"}]}
+Formatta la risposta ESCLUSIVAMENTE come JSON:
+{"findings": [{"value": "il dato", "category": "CATEGORIA"}]}
 
 REGOLE:
-1. Estrai il valore esattamente come appare nel testo.
-2. Includi nomi completi.
+1. Estrai il valore esattamente come scritto.
+2. Identifica nomi e cognomi completi.
 3. Se non trovi nulla, restituisci {"findings": []}.
-4. NON aggiungere altro testo, solo il JSON.
-
-TESTO:
-${text}`;
+4. Restituisci SOLO il JSON, niente chiacchiere o markdown.`;
 
     try {
         const response = await fetch(OLLAMA_URL, {
@@ -73,7 +71,10 @@ ${text}`;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: OLLAMA_MODEL,
-                prompt: systemPrompt,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `ANALIZZA QUESTO TESTO:\n\n${text}` }
+                ],
                 format: 'json',
                 stream: false,
                 options: {
@@ -87,20 +88,24 @@ ${text}`;
         }
 
         const data = await response.json();
-        let rawResponse = data.response || "";
+        let rawResponse = data.message?.content || "";
 
         if (!rawResponse || rawResponse.trim() === "") {
+            console.warn("[OllamaLocal] Empty response from model.");
             return [];
         }
 
-        // Remove markdown code blocks
+        // Clean up markdown noise
         rawResponse = rawResponse.replace(/```json/g, "").replace(/```/g, "").trim();
 
         try {
             const parsed = JSON.parse(rawResponse);
-            return parsed.findings || [];
+            const findings = parsed.findings || [];
+            console.log(`[OllamaLocal] Identified ${findings.length} sensitive fields.`);
+            return findings;
         } catch (e) {
-            console.error("[OllamaLocal] FAILED to parse JSON, trying regex fallback:", rawResponse);
+            console.error("[OllamaLocal] FAILED to parse JSON:", rawResponse);
+            // Regex fallback
             const findings: PIIFinding[] = [];
             const regex = /"value":\s*"([^"]+)",\s*"category":\s*"([^"]+)"/g;
             let match;
