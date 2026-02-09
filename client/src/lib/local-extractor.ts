@@ -162,61 +162,12 @@ function cleanText(text: string): string {
         .trim();
 }
 
-// --- HYBRID PII EXTRACTION (REGEX + NER) ---
+// --- HYBRID PII EXTRACTION REMOVED ---
+// Redirected to ollama.ts for Full Context Strategy
 
-import { scanTextCandidates } from './regex-patterns';
-import { nerEngine } from './ner-engine';
 
-export interface PIIFinding {
-    value: string;
-    category: string;
-    description?: string;
-}
 
-/**
- * Orchestrates the Hybrid PII Extraction:
- * 1. "Sniper" Layer: Strict Regex for structured data (CF, Email, IBAN).
- * 2. "Scholar" Layer: NER Model for semantic entities (Names, Orgs).
- */
-export async function scanForPII(text: string, progressCallback?: (status: string) => void): Promise<PIIFinding[]> {
-    const findings: PIIFinding[] = [];
-    const uniqueValues = new Set<string>();
-
-    // 1. REGEX PASS (Synchronous, Instant)
-    if (progressCallback) progressCallback('Running Pattern Analysis...');
-    const regexCandidates = scanTextCandidates(text);
-
-    for (const c of regexCandidates) {
-        if (!uniqueValues.has(c.value)) {
-            findings.push({ value: c.value, category: c.type });
-            uniqueValues.add(c.value);
-        }
-    }
-
-    // 2. NER PASS (Asynchronous, Intelligent)
-    try {
-        if (progressCallback) progressCallback('Loading Neural Engine...');
-        // We only run NER for text that is long enough to have context
-        if (text.length > 50) {
-            const nerEntities = await nerEngine.extractEntities(text);
-
-            for (const entity of nerEntities) {
-                // If we already found this value via regex (e.g. a name matched by "Sig."), skip or upgrade?
-                // Generelly, NER is better for names without prefixes.
-                if (!uniqueValues.has(entity.value)) {
-                    findings.push({ value: entity.value, category: entity.type });
-                    uniqueValues.add(entity.value);
-                }
-            }
-        }
-    } catch (e) {
-        console.warn('[HybridExtractor] NER failed, falling back to Regex only:', e);
-    }
-
-    if (progressCallback) progressCallback(`Scan Complete. Found ${findings.length} items.`);
-    return findings;
-}
-
+// Helper for local plaintext extraction
 async function extractPlainText(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -225,3 +176,4 @@ async function extractPlainText(file: File): Promise<string> {
         reader.readAsText(file);
     });
 }
+

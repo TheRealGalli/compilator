@@ -3,6 +3,8 @@
  * Designed to act as a deterministic "Sniper" layer before LLM processing.
  */
 
+import { NAMES_SET, SURNAMES_SET } from './data/italian-dataset';
+
 export const PII_REGEX_PATTERNS = {
     // Email: Standard RFC 5322 (simplified for practicality)
     EMAIL: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
@@ -179,6 +181,10 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
         }
     }
 
+    // --- HYBRID PII EXTRACTION (REGEX + DICTIONARY) ---
+
+
+
     // 2. HEURISTICS PASS (Names, Orgs, Places)
 
     // Helper for heuristic extraction
@@ -197,28 +203,50 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
 
             // STRICT FILTERING for NAMES
             if (type === 'FULL_NAME') {
-                const words = potentialValue.split(/\s+/);
+                const words = potentialValue.split(/\s+/).map(w => w.toUpperCase());
 
                 // Rule 1: Must be at least 2 words (Name Surname)
                 if (words.length < 2) continue;
 
                 // Rule 2: Double Capitalization Strictness
-                // EVERY word must start with an Uppercase letter.
-                // "si obbliga" -> "si" (lower) or "obbliga" (lower) => REJECT
-                // "Mario Rossi" -> "Mario" (Upper) "Rossi" (Upper) => ACCEPT
-                const isAllCapitalized = words.every(w => /^[A-ZÀÈÉÌÒÙ]/.test(w));
+                const isAllCapitalized = potentialValue.split(/\s+/).every(w => /^[A-ZÀÈÉÌÒÙ]/.test(w));
                 if (!isAllCapitalized) continue;
 
-                // Rule 3: Reject specific legal verbs even if capitalized (e.g. at start of sentence)
-                const forbiddenStarts = ['Si', 'Non', 'Vi', 'Ci', 'Le', 'Gli', 'Lo', 'Il', 'La', 'I', 'Che', 'Chi'];
-                if (forbiddenStarts.includes(words[0])) continue;
+                // Rule 3: Reject specific legal verbs/articles
+                const forbiddenStarts = ['Si', 'Non', 'Vi', 'Ci', 'Le', 'Gli', 'Lo', 'Il', 'La', 'I', 'Che', 'Chi', 'Dichiara'];
+                if (forbiddenStarts.some(f => potentialValue.startsWith(f))) continue;
+
+                // Rule 4: DICTIONARY CHECK (The "Dopata" Strategy)
+                // Check if at least ONE word is a known Name or Surname
+                const hasKnownName = words.some(w => NAMES_SET.has(w));
+                const hasKnownSurname = words.some(w => SURNAMES_SET.has(w));
+
+                // If strictly "Si impegna", it won't be in the dictionary.
+                // If "Mario Rossi", "MARIO" is in NAMES, "ROSSI" is in SURNAMES.
+                if (!hasKnownName && !hasKnownSurname) {
+                    // If it doesn't look like a name AND isn't in dictionary, be skeptical.
+                    // But we keep it as LOW confidence for Ollama to decide, UNLESS it's a verb.
+                    // User wants "Regex First" to be strict.
+                    // Let's degrade confidence if not in dictionary.
+                    // Actually, if we want "The Sniper", we might skip it if it's not in DB, 
+                    // BUT 2000 names is small. Let's keep it but mark confidence.
+                }
             }
 
-            // Basic cleanup: ignore if strictly common words often capitalized in titles
             if (potentialValue.length > 3) {
-                // Determine confidence: "Nato a" is very strong for birthplace, "Sig." is strong for name
                 let conf: 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM';
-                if (type === 'PLACE_OF_BIRTH' || type === 'FULL_NAME') conf = 'MEDIUM'; // Let LLM confirm
+
+                if (type === 'FULL_NAME') {
+                    const words = potentialValue.toUpperCase().split(' ');
+                    const nameMatch = words.some(w => NAMES_SET.has(w));
+                    const surnameMatch = words.some(w => SURNAMES_SET.has(w));
+
+                    if (nameMatch && surnameMatch) conf = 'HIGH'; // "Mario Rossi" (Both found)
+                    else if (nameMatch || surnameMatch) conf = 'MEDIUM'; // "Mario Vattelapesca" (Name found)
+                    else conf = 'LOW'; // "Pincopallo Vattelapesca" (Neither found)
+                }
+
+                if (type === 'PLACE_OF_BIRTH') conf = 'MEDIUM';
 
                 addCandidate(potentialValue, type, match.index + match[0].indexOf(potentialValue), conf);
             }

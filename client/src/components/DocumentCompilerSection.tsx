@@ -35,7 +35,8 @@ import { Slider } from "@/components/ui/slider";
 
 import { getApiUrl } from "@/lib/api-config";
 import { apiRequest } from "@/lib/queryClient";
-import { extractTextLocally, scanForPII } from "@/lib/local-extractor";
+import { extractTextLocally } from "@/lib/local-extractor";
+import { extractPIILocal } from "@/lib/ollama";
 import { useOllama } from "@/contexts/OllamaContext";
 
 import {
@@ -450,7 +451,7 @@ export function DocumentCompilerSection({
     if (!text || text.trim() === "") return { anonymized: text, newVault: currentVault };
 
     try {
-      const findings = await scanForPII(text);
+      const findings = await extractPIILocal(text);
       const vaultMap = new Map<string, string>(Object.entries(currentVault));
 
       for (const finding of findings) {
@@ -510,8 +511,15 @@ export function DocumentCompilerSection({
       if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval) {
         console.log('[DocumentCompiler] Hybrid Pawn Check triggered...');
 
-        // REMOVED OLLAMA CHECK for Hybrid NER Strategy
-        // if (ollamaStatus !== 'connected') { ... }
+        if (ollamaStatus !== 'connected') {
+          toast({
+            title: "Ollama non connesso",
+            description: "Assicurati che Ollama sia attivo e che l'estensione Gromit Bridge sia installata.",
+            variant: "destructive"
+          });
+          setIsCompiling(false);
+          return;
+        }
 
         try {
           // --- PHASE 1: SURGICAL EXTRACTION ---
@@ -524,7 +532,7 @@ export function DocumentCompilerSection({
           // Helper to extract findings and update vaultMap
           const extractAndVault = async (text: string, vMap: Map<string, string>, vCounts: Map<string, number>) => {
             if (!text || text.trim().length === 0) return;
-            const findings = await scanForPII(text);
+            const findings = await extractPIILocal(text);
 
             const ALLOWED = [
               'FULL_NAME', 'SURNAME', 'DATE_OF_BIRTH', 'PLACE_OF_BIRTH',
@@ -697,7 +705,7 @@ export function DocumentCompilerSection({
               const charCount = doc.text.length;
               console.log(`[DocumentCompiler] -> Analizzando '${doc.name}' (${charCount} char)...`);
 
-              const findings = await scanForPII(doc.text, (status) => console.log(`[NER] ${doc.name}: ${status}`));
+              const findings = await extractPIILocal(doc.text);
 
               console.log(`[DocumentCompiler] <- '${doc.name}' finito: ${findings.length} elementi trovati.`);
               return { name: doc.name, findings };

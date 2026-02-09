@@ -177,112 +177,116 @@ async function getBridgeVersion(retries = 2): Promise<string> {
 
 
 
-// Validator Prompt for Gemma 3
-const VALIDATOR_PROMPT = `MISSION: PII Validation.
-You will receive a list of "Candidates" (text snippets) with their surrounding context and a PROPOSED TYPE.
-Your job is to determine if each candidate is GENUINE and if the TYPE is correct.
+// Validator + Discovery Prompt for Gemma 3 (Full Context)
+const FULL_CONTEXT_PROMPT = `MISSION: PII Validation & Discovery.
+I will provide a TEXT CHUNK and a list of "REGEX CANDIDATES".
+Your job is to:
+1. VALIDATE candidates: Confirm if they are real persons/orgs in this context. reject verbs/common words.
+2. DISCOVER new PII: Find names/orgs/places that Regex missed.
 
 [RULES]
-1. ANALYZE context. 
-   - "Nato a [Roma]" -> [Roma] is PLACE_OF_BIRTH (CONFIRM).
-   - "Società [Acme Srl]" -> [Acme Srl] is ORGANIZATION (CONFIRM).
-   - "Sig. [Mario Rossi]" -> [Mario Rossi] is FULL_NAME (CONFIRM).
-2. COMPATIBILITY: If category is ORGANIZATION but value is a person's name (e.g. "Studio Legale [Mario Rossi]"), acceptable as ORGANIZATION or FULL_NAME.
-3. REJECT FALSE POSITIVES (STRICT):
-   - Phrases starting with verbs (e.g., "Si impegna", "Dichiara", "Continuerà") are NOT names.
-   - Sentence fragments (e.g., "non sarà tenuto") are NOT names.
-   - Creative works, generic dates ("2023").
-4. RETURN: A JSON array of IDs that are VALID.
-   Example Input: [{"id": 1, "value": "Roma", "type": "PLACE_OF_BIRTH", "context": "nato a Roma"}, {"id": 2, "value": "2024", "type": "DATE", "context": "Copyright 2024"}]
-   Example Output: [1]
-   (Because "Roma" is a valid birthplace, "2024" is copyright year).
+- Context is KING. "Rossi" in "Sig. Rossi" is a Name. "Rossi" in "colore rossi" is an adjective (Reject).
+- "Si impegna", "Dichiara", "Sottoscritto" are VERBS/ROLES, not names (Reject).
+- "Mario Rossi" (Double Cap) is usually a Name (Confirm).
 
-[CRITICAL]
-- Return ONLY the JSON array of integers. No markdown, no explanation.`;
+[OUTPUT FORMAT]
+Return a JSON array of objects:
+[{"value": "Mario Rossi", "type": "FULL_NAME"}, {"value": "Acme Srl", "type": "ORGANIZATION"}]
+- VALUE must be exactly as in text.
+- TYPE must be one of: FULL_NAME, ORGANIZATION, PLACE_OF_BIRTH, DATE_OF_BIRTH, UNKNOWN.
+- NO Markdown. NO Explanations. ONLY JSON.
+
+[INPUT DATA]
+`;
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
-    // 1. SCAN CANDIDATES (Regex + Heuristics)
+    // 1. SCAN CANDIDATES (Regex + Heuristics + Dictionary)
     const { scanTextCandidates } = await import('./regex-patterns');
     const candidates = scanTextCandidates(text);
+    console.log(`[OllamaLocal] Regex/Dict found ${candidates.length} candidates.`);
 
-    console.log(`[OllamaLocal] Found ${candidates.length} candidates.`);
+    const highConfidenceCandidates = candidates.filter(c => c.confidence === 'HIGH');
+    const lowConfidenceCandidates = candidates.filter(c => c.confidence !== 'HIGH');
 
-    const highConfidence: PIIFinding[] = [];
-    const toValidate: any[] = [];
+    // 2. PREPARE TEXT CHUNKS (For Full Context Analysis)
+    // Even though user wants "Full Context", sending 100k chars to Gemma 1B will fail/hallucinate.
+    // We chunk smart (~20k chars) to give enough context for paragraphs.
+    const CONTEXT_WINDOW = 20000;
+    const chunks = [];
+    for (let i = 0; i < text.length; i += CONTEXT_WINDOW) {
+        chunks.push(text.substring(i, i + CONTEXT_WINDOW + 1000)); // +1000 for overlap
+    }
 
-    // 2. SORT CANDIDATES
-    // High Confidence -> Auto-accept
-    // Low/Medium (Names, Dates, Phones) -> Send to LLM
-    let idCounter = 1;
-    for (const c of candidates) {
-        if (c.confidence === 'HIGH') {
-            highConfidence.push({ value: c.value, category: c.type });
-        } else {
-            // Check for obvious false positive dates (e.g. today's year alone)
-            if (c.type === 'DATE' && c.value.length < 6) continue;
+    console.log(`[OllamaLocal] Splitting document into ${chunks.length} chunks for Full-Context analysis.`);
 
-            toValidate.push({
-                id: idCounter++,
-                value: c.value,
-                type: c.type,
-                context: c.context.replace(/\n/g, ' ').substring(0, 80) // Limit context
-            });
+    const unifiedFindings = new Map<string, string>(); // Value -> Type
+
+    // Pre-populate with HIGH confidence regex (Strict Matches like IBAN, CF are always true)
+    // We don't even need to ask Gemma about IBANs, they are math patterns.
+    // We only ask Gemma about Names/Orgs/Places.
+    for (const c of highConfidenceCandidates) {
+        if (!['FULL_NAME', 'ORGANIZATION', 'PLACE_OF_BIRTH'].includes(c.type)) {
+            // It's a structured field (Email, CF, etc.) -> Accept immediately
+            unifiedFindings.set(c.value, c.type);
         }
     }
 
-    console.log(`[OllamaLocal] Auto-accepted: ${highConfidence.length}. To Validate: ${toValidate.length}.`);
+    // 3. PROCESS EACH CHUNK
+    for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
 
-    if (toValidate.length === 0) {
-        return highConfidence;
-    }
+        // Filter candidates relevant to this chunk (optimization)
+        const chunkCandidates = lowConfidenceCandidates.filter(c => chunk.includes(c.value));
+        const candidateListStr = JSON.stringify(chunkCandidates.map(c => ({ value: c.value, type: c.type })));
 
-    // 3. VALIDATE WITH GEMMA (Batched)
-    const VALIDATION_BATCH_SIZE = 20;
-    const validIds = new Set<number>();
-
-    for (let i = 0; i < toValidate.length; i += VALIDATION_BATCH_SIZE) {
-        const batch = toValidate.slice(i, i + VALIDATION_BATCH_SIZE);
-        console.log(`[OllamaLocal] Validating batch ${i} - ${i + batch.length}...`);
+        console.log(`[OllamaLocal] Analyzing Chunk ${i + 1}/${chunks.length} with ${chunkCandidates.length} hints...`);
 
         try {
+            const prompt = `${FULL_CONTEXT_PROMPT}\n\n[REGEX CANDIDATES]\n${candidateListStr}\n\n[TEXT CHUNK]\n${chunk}`;
+
             const payload = {
                 model: OLLAMA_MODEL,
-                messages: [
-                    { role: 'system', content: VALIDATOR_PROMPT },
-                    { role: 'user', content: JSON.stringify(batch) }
-                ],
+                messages: [{ role: 'user', content: prompt }],
                 stream: false,
-                options: { temperature: 0.0, num_ctx: 4096 } // Low context needed
+                options: {
+                    temperature: 0.1, // Low temp for precision
+                    num_ctx: 32000    // High context window for Input processing
+                }
             };
 
-            const data = await _extractWithRetry(payload, 2); // Less retries needed
+            const data = await _extractWithRetry(payload, 2);
             const raw = data.message?.content || "[]";
-            console.log('[DEBUG-RAW] Validator Output:', raw);
 
-            // Extract JSON array from potentially messy output
+            // Safe JSON Parse
             const jsonMatch = raw.match(/\[.*\]/s);
             if (jsonMatch) {
-                const ids = JSON.parse(jsonMatch[0]);
-                if (Array.isArray(ids)) {
-                    ids.forEach((id: number) => validIds.add(id));
+                const results = JSON.parse(jsonMatch[0]);
+                if (Array.isArray(results)) {
+                    results.forEach((item: any) => {
+                        if (item && item.value && item.value.length > 2) {
+                            // "Gemma, did you find 'Si impegna'?" -> "No"
+                            // Only valid items survive here.
+                            unifiedFindings.set(item.value, item.type);
+                        }
+                    });
                 }
             }
         } catch (e) {
-            console.warn("[OllamaLocal] Validation failed for batch:", e);
+            console.warn(`[OllamaLocal] Chunk ${i} analysis failed:`, e);
+            // Fallback: If Gemma fails, we at least keep High Confidence regex
         }
     }
 
-    // 4. MERGE RESULTS
-    const validatedFindings = toValidate
-        .filter(item => validIds.has(item.id))
-        .map(item => ({
-            value: item.value,
-            category: item.type === 'POTENTIAL_NAME' ? 'FULL_NAME' : item.type
-        }));
+    // Convert Map to Array
+    const finalResults: PIIFinding[] = [];
+    for (const [value, category] of unifiedFindings.entries()) {
+        finalResults.push({ value, category });
+    }
 
-    return [...highConfidence, ...validatedFindings];
+    console.log(`[OllamaLocal] Total Unique Findings: ${finalResults.length}`);
+    return finalResults;
 }
 
 /**
