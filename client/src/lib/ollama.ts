@@ -177,21 +177,30 @@ async function getBridgeVersion(retries = 2): Promise<string> {
 }
 
 // Prompt unificato per massima precisione (Surgical Precision 5.2 - Batch Edition)
-const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.8)
+const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.9 - EU/GDPR)
 
-OBJECTIVE: Extract legitimate, human-entered identity data from the provided text.
-CRITICAL: Maintain absolute semantic integrity. Preserve capitalization and punctuation exactly as found.
+[PHASE 0: COGNITIVE PRE-ANALYSIS]
+Before extracting data, identify:
+1. THE OBJECT (Oggetto): Document type/purpose (e.g., Contract, Invoice, Report).
+2. THE SUBJECT (Soggetto): The primary Natural Person (Interessato) this document concerns.
+3. CONTEXTUAL FILTER: Focus on the Subject. Ignore secondary names (lawyers, witnesses) unless they are also targets.
+
+[GDPR INTELLIGENCE]
+- PERSONAL DATA (Art 4): Info relating to an identified or identifiable NATURAL PERSON.
+- IDENTIFIERS: Direct (Name, Tax ID) or Indirect (IP, Geolocation, Phone).
+- SPECIAL CATEGORIES (Art 9/10): Prioritize Health, Biometrics, Genetic, Ethnic, or Criminal data.
+- EXCLUSIONS: Ignore Legal Entities/Companies (e.g., "Google LLC") unless it's a personal business email. Ignore fully anonymous/statistical data.
 
 [1. SOURCE AWARENESS]
 You are analyzing documents that may contain:
 - STATIC TEXT: Standard paragraphs.
 - FILLABLE FIELDS: Structured data from [DATI COMPILATI NEL MODULO PDF]. PRIORITIZE THESE.
-- ITALIAN TERMINOLOGY: Map common Italian terms to the PREFERRED LABELS (e.g., Nome -> FULL_NAME, Indirizzo -> FULL_ADDRESS).
+- ITALIAN TERMINOLOGY: Map common terms (e.g., Nome -> FULL_NAME, Indirizzo -> FULL_ADDRESS).
 
 [2. GROUND RULES]
 - SOURCE-ONLY: Extract ONLY from <INPUT_DATA>. 
-- NO HALLUCINATIONS: Do not "correct" names or addresses. If the source says "St.", write "St.".
-- NO BOILERPLATE: Ignore system tags like "[INSERT_NAME]" or "[DOCUMENT_TYPE]".
+- NO HALLUCINATIONS: Do not "correct" or guess names/addresses.
+- NO BOILERPLATE: Ignore placeholders like "[INSERT_NAME]".
 - NO PROSE: Output ONLY [LABEL] Value.
 
 [3. PREFERRED IDENTITY LABELS]
@@ -202,13 +211,13 @@ One finding per line: [LABEL] Value
 Example: [FULL_NAME] Carlo Galli
 
 [5. MULTILINGUAL FEW-SHOT]
-Input: "<INPUT_DATA> ...Nato a: Siena (SI). Residente in: Via Roma 1, 53100. Codice Fiscale: GLLCRL80... [DATI COMPILATI NEL MODULO PDF] Nome: Jane Smith </INPUT_DATA>"
+Input: "<INPUT_DATA> Ditta Rossi Srl. Rappresentata da: Marco Bianchi. Sede: Milano. Dipendente: Jane Smith, nata a Roma il 01/01/1990. </INPUT_DATA>"
+Memory Analysis: Obj: Employee Record. Subject: Jane Smith.
 Output:
 [FULL_NAME] Jane Smith
-[PLACE_OF_BIRTH] Siena
-[STATE_PROVINCE] SI
-[FULL_ADDRESS] Via Roma 1, 53100
-[TAX_ID] GLLCRL80...`;
+[PLACE_OF_BIRTH] Roma
+[DATE_OF_BIRTH] 01/01/1990
+[ORGANIZATION] Ditta Rossi Srl`;
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
