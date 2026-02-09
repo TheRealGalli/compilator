@@ -85,28 +85,37 @@ async function extractPdfText(file: File): Promise<string> {
         const form = pdfDoc.getForm();
         const fields = form.getFields();
 
+        console.log(`[LocalExtractor] Found ${fields.length} AcroForm fields.`);
+
         if (fields.length > 0) {
             formText += "\n\n--- DATI MODULO (ACROFORM) ---\n";
             fields.forEach(field => {
-                const name = field.getName();
-                let value = "";
+                try {
+                    const name = field.getName();
+                    let value = "";
 
-                if (field instanceof PDFTextField) {
-                    value = field.getText() || "";
-                } else if (field instanceof PDFCheckBox) {
-                    value = field.isChecked() ? "Sì" : "No";
-                } else if (field instanceof PDFDropdown) {
-                    const selected = field.getSelected();
-                    value = selected ? selected.join(', ') : "";
-                } else if (field instanceof PDFOptionList) {
-                    const selected = field.getSelected();
-                    value = selected ? selected.join(', ') : "";
-                } else if (field instanceof PDFRadioGroup) {
-                    value = field.getSelected() || "";
-                }
+                    if (field instanceof PDFTextField) {
+                        value = field.getText() || "";
+                    } else if (field instanceof PDFCheckBox) {
+                        value = field.isChecked() ? "Sì" : "No";
+                    } else if (field instanceof PDFDropdown) {
+                        const selected = field.getSelected();
+                        value = selected ? selected.join(', ') : "";
+                    } else if (field instanceof PDFOptionList) {
+                        const selected = field.getSelected();
+                        value = selected ? selected.join(', ') : "";
+                    } else if (field instanceof PDFRadioGroup) {
+                        value = field.getSelected() || "";
+                    }
 
-                if (value && value.trim() !== "") {
-                    formText += `${name}: ${value}\n`;
+                    // Debug log for each field
+                    // console.log(`[LocalExtractor] Field '${name}': '${value}'`);
+
+                    if (value && value.trim() !== "") {
+                        formText += `${name}: ${value}\n`;
+                    }
+                } catch (fieldError) {
+                    console.warn(`[LocalExtractor] Error reading field:`, fieldError);
                 }
             });
             formText += "--- FINE DATI MODULO ---\n";
@@ -116,14 +125,10 @@ async function extractPdfText(file: File): Promise<string> {
         // Don't fail the whole extraction if forms fail
     }
 
-    // 3. Fallback: Se il testo è troppo breve (< 50 chars), potrebbe essere una scansione (immagine)
-    if (fullText.length < 50 && formText.length < 50) {
-        console.warn("[LocalExtractor] PDF sembra essere una scansione (poco testo trovato). OCR richiesto.");
-        return fullText + formText + "\n\n[AVVISO: Il documento sembra essere una scansione. L'OCR locale non è ancora attivo. Il testo potrebbe non essere stato estratto correttamente.]";
-        // TODO: Integrare Tesseract.js qui per OCR locale
-    }
-
-    return cleanText(fullText + formText);
+    // DEBUG: Print start of text to check quality
+    const finalContent = cleanText(fullText + formText);
+    console.log(`[LocalExtractor] Extracted Text Preview (First 200 chars):\n${finalContent.substring(0, 200)}...`);
+    return finalContent;
 }
 
 async function extractDocxText(file: File): Promise<string> {

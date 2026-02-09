@@ -21,9 +21,10 @@ export const PII_REGEX_PATTERNS = {
     // Supports spacing groups (e.g. IT00 A123 4567...)
     IBAN: /\bIT[0-9]{2}[A-Z][0-9]{10}[0-9A-Z]{12}\b|\bIT\s*[0-9]{2}\s*[A-Z]\s*([0-9]{5}\s*){2}([0-9A-Z]{5}\s*){2}[0-9A-Z]{2}\b/g,
 
-    // Phone Numbers (Italian mobile and landline)
-    // Matches: +39 333 1234567, 333 1234567, 02 1234567, 333-1234567
-    PHONE_NUMBER: /(?:(?:\+|00)39)?\s*(?:3\d{2}|0\d{1,4})\s*[ .\-]?\s*\d{3,4}\s*[ .\-]?\s*\d{3,4}\b/g,
+    // Phone Numbers (Italian mobile/landline + International)
+    // Matches: +39..., 0039..., or standard Italian 333... 02...
+    // Now includes generic international: Prefix (1-4 digits) + 9+ digits
+    PHONE_NUMBER: /(?:(?:\+|00)\d{1,4}[\s.-]*\d{9,})|(?:(?:\+|00)39)?\s*(?:3\d{2}|0\d{1,4})\s*[ .\-]?\s*\d{3,4}\s*[ .\-]?\s*\d{3,4}\b/g,
 
     // Dates (DD/MM/YYYY or YYYY-MM-DD or DD-MM-YYYY)
     // Avoids matching simple fractions like 10/20
@@ -256,6 +257,33 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
     matchHeuristic(NAME_INDICATORS, 'FULL_NAME');
     matchHeuristic(ORGANIZATION_INDICATORS, 'ORGANIZATION');
     matchHeuristic(BIRTHPLACE_INDICATORS, 'PLACE_OF_BIRTH');
+
+    // 3. DICTIONARY SWEEP (Find "Name Surname" anywhere)
+    // This catches "Mario Rossi" even without "Sig." prefix.
+    const words = text.split(/[\s,.:;()"]+/); // Tokenize
+    for (let i = 0; i < words.length - 1; i++) {
+        const w1 = words[i].toUpperCase();
+        const w2 = words[i + 1].toUpperCase();
+
+        // Check if bigram is Name + Surname
+        if (NAMES_SET.has(w1) && SURNAMES_SET.has(w2)) {
+            // Calculate approximate index (this is rough, but effective for finding candidates)
+            // We can use the original text index if we want precision, but for scanning candidates:
+            const originalSnippet = `${words[i]} ${words[i + 1]}`;
+
+            // Check if it's already added (deduplication handles it)
+            // Verify it's not a common false positive (e.g. "Che Rossi")
+            if (w1.length > 2 && w2.length > 2) {
+                // Search for the exact occurrence in text to get real index
+                // Note: This scans text again, but ensures we get the real context.
+                const regex = new RegExp(`\\b${w1}[\\s]+${w2}\\b`, 'gi');
+                let match;
+                while ((match = regex.exec(text)) !== null) {
+                    addCandidate(match[0], 'FULL_NAME', match.index, 'HIGH');
+                }
+            }
+        }
+    }
 
     return candidates;
 }
