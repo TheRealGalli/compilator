@@ -601,49 +601,48 @@ export function DocumentCompilerSection({
             }
           };
 
-          // 1. Parallel Extraction from Template, Notes, and Sources
+          // 1. Fetch text from sources first
+          const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
+            sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
+            masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
+          });
+          const extractData = await extractResponse.json();
+          if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
+
+          // 2. Parallel Extraction from Template, Notes, and Sources
           console.log(`[DocumentCompiler] Starting QUAD-CORE Parallel Extraction...`);
 
-          const extractionResults = await Promise.all([
-            // Local components
-            (async () => {
+          const extractionPromises = [];
+
+          if (templateContent.trim()) {
+            extractionPromises.push((async () => {
               const findings = await extractPIILocal(templateContent);
               return { name: 'Template', findings };
-            })(),
-            (async () => {
+            })());
+          }
+          if (notes.trim()) {
+            extractionPromises.push((async () => {
               const findings = await extractPIILocal(notes);
               return { name: 'Note', findings };
-            })(),
-            // Multi-source extraction
-            ...(async () => {
-              const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
-                sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
-                masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
-              });
-              const extractData = await extractResponse.json();
-              if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
+            })());
+          }
 
-              const allSourcePromises = [];
-              if (extractData.extractedSources) {
-                for (const source of extractData.extractedSources) {
-                  allSourcePromises.push((async () => {
-                    const findings = await extractPIILocal(source.text);
-                    return { name: source.name, findings };
-                  })());
-                }
-              }
-              if (extractData.extractedMaster) {
-                allSourcePromises.push((async () => {
-                  const findings = await extractPIILocal(extractData.extractedMaster.text);
-                  return { name: extractData.extractedMaster.name, findings };
-                })());
-              }
-              return await Promise.all(allSourcePromises);
-            })()
-          ]);
+          if (extractData.extractedSources) {
+            for (const source of extractData.extractedSources) {
+              extractionPromises.push((async () => {
+                const findings = await extractPIILocal(source.text);
+                return { name: source.name, findings };
+              })());
+            }
+          }
+          if (extractData.extractedMaster) {
+            extractionPromises.push((async () => {
+              const findings = await extractPIILocal(extractData.extractedMaster.text);
+              return { name: extractData.extractedMaster.name, findings };
+            })());
+          }
 
-          // Flatten results (handle the nested sources array)
-          const flatResults = extractionResults.flat();
+          const flatResults = await Promise.all(extractionPromises);
 
           // 2. Sequential Vault Registration (Safe Deduplication)
           const ALLOWED = [
