@@ -609,7 +609,7 @@ export function DocumentCompilerSection({
           const extractData = await extractResponse.json();
           if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
 
-          // 2. Controlled Batch Extraction (Surgical 5.3)
+          // 2. Controlled Batch Extraction (Surgical 5.5)
           const allDocs = [
             ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent }] : []),
             ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes }] : []),
@@ -617,9 +617,9 @@ export function DocumentCompilerSection({
             ...(extractData.extractedMaster ? [extractData.extractedMaster] : [])
           ];
 
-          console.log(`[DocumentCompiler] [Surgical 5.3] Avvio Hyper-Drive su ${allDocs.length} sorgenti...`);
+          console.log(`[DocumentCompiler] [Surgical 5.5] Avvio Ultra-Drive su ${allDocs.length} sorgenti...`);
           const startTime = Date.now();
-          const DOC_BATCH_SIZE = 2;
+          const DOC_BATCH_SIZE = 4; // Batch da 4 per processare 8 documenti in 2 round (M1 optimized)
           const flatResults = [];
 
           for (let i = 0; i < allDocs.length; i += DOC_BATCH_SIZE) {

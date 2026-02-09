@@ -1,4 +1,4 @@
-const BRIDGE_VERSION = "3.2.0"; // Full-Doc Edition
+const BRIDGE_VERSION = "3.3.0"; // Ultra-Drive Edition
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'GET_VERSION') {
@@ -53,7 +53,7 @@ async function handleTurboExtraction(request, sendResponse) {
                 stream: false,
                 options: {
                     temperature: 0.1,
-                    num_ctx: 32768, // Ampia finestra per gestire interi documenti in un colpo solo
+                    num_ctx: 65536, // Ultra-Drive: 64k context per gestire flussi massicci
                     num_predict: 2048,
                     stop: ["</INPUT_DATA>", "[LABEL] ["]
                 }
