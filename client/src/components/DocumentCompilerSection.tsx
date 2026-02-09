@@ -623,12 +623,22 @@ export function DocumentCompilerSection({
             const extractData = await extractResponse.json();
             if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
 
-            allDocs = [
+            const rawDocs = [
               ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent }] : []),
               ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes }] : []),
               ...(extractData.extractedSources || []),
               ...(extractData.extractedMaster ? [extractData.extractedMaster] : [])
             ];
+            // Deduplicate by name to avoid processing the same document twice
+            const seenNames = new Set<string>();
+            allDocs = rawDocs.filter(doc => {
+              if (seenNames.has(doc.name)) {
+                console.log(`[DocumentCompiler] [Dedup] Skipping duplicate: '${doc.name}'`);
+                return false;
+              }
+              seenNames.add(doc.name);
+              return true;
+            });
             sourceTextCache.current = allDocs;
           }
 

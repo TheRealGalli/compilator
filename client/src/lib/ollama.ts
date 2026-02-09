@@ -11,8 +11,8 @@ export interface PIIFinding {
 let currentBaseUrl = 'http://localhost:11434';
 const OLLAMA_MODEL = 'gemma3:1b';
 
-const CHUNK_SIZE = 8000; // Large context for full-document mapping
-const CHUNK_OVERLAP = 1000;
+const CHUNK_SIZE = 32000; // ~32k chars, safe for Gemma 3 context
+const CHUNK_OVERLAP = 2000;
 
 /**
  * Rileva se l'estensione "Gromit Bridge" è caricata tramite flag nel DOM o window prop.
@@ -351,7 +351,7 @@ async function _extractSingleChunk(text: string, knownValues: string[]): Promise
             stream: false,
             options: {
                 temperature: 0.1,
-                num_ctx: 16384,
+                num_ctx: 131072,  // Gemma3 full 128k context
                 num_predict: 2048,
             }
         };
