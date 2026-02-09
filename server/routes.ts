@@ -442,6 +442,20 @@ async function extractText(buffer: Buffer, mimeType: string, driveId?: string): 
         }
 
         console.log(`[DEBUG extractText] PDF parsed successfully via pdfjs-dist, characters: ${fullText.length}, pages: ${doc.numPages}`);
+
+        // NEW: Capture Fillable Form Data (AcroForms) - Surgical 5.6
+        try {
+          const formFields = await getPdfFormFields(buffer);
+          const filledFields = formFields.filter(f => f.value !== undefined && f.value !== "" && f.value !== false);
+          if (filledFields.length > 0) {
+            console.log(`[DEBUG extractText] Detected ${filledFields.length} filled form fields in PDF.`);
+            const formText = filledFields.map(f => `[CAMPO MODULO: ${f.label}] [VALORE: ${f.value}]`).join('\n');
+            fullText += "\n\n--- DATI COMPILATI NEL MODULO PDF (AcroForms) ---\n" + formText + "\n--- FINE DATI MODULO ---\n";
+          }
+        } catch (formErr) {
+          console.warn("[DEBUG extractText] Error extracting AcroForm fields, skipping:", formErr);
+        }
+
         return fullText;
       } catch (pdfError) {
         console.error(`[ERROR extractText] pdfjs-dist extraction failed:`, pdfError);

@@ -36,12 +36,24 @@ export async function getPdfFormFields(buffer: Buffer): Promise<PdfFormField[]> 
             }
 
             let type: PdfFormField['type'] = 'unknown';
-            if (field instanceof PDFTextField) type = 'text';
-            else if (field instanceof PDFCheckBox) type = 'checkbox';
-            else if (field instanceof PDFDropdown) type = 'dropdown';
-            else if (field instanceof PDFRadioGroup) type = 'radio';
+            let value: string | boolean | undefined = undefined;
 
-            return { name, label: label || name, type };
+            if (field instanceof PDFTextField) {
+                type = 'text';
+                value = field.getText();
+            } else if (field instanceof PDFCheckBox) {
+                type = 'checkbox';
+                value = field.isChecked();
+            } else if (field instanceof PDFDropdown) {
+                type = 'dropdown';
+                const selected = field.getSelected();
+                value = selected.length > 0 ? selected[0] : "";
+            } else if (field instanceof PDFRadioGroup) {
+                type = 'radio';
+                value = field.getSelected();
+            }
+
+            return { name, label: label || name, type, value };
         });
     } catch (error) {
         console.error('[getPdfFormFields] Error:', error);
