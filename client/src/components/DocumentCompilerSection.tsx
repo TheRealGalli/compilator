@@ -46,6 +46,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { extractTextLocally } from "@/lib/local-extractor";
+
 import { Textarea } from "@/components/ui/textarea";
 
 
@@ -615,19 +617,63 @@ export function DocumentCompilerSection({
             console.log('[DocumentCompiler] [Cache] Using cached source texts.');
             allDocs = sourceTextCache.current;
           } else {
-            console.log('[DocumentCompiler] Fetching texts from backend...');
-            const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
-              sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
-              masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
-            });
-            const extractData = await extractResponse.json();
-            if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
+
+            console.log('[DocumentCompiler] [Local-Privacy] Extracting texts locally (Zero-Data)...');
+
+            // Helper to convert base64 to File for local extraction
+            const base64ToFile = (base64: string, filename: string, mimeType: string): File => {
+              const byteCharacters = atob(base64);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: mimeType });
+              return new File([blob], filename, { type: mimeType });
+            };
+
+            const localExtractedSources: any[] = [];
+
+            // 1. Extract Selected Sources
+            for (const source of selectedSources) {
+              if (source.base64) {
+                try {
+                  const file = base64ToFile(source.base64, source.name, source.type);
+                  // Skip images for text extraction as per original logic
+                  if (!source.type.startsWith('image/')) {
+                    const text = await extractTextLocally(file);
+                    localExtractedSources.push({ name: source.name, text });
+                  }
+                } catch (e) {
+                  console.error(`[DocumentCompiler] Local extraction failed for ${source.name}:`, e);
+                  toast({
+                    title: "Errore Lettura File",
+                    description: `Impossibile leggere ${source.name} in locale.`,
+                    variant: "destructive"
+                  });
+                }
+              }
+            }
+
+            // 2. Extract Master Source
+            let localExtractedMaster = null;
+            if (masterSource && masterSource.base64) {
+              try {
+                const file = base64ToFile(masterSource.base64, masterSource.name, masterSource.type);
+                if (!masterSource.type.startsWith('image/')) {
+                  const text = await extractTextLocally(file);
+                  localExtractedMaster = { name: masterSource.name, text };
+                }
+              } catch (e) {
+                console.error(`[DocumentCompiler] Local extraction failed for Master ${masterSource.name}:`, e);
+              }
+            }
 
             const rawDocs = [
               ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent }] : []),
               ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes }] : []),
-              ...(extractData.extractedSources || []),
-              ...(extractData.extractedMaster ? [extractData.extractedMaster] : [])
+              ...(localExtractedSources || []),
+              ...(localExtractedMaster ? [localExtractedMaster] : [])
             ];
             // Deduplicate by name to avoid processing the same document twice
             const seenNames = new Set<string>();
