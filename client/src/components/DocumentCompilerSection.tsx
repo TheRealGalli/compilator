@@ -609,40 +609,34 @@ export function DocumentCompilerSection({
           const extractData = await extractResponse.json();
           if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
 
-          // 2. Parallel Extraction from Template, Notes, and Sources
-          console.log(`[DocumentCompiler] Starting QUAD-CORE Parallel Extraction...`);
+          // 2. Controlled Batch Extraction (Surgical 5.2)
+          const allDocs = [
+            ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent }] : []),
+            ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes }] : []),
+            ...(extractData.extractedSources || []),
+            ...(extractData.extractedMaster ? [extractData.extractedMaster] : [])
+          ];
 
-          const extractionPromises = [];
+          console.log(`[DocumentCompiler] [Surgical 5.2] Avvio elaborazione di ${allDocs.length} sorgenti in batch da 2...`);
 
-          if (templateContent.trim()) {
-            extractionPromises.push((async () => {
-              const findings = await extractPIILocal(templateContent);
-              return { name: 'Template', findings };
-            })());
-          }
-          if (notes.trim()) {
-            extractionPromises.push((async () => {
-              const findings = await extractPIILocal(notes);
-              return { name: 'Note', findings };
-            })());
-          }
+          const DOC_BATCH_SIZE = 2; // Process 2 docs at a time to prevent CPU/Memory thrashing
+          const flatResults = [];
 
-          if (extractData.extractedSources) {
-            for (const source of extractData.extractedSources) {
-              extractionPromises.push((async () => {
-                const findings = await extractPIILocal(source.text);
-                return { name: source.name, findings };
-              })());
-            }
-          }
-          if (extractData.extractedMaster) {
-            extractionPromises.push((async () => {
-              const findings = await extractPIILocal(extractData.extractedMaster.text);
-              return { name: extractData.extractedMaster.name, findings };
-            })());
+          for (let i = 0; i < allDocs.length; i += DOC_BATCH_SIZE) {
+            const batch = allDocs.slice(i, i + DOC_BATCH_SIZE);
+            console.log(`[DocumentCompiler] [Batch ${(i / DOC_BATCH_SIZE) + 1}/${Math.ceil(allDocs.length / DOC_BATCH_SIZE)}] Elaborazione in corso...`);
+
+            const batchResults = await Promise.all(batch.map(async (doc) => {
+              console.log(`[DocumentCompiler] -> Estrazione da '${doc.name}' (${doc.text.length} char)...`);
+              const findings = await extractPIILocal(doc.text);
+              console.log(`[DocumentCompiler] <- '${doc.name}' completato: ${findings.length} elementi trovati.`);
+              return { name: doc.name, findings };
+            }));
+
+            flatResults.push(...batchResults);
           }
 
-          const flatResults = await Promise.all(extractionPromises);
+          console.log(`[DocumentCompiler] Tutte le estrazioni completate. Inizio registrazione vault...`);
 
           // 2. Sequential Vault Registration (Safe Deduplication)
           const ALLOWED = [

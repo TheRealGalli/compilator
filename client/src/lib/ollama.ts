@@ -176,68 +176,58 @@ async function getBridgeVersion(retries = 2): Promise<string> {
     return "0.0.0";
 }
 
-// Prompt unificato per massima precisione (Surgical Precision 5.1 - Quad-Core Edition)
-const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.1)
+// Prompt unificato per massima precisione (Surgical Precision 5.2 - Batch Edition)
+const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.2)
 
 OBJECTIVE: Extract ONLY legitimate, human-entered identity data.
 ZERO TOLERANCE for system boilerplate, legal labels, or generic placeholders.
 
 [CRITICAL RULE: SOURCE-ONLY EXTRACTION]
-Your ONLY source of truth is the text provided within the <INPUT_DATA> tags. 
-The samples provided in "CONTRASTIVE LEARNING" (below) are for logic training ONLY. 
-NEVER extract or reuse names (e.g., Marco Bianchi, David Miller), addresses, or any values from the training examples.
+Your ONLY source of truth is the text within <INPUT_DATA_CHUNK>. 
+NEVER extract text from [DOCUMENT PREAMBLE] or "CONTRASTIVE LEARNING". 
+If you see tags like "[DOCUMENT_TYPE]" or "[PHASE 0]", IGNORE THEM. They are instructions, not data.
 
 [PHASE 0: DOCUMENT CLASSIFICATION]
-Before extracting data, identify the TYPE of document provided (e.g., Tax Form, ID Card, Invoice, Email). 
-Adjust your extraction sensitivity based on the document's context.
+Identify the document type (e.g., Modello 730, IRS Form SS-4, ID Card) and adjust extraction logic. 
+DO NOT output the document type as a finding unless specifically requested by a label.
 
 JUDGMENT RULES:
-1. VALUE VS LABEL: A value is NOT real if it's identical or derivative of the field label (e.g., "Taxpayer Name: Taxpayer Name").
-2. SEMANTIC FILTRATION: Discard all generic placeholders and system-generated text:
-   * Status: N/A, None, Not Applicable, Unknown, Pending, Not Provided, Da compilare, Inserire qui.
-   * Examples: Example, yourname@example.com, john.doe, Mario Rossi (as a generic placeholder), Esempio, Sig./Sig.ra.
-   * Links: URLs starting with .gov, .edu, .org, example.com, or similar generic domains (e.g., irs.gov, agenziaentrate.it).
-   * Instructions/Boilerplate: Any text that instructs the user to fill in information, refers to legal sections, or describes the field rather than providing data.
+1. VALUE VS LABEL: A value is NOT real if it's identical to the field label or a placeholder (e.g., "[DOCUMENT_TYPE]", "Name: Name").
+2. SEMANTIC FILTRATION: Discard all generic placeholders:
+   * Status: N/A, None, Unknown, Pending, Da compilare, Inserire qui.
+   * Examples: Example, yourname@example.com, john.doe, Mario Rossi, Sig./Sig.ra.
+   * Formatting: Any text that looks like a tag, instruction, or prompt artifact (e.g., [NOME_PERSONA]).
 3. IDENTITY VALIDATION:
-   * NOME_PERSONA: Must contain 2+ words (first name and last name es Carlo Galli), no generic terms like "Officer," "Taxpayer," "Azienda," "Company," or "Ditta."
-   * COGNOME_PERSONA: Must contain at least one word, no generic terms.
-   * DATA_DI_NASCITA: Must be a valid date format.
-   * LUOGO_DI_NASCITA: Must be a recognizable location.
-   * CODICE_FISCALE: Must be a 16-character alphanumeric string (Italian pattern).
-   * PARTITA_IVA: Must be an 11-digit numeric string (Italian pattern).
-   * INDIRIZZO_COMPLETO: Must contain street name, number, city, and postal code.
-   * IBAN: Valid structure for an IBAN (e.g., starting with "IT").
-   * ORGANIZZAZIONE: Ignore generic business type labels (e.g., "Limited Liability Company"). Focus on actual business name.
+   * NOME_PERSONA: Must be a real human name. No roles ("Director", "Agent") or company names.
+   * INDIRIZZO_COMPLETO: Must be a physical address. No generic placeholders.
+   * IBAN / CODICE_FISCALE: Must follow strict alphanumeric patterns.
 
 PERSONAL DATA LABELS:
 [NOME_PERSONA], [COGNOME_PERSONA], [DATA_DI_NASCITA], [LUOGO_DI_NASCITA], [CODICE_FISCALE], [PARTITA_IVA], [INDIRIZZO_COMPLETO], [VIA], [CITTA], [PROVINCIA], [CAP], [NAZIONE], [NUMERO_TELEFONO], [EMAIL], [NUMERO_DOCUMENTO], [TIPO_DOCUMENTO], [DATA_EMISSIONE_DOCUMENTO], [DATA_SCADENZA_DOCUMENTO], [ENTE_EMITTENTE_DOCUMENTO], [SESSO], [NAZIONALITA], [PROFESSIONE], [IBAN], [ORGANIZZAZIONE], [RUOLO]
 
 RESPONSE FORMAT:
 One finding per line in format: [LABEL] Value
-No JSON. No prose.
+No JSON. No prose. No placeholder tags.
 
 CONTRASTIVE LEARNING (TRAINING ONLY - NEVER REUSE THIS DATA):
 
-[CASE A: Boilerplate Noise]
-Input: "...Taxpayer Identification Number (TIN). See instructions for Part I. Number: Unknown."
+[CASE A: Hallucinated Labels]
+Input: "[DOCUMENT PREAMBLE: Tax Form...] <INPUT_DATA_CHUNK> Name: [NOME_PERSONA] </INPUT_DATA_CHUNK>"
 Output: (NOTHING)
 
-[CASE B: Example Data]
-Input: "...Enter your email here (e.g., mario.rossi@example.com). Nome Cognome: John Doe. Indirizzo: Via Roma 1 (solo per test)..."
+[CASE B: Placeholder Noise]
+Input: "...Enter email (e.g., test@test.com). Status: Unknown. Partita IVA: [PARTITA_IVA]"
 Output: (NOTHING)
 
-[CASE C: Mixed Data & Global Context]
-Input: "...Application for Mr. David Miller (1980-07-22), Place of Birth: London, UK, Address: 10 Downing Street, London SW1A 2AA, UK. Phone: +44 20 7946 0123."
+[CASE C: Real Extraction]
+Input: "...Application for Carlo Galli (born 1980-07-22) residing at Via Roma 1, Siena, IT..."
 Output:
-[NOME_PERSONA] David Miller
+[NOME_PERSONA] Carlo Galli
 [DATA_DI_NASCITA] 1980-07-22
-[LUOGO_DI_NASCITA] London
-[NAZIONE] UK
-[INDIRIZZO_COMPLETO] 10 Downing Street, London SW1A 2AA, United Kingdom
-[VIA] 10 Downing Street
-[CITTA] London
-[CAP] SW1A 2AA
-[NUMERO_TELEFONO] +44 20 7946 0123`;
+[INDIRIZZO_COMPLETO] Via Roma 1, Siena, Italy
+[VIA] Via Roma 1
+[CITTA] Siena
+[NAZIONE] Italy`;
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
