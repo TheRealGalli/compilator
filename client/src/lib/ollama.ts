@@ -179,16 +179,20 @@ async function getBridgeVersion(retries = 2): Promise<string> {
 
 // Validator Prompt for Gemma 3
 const VALIDATOR_PROMPT = `MISSION: PII Validation.
-You will receive a list of "Candidates" (text snippets) with their surrounding context.
-Your job is to determine if each candidate is GENUINE Sensitive Personal Data (PII) or a False Positive.
+You will receive a list of "Candidates" (text snippets) with their surrounding context and a PROPOSED TYPE.
+Your job is to determine if each candidate is GENUINE and if the TYPE is correct.
 
 [RULES]
-1. ANALYZE the "context" to understand if the "value" is actually a Name, Date of Birth, or Phone Number.
-2. IGNORE: Company names (unless it's a personal ditta), creative works, generic dates (e.g. "dated 2023"), public info.
-3. RETURN: A JSON array of IDs that are VALID PII.
-   Example Input: [{"id": 1, "value": "2024", "type": "DATE", "context": "Copyright 2024"}, {"id": 2, "value": "Mario Rossi", "type": "NAME", "context": "Il Sig. Mario Rossi dichiara"}]
-   Example Output: [2]
-   (Because "2024" is a year/copyright, "Mario Rossi" is a person).
+1. ANALYZE context. 
+   - "Nato a [Roma]" -> [Roma] is PLACE_OF_BIRTH (CONFIRM).
+   - "Società [Acme Srl]" -> [Acme Srl] is ORGANIZATION (CONFIRM).
+   - "Sig. [Mario Rossi]" -> [Mario Rossi] is FULL_NAME (CONFIRM).
+2. COMPATIBILITY: If category is ORGANIZATION but value is a person's name (e.g. "Studio Legale [Mario Rossi]"), acceptable as ORGANIZATION or FULL_NAME.
+3. IGNORE: Creative works, generic dates ("2023"), public info.
+4. RETURN: A JSON array of IDs that are VALID.
+   Example Input: [{"id": 1, "value": "Roma", "type": "PLACE_OF_BIRTH", "context": "nato a Roma"}, {"id": 2, "value": "2024", "type": "DATE", "context": "Copyright 2024"}]
+   Example Output: [1]
+   (Because "Roma" is a valid birthplace, "2024" is copyright year).
 
 [CRITICAL]
 - Return ONLY the JSON array of integers. No markdown, no explanation.`;
@@ -270,7 +274,10 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // 4. MERGE RESULTS
     const validatedFindings = toValidate
         .filter(item => validIds.has(item.id))
-        .map(item => ({ value: item.value, category: item.type === 'POTENTIAL_NAME' ? 'FULL_NAME' : item.type }));
+        .map(item => ({
+            value: item.value,
+            category: item.type === 'POTENTIAL_NAME' ? 'FULL_NAME' : item.type
+        }));
 
     return [...highConfidence, ...validatedFindings];
 }

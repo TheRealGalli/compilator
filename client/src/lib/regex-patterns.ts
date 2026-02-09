@@ -41,11 +41,23 @@ export const PII_REGEX_PATTERNS = {
  * Executes all regex patterns on the text and returns a unified list of findings.
  * Handles deduplication and basic validation/normalization.
  */
-// Keywords that often precede a name in Italian documents
+// 1. NAME INDICATORS (Prefixes for people)
 const NAME_INDICATORS = [
     'Sig\\.', 'Sig\\.ra', 'Dott\\.', 'Dr\\.', 'Prof\\.', 'Avv\\.', 'Spett\\.', 'Gent\\.',
-    'sottoscritto', 'sottoscritta', 'ente', 'rappresentante', 'nato a', 'nata a', 'residente a',
-    'di', 'da', 'a', 'favore di', 'contro'
+    'sottoscritto', 'sottoscritta', 'rappresentante', 'favore di', 'contro',
+    'nominativo', 'dipendente', 'cliente', 'paziente'
+];
+
+// 2. ORGANIZATION INDICATORS (Prefixes for companies/entities)
+const ORGANIZATION_INDICATORS = [
+    'ente', 'società', 'ditta', 'azienda', 'studio', 'banca', 'istituto', 'associazione',
+    'comune di', 'provincia di', 'regione', 'ministero', 'tribunale'
+];
+
+// 3. BIRTHPLACE INDICATORS (Prefixes for places)
+const BIRTHPLACE_INDICATORS = [
+    'nato a', 'nata a', 'nati a', 'residente a', 'residente in', 'vivente a', 'domiciliato a',
+    'sito in', 'sede a', 'luogo di nascita'
 ];
 
 // Helper to grab context around a match
@@ -57,7 +69,7 @@ function getContext(text: string, index: number, matchLength: number, contextSiz
 
 export interface CandidateFinding {
     value: string;
-    type: string; // The regex category or 'POTENTIAL_NAME'
+    type: string; // The regex category or specificity (FULL_NAME, ORGANIZATION, etc.)
     context: string;
     confidence: 'HIGH' | 'MEDIUM' | 'LOW';
 }
@@ -74,7 +86,6 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
         const cleanValue = value.trim();
         if (cleanValue.length < 2) return;
 
-        // Context is vital for the LLM to decide
         const context = getContext(text, index, value.length);
         const key = `${type}:${cleanValue.toUpperCase()}`;
 
@@ -93,8 +104,6 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
             if (category === 'VAT_NUMBER' && match[1]) val = match[1];
             if (category === 'IBAN') val = val.replace(/\s+/g, '');
 
-            // Heuristic: If it matches a strict pattern like Email/IBAN/CF, it's HIGH confidence.
-            // Phone numbers can be tricky (dates), so MEDIUM.
             let conf: 'HIGH' | 'MEDIUM' | 'LOW' = 'HIGH';
             if (category === 'PHONE_NUMBER' || category === 'DATE') conf = 'MEDIUM';
 
@@ -102,21 +111,29 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
         }
     }
 
-    // 2. NAME HEURISTICS (The "Smart Search")
-    // Look for: Keyword + (Space) + Capitalized Words (2-4 words)
-    // Regex: (Keyword)\s+([A-Z][a-zàèéìòù]+\s+){1,3}[A-Z][a-zàèéìòù]+
-    const indicators = NAME_INDICATORS.join('|');
-    const nameRegex = new RegExp(`\\b(${indicators})\\s+((?:[A-Z][a-zàèéìòù]+\\s*){2,4})`, 'gi');
+    // 2. HEURISTICS PASS (Names, Orgs, Places)
 
-    let nameMatch;
-    while ((nameMatch = nameRegex.exec(text)) !== null) {
-        // match[1] is the keyword, match[2] is the potential name
-        const potentialName = nameMatch[2].trim();
-        // Ignore if it looks like a sentence start or all caps header (heuristic)
-        if (potentialName.length > 3) {
-            addCandidate(potentialName, 'POTENTIAL_NAME', nameMatch.index + nameMatch[0].indexOf(potentialName), 'LOW');
+    // Helper for heuristic extraction
+    const matchHeuristic = (indicators: string[], type: string) => {
+        const regexStr = `\\b(${indicators.join('|')})\\s+((?:[A-Z][a-zàèéìòù]+\\s*){1,4})`;
+        const regex = new RegExp(regexStr, 'gi');
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            const potentialValue = match[2].trim();
+            // Basic cleanup: ignore if strictly common words often capitalized in titles
+            if (potentialValue.length > 3 && !['Il', 'Lo', 'La', 'I', 'Gli', 'Le'].includes(potentialValue)) {
+                // Determine confidence: "Nato a" is very strong for birthplace, "Sig." is strong for name
+                let conf: 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM';
+                if (type === 'PLACE_OF_BIRTH' || type === 'FULL_NAME') conf = 'MEDIUM'; // Let LLM confirm
+
+                addCandidate(potentialValue, type, match.index + match[0].indexOf(potentialValue), conf);
+            }
         }
-    }
+    };
+
+    matchHeuristic(NAME_INDICATORS, 'FULL_NAME');
+    matchHeuristic(ORGANIZATION_INDICATORS, 'ORGANIZATION');
+    matchHeuristic(BIRTHPLACE_INDICATORS, 'PLACE_OF_BIRTH');
 
     return candidates;
 }
