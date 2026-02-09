@@ -1,4 +1,4 @@
-const BRIDGE_VERSION = "3.1.0"; // Surgical Parallel
+const BRIDGE_VERSION = "3.2.0"; // Full-Doc Edition
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'GET_VERSION') {
@@ -37,87 +37,61 @@ async function handleStandardFetch(request, sendResponse) {
 
 async function handleTurboExtraction(request, sendResponse) {
     const { text, url, model, systemPrompt } = request;
-    const CHUNK_SIZE = 8000;
-    const OVERLAP = 1000;
-    const CONCURRENCY = 4; // Ritorno a 4 slot paralleli per saturare l'M1 in hyper-drive
 
-    console.log(`[GromitHyperDrive] Avvio estrazione PII (Testo: ${text.length} char)...`);
+    console.log(`[GromitFullDoc] Avvio estrazione PII (Testo: ${text.length} char)...`);
 
-    // Capture the first 1000 chars as Document Context for all chunks
-    const docContext = text.substring(0, 1000);
-
-    // 1. Chunking interno
-    const chunks = [];
-    for (let i = 0; i < text.length; i += (CHUNK_SIZE - OVERLAP)) {
-        chunks.push(text.substring(i, i + CHUNK_SIZE));
-        if (i + CHUNK_SIZE >= text.length) break;
-    }
-
-    const allFindings = [];
-    const seenKeys = new Set();
-    const knownValues = [];
-
-    // 2. Esecuzione parallela a lotti
-    for (let i = 0; i < chunks.length; i += CONCURRENCY) {
-        const batch = chunks.slice(i, i + CONCURRENCY);
-
-        const results = await Promise.all(batch.map(async (chunk) => {
-            try {
-                const response = await fetch(`${url}/api/chat`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        model,
-                        messages: [
-                            { role: 'system', content: systemPrompt + (knownValues.length > 0 ? `\n\nALREADY KNOWN: ${knownValues.slice(-50).join(', ')}` : "") },
-                            { role: 'user', content: `[DOCUMENT PREAMBLE: ${docContext}...]\n\n<INPUT_DATA_CHUNK>\n${chunk}\n</INPUT_DATA_CHUNK>` }
-                        ],
-                        stream: false,
-                        options: {
-                            temperature: 0.1,
-                            num_ctx: 8192, // Ottimizzato per 8k chunks: riduce memoria e latenza
-                            num_predict: 1024, // Sufficiente per i risultati, velocizza la fine della generazione
-                            stop: ["</INPUT_DATA_CHUNK>", "[LABEL] ["]
-                        }
-                    })
-                });
-
-                if (!response.ok) return [];
-                const data = await response.json();
-                const content = data.message?.content || "";
-
-                // Parser linea per linea
-                const chunkFindings = [];
-                for (const line of content.split('\n')) {
-                    const match = line.match(/^\[([A-Z_]+)\]\s*(.*)$/);
-                    if (match) {
-                        const val = match[2].trim();
-                        // Filter out hallucinations like [NOME_PERSONA] or tags
-                        if (val.length > 2 && !val.includes('[') && !val.includes(']')) {
-                            chunkFindings.push({ category: match[1].toUpperCase(), value: val });
-                        }
-                    }
+    try {
+        const response = await fetch(`${url}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `<INPUT_DATA>\n${text}\n</INPUT_DATA>` }
+                ],
+                stream: false,
+                options: {
+                    temperature: 0.1,
+                    num_ctx: 32768, // Ampia finestra per gestire interi documenti in un colpo solo
+                    num_predict: 2048,
+                    stop: ["</INPUT_DATA>", "[LABEL] ["]
                 }
-                return chunkFindings;
-            } catch (err) {
-                console.error("[GromitHyperDrive] Errore chunk:", err);
-                return [];
-            }
-        }));
+            })
+        });
 
-        // 3. Merging e De-duplicazione istantanea
-        for (const chunkResults of results) {
-            for (const f of chunkResults) {
-                const key = `${f.value.toLowerCase()}|${f.category}`;
-                if (!seenKeys.has(key)) {
-                    allFindings.push(f);
-                    seenKeys.add(key);
-                    knownValues.push(f.value);
+        if (!response.ok) {
+            sendResponse({ success: false, error: `Ollama error: ${response.status}` });
+            return;
+        }
+
+        const data = await response.json();
+        const content = data.message?.content || "";
+
+        // Parser linea per linea
+        const allFindings = [];
+        const seenKeys = new Set();
+
+        for (const line of content.split('\n')) {
+            const match = line.match(/^\[([A-Z_]+)\]\s*(.*)$/);
+            if (match) {
+                const val = match[2].trim();
+                // Filtro per allucinazioni e pulizia tag
+                if (val.length > 2 && !val.includes('[') && !val.includes(']')) {
+                    const key = `${val.toLowerCase()}|${match[1]}`;
+                    if (!seenKeys.has(key)) {
+                        allFindings.push({ category: match[1].toUpperCase(), value: val });
+                        seenKeys.add(key);
+                    }
                 }
             }
         }
-    }
 
-    console.log(`[GromitHyperDrive] Completato! Elementi trovati: ${allFindings.length}`);
-    sendResponse({ success: true, findings: allFindings });
+        console.log(`[GromitFullDoc] Completato! Elementi trovati: ${allFindings.length}`);
+        sendResponse({ success: true, findings: allFindings });
+
+    } catch (err) {
+        console.error("[GromitFullDoc] Errore critico:", err);
+        sendResponse({ success: false, error: err.message });
+    }
 }

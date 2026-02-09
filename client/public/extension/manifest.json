@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "Gromit Bridge 3.1.0 (Surgical Parallel)",
-    "version": "3.1.0",
+    "name": "Gromit Bridge 3.2.0 (Full-Doc Edition)",
+    "version": "3.2.0",
     "description": "Collega Gromit all'AI locale (Ollama) superando i blocchi di sicurezza del browser.",
     "icons": {
         "128": "icon.png"
