@@ -11,8 +11,9 @@ export interface PIIFinding {
 let currentBaseUrl = 'http://localhost:11434';
 const OLLAMA_MODEL = 'gemma3:1b';
 
-const CHUNK_SIZE = 32000; // ~32k chars, safe for Gemma 3 context
-const CHUNK_OVERLAP = 2000;
+// Removed CHUNK_SIZE as we are now doing Full Text
+// const CHUNK_SIZE = 32000;
+// const CHUNK_OVERLAP = 2000;
 
 /**
  * Rileva se l'estensione "Gromit Bridge" è caricata tramite flag nel DOM o window prop.
@@ -175,8 +176,6 @@ async function getBridgeVersion(retries = 2): Promise<string> {
     return "0.0.0";
 }
 
-
-
 // Validator Prompt for Strict Mode
 // Note: The actual prompt is now generated dynamically inside extractPIILocal
 
@@ -201,22 +200,10 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     }
 
     // 2. LLM SWEEPER (Full Text Discovery)
-    // We split text into semantic chunks (~2500 chars) to allow the LLM to see full context.
-    const CHUNK_SIZE = 2500;
-    const OVERLAP = 200;
-    const chunks: string[] = [];
+    // User requested FULL DOCUMENT context.
+    console.log(`[OllamaLocal] Sending FULL TEXT (${text.length} chars) to LLM...`);
 
-    for (let i = 0; i < text.length; i += (CHUNK_SIZE - OVERLAP)) {
-        chunks.push(text.substring(i, i + CHUNK_SIZE));
-    }
-
-    console.log(`[OllamaLocal] Text split into ${chunks.length} chunks for LLM discovery.`);
-
-    // Process chunks sequentially
-    for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-
-        const prompt = `MISSION: FULL PII DISCOVERY.
+    const prompt = `MISSION: FULL PII DISCOVERY.
 I will act as a Privacy Officer. I need you to extract EVERY single piece of Personal Data (PII) from the text below.
 Do not ask "is this PII?". Instead, FIND IT.
 
@@ -235,49 +222,46 @@ Return a JSON ARRAY only.
 - "type": One of FULL_NAME, ORGANIZATION, ADDRESS, DATE, OTHER.
 
 [TEXT TO ANALYZE]
-${chunk}
+${text}
 `;
 
+    try {
+        const payload = {
+            model: OLLAMA_MODEL,
+            messages: [{ role: 'user', content: prompt }],
+            stream: false,
+            format: 'json',
+            options: {
+                temperature: 0.1,
+                num_ctx: 16384     // MAX CONTEXT (Increased to 16k to be safe for full docs)
+            }
+        };
+
+        const data = await _extractWithRetry(payload, 2);
+        let findings: any[] = [];
+
         try {
-            // Using internal helper if available or direct fetch
-            const payload = {
-                model: OLLAMA_MODEL,
-                messages: [{ role: 'user', content: prompt }],
-                stream: false,
-                format: 'json',
-                options: {
-                    temperature: 0.1, // Low temp for precision
-                    num_ctx: 4096     // Ensure large context
-                }
-            };
-
-            // Assuming _extractWithRetry is available in scope (it is in the file)
-            const data = await _extractWithRetry(payload, 2);
-            let findings: any[] = [];
-
-            try {
-                if (data.message?.content) {
-                    findings = JSON.parse(data.message.content);
-                }
-                if (!Array.isArray(findings)) findings = [];
-            } catch (e) {
-                console.warn("[OllamaLocal] Failed to parse JSON response:", data.message?.content);
+            if (data.message?.content) {
+                findings = JSON.parse(data.message.content);
             }
-
-            // Merge findings
-            for (const finding of findings) {
-                if (finding.value && finding.value.length > 2) {
-                    const val = finding.value.trim();
-                    // Upsert: LLM context is usually better for 'Type' than Regex Low Confidence.
-                    if (!unifiedFindings.has(val)) {
-                        unifiedFindings.set(val, finding.type);
-                    }
-                }
-            }
-
-        } catch (err) {
-            console.error(`[OllamaLocal] Chunk ${i + 1} failed:`, err);
+            if (!Array.isArray(findings)) findings = [];
+        } catch (e) {
+            console.warn("[OllamaLocal] Failed to parse JSON response:", data.message?.content);
         }
+
+        // Merge findings
+        for (const finding of findings) {
+            if (finding.value && finding.value.length > 2) {
+                const val = finding.value.trim();
+                // Upsert: LLM context is usually better for 'Type' than Regex Low Confidence.
+                if (!unifiedFindings.has(val)) {
+                    unifiedFindings.set(val, finding.type);
+                }
+            }
+        }
+
+    } catch (err) {
+        console.error(`[OllamaLocal] Full Text Extraction failed:`, err);
     }
 
     // 3. Convert Map to Array
@@ -322,5 +306,3 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promi
     }
     throw new Error('Retries exhausted');
 }
-
-
