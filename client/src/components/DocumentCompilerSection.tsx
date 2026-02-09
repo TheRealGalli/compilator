@@ -278,6 +278,7 @@ export function DocumentCompilerSection({
   const [reportVault, setReportVault] = useState<Record<string, string>>({});
   const [reportVaultCounts, setReportVaultCounts] = useState<Record<string, number>>({});
   const [isWaitingForPawnApproval, setIsWaitingForPawnApproval] = useState(false);
+  const sourceTextCache = useRef<Array<{ name: string; text: string }>>([]);
 
   const handleMention = (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => {
     setMentionCounts(prev => {
@@ -520,7 +521,7 @@ export function DocumentCompilerSection({
         try {
           // --- PHASE 1: SURGICAL EXTRACTION ---
           // Identify all PII findings from all texts to build a MASTER VAULT
-          console.log('[DocumentCompiler] Phase 1: Surgical Extraction starting...');
+          console.log('[DocumentCompiler] Phase 1: Surgical Extraction starting (v5.8)...');
 
           const vaultMap = new Map<string, string>(Object.entries(guardrailVault));
           const vaultCounts = new Map<string, number>();
@@ -608,25 +609,32 @@ export function DocumentCompilerSection({
             }
           };
 
-          // 1. Fetch text from sources first
-          const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
-            sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
-            masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
-          });
-          const extractData = await extractResponse.json();
-          if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
+          // 1. Fetch text from sources (with Cache)
+          let allDocs = [];
+          if (sourceTextCache.current.length > 0) {
+            console.log('[DocumentCompiler] [Cache] Using cached source texts.');
+            allDocs = sourceTextCache.current;
+          } else {
+            console.log('[DocumentCompiler] Fetching texts from backend...');
+            const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
+              sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
+              masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
+            });
+            const extractData = await extractResponse.json();
+            if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
 
-          // 2. Controlled Batch Extraction (Surgical 5.5)
-          const allDocs = [
-            ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent }] : []),
-            ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes }] : []),
-            ...(extractData.extractedSources || []),
-            ...(extractData.extractedMaster ? [extractData.extractedMaster] : [])
-          ];
+            allDocs = [
+              ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent }] : []),
+              ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes }] : []),
+              ...(extractData.extractedSources || []),
+              ...(extractData.extractedMaster ? [extractData.extractedMaster] : [])
+            ];
+            sourceTextCache.current = allDocs;
+          }
 
-          console.log(`[DocumentCompiler] [Surgical 5.5] Avvio Ultra-Drive su ${allDocs.length} sorgenti...`);
+          console.log(`[DocumentCompiler] [Surgical 5.8] Avvio Ultra-Drive su ${allDocs.length} sorgenti...`);
           const startTime = Date.now();
-          const DOC_BATCH_SIZE = 4; // Batch da 4 per processare 8 documenti in 2 round (M1 optimized)
+          const DOC_BATCH_SIZE = 1; // Instant feedback per document (Requestedized)
           const flatResults = [];
 
           for (let i = 0; i < allDocs.length; i += DOC_BATCH_SIZE) {
@@ -654,12 +662,12 @@ export function DocumentCompilerSection({
 
           // 3. Sequential Vault Registration (Safe Deduplication)
           const ALLOWED = [
-            'NOME_PERSONA', 'COGNOME_PERSONA', 'DATA_DI_NASCITA', 'LUOGO_DI_NASCITA',
-            'CODICE_FISCALE', 'PARTITA_IVA', 'INDIRIZZO_COMPLETO', 'VIA', 'CITTA',
-            'PROVINCIA', 'CAP', 'NAZIONE', 'NUMERO_TELEFONO', 'EMAIL',
-            'NUMERO_DOCUMENTO', 'TIPO_DOCUMENTO', 'DATA_EMISSIONE_DOCUMENTO',
-            'DATA_SCADENZA_DOCUMENTO', 'ENTE_EMITTENTE_DOCUMENTO', 'SESSO',
-            'NAZIONALITA', 'PROFESSIONE', 'IBAN', 'ORGANIZZAZIONE', 'RUOLO', 'ALTRO'
+            'FULL_NAME', 'SURNAME', 'DATE_OF_BIRTH', 'PLACE_OF_BIRTH',
+            'TAX_ID', 'VAT_NUMBER', 'FULL_ADDRESS', 'STREET', 'CITY',
+            'STATE_PROVINCE', 'ZIP_CODE', 'COUNTRY', 'PHONE_NUMBER', 'EMAIL',
+            'DOCUMENT_ID', 'DOCUMENT_TYPE', 'ISSUE_DATE',
+            'EXPIRY_DATE', 'ISSUING_AUTHORITY', 'GENDER',
+            'NATIONALITY', 'OCCUPATION', 'IBAN', 'ORGANIZATION', 'JOB_TITLE', 'MISC'
           ];
 
           for (const res of flatResults) {
@@ -674,22 +682,29 @@ export function DocumentCompilerSection({
               if (rawValue.includes('[') || rawValue.includes(']') || rawValue.includes('<')) continue;
               if (rawValue.toLowerCase() === 'null' || rawValue.toLowerCase() === 'undefined') continue;
 
-              // Normalization
+              // 2. Category normalization (English-First)
               if (!ALLOWED.includes(category)) {
-                if (category.includes('NAME') || category.includes('PERSON')) category = 'NOME_PERSONA';
-                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA')) category = 'ORGANIZZAZIONE';
-                else if (category.includes('ADDR') || category.includes('INDIRIZZO')) category = 'INDIRIZZO_COMPLETO';
+                if (category.includes('NAME') || category.includes('PERSON') || category.includes('NOME')) category = 'FULL_NAME';
+                else if (category.includes('SUR') || category.includes('LAST') || category.includes('COGN')) category = 'SURNAME';
+                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA') || category.includes('CORP')) category = 'ORGANIZATION';
+                else if (category.includes('ADDR') || category.includes('INDIRIZZO')) category = 'FULL_ADDRESS';
+                else if (category.includes('STREET') || category.includes('VIA')) category = 'STREET';
                 else if (category.includes('MAIL')) category = 'EMAIL';
-                else if (category.includes('TEL') || category.includes('PHONE')) category = 'NUMERO_TELEFONO';
+                else if (category.includes('TEL') || category.includes('PHONE') || category.includes('CELL')) category = 'PHONE_NUMBER';
                 else if (category.includes('BANK') || category.includes('IBAN')) category = 'IBAN';
-                else if (category.includes('CITY') || category.includes('CITTA')) category = 'CITTA';
-                else if (category.includes('PROV')) category = 'PROVINCIA';
-                else if (category.includes('COUNTRY') || category.includes('NAZIONE')) category = 'NAZIONE';
+                else if (category.includes('CITY') || category.includes('CITTA')) category = 'CITY';
+                else if (category.includes('STATE') || category.includes('PROV')) category = 'STATE_PROVINCE';
+                else if (category.includes('COUNTRY') || category.includes('NATION') || category.includes('NAZION')) category = 'COUNTRY';
+                else if (category.includes('TAX') || category.includes('SOCIAL') || category.includes('FISCAL') || category.includes('CODICE')) category = 'TAX_ID';
+                else if (category.includes('VAT') || category.includes('IVA')) category = 'VAT_NUMBER';
+                else if (category.includes('ZIP') || category.includes('POST') || category.includes('CAP')) category = 'ZIP_CODE';
                 else if (category.includes('BIRTH')) {
-                  if (category.includes('PLACE') || category.includes('LUOGO')) category = 'LUOGO_DI_NASCITA';
-                  else category = 'DATA_DI_NASCITA';
+                  if (category.includes('PLACE') || category.includes('LUOGO')) category = 'PLACE_OF_BIRTH';
+                  else category = 'DATE_OF_BIRTH';
                 }
-                else category = 'ALTRO';
+                else if (category.includes('DOC') || category.includes('NUMBER')) category = 'DOCUMENT_ID';
+                else if (category.includes('ROLE') || category.includes('JOB') || category.includes('RUOLO')) category = 'JOB_TITLE';
+                else category = 'MISC';
               }
 
               let token = "";
@@ -768,26 +783,21 @@ export function DocumentCompilerSection({
         finalNotes = performMechanicalGlobalSweep(notes, guardrailVault);
 
         // 2. Re-extract (or fetch) texts to apply sweep to sources
-        // Note: We need the text from sources to send "anonymizedText" to the backend
-        const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
-          sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
-          masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
-        });
-        const extractData = await extractResponse.json();
-
-        if (extractData.success) {
-          if (extractData.extractedSources) {
-            for (let i = 0; i < finalSources.length; i++) {
-              const extracted = extractData.extractedSources.find((e: any) => e.name === finalSources[i].name);
-              if (extracted) {
-                console.log(`[DocumentCompiler] Sweeping source: ${finalSources[i].name}`);
-                (finalSources[i] as any).anonymizedText = performMechanicalGlobalSweep(extracted.text, guardrailVault);
-              }
+        if (sourceTextCache.current.length > 0) {
+          const cached = sourceTextCache.current;
+          for (let i = 0; i < finalSources.length; i++) {
+            const extracted = cached.find(e => e.name === finalSources[i].name);
+            if (extracted) {
+              console.log(`[DocumentCompiler] [Cache] Sweeping source: ${finalSources[i].name}`);
+              (finalSources[i] as any).anonymizedText = performMechanicalGlobalSweep(extracted.text, guardrailVault);
             }
           }
-          if (finalMasterSource && extractData.extractedMaster) {
-            console.log(`[DocumentCompiler] Sweeping master source: ${finalMasterSource.name}`);
-            (finalMasterSource as any).anonymizedText = performMechanicalGlobalSweep(extractData.extractedMaster.text, guardrailVault);
+          if (finalMasterSource) {
+            const extracted = cached.find(e => e.name === finalMasterSource.name);
+            if (extracted) {
+              console.log(`[DocumentCompiler] [Cache] Sweeping master source: ${finalMasterSource.name}`);
+              (finalMasterSource as any).anonymizedText = performMechanicalGlobalSweep(extracted.text, guardrailVault);
+            }
           }
         }
       }

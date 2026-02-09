@@ -177,40 +177,38 @@ async function getBridgeVersion(retries = 2): Promise<string> {
 }
 
 // Prompt unificato per massima precisione (Surgical Precision 5.2 - Batch Edition)
-const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.7)
+const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.8)
 
-OBJECTIVE: Extract ONLY legitimate, human-entered identity data from the provided text.
-CRITICAL: Maintain absolute semantic integrity. Do not guess or modify found values.
+OBJECTIVE: Extract legitimate, human-entered identity data from the provided text.
+CRITICAL: Maintain absolute semantic integrity. Preserve capitalization and punctuation exactly as found.
 
 [1. SOURCE AWARENESS]
-You will receive data from multiple sources:
-- STATIC PDF: Text extracted from images or layout.
-- FILLABLE PDF (AcroForms): Structured fields from [DATI COMPILATI NEL MODULO PDF]. PRIORITIZE THIS DATA.
-- DOCX/CSV/TXT: Raw text or structured lists.
+You are analyzing documents that may contain:
+- STATIC TEXT: Standard paragraphs.
+- FILLABLE FIELDS: Structured data from [DATI COMPILATI NEL MODULO PDF]. PRIORITIZE THESE.
+- ITALIAN TERMINOLOGY: Map common Italian terms to the PREFERRED LABELS (e.g., Nome -> FULL_NAME, Indirizzo -> FULL_ADDRESS).
 
 [2. GROUND RULES]
-- SOURCE-ONLY: Extract ONLY from the provided <INPUT_DATA>. 
-- NO HALLUCINATIONS: If a field contains instructions (e.g., "[Insert Name]"), IGNORE IT.
-- NO PROSE: Output ONLY the labels and values.
-- DEDUPLICATION: Extract unique identities once per session.
+- SOURCE-ONLY: Extract ONLY from <INPUT_DATA>. 
+- NO HALLUCINATIONS: Do not "correct" names or addresses. If the source says "St.", write "St.".
+- NO BOILERPLATE: Ignore system tags like "[INSERT_NAME]" or "[DOCUMENT_TYPE]".
+- NO PROSE: Output ONLY [LABEL] Value.
 
 [3. PREFERRED IDENTITY LABELS]
 [FULL_NAME], [SURNAME], [DATE_OF_BIRTH], [PLACE_OF_BIRTH], [TAX_ID], [VAT_NUMBER], [FULL_ADDRESS], [STREET], [CITY], [STATE_PROVINCE], [ZIP_CODE], [COUNTRY], [PHONE_NUMBER], [EMAIL], [DOCUMENT_ID], [DOCUMENT_TYPE], [ISSUE_DATE], [EXPIRY_DATE], [ISSUING_AUTHORITY], [GENDER], [NATIONALITY], [OCCUPATION], [IBAN], [ORGANIZATION], [JOB_TITLE], [MISC]
 
-*NOTE: You are intelligent. Use descriptive English labels in [CAPS_WITH_UNDERSCORES] for any other sensitive data.*
-
 [4. FORMATTING]
 One finding per line: [LABEL] Value
-Example: [FULL_NAME] John Doe
+Example: [FULL_NAME] Carlo Galli
 
-[5. FEW-SHOT EXAMPLES]
-Input: "<INPUT_DATA> Name: [Insert Here]. Employee: Jane Smith (ID: 12345). Home: 123 Maple St, NYC. </INPUT_DATA>"
+[5. MULTILINGUAL FEW-SHOT]
+Input: "<INPUT_DATA> ...Nato a: Siena (SI). Residente in: Via Roma 1, 53100. Codice Fiscale: GLLCRL80... [DATI COMPILATI NEL MODULO PDF] Nome: Jane Smith </INPUT_DATA>"
 Output:
 [FULL_NAME] Jane Smith
-[DOCUMENT_ID] 12345
-[FULL_ADDRESS] 123 Maple St, NYC
-[CITY] New York City
-[STATE_PROVINCE] NY`;
+[PLACE_OF_BIRTH] Siena
+[STATE_PROVINCE] SI
+[FULL_ADDRESS] Via Roma 1, 53100
+[TAX_ID] GLLCRL80...`;
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
