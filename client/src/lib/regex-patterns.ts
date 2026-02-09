@@ -41,39 +41,82 @@ export const PII_REGEX_PATTERNS = {
  * Executes all regex patterns on the text and returns a unified list of findings.
  * Handles deduplication and basic validation/normalization.
  */
-export function scanTextWithRegex(text: string): { value: string; category: string }[] {
-    const findings: { value: string; category: string }[] = [];
-    const uniqueValues = new Set<string>();
+// Keywords that often precede a name in Italian documents
+const NAME_INDICATORS = [
+    'Sig\\.', 'Sig\\.ra', 'Dott\\.', 'Dr\\.', 'Prof\\.', 'Avv\\.', 'Spett\\.', 'Gent\\.',
+    'sottoscritto', 'sottoscritta', 'ente', 'rappresentante', 'nato a', 'nata a', 'residente a',
+    'di', 'da', 'a', 'favore di', 'contro'
+];
 
+// Helper to grab context around a match
+function getContext(text: string, index: number, matchLength: number, contextSize = 50): string {
+    const start = Math.max(0, index - contextSize);
+    const end = Math.min(text.length, index + matchLength + contextSize);
+    return text.substring(start, end).replace(/\s+/g, ' '); // Normalize spaces
+}
+
+export interface CandidateFinding {
+    value: string;
+    type: string; // The regex category or 'POTENTIAL_NAME'
+    context: string;
+    confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
+/**
+ * Scans text for PII candidates using strict regex + heuristics.
+ * Returns a list of candidates with context for the LLM to validate.
+ */
+export function scanTextCandidates(text: string): CandidateFinding[] {
+    const candidates: CandidateFinding[] = [];
+    const uniqueKeys = new Set<string>();
+
+    const addCandidate = (value: string, type: string, index: number, confidence: 'HIGH' | 'MEDIUM' | 'LOW') => {
+        const cleanValue = value.trim();
+        if (cleanValue.length < 2) return;
+
+        // Context is vital for the LLM to decide
+        const context = getContext(text, index, value.length);
+        const key = `${type}:${cleanValue.toUpperCase()}`;
+
+        if (!uniqueKeys.has(key)) {
+            candidates.push({ value: cleanValue, type, context, confidence });
+            uniqueKeys.add(key);
+        }
+    };
+
+    // 1. STRICT REGEX PASS
     for (const [category, regex] of Object.entries(PII_REGEX_PATTERNS)) {
-        // Create a new RegExp object to ensure clean state and correct global execution
         let localRegex = new RegExp(regex.source, regex.flags);
         let match;
-
         while ((match = localRegex.exec(text)) !== null) {
-            let extractedValue = match[0];
+            let val = match[0];
+            if (category === 'VAT_NUMBER' && match[1]) val = match[1];
+            if (category === 'IBAN') val = val.replace(/\s+/g, '');
 
-            // Special handling for capture groups
-            if (category === 'VAT_NUMBER' && match[1]) {
-                extractedValue = match[1]; // Capture just the digits if group present
-            }
-            if (category === 'IBAN') {
-                extractedValue = extractedValue.replace(/\s+/g, ''); // Normalize IBAN removing spaces
-            }
-            if (category === 'PHONE_NUMBER') {
-                // Ignore matches that are too short to be phone numbers
-                if (extractedValue.replace(/\D/g, '').length < 8) continue;
-            }
+            // Heuristic: If it matches a strict pattern like Email/IBAN/CF, it's HIGH confidence.
+            // Phone numbers can be tricky (dates), so MEDIUM.
+            let conf: 'HIGH' | 'MEDIUM' | 'LOW' = 'HIGH';
+            if (category === 'PHONE_NUMBER' || category === 'DATE') conf = 'MEDIUM';
 
-            const cleanValue = extractedValue.trim();
-            const key = `${category}:${cleanValue.toUpperCase()}`;
-
-            if (!uniqueValues.has(key)) {
-                findings.push({ value: cleanValue, category });
-                uniqueValues.add(key);
-            }
+            addCandidate(val, category, match.index, conf);
         }
     }
 
-    return findings;
+    // 2. NAME HEURISTICS (The "Smart Search")
+    // Look for: Keyword + (Space) + Capitalized Words (2-4 words)
+    // Regex: (Keyword)\s+([A-Z][a-zàèéìòù]+\s+){1,3}[A-Z][a-zàèéìòù]+
+    const indicators = NAME_INDICATORS.join('|');
+    const nameRegex = new RegExp(`\\b(${indicators})\\s+((?:[A-Z][a-zàèéìòù]+\\s*){2,4})`, 'gi');
+
+    let nameMatch;
+    while ((nameMatch = nameRegex.exec(text)) !== null) {
+        // match[1] is the keyword, match[2] is the potential name
+        const potentialName = nameMatch[2].trim();
+        // Ignore if it looks like a sentence start or all caps header (heuristic)
+        if (potentialName.length > 3) {
+            addCandidate(potentialName, 'POTENTIAL_NAME', nameMatch.index + nameMatch[0].indexOf(potentialName), 'LOW');
+        }
+    }
+
+    return candidates;
 }

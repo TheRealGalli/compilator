@@ -171,167 +171,108 @@ async function getBridgeVersion(retries = 2): Promise<string> {
         });
 
         if (version !== "0.0.0") return version;
-        if (i < retries) await new Promise(r => setTimeout(r, 500));
     }
     return "0.0.0";
 }
 
-// Prompt unificato per massima precisione (Surgical Precision 5.2 - Batch Edition)
-const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.9 - EU/GDPR)
 
-[PHASE 0: COGNITIVE PRE-ANALYSIS]
-Before extracting data, identify:
-1. THE OBJECT (Oggetto): Document type/purpose (e.g., Contract, Invoice, Report).
-2. THE SUBJECT (Soggetto): The primary Natural Person (Interessato) this document concerns.
-3. CONTEXTUAL FILTER: Focus on the Subject. Ignore secondary names (lawyers, witnesses) unless they are also targets.
 
-[GDPR INTELLIGENCE]
-- PERSONAL DATA (Art 4): Info relating to an identified or identifiable NATURAL PERSON.
-- IDENTIFIERS: Direct (Name, Tax ID) or Indirect (IP, Geolocation, Phone).
-- SPECIAL CATEGORIES (Art 9/10): Prioritize Health, Biometrics, Genetic, Ethnic, or Criminal data.
-- EXCLUSIONS: Ignore Legal Entities/Companies (e.g., "Google LLC") unless it's a personal business email. Ignore fully anonymous/statistical data.
+// Validator Prompt for Gemma 3
+const VALIDATOR_PROMPT = `MISSION: PII Validation.
+You will receive a list of "Candidates" (text snippets) with their surrounding context.
+Your job is to determine if each candidate is GENUINE Sensitive Personal Data (PII) or a False Positive.
 
-[1. SOURCE AWARENESS]
-You are analyzing documents that may contain:
-- STATIC TEXT: Standard paragraphs.
-- FILLABLE FIELDS: Structured data from [DATI COMPILATI NEL MODULO PDF]. PRIORITIZE THESE.
-- ITALIAN TERMINOLOGY: Map common terms (e.g., Nome -> FULL_NAME, Indirizzo -> FULL_ADDRESS).
+[RULES]
+1. ANALYZE the "context" to understand if the "value" is actually a Name, Date of Birth, or Phone Number.
+2. IGNORE: Company names (unless it's a personal ditta), creative works, generic dates (e.g. "dated 2023"), public info.
+3. RETURN: A JSON array of IDs that are VALID PII.
+   Example Input: [{"id": 1, "value": "2024", "type": "DATE", "context": "Copyright 2024"}, {"id": 2, "value": "Mario Rossi", "type": "NAME", "context": "Il Sig. Mario Rossi dichiara"}]
+   Example Output: [2]
+   (Because "2024" is a year/copyright, "Mario Rossi" is a person).
 
-[2. GROUND RULES]
-- SOURCE-ONLY: Extract ONLY from <INPUT_DATA>. 
-- NO HALLUCINATIONS: Do not "correct" or guess names/addresses.
-- NO BOILERPLATE: Ignore placeholders like "[INSERT_NAME]".
-- NO PROSE: Output ONLY [LABEL] Value. Do not include "Here is the output" or markdown code blocks.
-- NOEXPLANATION: Do not explain your findings. Just list them.
-
-[3. PREFERRED IDENTITY LABELS]
-[FULL_NAME], [SURNAME], [DATE_OF_BIRTH], [PLACE_OF_BIRTH], [TAX_ID], [VAT_NUMBER], [FULL_ADDRESS], [STREET], [CITY], [STATE_PROVINCE], [ZIP_CODE], [COUNTRY], [PHONE_NUMBER], [EMAIL], [DOCUMENT_ID], [DOCUMENT_TYPE], [ISSUE_DATE], [EXPIRY_DATE], [ISSUING_AUTHORITY], [GENDER], [NATIONALITY], [OCCUPATION], [IBAN], [ORGANIZATION], [JOB_TITLE], [MISC]
-
-[4. FORMATTING]
-One finding per line: [LABEL] Value
-Example: [FULL_NAME] Carlo Galli
-
-[5. MULTILINGUAL FEW-SHOT]
-Input: "<INPUT_DATA> Ditta Rossi Srl. Rappresentata da: Marco Bianchi. Sede: Milano. Dipendente: Jane Smith, nata a Roma il 01/01/1990. </INPUT_DATA>"
-Memory Analysis: Obj: Employee Record. Subject: Jane Smith.
-Output:
-[FULL_NAME] Jane Smith
-[PLACE_OF_BIRTH] Roma
-[DATE_OF_BIRTH] 01/01/1990
-[ORGANIZATION] Ditta Rossi Srl`;
+[CRITICAL]
+- Return ONLY the JSON array of integers. No markdown, no explanation.`;
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
-    const version = await getBridgeVersion();
-    const isTurboAvailable = version.startsWith("3.");
+    // 1. SCAN CANDIDATES (Regex + Heuristics)
+    const { scanTextCandidates } = await import('./regex-patterns');
+    const candidates = scanTextCandidates(text);
 
-    // FORCE FALLBACK TO LOCAL PARSING FOR DEBUGGING AND BETTER CONTROL
-    // We bypass the extension's internal logic which seems to be failing with Gemma 3.
-    // if (isTurboAvailable) { ... } 
-    /*
-    if (isTurboAvailable) {
-        console.log(`[OllamaLocal] Bridge v${version} rilevata. Uso TURBO PIPELINE (Offload)...`);
-        return new Promise((resolve) => {
-            const requestId = Math.random().toString(36).substring(7);
-            const handler = (event: any) => {
-                if (event.detail.requestId === requestId) {
-                    window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
-                    const findings = event.detail.response?.findings || [];
-                    console.log(`[OllamaLocal] Turbo Pipeline completata: ${findings.length} elementi trovati.`);
-                    resolve(findings);
-                }
-            };
-            window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+    console.log(`[OllamaLocal] Found ${candidates.length} candidates.`);
 
-            window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
-                detail: {
-                    detail: {
-                        type: 'OLLAMA_PII_TURBO',
-                        text,
-                        url: currentBaseUrl,
-                        model: OLLAMA_MODEL,
-                        systemPrompt: SHARED_MISSION_PROMPT
-                    },
-                    requestId
-                }
-            }));
-        });
-    }
-    */
+    const highConfidence: PIIFinding[] = [];
+    const toValidate: any[] = [];
 
-    console.warn(`[OllamaLocal] Bridge v${version} non supporta Turbo. Fallback su splitting manuale.`);
+    // 2. SORT CANDIDATES
+    // High Confidence -> Auto-accept
+    // Low/Medium (Names, Dates, Phones) -> Send to LLM
+    let idCounter = 1;
+    for (const c of candidates) {
+        if (c.confidence === 'HIGH') {
+            highConfidence.push({ value: c.value, category: c.type });
+        } else {
+            // Check for obvious false positive dates (e.g. today's year alone)
+            if (c.type === 'DATE' && c.value.length < 6) continue;
 
-    // Fallback classico se il bridge è vecchio o assente
-    if (text.length <= CHUNK_SIZE) {
-        return _extractSingleChunk(text, []);
-    }
-
-    const allFindings: PIIFinding[] = [];
-    const processedValues = new Set<string>();
-
-    // 1. REGEX LAYER (The "Sniper")
-    // Executed first to capture deterministic entities with 100% precision.
-    const { scanTextWithRegex } = await import('./regex-patterns');
-    const regexFindings = scanTextWithRegex(text);
-    console.log(`[OllamaLocal] Regex Layer found ${regexFindings.length} entities.`);
-
-    // Add regex findings to processedValues to avoid duplicates later
-    for (const rf of regexFindings) {
-        allFindings.push(rf);
-        processedValues.add(`${rf.value.toLowerCase()}|${rf.category}`);
-    }
-
-    // 2. LLM LAYER (The "Detective")
-    // Executed in parallel chunks to find contextual entities (Names, Roles, etc.)
-    console.log(`[OllamaLocal] Documento lungo (${text.length} caratteri). Uso splitting PARALLELO (Context: ${CHUNK_SIZE})...`);
-
-    // Creazione dei chunk
-    const chunks: string[] = [];
-    for (let i = 0; i < text.length; i += (CHUNK_SIZE - CHUNK_OVERLAP)) {
-        chunks.push(text.substring(i, i + CHUNK_SIZE));
-        if (i + CHUNK_SIZE >= text.length) break;
-    }
-
-    // Esecuzione parallela a lotti (max 2 alla volta per stabilità con chunk da 8k)
-    const BATCH_SIZE = 2;
-    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-        const currentBatch = chunks.slice(i, i + BATCH_SIZE);
-        // We pass the ALREADY FOUND regex values as context to avoid re-finding them? 
-        // Or we pass a limited list. Let's pass the recent ones to avoid massive context injection.
-        const knownList = Array.from(processedValues).slice(-150);
-
-        console.log(`[OllamaLocal] Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)}...`);
-
-        const batchResults = await Promise.all(
-            currentBatch.map(chunk => _extractSingleChunk(chunk, knownList).catch(err => {
-                console.warn("[OllamaLocal] Errore in un chunk parallelo, salto...", err);
-                return [] as PIIFinding[];
-            }))
-        );
-
-        // Unione risultati ed eliminazione duplicati
-        for (const findings of batchResults) {
-            for (const f of findings) {
-                const valLower = f.value.toLowerCase();
-                const key = `${valLower}|${f.category}`;
-
-                // HYBRID MERGE LOGIC:
-                // If the value was already found by Regex, we trust Regex category.
-                // However, if the value is identical but category is different...
-                // Regex patterns are strict, so if Regex says EMAIL, it's EMAIL.
-                // If LLM says "Mario" is EMAIL (hallucination), Regex won't contain "Mario" as Email.
-                // So if key exists, we skip.
-
-                if (!processedValues.has(key)) {
-                    allFindings.push(f);
-                    processedValues.add(key);
-                }
-            }
+            toValidate.push({
+                id: idCounter++,
+                value: c.value,
+                type: c.type,
+                context: c.context.replace(/\n/g, ' ').substring(0, 80) // Limit context
+            });
         }
     }
 
-    return allFindings;
+    console.log(`[OllamaLocal] Auto-accepted: ${highConfidence.length}. To Validate: ${toValidate.length}.`);
+
+    if (toValidate.length === 0) {
+        return highConfidence;
+    }
+
+    // 3. VALIDATE WITH GEMMA (Batched)
+    const VALIDATION_BATCH_SIZE = 20;
+    const validIds = new Set<number>();
+
+    for (let i = 0; i < toValidate.length; i += VALIDATION_BATCH_SIZE) {
+        const batch = toValidate.slice(i, i + VALIDATION_BATCH_SIZE);
+        console.log(`[OllamaLocal] Validating batch ${i} - ${i + batch.length}...`);
+
+        try {
+            const payload = {
+                model: OLLAMA_MODEL,
+                messages: [
+                    { role: 'system', content: VALIDATOR_PROMPT },
+                    { role: 'user', content: JSON.stringify(batch) }
+                ],
+                stream: false,
+                options: { temperature: 0.0, num_ctx: 4096 } // Low context needed
+            };
+
+            const data = await _extractWithRetry(payload, 2); // Less retries needed
+            const raw = data.message?.content || "[]";
+            console.log('[DEBUG-RAW] Validator Output:', raw);
+
+            // Extract JSON array from potentially messy output
+            const jsonMatch = raw.match(/\[.*\]/s);
+            if (jsonMatch) {
+                const ids = JSON.parse(jsonMatch[0]);
+                if (Array.isArray(ids)) {
+                    ids.forEach((id: number) => validIds.add(id));
+                }
+            }
+        } catch (e) {
+            console.warn("[OllamaLocal] Validation failed for batch:", e);
+        }
+    }
+
+    // 4. MERGE RESULTS
+    const validatedFindings = toValidate
+        .filter(item => validIds.has(item.id))
+        .map(item => ({ value: item.value, category: item.type === 'POTENTIAL_NAME' ? 'FULL_NAME' : item.type }));
+
+    return [...highConfidence, ...validatedFindings];
 }
 
 /**
@@ -367,66 +308,4 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promi
     throw new Error('Retries exhausted');
 }
 
-async function _extractSingleChunk(text: string, knownValues: string[]): Promise<PIIFinding[]> {
-    const knownContext = knownValues.length > 0
-        ? `\n\nALREADY IDENTIFIED DATA (DO NOT LIST THESE AGAIN):\n- ${knownValues.join('\n- ')}`
-        : "";
 
-    try {
-        const payload = {
-            model: OLLAMA_MODEL,
-            messages: [
-                { role: 'system', content: SHARED_MISSION_PROMPT + knownContext },
-                { role: 'user', content: `<INPUT_DATA>\n${text}\n</INPUT_DATA>` }
-            ],
-            stream: false,
-            options: {
-                temperature: 0.1,
-                num_ctx: 131072,  // Gemma3 full 128k context
-                num_predict: 2048,
-            }
-        };
-
-        const data = await _extractWithRetry(payload);
-        if (!data || !data.message) {
-            throw new Error("Risposta incompleta da Ollama");
-        }
-        let rawResponse = data.message.content || "";
-        console.log('[DEBUG-RAW] Gemma output:', rawResponse);
-
-        const findings: PIIFinding[] = [];
-        const lines = rawResponse.split('\n');
-
-        for (const line of lines) {
-            // Regex refined to handle:
-            // 1. Standard: "[NAME] Value"
-            // 2. Bullet points: "* [NAME] Value" or "- [NAME] Value"
-            // 3. Colon separators: "[NAME]: Value"
-            // 4. Markdown code blocks (ignores ```)
-            // 5. Enumerated lists: "1. [NAME] Value"
-            const cleanLine = line.replace(/^[\s\*\-\d\.]+|```/g, '').trim();
-            const match = cleanLine.match(/^\[([A-Z_]+)\]\s*[:\-]?\s*(.*)/i);
-
-            if (match) {
-                const category = match[1].toUpperCase();
-                const value = match[2].trim();
-
-                // Final safety check against obvious synthetic placeholders
-                const isPlaceholder = /\[.*\]|example|not specified|information not|synthetic|NOME_PERSONA_\d+/i.test(value);
-
-                if (value && value.length > 2 && !isPlaceholder) {
-                    findings.push({ value, category });
-                }
-            }
-        }
-
-        if (findings.length > 0) {
-            console.log(`[OllamaLocal] Estratti ${findings.length} elementi (Text Mode).`);
-        }
-
-        return findings;
-    } catch (error) {
-        console.error('[OllamaLocal] Errore estrazione:', error);
-        throw error;
-    }
-}
