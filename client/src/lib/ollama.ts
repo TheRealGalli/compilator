@@ -184,119 +184,109 @@ async function getBridgeVersion(retries = 2): Promise<string> {
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
-    // 1. SCAN CANDIDATES (Regex + Heuristics + Dictionary)
-    const { scanTextCandidates } = await import('./regex-patterns');
-    const candidates = scanTextCandidates(text);
-    console.log(`[OllamaLocal] Regex/Dict found ${candidates.length} candidates.`);
-
-    const highConfidenceCandidates = candidates.filter(c => c.confidence === 'HIGH');
-    const lowConfidenceCandidates = candidates.filter(c => c.confidence !== 'HIGH');
-
-    // 2. FILTER CANDIDATES (Strategic Split)
-    // - HIGH Confidence -> Auto-Accept (Regex is trusted master).
-    // - LOW/MEDIUM Confidence -> Send to Ollama (Validator).
-
+    console.log(`[OllamaLocal] Starting Hybrid PII Extraction on ${text.length} chars...`);
     const unifiedFindings = new Map<string, string>(); // Value -> Type
 
-    // Auto-accept High Confidence
-    // Auto-accept High Confidence
-    // We trust regex for things like IBAN, CF, and Dictionary-verified Names.
+    // 1. REGEX SNIPER (Trusted High Confidence)
+    // We run regex first to catch obvious things (IBAN, Email, CF) which are mathematically verifiable.
+    const { scanTextCandidates } = await import('./regex-patterns');
+    const candidates = scanTextCandidates(text);
+    const highConfidenceCandidates = candidates.filter(c => c.confidence === 'HIGH');
+
+    console.log(`[OllamaLocal] Regex found ${highConfidenceCandidates.length} HIGH confidence items.`);
+
+    // Auto-accept High Confidence (IBAN, CF, Dictionary Names)
     for (const c of highConfidenceCandidates) {
         unifiedFindings.set(c.value, c.type);
     }
 
-    // Filter candidates for Ollama
-    const candidateList = lowConfidenceCandidates.map(c => ({
-        value: c.value,
-        type: c.type,
-        context: c.context // CRITICAL: Ollama only sees this snippet
-    }));
+    // 2. LLM SWEEPER (Full Text Discovery)
+    // We split text into semantic chunks (~2500 chars) to allow the LLM to see full context.
+    const CHUNK_SIZE = 2500;
+    const OVERLAP = 200;
+    const chunks: string[] = [];
 
-    if (candidateList.length === 0) {
-        console.log('[OllamaLocal] No low-confidence candidates to validate. Done.');
-        // Return structured findings
-        const finalResults: PIIFinding[] = [];
-        for (const [value, category] of unifiedFindings.entries()) {
-            finalResults.push({ value, category });
-        }
-        return finalResults;
+    for (let i = 0; i < text.length; i += (CHUNK_SIZE - OVERLAP)) {
+        chunks.push(text.substring(i, i + CHUNK_SIZE));
     }
 
-    console.log(`[OllamaLocal] Sending ${candidateList.length} suspicious candidates to Ollama for validation...`);
+    console.log(`[OllamaLocal] Text split into ${chunks.length} chunks for LLM discovery.`);
 
-    // 3. BATCH PROCESSING (Validator Mode)
-    // We send batches of candidates (e.g. 20 at a time) to avoid token limits,
-    // although we are sending small contexts so we can fit many.
-    const BATCH_SIZE = 15;
-    const batches = [];
-    for (let i = 0; i < candidateList.length; i += BATCH_SIZE) {
-        batches.push(candidateList.slice(i, i + BATCH_SIZE));
-    }
+    // Process chunks sequentially
+    for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
 
-    for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
-        console.log(`[OllamaLocal] Validating Batch ${i + 1}/${batches.length}...`);
+        const prompt = `MISSION: FULL PII DISCOVERY.
+I will act as a Privacy Officer. I need you to extract EVERY single piece of Personal Data (PII) from the text below.
+Do not ask "is this PII?". Instead, FIND IT.
 
-        const candidateJson = JSON.stringify(batch);
-
-        const prompt = `MISSION: STRICT PII AUDITOR.
-I will provide a JSON list of "SUSPICIOUS TEXT SNIPPETS".
-Your job is to aggressively FILTER OUT False Positives.
-Assume most inputs are NOT PII until proven otherwise by context.
-
-[MINDSET]
-- Be Critical. Do NOT be a "Yes Man".
-- If in doubt -> REJECT.
-- Better to miss a name than to censor a common verb.
-
-[INPUT]
-${candidateJson}
+[TARGET ENTITIES]
+- NAMES (Employee, Client, Third Party Designee, Responsible Party, Directors)
+- ADDRESSES (Full Street, City, State, ZIP)
+- ORGANIZATION NAMES (LLC, Inc, Corp, Business Names)
+- DATES (Birth, Start Date, Signature Date)
+- CODES (SSN, EIN, ITIN - even if partial or "FOREIGN")
+- EMAILS & PHONES
 
 [OUTPUT FORMAT]
-Return ONLY the JSON array of items that PASSED your audit.
-[{"value": "Mario Rossi", "type": "FULL_NAME"}]
+Return a JSON ARRAY only.
+[{"value": "Mario Rossi", "type": "FULL_NAME"}, {"value": "Via Roma 10", "type": "ADDRESS"}]
+- "value": Exact substring from text.
+- "type": One of FULL_NAME, ORGANIZATION, ADDRESS, DATE, OTHER.
+
+[TEXT TO ANALYZE]
+${chunk}
 `;
 
         try {
+            // Using internal helper if available or direct fetch
             const payload = {
                 model: OLLAMA_MODEL,
                 messages: [{ role: 'user', content: prompt }],
                 stream: false,
+                format: 'json',
                 options: {
-                    temperature: 0.0, // Zero creativity
-                    num_ctx: 8192     // Sufficient for JSON lists
+                    temperature: 0.1, // Low temp for precision
+                    num_ctx: 4096     // Ensure large context
                 }
             };
 
+            // Assuming _extractWithRetry is available in scope (it is in the file)
             const data = await _extractWithRetry(payload, 2);
-            const raw = data.message?.content || "[]";
+            let findings: any[] = [];
 
-            // Safe JSON Parse
-            const jsonMatch = raw.match(/\[.*\]/s);
-            if (jsonMatch) {
-                const results = JSON.parse(jsonMatch[0]);
-                if (Array.isArray(results)) {
-                    results.forEach((item: any) => {
-                        // Grounding: Ensure the validated item was actually in our batch (Prevent hallucinations)
-                        const original = batch.find(b => b.value === item.value);
-                        if (original && item.value && item.value.length > 2) {
-                            unifiedFindings.set(item.value, item.type || original.type);
-                        }
-                    });
+            try {
+                if (data.message?.content) {
+                    findings = JSON.parse(data.message.content);
+                }
+                if (!Array.isArray(findings)) findings = [];
+            } catch (e) {
+                console.warn("[OllamaLocal] Failed to parse JSON response:", data.message?.content);
+            }
+
+            // Merge findings
+            for (const finding of findings) {
+                if (finding.value && finding.value.length > 2) {
+                    const val = finding.value.trim();
+                    // Upsert: LLM context is usually better for 'Type' than Regex Low Confidence.
+                    if (!unifiedFindings.has(val)) {
+                        unifiedFindings.set(val, finding.type);
+                    }
                 }
             }
-        } catch (e) {
-            console.warn(`[OllamaLocal] Batch ${i} validation failed:`, e);
+
+        } catch (err) {
+            console.error(`[OllamaLocal] Chunk ${i + 1} failed:`, err);
         }
     }
 
-    // Convert Map to Array
+    // 3. Convert Map to Array
     const finalResults: PIIFinding[] = [];
     for (const [value, category] of unifiedFindings.entries()) {
         finalResults.push({ value, category });
     }
 
-    console.log(`[OllamaLocal] Total Verified Findings: ${finalResults.length}`);
+    console.log(`[OllamaLocal] Discovery Complete. Total Unique PII: ${finalResults.length}`);
     return finalResults;
 }
 

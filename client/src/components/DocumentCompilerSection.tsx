@@ -695,7 +695,7 @@ export function DocumentCompilerSection({
 
           console.log(`[DocumentCompiler] [Surgical 5.8] Avvio Ultra-Drive su ${allDocs.length} sorgenti...`);
           const startTime = Date.now();
-          const DOC_BATCH_SIZE = 1; // Instant feedback per document (Requestedized)
+          const DOC_BATCH_SIZE = 2; // Process 2 docs in parallel (High Perfromance)
           const flatResults = [];
 
           for (let i = 0; i < allDocs.length; i += DOC_BATCH_SIZE) {
