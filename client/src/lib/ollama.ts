@@ -177,27 +177,9 @@ async function getBridgeVersion(retries = 2): Promise<string> {
 
 
 
-// Validator + Discovery Prompt for Gemma 3 (Full Context)
-const FULL_CONTEXT_PROMPT = `MISSION: PII Validation & Discovery.
-I will provide a TEXT CHUNK and a list of "REGEX CANDIDATES".
-Your job is to:
-1. VALIDATE candidates: Confirm if they are real persons/orgs in this context. reject verbs/common words.
-2. DISCOVER new PII: Find names/orgs/places that Regex missed.
+// Validator Prompt for Strict Mode
+// Note: The actual prompt is now generated dynamically inside extractPIILocal
 
-[RULES]
-- Context is KING. "Rossi" in "Sig. Rossi" is a Name. "Rossi" in "colore rossi" is an adjective (Reject).
-- "Si impegna", "Dichiara", "Sottoscritto" are VERBS/ROLES, not names (Reject).
-- "Mario Rossi" (Double Cap) is usually a Name (Confirm).
-
-[OUTPUT FORMAT]
-Return a JSON array of objects:
-[{"value": "Mario Rossi", "type": "FULL_NAME"}, {"value": "Acme Srl", "type": "ORGANIZATION"}]
-- VALUE must be exactly as in text.
-- TYPE must be one of: FULL_NAME, ORGANIZATION, PLACE_OF_BIRTH, DATE_OF_BIRTH, UNKNOWN.
-- NO Markdown. NO Explanations. ONLY JSON.
-
-[INPUT DATA]
-`;
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
@@ -210,49 +192,79 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     const highConfidenceCandidates = candidates.filter(c => c.confidence === 'HIGH');
     const lowConfidenceCandidates = candidates.filter(c => c.confidence !== 'HIGH');
 
-    // 2. PREPARE TEXT CHUNKS (For Full Context Analysis)
-    // Even though user wants "Full Context", sending 100k chars to Gemma 1B will fail/hallucinate.
-    // We chunk smart (~20k chars) to give enough context for paragraphs.
-    const CONTEXT_WINDOW = 20000;
-    const chunks = [];
-    for (let i = 0; i < text.length; i += CONTEXT_WINDOW) {
-        chunks.push(text.substring(i, i + CONTEXT_WINDOW + 1000)); // +1000 for overlap
-    }
-
-    console.log(`[OllamaLocal] Splitting document into ${chunks.length} chunks for Full-Context analysis.`);
+    // 2. FILTER CANDIDATES (Strategic Split)
+    // - HIGH Confidence -> Auto-Accept (Regex is trusted master).
+    // - LOW/MEDIUM Confidence -> Send to Ollama (Validator).
 
     const unifiedFindings = new Map<string, string>(); // Value -> Type
 
-    // Pre-populate with HIGH confidence regex (Strict Matches like IBAN, CF are always true)
-    // We don't even need to ask Gemma about IBANs, they are math patterns.
-    // We only ask Gemma about Names/Orgs/Places.
+    // Auto-accept High Confidence
+    // Auto-accept High Confidence
+    // We trust regex for things like IBAN, CF, and Dictionary-verified Names.
     for (const c of highConfidenceCandidates) {
-        if (!['FULL_NAME', 'ORGANIZATION', 'PLACE_OF_BIRTH'].includes(c.type)) {
-            // It's a structured field (Email, CF, etc.) -> Accept immediately
-            unifiedFindings.set(c.value, c.type);
-        }
+        unifiedFindings.set(c.value, c.type);
     }
 
-    // 3. PROCESS EACH CHUNK
-    for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
+    // Filter candidates for Ollama
+    const candidateList = lowConfidenceCandidates.map(c => ({
+        value: c.value,
+        type: c.type,
+        context: c.context // CRITICAL: Ollama only sees this snippet
+    }));
 
-        // Filter candidates relevant to this chunk (optimization)
-        const chunkCandidates = lowConfidenceCandidates.filter(c => chunk.includes(c.value));
-        const candidateListStr = JSON.stringify(chunkCandidates.map(c => ({ value: c.value, type: c.type })));
+    if (candidateList.length === 0) {
+        console.log('[OllamaLocal] No low-confidence candidates to validate. Done.');
+        // Return structured findings
+        const finalResults: PIIFinding[] = [];
+        for (const [value, category] of unifiedFindings.entries()) {
+            finalResults.push({ value, category });
+        }
+        return finalResults;
+    }
 
-        console.log(`[OllamaLocal] Analyzing Chunk ${i + 1}/${chunks.length} with ${chunkCandidates.length} hints...`);
+    console.log(`[OllamaLocal] Sending ${candidateList.length} suspicious candidates to Ollama for validation...`);
+
+    // 3. BATCH PROCESSING (Validator Mode)
+    // We send batches of candidates (e.g. 20 at a time) to avoid token limits,
+    // although we are sending small contexts so we can fit many.
+    const BATCH_SIZE = 15;
+    const batches = [];
+    for (let i = 0; i < candidateList.length; i += BATCH_SIZE) {
+        batches.push(candidateList.slice(i, i + BATCH_SIZE));
+    }
+
+    for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        console.log(`[OllamaLocal] Validating Batch ${i + 1}/${batches.length}...`);
+
+        const candidateJson = JSON.stringify(batch);
+
+        const prompt = `MISSION: STRICT PII AUDITOR.
+I will provide a JSON list of "SUSPICIOUS TEXT SNIPPETS".
+Your job is to aggressively FILTER OUT False Positives.
+Assume most inputs are NOT PII until proven otherwise by context.
+
+[MINDSET]
+- Be Critical. Do NOT be a "Yes Man".
+- If in doubt -> REJECT.
+- Better to miss a name than to censor a common verb.
+
+[INPUT]
+${candidateJson}
+
+[OUTPUT FORMAT]
+Return ONLY the JSON array of items that PASSED your audit.
+[{"value": "Mario Rossi", "type": "FULL_NAME"}]
+`;
 
         try {
-            const prompt = `${FULL_CONTEXT_PROMPT}\n\n[REGEX CANDIDATES]\n${candidateListStr}\n\n[TEXT CHUNK]\n${chunk}`;
-
             const payload = {
                 model: OLLAMA_MODEL,
                 messages: [{ role: 'user', content: prompt }],
                 stream: false,
                 options: {
-                    temperature: 0.1, // Low temp for precision
-                    num_ctx: 32000    // High context window for Input processing
+                    temperature: 0.0, // Zero creativity
+                    num_ctx: 8192     // Sufficient for JSON lists
                 }
             };
 
@@ -265,17 +277,16 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
                 const results = JSON.parse(jsonMatch[0]);
                 if (Array.isArray(results)) {
                     results.forEach((item: any) => {
-                        if (item && item.value && item.value.length > 2) {
-                            // "Gemma, did you find 'Si impegna'?" -> "No"
-                            // Only valid items survive here.
-                            unifiedFindings.set(item.value, item.type);
+                        // Grounding: Ensure the validated item was actually in our batch (Prevent hallucinations)
+                        const original = batch.find(b => b.value === item.value);
+                        if (original && item.value && item.value.length > 2) {
+                            unifiedFindings.set(item.value, item.type || original.type);
                         }
                     });
                 }
             }
         } catch (e) {
-            console.warn(`[OllamaLocal] Chunk ${i} analysis failed:`, e);
-            // Fallback: If Gemma fails, we at least keep High Confidence regex
+            console.warn(`[OllamaLocal] Batch ${i} validation failed:`, e);
         }
     }
 
@@ -285,7 +296,7 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
         finalResults.push({ value, category });
     }
 
-    console.log(`[OllamaLocal] Total Unique Findings: ${finalResults.length}`);
+    console.log(`[OllamaLocal] Total Verified Findings: ${finalResults.length}`);
     return finalResults;
 }
 
