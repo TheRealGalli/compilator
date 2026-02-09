@@ -203,23 +203,24 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // User requested FULL DOCUMENT context.
     console.log(`[OllamaLocal] Sending FULL TEXT (${text.length} chars) to LLM...`);
 
-    const prompt = `MISSION: FULL PII DISCOVERY.
-I will act as a Privacy Officer. I need you to extract EVERY single piece of Personal Data (PII) from the text below.
-Do not ask "is this PII?". Instead, FIND IT.
+    const prompt = `MISSION: EXTRACT PII (EXACT MATCHES ONLY).
+I needs you to list every PII (Personal Identifiable Information) found in the text.
+RULES:
+1. EXTRACT EXACT SUBSTRINGS. Do not fix typos, do not reformat dates.
+2. If a name is "MARIO ROSSI", return "MARIO ROSSI".
+3. Ignore field labels like "Name:", "Date:". Extract only the VALUE.
 
 [TARGET ENTITIES]
-- NAMES (Employee, Client, Third Party Designee, Responsible Party, Directors)
-- ADDRESSES (Full Street, City, State, ZIP)
-- ORGANIZATION NAMES (LLC, Inc, Corp, Business Names)
-- DATES (Birth, Start Date, Signature Date)
-- CODES (SSN, EIN, ITIN - even if partial or "FOREIGN")
-- EMAILS & PHONES
+- NAMES (Person names, Signatories)
+- ADDRESSES (Street, City, Zip, State)
+- ORGANIZATIONS (Company names)
+- DATES (Birth, Signature)
+- CODES (Tax ID, SSN, VAT, IBAN)
+- CONTACTS (Email, Phone)
 
 [OUTPUT FORMAT]
-Return a JSON ARRAY only.
-[{"value": "Mario Rossi", "type": "FULL_NAME"}, {"value": "Via Roma 10", "type": "ADDRESS"}]
-- "value": Exact substring from text.
-- "type": One of FULL_NAME, ORGANIZATION, ADDRESS, DATE, OTHER.
+JSON Array only.
+[{"value": "Exact Text", "type": "CATEGORY"}]
 
 [TEXT TO ANALYZE]
 ${text}
@@ -232,8 +233,8 @@ ${text}
             stream: false,
             format: 'json',
             options: {
-                temperature: 0.1,
-                num_ctx: 8192     // OPTIMIZED for 8GB RAM (16k is too heavy)
+                temperature: 0.0, // Zero temp for MAXIMUM PRECISION
+                num_ctx: 8192     // Optimized for 8GB RAM
             }
         };
 
@@ -249,10 +250,19 @@ ${text}
             console.warn("[OllamaLocal] Failed to parse JSON response:", data.message?.content);
         }
 
-        // Merge findings
+        // Merge findings with STRICT VALIDATION
         for (const finding of findings) {
             if (finding.value && finding.value.length > 2) {
                 const val = finding.value.trim();
+
+                // CRITICAL VALIDATION: Anti-Hallucination Check
+                // If the text does not contain the EXACT sub-string, we reject it.
+                // This prevents "Mario Rossi" if the text says "Mario Ross".
+                if (!text.includes(val)) {
+                    console.warn(`[OllamaLocal] HALLUCINATION REJECTED: '${val}' not found in source text.`);
+                    continue;
+                }
+
                 // Upsert: LLM context is usually better for 'Type' than Regex Low Confidence.
                 if (!unifiedFindings.has(val)) {
                     unifiedFindings.set(val, finding.type);
