@@ -129,22 +129,25 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
 
             // STRICT FILTERING for NAMES
             if (type === 'FULL_NAME') {
-                // Rule 1: Must be at least 2 words (Name Surname)
                 const words = potentialValue.split(/\s+/);
+
+                // Rule 1: Must be at least 2 words (Name Surname)
                 if (words.length < 2) continue;
 
-                // Rule 2: Must NOT be a common sentence start or verb phrase
-                // (e.g. "Si Impegna" might pass if "Si" was in indicators? No, indicators are "Sig." etc.)
-                // But sometimes indicators are weak.
+                // Rule 2: Double Capitalization Strictness
+                // EVERY word must start with an Uppercase letter.
+                // "si obbliga" -> "si" (lower) or "obbliga" (lower) => REJECT
+                // "Mario Rossi" -> "Mario" (Upper) "Rossi" (Upper) => ACCEPT
+                const isAllCapitalized = words.every(w => /^[A-ZÀÈÉÌÒÙ]/.test(w));
+                if (!isAllCapitalized) continue;
 
-                // Rule 3: Check for "Double Capitalization" strictness
-                // We typically expect "Mario Rossi".
-                // We reject if any word is NOT capitalized (already handled by regex)
-                // We reject if it looks like a date "Gennaio 2020" -> Regex handles dates differently.
+                // Rule 3: Reject specific legal verbs even if capitalized (e.g. at start of sentence)
+                const forbiddenStarts = ['Si', 'Non', 'Vi', 'Ci', 'Le', 'Gli', 'Lo', 'Il', 'La', 'I', 'Che', 'Chi'];
+                if (forbiddenStarts.includes(words[0])) continue;
             }
 
             // Basic cleanup: ignore if strictly common words often capitalized in titles
-            if (potentialValue.length > 3 && !['Il', 'Lo', 'La', 'I', 'Gli', 'Le', 'Si', 'Non'].includes(potentialValue)) {
+            if (potentialValue.length > 3) {
                 // Determine confidence: "Nato a" is very strong for birthplace, "Sig." is strong for name
                 let conf: 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM';
                 if (type === 'PLACE_OF_BIRTH' || type === 'FULL_NAME') conf = 'MEDIUM'; // Let LLM confirm
