@@ -116,6 +116,13 @@ async function extractPdfText(file: File): Promise<string> {
         // Don't fail the whole extraction if forms fail
     }
 
+    // 3. Fallback: Se il testo è troppo breve (< 50 chars), potrebbe essere una scansione (immagine)
+    if (fullText.length < 50 && formText.length < 50) {
+        console.warn("[LocalExtractor] PDF sembra essere una scansione (poco testo trovato). OCR richiesto.");
+        return fullText + formText + "\n\n[AVVISO: Il documento sembra essere una scansione. L'OCR locale non è ancora attivo. Il testo potrebbe non essere stato estratto correttamente.]";
+        // TODO: Integrare Tesseract.js qui per OCR locale
+    }
+
     return fullText + formText;
 }
 

@@ -797,26 +797,36 @@ export function DocumentCompilerSection({
 
           const masterVault = Object.fromEntries(vaultMap);
           const masterCounts = Object.fromEntries(vaultCounts);
-          console.log('[DocumentCompiler] Phase 1 Complete. Master Vault size:', vaultMap.size);
-          console.log('[DocumentCompiler] Vault Findings:', masterVault);
 
-          // --- PHASE 2: MECHANICAL GLOBAL SWEEP ---
-          setGuardrailVault(masterVault);
+          // --- PHASE 2: MECHANICAL GLOBAL SWEEP (LOCAL) ---
+          console.log('[DocumentCompiler] Phase 2: Mechanical Global Sweep (Local-Privacy)...');
+
+          // Apply anonymity to ALL documents locally
+          const anonymizedDocs = allDocs.map(doc => {
+            const anonymizedText = performMechanicalGlobalSweep(doc.text, masterVault);
+            return {
+              ...doc,
+              text: anonymizedText,
+              originalText: doc.text // Keep for preview if needed
+            };
+          });
+
+          // Update Source Cache with anonymized versions
+          sourceTextCache.current = anonymizedDocs;
+
+          console.log('[DocumentCompiler] Local Anonymization Complete.');
+
           setReportVault(masterVault);
           setReportVaultCounts(masterCounts);
-
-          if (vaultMap.size === 0) {
-            console.warn('[DocumentCompiler] NO PII detected in any source.');
-          }
           setIsWaitingForPawnApproval(true);
           setIsAnonymizationReportOpen(true);
           setIsCompiling(false);
-          return; // STOP HERE, wait for user confirmation
-        } catch (err) {
-          console.error("[DocumentCompiler] Hybrid Anonymization failed:", err);
+          return; // STOP HERE until user approves
+        } catch (error) {
+          console.error('[DocumentCompiler] Privacy Check Error:', error);
           toast({
-            title: "Errore Anonimizzazione Locale",
-            description: "Assicurati che Ollama sia attivo (`ollama serve`).",
+            title: "Errore Privacy Check",
+            description: "Si è verificato un errore durante l'analisi dei dati sensibili.",
             variant: "destructive"
           });
           setIsCompiling(false);
@@ -824,66 +834,111 @@ export function DocumentCompilerSection({
         }
       }
 
-      // If we reach here, either Pawn is not active OR it's already approved
-      // IMPORTANT: When Pawn is active, we MUST send the ANONIMIZED content to the server
+      // --- COMPILATION PHASE (Post-Approval or No-Guardrail) ---
+      console.log('[DocumentCompiler] Starting Compilation Phase...');
+
+      // Define final payload variables
       let finalTemplate = templateContent;
       let finalNotes = notes;
-      let finalSources = selectedSources.map(s => ({ ...s }));
-      let finalMasterSource = masterSource ? { ...masterSource } : null;
+      let finalSources: any[] = [];
+      let finalMasterSource: any = null;
 
-      if (activeGuardrails.includes('pawn') && isWaitingForPawnApproval) {
-        console.log('[DocumentCompiler] Applying Deterministic Global Sweep to final payload...');
+      // PREPARE PAYLOAD FOR SERVER (ZERO-DATA COMPLIANCE)
+      if (activeGuardrails.includes('pawn')) {
+        console.log('[DocumentCompiler] Preparing Zero-Data Payload (Local Anonymization)...');
 
-        // 1. Mechanical sweep for Template & Notes
+        // 1. Mechanical sweep for Template & Notes (Local)
         finalTemplate = performMechanicalGlobalSweep(templateContent, guardrailVault);
         finalNotes = performMechanicalGlobalSweep(notes, guardrailVault);
 
-        // 2. Re-extract (or fetch) texts to apply sweep to sources
-        if (sourceTextCache.current.length > 0) {
-          const cached = sourceTextCache.current;
-          for (let i = 0; i < finalSources.length; i++) {
-            const extracted = cached.find(e => e.name === finalSources[i].name);
-            if (extracted) {
-              console.log(`[DocumentCompiler] [Cache] Sweeping source: ${finalSources[i].name}`);
-              (finalSources[i] as any).anonymizedText = performMechanicalGlobalSweep(extracted.text, guardrailVault);
+        // 2. Prepare Sources (Text Only - Anonymized)
+        const getAnonymizedText = async (source: any) => {
+          // Try to find in cache first
+          const cached = sourceTextCache.current.find(d => d.name === source.name);
+          let text = cached ? cached.text : "";
+
+          // If not in cache, extract now (fallback)
+          if (!text && source.base64 && !source.type.startsWith('image/')) {
+            const base64ToFile = (base64: string, filename: string, mimeType: string): File => {
+              const byteCharacters = atob(base64);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: mimeType });
+              return new File([blob], filename, { type: mimeType });
+            };
+            try {
+              const file = base64ToFile(source.base64, source.name, source.type);
+              text = await extractTextLocally(file);
+            } catch (e) {
+              console.error("Local extract error fallback:", e);
             }
           }
-          if (finalMasterSource) {
-            const extracted = cached.find(e => e.name === finalMasterSource.name);
-            if (extracted) {
-              console.log(`[DocumentCompiler] [Cache] Sweeping master source: ${finalMasterSource.name}`);
-              (finalMasterSource as any).anonymizedText = performMechanicalGlobalSweep(extracted.text, guardrailVault);
-            }
-          }
+
+          // Apply Sweep
+          return performMechanicalGlobalSweep(text, guardrailVault);
+        };
+
+        // Construct Sources Payload
+        for (const s of selectedSources) {
+          const anonymizedText = await getAnonymizedText(s);
+          finalSources.push({
+            name: s.name,
+            type: 'text/plain', // Force text type so server treats it as raw text
+            content: anonymizedText,
+            originalType: s.type
+          });
+        }
+
+        // Construct Master Payload
+        if (masterSource) {
+          const anonymizedMaster = await getAnonymizedText(masterSource);
+          finalMasterSource = {
+            name: masterSource.name,
+            type: 'text/plain',
+            content: anonymizedMaster,
+            originalType: masterSource.type
+          };
+        }
+
+      } else {
+        // Standard Flow (Send Base64) - Legacy or Non-Pawn
+        console.log('[DocumentCompiler] Preparing Standard Payload (Base64)...');
+        finalSources = selectedSources.map((source) => ({
+          name: source.name,
+          type: source.type,
+          base64: source.base64,
+        }));
+        if (masterSource) {
+          finalMasterSource = {
+            name: masterSource.name,
+            type: masterSource.type,
+            base64: masterSource.base64,
+          };
         }
       }
 
+      console.log(`[DocumentCompiler] Sending ${finalSources.length} sources to server...`);
+
       const response = await apiRequest('POST', '/api/compile', {
         template: finalTemplate,
+        modelProvider,
         notes: finalNotes,
-        temperature,
+        temperature: temperature,
+        sources: finalSources,
+        masterSource: finalMasterSource,
         webResearch,
         detailedAnalysis,
         formalTone,
-        modelProvider,
-        activeGuardrails,
-        guardrailVault,
-        sources: finalSources.map(s => ({
-          name: s.name,
-          type: s.type,
-          base64: s.base64,
-          anonymizedText: (s as any).anonymizedText
-        })),
-        masterSource: finalMasterSource ? {
-          name: finalMasterSource.name,
-          type: finalMasterSource.type,
-          base64: finalMasterSource.base64,
-          anonymizedText: (finalMasterSource as any).anonymizedText
-        } : null
+        studioFontSize,
+        currentMode,
+        // Send the Vault so the Server can use it for consistency if needed
+        pawnVault: activeGuardrails.includes('pawn') ? guardrailVault : undefined
       });
 
       const data = await response.json();
-      // Log removed to clean up console
 
       if (data.compiledContent) {
         // Sanitize escaped brackets
@@ -893,23 +948,15 @@ export function DocumentCompilerSection({
           .replace(/\\-/g, '-')
           .replace(/\\\*/g, '*');
 
-        // Force checkboxes to be list items for Tiptap (replace "^[ ]" with "- [ ]")
+        // Force checkboxes to be list items for Tiptap
         sanitizedContent = sanitizedContent.replace(/^(\s*)\[([ xX])\]/gm, '$1- [$2]');
 
+        // Context Construction for Refinement
         const context = {
           sources: finalSources.map(s => ({
-            name: s.name,
-            type: s.type,
-            base64: s.base64,
-            anonymizedText: (s as any).anonymizedText
+            ...s,
           })),
-          masterSource: finalMasterSource ? {
-            name: finalMasterSource.name,
-            type: finalMasterSource.type,
-            base64: finalMasterSource.base64,
-            anonymizedText: (finalMasterSource as any).anonymizedText
-          } : null
-          ,
+          masterSource: finalMasterSource,
           notes,
           temperature,
           webResearch,
@@ -923,8 +970,11 @@ export function DocumentCompilerSection({
         };
 
         // Restoration of original values for the user (Reverse Sweep)
-        const finalContent = performMechanicalReverseSweep(sanitizedContent, guardrailVault);
-        console.log('[DocumentCompiler] De-anonymization complete.');
+        let finalContent = sanitizedContent;
+        if (activeGuardrails.includes('pawn')) {
+          finalContent = performMechanicalReverseSweep(sanitizedContent, guardrailVault);
+          console.log('[DocumentCompiler] De-anonymization complete.');
+        }
 
         setLastCompileContext(context);
         setCompiledContent(finalContent);
@@ -935,7 +985,6 @@ export function DocumentCompilerSection({
         // FREEZE UI if master pin is active
         if (masterSource) {
           setIsLocked(true);
-          // Calculate the color to freeze
           let color = 'text-muted-foreground';
           if (!masterSource.isBypass) {
             if (masterSource.isXfa) color = 'text-red-500 fill-red-500/20';
@@ -943,20 +992,17 @@ export function DocumentCompilerSection({
             else if (masterSource.isFillable) color = 'text-green-500 fill-green-500/20';
           }
           setFrozenColor(color);
-          // Save this master compilation state
           takeMasterSnapshot(masterSource.id);
         } else {
-          // Take snapshot of this standard compilation to restore later on unpin
           takeStandardSnapshot();
         }
 
-        if (onCompile) onCompile(sanitizedContent); // Notify parent of compilation
+        if (onCompile) onCompile(sanitizedContent);
 
         if (data.guardrailVault) {
           setGuardrailVault(data.guardrailVault);
         }
 
-        // Reset the approval state after successful compilation
         setIsWaitingForPawnApproval(false);
 
         toast({
