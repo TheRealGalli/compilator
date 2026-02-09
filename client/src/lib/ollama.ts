@@ -225,6 +225,10 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     const version = await getBridgeVersion();
     const isTurboAvailable = version.startsWith("3.");
 
+    // FORCE FALLBACK TO LOCAL PARSING FOR DEBUGGING AND BETTER CONTROL
+    // We bypass the extension's internal logic which seems to be failing with Gemma 3.
+    // if (isTurboAvailable) { ... } 
+    /*
     if (isTurboAvailable) {
         console.log(`[OllamaLocal] Bridge v${version} rilevata. Uso TURBO PIPELINE (Offload)...`);
         return new Promise((resolve) => {
@@ -253,6 +257,7 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
             }));
         });
     }
+    */
 
     console.warn(`[OllamaLocal] Bridge v${version} non supporta Turbo. Fallback su splitting manuale.`);
 
@@ -361,12 +366,16 @@ async function _extractSingleChunk(text: string, knownValues: string[]): Promise
             throw new Error("Risposta incompleta da Ollama");
         }
         let rawResponse = data.message.content || "";
+        console.log('[DEBUG-RAW] Gemma output:', rawResponse);
 
         const findings: PIIFinding[] = [];
         const lines = rawResponse.split('\n');
 
         for (const line of lines) {
-            const match = line.trim().match(/^\[([A-Z_]+)\]\s*(.*)$/i);
+            // Relaxed regex to handle bullet points (*, -), numbers (1.), and optional colons/dashes
+            // Matches: "[NAME] Value", "* [NAME]: Value", "1. [NAME] - Value"
+            const match = line.match(/\[([A-Z_]+)\]\s*[:\-]?\s*(.*)/i);
+
             if (match) {
                 const category = match[1].toUpperCase();
                 const value = match[2].trim();
