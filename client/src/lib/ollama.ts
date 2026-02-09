@@ -267,9 +267,24 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
         return _extractSingleChunk(text, []);
     }
 
-    console.log(`[OllamaLocal] Documento lungo (${text.length} caratteri). Uso splitting PARALLELO (Context: ${CHUNK_SIZE})...`);
     const allFindings: PIIFinding[] = [];
     const processedValues = new Set<string>();
+
+    // 1. REGEX LAYER (The "Sniper")
+    // Executed first to capture deterministic entities with 100% precision.
+    const { scanTextWithRegex } = await import('./regex-patterns');
+    const regexFindings = scanTextWithRegex(text);
+    console.log(`[OllamaLocal] Regex Layer found ${regexFindings.length} entities.`);
+
+    // Add regex findings to processedValues to avoid duplicates later
+    for (const rf of regexFindings) {
+        allFindings.push(rf);
+        processedValues.add(`${rf.value.toLowerCase()}|${rf.category}`);
+    }
+
+    // 2. LLM LAYER (The "Detective")
+    // Executed in parallel chunks to find contextual entities (Names, Roles, etc.)
+    console.log(`[OllamaLocal] Documento lungo (${text.length} caratteri). Uso splitting PARALLELO (Context: ${CHUNK_SIZE})...`);
 
     // Creazione dei chunk
     const chunks: string[] = [];
@@ -282,6 +297,8 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     const BATCH_SIZE = 2;
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
         const currentBatch = chunks.slice(i, i + BATCH_SIZE);
+        // We pass the ALREADY FOUND regex values as context to avoid re-finding them? 
+        // Or we pass a limited list. Let's pass the recent ones to avoid massive context injection.
         const knownList = Array.from(processedValues).slice(-150);
 
         console.log(`[OllamaLocal] Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)}...`);
@@ -298,6 +315,14 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
             for (const f of findings) {
                 const valLower = f.value.toLowerCase();
                 const key = `${valLower}|${f.category}`;
+
+                // HYBRID MERGE LOGIC:
+                // If the value was already found by Regex, we trust Regex category.
+                // However, if the value is identical but category is different...
+                // Regex patterns are strict, so if Regex says EMAIL, it's EMAIL.
+                // If LLM says "Mario" is EMAIL (hallucination), Regex won't contain "Mario" as Email.
+                // So if key exists, we skip.
+
                 if (!processedValues.has(key)) {
                     allFindings.push(f);
                     processedValues.add(key);
