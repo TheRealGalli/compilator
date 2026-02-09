@@ -601,31 +601,117 @@ export function DocumentCompilerSection({
             }
           };
 
-          // 1. Extract from Template & Notes
-          console.log(`[DocumentCompiler] Extracting from Template...`);
-          await extractAndVault(templateContent, vaultMap, vaultCounts);
-          console.log(`[DocumentCompiler] Extracting from Notes...`);
-          await extractAndVault(notes, vaultMap, vaultCounts);
+          // 1. Parallel Extraction from Template, Notes, and Sources
+          console.log(`[DocumentCompiler] Starting QUAD-CORE Parallel Extraction...`);
 
-          // 2. Extract texts from sources via backend for Phase 1
-          const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
-            sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
-            masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
-          });
+          const extractionResults = await Promise.all([
+            // Local components
+            (async () => {
+              const findings = await extractPIILocal(templateContent);
+              return { name: 'Template', findings };
+            })(),
+            (async () => {
+              const findings = await extractPIILocal(notes);
+              return { name: 'Note', findings };
+            })(),
+            // Multi-source extraction
+            ...(async () => {
+              const extractResponse = await apiRequest('POST', '/api/pawn-extract', {
+                sources: selectedSources.map(s => ({ name: s.name, type: s.type, base64: s.base64 })),
+                masterSource: masterSource ? { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 } : null
+              });
+              const extractData = await extractResponse.json();
+              if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
 
-          const extractData = await extractResponse.json();
-          if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
+              const allSourcePromises = [];
+              if (extractData.extractedSources) {
+                for (const source of extractData.extractedSources) {
+                  allSourcePromises.push((async () => {
+                    const findings = await extractPIILocal(source.text);
+                    return { name: source.name, findings };
+                  })());
+                }
+              }
+              if (extractData.extractedMaster) {
+                allSourcePromises.push((async () => {
+                  const findings = await extractPIILocal(extractData.extractedMaster.text);
+                  return { name: extractData.extractedMaster.name, findings };
+                })());
+              }
+              return await Promise.all(allSourcePromises);
+            })()
+          ]);
 
-          // Continue extracting from sources
-          if (extractData.extractedSources) {
-            for (const source of extractData.extractedSources) {
-              console.log(`[DocumentCompiler] Extracting PII from source: ${source.name}`);
-              await extractAndVault(source.text, vaultMap, vaultCounts);
+          // Flatten results (handle the nested sources array)
+          const flatResults = extractionResults.flat();
+
+          // 2. Sequential Vault Registration (Safe Deduplication)
+          const ALLOWED = [
+            'NOME_PERSONA', 'COGNOME_PERSONA', 'DATA_DI_NASCITA', 'LUOGO_DI_NASCITA',
+            'CODICE_FISCALE', 'PARTITA_IVA', 'INDIRIZZO_COMPLETO', 'VIA', 'CITTA',
+            'PROVINCIA', 'CAP', 'NAZIONE', 'NUMERO_TELEFONO', 'EMAIL',
+            'NUMERO_DOCUMENTO', 'TIPO_DOCUMENTO', 'DATA_EMISSIONE_DOCUMENTO',
+            'DATA_SCADENZA_DOCUMENTO', 'ENTE_EMITTENTE_DOCUMENTO', 'SESSO',
+            'NAZIONALITA', 'PROFESSIONE', 'IBAN', 'ORGANIZZAZIONE', 'RUOLO', 'ALTRO'
+          ];
+
+          for (const res of flatResults) {
+            console.log(`[DocumentCompiler] Registering PII from: ${res.name} (${res.findings.length} findings)`);
+
+            for (const f of res.findings) {
+              const rawValue = f.value.trim();
+              let category = f.category.toUpperCase().replace(/[^A-Z_]/g, '_');
+
+              if (!rawValue || rawValue.length < 2) continue;
+
+              // Normalization
+              if (!ALLOWED.includes(category)) {
+                if (category.includes('NAME') || category.includes('PERSON')) category = 'NOME_PERSONA';
+                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA')) category = 'ORGANIZZAZIONE';
+                else if (category.includes('ADDR') || category.includes('INDIRIZZO')) category = 'INDIRIZZO_COMPLETO';
+                else if (category.includes('MAIL')) category = 'EMAIL';
+                else if (category.includes('TEL') || category.includes('PHONE')) category = 'NUMERO_TELEFONO';
+                else if (category.includes('BANK') || category.includes('IBAN')) category = 'IBAN';
+                else if (category.includes('CITY') || category.includes('CITTA')) category = 'CITTA';
+                else if (category.includes('PROV')) category = 'PROVINCIA';
+                else if (category.includes('COUNTRY') || category.includes('NAZIONE')) category = 'NAZIONE';
+                else if (category.includes('BIRTH')) {
+                  if (category.includes('PLACE') || category.includes('LUOGO')) category = 'LUOGO_DI_NASCITA';
+                  else category = 'DATA_DI_NASCITA';
+                }
+                else category = 'ALTRO';
+              }
+
+              let token = "";
+              const normalizedValue = rawValue.toLowerCase();
+
+              // Deduplication
+              for (const [existingToken, existingValue] of vaultMap.entries()) {
+                if (existingValue.toLowerCase() === normalizedValue) {
+                  token = existingToken;
+                  break;
+                }
+              }
+
+              if (!token) {
+                let nextIndex = 1;
+                const existingIndices = Array.from(vaultMap.keys())
+                  .filter(t => t.startsWith(`[${category}_`))
+                  .map(t => {
+                    const match = t.match(/_(\d+)\]$/);
+                    return match ? parseInt(match[1]) : 0;
+                  });
+
+                if (existingIndices.length > 0) {
+                  nextIndex = Math.max(...existingIndices) + 1;
+                }
+
+                token = `[${category}_${nextIndex}]`;
+                vaultMap.set(token, rawValue);
+                console.log(`[DocumentCompiler] Vault registered: ${token} -> ${rawValue}`);
+              }
+              vaultCounts.set(token, (vaultCounts.get(token) || 0) + 1);
             }
-          }
-          if (extractData.extractedMaster) {
-            console.log(`[DocumentCompiler] Extracting PII from master source: ${extractData.extractedMaster.name}`);
-            await extractAndVault(extractData.extractedMaster.text, vaultMap, vaultCounts);
           }
 
           const masterVault = Object.fromEntries(vaultMap);

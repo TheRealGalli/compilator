@@ -176,8 +176,8 @@ async function getBridgeVersion(retries = 2): Promise<string> {
     return "0.0.0";
 }
 
-// Prompt unificato per massima precisione (Surgical Precision 5.0)
-const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.0)
+// Prompt unificato per massima precisione (Surgical Precision 5.1 - Quad-Core Edition)
+const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.1)
 
 OBJECTIVE: Extract ONLY legitimate, human-entered identity data.
 ZERO TOLERANCE for system boilerplate, legal labels, or generic placeholders.
@@ -186,6 +186,10 @@ ZERO TOLERANCE for system boilerplate, legal labels, or generic placeholders.
 Your ONLY source of truth is the text provided within the <INPUT_DATA> tags. 
 The samples provided in "CONTRASTIVE LEARNING" (below) are for logic training ONLY. 
 NEVER extract or reuse names (e.g., Marco Bianchi, David Miller), addresses, or any values from the training examples.
+
+[PHASE 0: DOCUMENT CLASSIFICATION]
+Before extracting data, identify the TYPE of document provided (e.g., Tax Form, ID Card, Invoice, Email). 
+Adjust your extraction sensitivity based on the document's context.
 
 JUDGMENT RULES:
 1. VALUE VS LABEL: A value is NOT real if it's identical or derivative of the field label (e.g., "Taxpayer Name: Taxpayer Name").
@@ -197,16 +201,13 @@ JUDGMENT RULES:
 3. IDENTITY VALIDATION:
    * NOME_PERSONA: Must contain 2+ words (first name and last name es Carlo Galli), no generic terms like "Officer," "Taxpayer," "Azienda," "Company," or "Ditta."
    * COGNOME_PERSONA: Must contain at least one word, no generic terms.
-   * DATA_DI_NASCITA: Must be a valid date format (e.g., DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD-MMM-YYYY).
-   * LUOGO_DI_NASCITA: Must be a recognizable city, town, or country name.
+   * DATA_DI_NASCITA: Must be a valid date format.
+   * LUOGO_DI_NASCITA: Must be a recognizable location.
    * CODICE_FISCALE: Must be a 16-character alphanumeric string (Italian pattern).
    * PARTITA_IVA: Must be an 11-digit numeric string (Italian pattern).
-   * INDIRIZZO_COMPLETO: Must contain street name and number, city, and postal code.
-   * CAP: Must be a 5-digit numeric string for Italian postal codes.
-   * NUMERO_TELEFONO: Must contain at least 7 digits.
-   * EMAIL: Must contain "@" and a valid domain.
+   * INDIRIZZO_COMPLETO: Must contain street name, number, city, and postal code.
    * IBAN: Valid structure for an IBAN (e.g., starting with "IT").
-   * ORGANIZZAZIONE: Ignore generic business type labels (e.g., "Limited Liability Company," "S.r.l."). Focus on actual business name.
+   * ORGANIZZAZIONE: Ignore generic business type labels (e.g., "Limited Liability Company"). Focus on actual business name.
 
 PERSONAL DATA LABELS:
 [NOME_PERSONA], [COGNOME_PERSONA], [DATA_DI_NASCITA], [LUOGO_DI_NASCITA], [CODICE_FISCALE], [PARTITA_IVA], [INDIRIZZO_COMPLETO], [VIA], [CITTA], [PROVINCIA], [CAP], [NAZIONE], [NUMERO_TELEFONO], [EMAIL], [NUMERO_DOCUMENTO], [TIPO_DOCUMENTO], [DATA_EMISSIONE_DOCUMENTO], [DATA_SCADENZA_DOCUMENTO], [ENTE_EMITTENTE_DOCUMENTO], [SESSO], [NAZIONALITA], [PROFESSIONE], [IBAN], [ORGANIZZAZIONE], [RUOLO]
@@ -215,34 +216,17 @@ RESPONSE FORMAT:
 One finding per line in format: [LABEL] Value
 No JSON. No prose.
 
-CONTRASTIVE LEARNING:
+CONTRASTIVE LEARNING (TRAINING ONLY - NEVER REUSE THIS DATA):
 
 [CASE A: Boilerplate Noise]
-Input: "...Taxpayer Identification Number (TIN). See instructions for Part I. Number: Unknown. Nome del Cliente: Inserire qui."
+Input: "...Taxpayer Identification Number (TIN). See instructions for Part I. Number: Unknown."
 Output: (NOTHING)
 
 [CASE B: Example Data]
 Input: "...Enter your email here (e.g., mario.rossi@example.com). Nome Cognome: John Doe. Indirizzo: Via Roma 1 (solo per test)..."
 Output: (NOTHING)
 
-[CASE C: Real Data Discovery]
-Input: "...Dati Anagrafici: Nome: Marco, Cognome: Bianchi, Data di Nascita: 15/03/1985, Luogo di Nascita: Roma, Italia, CF: BNCMCR85C15H501V, Indirizzo: Via Garibaldi 12, 20121 Milano (MI), Azienda: Tech Solutions S.r.l., P.IVA: 09876543210..."
-Output:
-[NOME_PERSONA] Marco Bianchi
-[COGNOME_PERSONA] Bianchi
-[DATA_DI_NASCITA] 15/03/1985
-[LUOGO_DI_NASCITA] Roma
-[NAZIONE] Italia
-[CODICE_FISCALE] BNCMCR85C15H501V
-[INDIRIZZO_COMPLETO] Via Garibaldi 12, 20121 Milano (MI), Italia
-[VIA] Via Garibaldi 12
-[CITTA] Milano
-[PROVINCIA] MI
-[CAP] 20121
-[ORGANIZZAZIONE] Tech Solutions
-[PARTITA_IVA] 09876543210
-
-[CASE D: Mixed Data & Global Context]
+[CASE C: Mixed Data & Global Context]
 Input: "...Application for Mr. David Miller (1980-07-22), Place of Birth: London, UK, Address: 10 Downing Street, London SW1A 2AA, UK. Phone: +44 20 7946 0123."
 Output:
 [NOME_PERSONA] David Miller

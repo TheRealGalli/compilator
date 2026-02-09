@@ -1,4 +1,4 @@
-const BRIDGE_VERSION = "3.0.0";
+const BRIDGE_VERSION = "3.1.0"; // Surgical Parallel
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'GET_VERSION') {
@@ -39,9 +39,12 @@ async function handleTurboExtraction(request, sendResponse) {
     const { text, url, model, systemPrompt } = request;
     const CHUNK_SIZE = 8000;
     const OVERLAP = 1000;
-    const CONCURRENCY = 4; // Più slot paralleli per raddoppiare la velocità
+    const CONCURRENCY = 2; // Ridotto a 2 per gestire meglio il parallelo multi-doc dell'M1
 
-    console.log(`[GromitTurbo] Avvio estrazione PII (Testo: ${text.length} char)...`);
+    console.log(`[GromitParallel] Avvio estrazione PII (Testo: ${text.length} char)...`);
+
+    // Capture the first 1000 chars as Document Context for all chunks
+    const docContext = text.substring(0, 1000);
 
     // 1. Chunking interno
     const chunks = [];
@@ -67,7 +70,7 @@ async function handleTurboExtraction(request, sendResponse) {
                         model,
                         messages: [
                             { role: 'system', content: systemPrompt + (knownValues.length > 0 ? `\n\nALREADY KNOWN: ${knownValues.slice(-50).join(', ')}` : "") },
-                            { role: 'user', content: `<INPUT_DATA>\n${chunk}\n</INPUT_DATA>` }
+                            { role: 'user', content: `[DOCUMENT PREAMBLE: ${docContext}...]\n\n<INPUT_DATA_CHUNK>\n${chunk}\n</INPUT_DATA_CHUNK>` }
                         ],
                         stream: false,
                         options: { temperature: 0.1, num_ctx: 16384, num_predict: 2048 }
@@ -91,7 +94,7 @@ async function handleTurboExtraction(request, sendResponse) {
                 }
                 return chunkFindings;
             } catch (err) {
-                console.error("[GromitTurbo] Errore chunk:", err);
+                console.error("[GromitParallel] Errore chunk:", err);
                 return [];
             }
         }));
@@ -109,6 +112,6 @@ async function handleTurboExtraction(request, sendResponse) {
         }
     }
 
-    console.log(`[GromitTurbo] Completato! Elementi trovati: ${allFindings.length}`);
+    console.log(`[GromitParallel] Completato! Elementi trovati: ${allFindings.length}`);
     sendResponse({ success: true, findings: allFindings });
 }
