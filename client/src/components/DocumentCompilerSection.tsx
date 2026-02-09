@@ -887,7 +887,7 @@ export function DocumentCompilerSection({
           finalSources.push({
             name: s.name,
             type: 'text/plain', // Force text type so server treats it as raw text
-            content: anonymizedText,
+            anonymizedText: anonymizedText,
             originalType: s.type
           });
         }
@@ -898,7 +898,7 @@ export function DocumentCompilerSection({
           finalMasterSource = {
             name: masterSource.name,
             type: 'text/plain',
-            content: anonymizedMaster,
+            anonymizedText: anonymizedMaster,
             originalType: masterSource.type
           };
         }
