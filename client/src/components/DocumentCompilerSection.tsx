@@ -507,7 +507,7 @@ export function DocumentCompilerSection({
       const { getApiUrl } = await import("@/lib/api-config");
 
       // --- NEW: PREVENTIVE PAWN CHECK (LOCAL-FIRST) ---
-      if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval && !webResearch) {
+      if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval) {
         console.log('[DocumentCompiler] Hybrid Pawn Check triggered...');
 
         if (ollamaStatus !== 'connected') {
