@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Gromit Bridge",
-    "version": "3.4.0",
+    "version": "3.5.0",
     "description": "Collega Gromit all'AI locale (Ollama) con supporto Turbo PII Pipeline.",
     "icons": {
         "128": "icon.png"
