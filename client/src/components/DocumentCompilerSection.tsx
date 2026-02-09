@@ -331,6 +331,13 @@ export function DocumentCompilerSection({
     }
   }, [masterSource?.id, masterSource?.isFillable, masterSource?.isBypass, isLocked, isPdfMode]);
 
+  // 3. RESET PAWN APPROVAL if sources change (Security Check)
+  useEffect(() => {
+    if (activeGuardrails.includes('pawn')) {
+      setIsWaitingForPawnApproval(false);
+    }
+  }, [selectedSources, masterSource, activeGuardrails]);
+
   // const fetchDocuments = async () => { // This function is no longer used.
   //   try {
   //     const { getApiUrl } = await import("@/lib/api-config");
@@ -695,7 +702,7 @@ export function DocumentCompilerSection({
 
           console.log(`[DocumentCompiler] [Surgical 5.8] Avvio Ultra-Drive su ${allDocs.length} sorgenti...`);
           const startTime = Date.now();
-          const DOC_BATCH_SIZE = 2; // Process 2 docs in parallel (High Perfromance)
+          const DOC_BATCH_SIZE = 1; // Process 1 doc at a time (Safe for 8GB RAM)
           const flatResults = [];
 
           for (let i = 0; i < allDocs.length; i += DOC_BATCH_SIZE) {

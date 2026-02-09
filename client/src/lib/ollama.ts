@@ -233,7 +233,7 @@ ${text}
             format: 'json',
             options: {
                 temperature: 0.1,
-                num_ctx: 16384     // MAX CONTEXT (Increased to 16k to be safe for full docs)
+                num_ctx: 8192     // OPTIMIZED for 8GB RAM (16k is too heavy)
             }
         };
 
