@@ -427,6 +427,8 @@ export function DocumentCompilerSection({
       if (!value || value.length < 2) continue;
       // Escape for regex (simple version)
       const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // CRITICAL: Use 'gi' for Case-Insensitive Global replacement
+      // If vault has "ROSSI" and text has "Rossi", we want to catch it.
       const regex = new RegExp(escapedValue, 'gi');
       result = result.replace(regex, token);
     }
@@ -439,9 +441,11 @@ export function DocumentCompilerSection({
     let result = text;
     // Replaces tokens [CAT_X] with their values
     for (const [token, value] of Object.entries(vault)) {
-      // Escape token for regex (they contain brackets)
-      const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(escapedToken, 'g');
+      // Escape token for regex (they contain brackets [NAME_1])
+      // We modify the regex to be lenient with spaces: \[ ?NAME_1 ?\]
+      const coreToken = token.replace(/^\[|\]$/g, ''); // Extract 'NAME_1' from '[NAME_1]'
+      // Regex: \[ \s* NAME_1 \s* \]
+      const regex = new RegExp(`\\[\\s*${coreToken}\\s*\\]`, 'g');
       result = result.replace(regex, value);
     }
     return result;
