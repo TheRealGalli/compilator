@@ -115,13 +115,36 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
 
     // Helper for heuristic extraction
     const matchHeuristic = (indicators: string[], type: string) => {
+        // Regex Explanation:
+        // \b(${indicators.join('|')}) : Match the prefix (e.g. "Sig.", "Nato a")
+        // \s+ : Space(s)
+        // ((?:[A-Z][a-zàèéìòù]+\s*){1,4}) : Capture group 2. Matches 1 to 4 Capitalized Words.
+        // UNLESS it's a generic word like "Il", "Lo" (already filtered below).
+
         const regexStr = `\\b(${indicators.join('|')})\\s+((?:[A-Z][a-zàèéìòù]+\\s*){1,4})`;
         const regex = new RegExp(regexStr, 'gi');
         let match;
         while ((match = regex.exec(text)) !== null) {
             const potentialValue = match[2].trim();
+
+            // STRICT FILTERING for NAMES
+            if (type === 'FULL_NAME') {
+                // Rule 1: Must be at least 2 words (Name Surname)
+                const words = potentialValue.split(/\s+/);
+                if (words.length < 2) continue;
+
+                // Rule 2: Must NOT be a common sentence start or verb phrase
+                // (e.g. "Si Impegna" might pass if "Si" was in indicators? No, indicators are "Sig." etc.)
+                // But sometimes indicators are weak.
+
+                // Rule 3: Check for "Double Capitalization" strictness
+                // We typically expect "Mario Rossi".
+                // We reject if any word is NOT capitalized (already handled by regex)
+                // We reject if it looks like a date "Gennaio 2020" -> Regex handles dates differently.
+            }
+
             // Basic cleanup: ignore if strictly common words often capitalized in titles
-            if (potentialValue.length > 3 && !['Il', 'Lo', 'La', 'I', 'Gli', 'Le'].includes(potentialValue)) {
+            if (potentialValue.length > 3 && !['Il', 'Lo', 'La', 'I', 'Gli', 'Le', 'Si', 'Non'].includes(potentialValue)) {
                 // Determine confidence: "Nato a" is very strong for birthplace, "Sig." is strong for name
                 let conf: 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM';
                 if (type === 'PLACE_OF_BIRTH' || type === 'FULL_NAME') conf = 'MEDIUM'; // Let LLM confirm

@@ -188,7 +188,10 @@ Your job is to determine if each candidate is GENUINE and if the TYPE is correct
    - "Società [Acme Srl]" -> [Acme Srl] is ORGANIZATION (CONFIRM).
    - "Sig. [Mario Rossi]" -> [Mario Rossi] is FULL_NAME (CONFIRM).
 2. COMPATIBILITY: If category is ORGANIZATION but value is a person's name (e.g. "Studio Legale [Mario Rossi]"), acceptable as ORGANIZATION or FULL_NAME.
-3. IGNORE: Creative works, generic dates ("2023"), public info.
+3. REJECT FALSE POSITIVES (STRICT):
+   - Phrases starting with verbs (e.g., "Si impegna", "Dichiara", "Continuerà") are NOT names.
+   - Sentence fragments (e.g., "non sarà tenuto") are NOT names.
+   - Creative works, generic dates ("2023").
 4. RETURN: A JSON array of IDs that are VALID.
    Example Input: [{"id": 1, "value": "Roma", "type": "PLACE_OF_BIRTH", "context": "nato a Roma"}, {"id": 2, "value": "2024", "type": "DATE", "context": "Copyright 2024"}]
    Example Output: [1]

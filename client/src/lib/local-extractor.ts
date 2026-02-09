@@ -123,13 +123,13 @@ async function extractPdfText(file: File): Promise<string> {
         // TODO: Integrare Tesseract.js qui per OCR locale
     }
 
-    return fullText + formText;
+    return cleanText(fullText + formText);
 }
 
 async function extractDocxText(file: File): Promise<string> {
     const arrayBuffer = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer });
-    return result.value;
+    return cleanText(result.value);
 }
 
 async function extractXlsxText(file: File): Promise<string> {
@@ -145,13 +145,27 @@ async function extractXlsxText(file: File): Promise<string> {
         }
     });
 
-    return fullText;
+    return cleanText(fullText);
+}
+
+/**
+ * Cleans extracted text to remove noise and normalize whitespace.
+ * Helps regex/LLM processing by ensuring consistent formatting.
+ */
+function cleanText(text: string): string {
+    return text
+        .replace(/\r\n/g, '\n')           // Normalize newlines
+        .replace(/\u00A0/g, ' ')          // Replace non-breaking spaces
+        .replace(/[ \t]+/g, ' ')          // Collapse multiple spaces/tabs
+        .replace(/\n\s+\n/g, '\n\n')      // Collapse spaces in empty lines
+        .replace(/\n{3,}/g, '\n\n')       // Max 2 newlines
+        .trim();
 }
 
 async function extractPlainText(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
+        reader.onload = () => resolve(cleanText(reader.result as string));
         reader.onerror = reject;
         reader.readAsText(file);
     });
