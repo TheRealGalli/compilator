@@ -609,7 +609,7 @@ export function DocumentCompilerSection({
           const extractData = await extractResponse.json();
           if (!extractData.success) throw new Error("Estrazione sorgenti fallita");
 
-          // 2. Controlled Batch Extraction (Surgical 5.2)
+          // 2. Controlled Batch Extraction (Surgical 5.3)
           const allDocs = [
             ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent }] : []),
             ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes }] : []),
@@ -617,28 +617,35 @@ export function DocumentCompilerSection({
             ...(extractData.extractedMaster ? [extractData.extractedMaster] : [])
           ];
 
-          console.log(`[DocumentCompiler] [Surgical 5.2] Avvio elaborazione di ${allDocs.length} sorgenti in batch da 2...`);
-
-          const DOC_BATCH_SIZE = 2; // Process 2 docs at a time to prevent CPU/Memory thrashing
+          console.log(`[DocumentCompiler] [Surgical 5.3] Avvio Hyper-Drive su ${allDocs.length} sorgenti...`);
+          const startTime = Date.now();
+          const DOC_BATCH_SIZE = 2;
           const flatResults = [];
 
           for (let i = 0; i < allDocs.length; i += DOC_BATCH_SIZE) {
             const batch = allDocs.slice(i, i + DOC_BATCH_SIZE);
-            console.log(`[DocumentCompiler] [Batch ${(i / DOC_BATCH_SIZE) + 1}/${Math.ceil(allDocs.length / DOC_BATCH_SIZE)}] Elaborazione in corso...`);
+            const batchNum = (i / DOC_BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(allDocs.length / DOC_BATCH_SIZE);
+
+            console.log(`[DocumentCompiler] [Batch ${batchNum}/${totalBatches}] In elaborazione...`);
 
             const batchResults = await Promise.all(batch.map(async (doc) => {
-              console.log(`[DocumentCompiler] -> Estrazione da '${doc.name}' (${doc.text.length} char)...`);
+              const charCount = doc.text.length;
+              console.log(`[DocumentCompiler] -> Analizzando '${doc.name}' (${charCount} char)...`);
+
               const findings = await extractPIILocal(doc.text);
-              console.log(`[DocumentCompiler] <- '${doc.name}' completato: ${findings.length} elementi trovati.`);
+
+              console.log(`[DocumentCompiler] <- '${doc.name}' finito: ${findings.length} elementi trovati.`);
               return { name: doc.name, findings };
             }));
 
             flatResults.push(...batchResults);
           }
 
-          console.log(`[DocumentCompiler] Tutte le estrazioni completate. Inizio registrazione vault...`);
+          const totalTime = (Date.now() - startTime) / 1000;
+          console.log(`[DocumentCompiler] Estrazione completata in ${totalTime.toFixed(1)}s (${(totalTime / allDocs.length).toFixed(1)}s per doc).`);
 
-          // 2. Sequential Vault Registration (Safe Deduplication)
+          // 3. Sequential Vault Registration (Safe Deduplication)
           const ALLOWED = [
             'NOME_PERSONA', 'COGNOME_PERSONA', 'DATA_DI_NASCITA', 'LUOGO_DI_NASCITA',
             'CODICE_FISCALE', 'PARTITA_IVA', 'INDIRIZZO_COMPLETO', 'VIA', 'CITTA',
@@ -656,6 +663,9 @@ export function DocumentCompilerSection({
               let category = f.category.toUpperCase().replace(/[^A-Z_]/g, '_');
 
               if (!rawValue || rawValue.length < 2) continue;
+              // Grounding Check: Ignore values that look like prompt artifacts or codes
+              if (rawValue.includes('[') || rawValue.includes(']') || rawValue.includes('<')) continue;
+              if (rawValue.toLowerCase() === 'null' || rawValue.toLowerCase() === 'undefined') continue;
 
               // Normalization
               if (!ALLOWED.includes(category)) {

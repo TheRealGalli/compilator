@@ -39,9 +39,9 @@ async function handleTurboExtraction(request, sendResponse) {
     const { text, url, model, systemPrompt } = request;
     const CHUNK_SIZE = 8000;
     const OVERLAP = 1000;
-    const CONCURRENCY = 2; // Ridotto a 2 per gestire meglio il parallelo multi-doc dell'M1
+    const CONCURRENCY = 4; // Ritorno a 4 slot paralleli per saturare l'M1 in hyper-drive
 
-    console.log(`[GromitParallel] Avvio estrazione PII (Testo: ${text.length} char)...`);
+    console.log(`[GromitHyperDrive] Avvio estrazione PII (Testo: ${text.length} char)...`);
 
     // Capture the first 1000 chars as Document Context for all chunks
     const docContext = text.substring(0, 1000);
@@ -73,7 +73,12 @@ async function handleTurboExtraction(request, sendResponse) {
                             { role: 'user', content: `[DOCUMENT PREAMBLE: ${docContext}...]\n\n<INPUT_DATA_CHUNK>\n${chunk}\n</INPUT_DATA_CHUNK>` }
                         ],
                         stream: false,
-                        options: { temperature: 0.1, num_ctx: 16384, num_predict: 2048 }
+                        options: {
+                            temperature: 0.1,
+                            num_ctx: 8192, // Ottimizzato per 8k chunks: riduce memoria e latenza
+                            num_predict: 1024, // Sufficiente per i risultati, velocizza la fine della generazione
+                            stop: ["</INPUT_DATA_CHUNK>", "[LABEL] ["]
+                        }
                     })
                 });
 
@@ -87,14 +92,15 @@ async function handleTurboExtraction(request, sendResponse) {
                     const match = line.match(/^\[([A-Z_]+)\]\s*(.*)$/);
                     if (match) {
                         const val = match[2].trim();
-                        if (val.length > 2) {
+                        // Filter out hallucinations like [NOME_PERSONA] or tags
+                        if (val.length > 2 && !val.includes('[') && !val.includes(']')) {
                             chunkFindings.push({ category: match[1].toUpperCase(), value: val });
                         }
                     }
                 }
                 return chunkFindings;
             } catch (err) {
-                console.error("[GromitParallel] Errore chunk:", err);
+                console.error("[GromitHyperDrive] Errore chunk:", err);
                 return [];
             }
         }));
@@ -112,6 +118,6 @@ async function handleTurboExtraction(request, sendResponse) {
         }
     }
 
-    console.log(`[GromitParallel] Completato! Elementi trovati: ${allFindings.length}`);
+    console.log(`[GromitHyperDrive] Completato! Elementi trovati: ${allFindings.length}`);
     sendResponse({ success: true, findings: allFindings });
 }
