@@ -531,12 +531,12 @@ export function DocumentCompilerSection({
             const findings = await extractPIILocal(text);
 
             const ALLOWED = [
-              'NOME_PERSONA', 'COGNOME_PERSONA', 'DATA_DI_NASCITA', 'LUOGO_DI_NASCITA',
-              'CODICE_FISCALE', 'PARTITA_IVA', 'INDIRIZZO_COMPLETO', 'VIA', 'CITTA',
-              'PROVINCIA', 'CAP', 'NAZIONE', 'NUMERO_TELEFONO', 'EMAIL',
-              'NUMERO_DOCUMENTO', 'TIPO_DOCUMENTO', 'DATA_EMISSIONE_DOCUMENTO',
-              'DATA_SCADENZA_DOCUMENTO', 'ENTE_EMITTENTE_DOCUMENTO', 'SESSO',
-              'NAZIONALITA', 'PROFESSIONE', 'IBAN', 'ORGANIZZAZIONE', 'RUOLO', 'ALTRO'
+              'FULL_NAME', 'SURNAME', 'DATE_OF_BIRTH', 'PLACE_OF_BIRTH',
+              'TAX_ID', 'VAT_NUMBER', 'FULL_ADDRESS', 'STREET', 'CITY',
+              'STATE_PROVINCE', 'ZIP_CODE', 'COUNTRY', 'PHONE_NUMBER', 'EMAIL',
+              'DOCUMENT_ID', 'DOCUMENT_TYPE', 'ISSUE_DATE',
+              'EXPIRY_DATE', 'ISSUING_AUTHORITY', 'GENDER',
+              'NATIONALITY', 'OCCUPATION', 'IBAN', 'ORGANIZATION', 'JOB_TITLE', 'MISC'
             ];
 
             for (const f of findings) {
@@ -548,20 +548,27 @@ export function DocumentCompilerSection({
 
               // 2. Category normalization
               if (!ALLOWED.includes(category)) {
-                if (category.includes('NAME') || category.includes('PERSON')) category = 'NOME_PERSONA';
-                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA')) category = 'ORGANIZZAZIONE';
-                else if (category.includes('ADDR') || category.includes('INDIRIZZO')) category = 'INDIRIZZO_COMPLETO';
+                if (category.includes('NAME') || category.includes('PERSON') || category.includes('NOME')) category = 'FULL_NAME';
+                else if (category.includes('SUR') || category.includes('LAST') || category.includes('COGN')) category = 'SURNAME';
+                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA') || category.includes('CORP')) category = 'ORGANIZATION';
+                else if (category.includes('ADDR') || category.includes('INDIRIZZO')) category = 'FULL_ADDRESS';
+                else if (category.includes('STREET') || category.includes('VIA')) category = 'STREET';
                 else if (category.includes('MAIL')) category = 'EMAIL';
-                else if (category.includes('TEL') || category.includes('PHONE')) category = 'NUMERO_TELEFONO';
+                else if (category.includes('TEL') || category.includes('PHONE') || category.includes('CELL')) category = 'PHONE_NUMBER';
                 else if (category.includes('BANK') || category.includes('IBAN')) category = 'IBAN';
-                else if (category.includes('CITY') || category.includes('CITTA')) category = 'CITTA';
-                else if (category.includes('PROV')) category = 'PROVINCIA';
-                else if (category.includes('COUNTRY') || category.includes('NAZIONE')) category = 'NAZIONE';
+                else if (category.includes('CITY') || category.includes('CITTA')) category = 'CITY';
+                else if (category.includes('STATE') || category.includes('PROV')) category = 'STATE_PROVINCE';
+                else if (category.includes('COUNTRY') || category.includes('NATION') || category.includes('NAZION')) category = 'COUNTRY';
+                else if (category.includes('TAX') || category.includes('SOCIAL') || category.includes('FISCAL') || category.includes('CODICE')) category = 'TAX_ID';
+                else if (category.includes('VAT') || category.includes('IVA')) category = 'VAT_NUMBER';
+                else if (category.includes('ZIP') || category.includes('POST') || category.includes('CAP')) category = 'ZIP_CODE';
                 else if (category.includes('BIRTH')) {
-                  if (category.includes('PLACE') || category.includes('LUOGO')) category = 'LUOGO_DI_NASCITA';
-                  else category = 'DATA_DI_NASCITA';
+                  if (category.includes('PLACE') || category.includes('LUOGO')) category = 'PLACE_OF_BIRTH';
+                  else category = 'DATE_OF_BIRTH';
                 }
-                else category = 'ALTRO';
+                else if (category.includes('DOC') || category.includes('NUMBER')) category = 'DOCUMENT_ID';
+                else if (category.includes('ROLE') || category.includes('JOB') || category.includes('RUOLO')) category = 'JOB_TITLE';
+                else category = 'MISC';
               }
 
               const value = rawValue;

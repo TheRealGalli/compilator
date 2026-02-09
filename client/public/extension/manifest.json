@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "Gromit Bridge 3.3.0 (Ultra-Drive Edition)",
-    "version": "3.3.0",
+    "name": "Gromit Bridge 3.4.0 (Ultra-Drive Global Edition)",
+    "version": "3.4.0",
     "description": "Collega Gromit all'AI locale (Ollama) superando i blocchi di sicurezza del browser.",
     "icons": {
         "128": "icon.png"

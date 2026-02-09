@@ -177,57 +177,40 @@ async function getBridgeVersion(retries = 2): Promise<string> {
 }
 
 // Prompt unificato per massima precisione (Surgical Precision 5.2 - Batch Edition)
-const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.2)
+const SHARED_MISSION_PROMPT = `MISSION: High-Fidelity Identity Discovery (Surgical Precision 5.7)
 
-OBJECTIVE: Extract ONLY legitimate, human-entered identity data.
-ZERO TOLERANCE for system boilerplate, legal labels, or generic placeholders.
+OBJECTIVE: Extract ONLY legitimate, human-entered identity data from the provided text.
+CRITICAL: Maintain absolute semantic integrity. Do not guess or modify found values.
 
-[CRITICAL RULE: SOURCE-ONLY EXTRACTION]
-Your ONLY source of truth is the text within <INPUT_DATA_CHUNK>. 
-NEVER extract text from [DOCUMENT PREAMBLE] or "CONTRASTIVE LEARNING". 
-If you see tags like "[DOCUMENT_TYPE]" or "[PHASE 0]", IGNORE THEM. They are instructions, not data.
+[1. SOURCE AWARENESS]
+You will receive data from multiple sources:
+- STATIC PDF: Text extracted from images or layout.
+- FILLABLE PDF (AcroForms): Structured fields from [DATI COMPILATI NEL MODULO PDF]. PRIORITIZE THIS DATA.
+- DOCX/CSV/TXT: Raw text or structured lists.
 
-[PHASE 0: DOCUMENT CLASSIFICATION]
-Identify the document type (e.g., Modello 730, IRS Form SS-4, ID Card) and adjust extraction logic. 
-DO NOT output the document type as a finding unless specifically requested by a label.
+[2. GROUND RULES]
+- SOURCE-ONLY: Extract ONLY from the provided <INPUT_DATA>. 
+- NO HALLUCINATIONS: If a field contains instructions (e.g., "[Insert Name]"), IGNORE IT.
+- NO PROSE: Output ONLY the labels and values.
+- DEDUPLICATION: Extract unique identities once per session.
 
-JUDGMENT RULES:
-1. VALUE VS LABEL: A value is NOT real if it's identical to the field label or a placeholder (e.g., "[DOCUMENT_TYPE]", "Name: Name").
-2. SEMANTIC FILTRATION: Discard all generic placeholders:
-   * Status: N/A, None, Unknown, Pending, Da compilare, Inserire qui.
-   * Examples: Example, yourname@example.com, john.doe, Mario Rossi, Sig./Sig.ra.
-   * Formatting: Any text that looks like a tag, instruction, or prompt artifact (e.g., [NOME_PERSONA]).
-3. IDENTITY VALIDATION:
-   * NOME_PERSONA: Must be a real human name. No roles ("Director", "Agent") or company names.
-   * INDIRIZZO_COMPLETO: Must be a physical address. No generic placeholders.
-   * IBAN / CODICE_FISCALE: Must follow strict alphanumeric patterns.
+[3. PREFERRED IDENTITY LABELS]
+[FULL_NAME], [SURNAME], [DATE_OF_BIRTH], [PLACE_OF_BIRTH], [TAX_ID], [VAT_NUMBER], [FULL_ADDRESS], [STREET], [CITY], [STATE_PROVINCE], [ZIP_CODE], [COUNTRY], [PHONE_NUMBER], [EMAIL], [DOCUMENT_ID], [DOCUMENT_TYPE], [ISSUE_DATE], [EXPIRY_DATE], [ISSUING_AUTHORITY], [GENDER], [NATIONALITY], [OCCUPATION], [IBAN], [ORGANIZATION], [JOB_TITLE], [MISC]
 
-PERSONAL DATA LABELS:
-[NOME_PERSONA], [COGNOME_PERSONA], [DATA_DI_NASCITA], [LUOGO_DI_NASCITA], [CODICE_FISCALE], [PARTITA_IVA], [INDIRIZZO_COMPLETO], [VIA], [CITTA], [PROVINCIA], [CAP], [NAZIONE], [NUMERO_TELEFONO], [EMAIL], [NUMERO_DOCUMENTO], [TIPO_DOCUMENTO], [DATA_EMISSIONE_DOCUMENTO], [DATA_SCADENZA_DOCUMENTO], [ENTE_EMITTENTE_DOCUMENTO], [SESSO], [NAZIONALITA], [PROFESSIONE], [IBAN], [ORGANIZZAZIONE], [RUOLO]
+*NOTE: You are intelligent. Use descriptive English labels in [CAPS_WITH_UNDERSCORES] for any other sensitive data.*
 
-RESPONSE FORMAT:
-One finding per line in format: [LABEL] Value
-No JSON. No prose. No placeholder tags.
+[4. FORMATTING]
+One finding per line: [LABEL] Value
+Example: [FULL_NAME] John Doe
 
-CONTRASTIVE LEARNING (TRAINING ONLY - NEVER REUSE THIS DATA):
-
-[CASE A: Hallucinated Labels]
-Input: "[DOCUMENT PREAMBLE: Tax Form...] <INPUT_DATA_CHUNK> Name: [NOME_PERSONA] </INPUT_DATA_CHUNK>"
-Output: (NOTHING)
-
-[CASE B: Placeholder Noise]
-Input: "...Enter email (e.g., test@test.com). Status: Unknown. Partita IVA: [PARTITA_IVA]"
-Output: (NOTHING)
-
-[CASE C: Real Extraction]
-Input: "...Application for Carlo Galli (born 1980-07-22) residing at Via Roma 1, Siena, IT..."
+[5. FEW-SHOT EXAMPLES]
+Input: "<INPUT_DATA> Name: [Insert Here]. Employee: Jane Smith (ID: 12345). Home: 123 Maple St, NYC. </INPUT_DATA>"
 Output:
-[NOME_PERSONA] Carlo Galli
-[DATA_DI_NASCITA] 1980-07-22
-[INDIRIZZO_COMPLETO] Via Roma 1, Siena, Italy
-[VIA] Via Roma 1
-[CITTA] Siena
-[NAZIONE] Italy`;
+[FULL_NAME] Jane Smith
+[DOCUMENT_ID] 12345
+[FULL_ADDRESS] 123 Maple St, NYC
+[CITY] New York City
+[STATE_PROVINCE] NY`;
 
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];

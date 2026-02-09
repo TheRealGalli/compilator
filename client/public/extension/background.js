@@ -1,4 +1,4 @@
-const BRIDGE_VERSION = "3.3.0"; // Ultra-Drive Edition
+const BRIDGE_VERSION = "3.4.0"; // Ultra-Drive Global Edition
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'GET_VERSION') {
