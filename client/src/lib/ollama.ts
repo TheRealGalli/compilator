@@ -201,7 +201,8 @@ You are analyzing documents that may contain:
 - SOURCE-ONLY: Extract ONLY from <INPUT_DATA>. 
 - NO HALLUCINATIONS: Do not "correct" or guess names/addresses.
 - NO BOILERPLATE: Ignore placeholders like "[INSERT_NAME]".
-- NO PROSE: Output ONLY [LABEL] Value.
+- NO PROSE: Output ONLY [LABEL] Value. Do not include "Here is the output" or markdown code blocks.
+- NOEXPLANATION: Do not explain your findings. Just list them.
 
 [3. PREFERRED IDENTITY LABELS]
 [FULL_NAME], [SURNAME], [DATE_OF_BIRTH], [PLACE_OF_BIRTH], [TAX_ID], [VAT_NUMBER], [FULL_ADDRESS], [STREET], [CITY], [STATE_PROVINCE], [ZIP_CODE], [COUNTRY], [PHONE_NUMBER], [EMAIL], [DOCUMENT_ID], [DOCUMENT_TYPE], [ISSUE_DATE], [EXPIRY_DATE], [ISSUING_AUTHORITY], [GENDER], [NATIONALITY], [OCCUPATION], [IBAN], [ORGANIZATION], [JOB_TITLE], [MISC]
@@ -372,9 +373,14 @@ async function _extractSingleChunk(text: string, knownValues: string[]): Promise
         const lines = rawResponse.split('\n');
 
         for (const line of lines) {
-            // Relaxed regex to handle bullet points (*, -), numbers (1.), and optional colons/dashes
-            // Matches: "[NAME] Value", "* [NAME]: Value", "1. [NAME] - Value"
-            const match = line.match(/\[([A-Z_]+)\]\s*[:\-]?\s*(.*)/i);
+            // Regex refined to handle:
+            // 1. Standard: "[NAME] Value"
+            // 2. Bullet points: "* [NAME] Value" or "- [NAME] Value"
+            // 3. Colon separators: "[NAME]: Value"
+            // 4. Markdown code blocks (ignores ```)
+            // 5. Enumerated lists: "1. [NAME] Value"
+            const cleanLine = line.replace(/^[\s\*\-\d\.]+|```/g, '').trim();
+            const match = cleanLine.match(/^\[([A-Z_]+)\]\s*[:\-]?\s*(.*)/i);
 
             if (match) {
                 const category = match[1].toUpperCase();
