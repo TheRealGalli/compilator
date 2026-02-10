@@ -830,6 +830,7 @@ export function DocumentCompilerSection({
 
           setReportVault(masterVault);
           setReportVaultCounts(masterCounts);
+          setGuardrailVault(masterVault); // FIX: Ensure context is updated with local PII
           setIsWaitingForPawnApproval(true);
           setIsAnonymizationReportOpen(true);
           setIsCompiling(false);
@@ -865,12 +866,15 @@ export function DocumentCompilerSection({
 
         // 2. Prepare Sources (Text Only - Anonymized)
         const getAnonymizedText = async (source: any) => {
-          // Try to find in cache first
+          // Try to find in cache first (which contains ANONYMIZED text after Phase 2)
           const cached = sourceTextCache.current.find(d => d.name === source.name);
-          let text = cached ? cached.text : "";
+          if (cached && cached.text) {
+            return cached.text;
+          }
 
-          // If not in cache, extract now (fallback)
-          if (!text && source.base64 && !source.type.startsWith('image/')) {
+          // If not in cache, extract now (fallback) and Anonymize on the fly
+          let text = "";
+          if (source.base64 && !source.type.startsWith('image/')) {
             const base64ToFile = (base64: string, filename: string, mimeType: string): File => {
               const byteCharacters = atob(base64);
               const byteNumbers = new Array(byteCharacters.length);
@@ -893,12 +897,23 @@ export function DocumentCompilerSection({
           return performMechanicalGlobalSweep(text, guardrailVault);
         };
 
+        // Helper to encode UTF-8 text to Base64
+        const toBase64 = (str: string) => {
+          try {
+            return btoa(unescape(encodeURIComponent(str)));
+          } catch (e) {
+            console.error("Base64 encode error", e);
+            return "";
+          }
+        };
+
         // Construct Sources Payload
         for (const s of selectedSources) {
           const anonymizedText = await getAnonymizedText(s);
           finalSources.push({
             name: s.name,
             type: 'text/plain', // Force text type so server treats it as raw text
+            base64: toBase64(anonymizedText), // Ensure Server receives content as file
             anonymizedText: anonymizedText,
             originalType: s.type
           });
@@ -910,6 +925,7 @@ export function DocumentCompilerSection({
           finalMasterSource = {
             name: masterSource.name,
             type: 'text/plain',
+            base64: toBase64(anonymizedMaster), // Ensure Server receives content as file
             anonymizedText: anonymizedMaster,
             originalType: masterSource.type
           };

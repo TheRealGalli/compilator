@@ -243,6 +243,7 @@ ${text}
 
         try {
             if (data.message?.content) {
+                console.log("[OllamaLocal] RAW LLM RESPONSE:", data.message.content); // DEBUG LOG
                 findings = JSON.parse(data.message.content);
             }
             if (!Array.isArray(findings)) findings = [];
@@ -260,6 +261,8 @@ ${text}
                 // This prevents "Mario Rossi" if the text says "Mario Ross".
                 if (!text.includes(val)) {
                     console.warn(`[OllamaLocal] HALLUCINATION REJECTED: '${val}' not found in source text.`);
+                    // Relaxed Match attempt for simple spacing issues
+                    // if (text.replace(/\s+/g, ' ').includes(val.replace(/\s+/g, ' '))) { ... }
                     continue;
                 }
 
