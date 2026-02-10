@@ -237,22 +237,10 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // User requested FULL DOCUMENT context.
     console.log(`[OllamaLocal] Sending FULL TEXT (${text.length} chars) to LLM...`);
 
-    // Prepare "Known Findings" string (Context only, to avoid re-extracting)
-    const knownValues = highConfidenceCandidates.map(c => c.value).join(", ");
-
-    // ULTRA-CONCISE PROMPT (Designed for Gemma 3 1B)
-    const prompt = `Analyze the text below. Extract Personal Data (PII) into a JSON array.
-CRITICAL: EXTRACT ONLY PERSONAL DATA EXACTLY AS FOUND IN TEXT (Keep ALL spaces and uppercase letters).
-
-Focus on:
-1. ADDRESSES (Via, Piazza, Residenza)
-2. NAMES (Mario Rossi)
-3. DATES
-
-Context (Already found, ignore these specific values but look around them): [${knownValues}]
-
-Output format: [{"value": "...", "type": "CATEGORY"}]
-
+    // ULTRA-CONCISE PROMPT (User's Proven Prompt)
+    // We use the exact phrasing that worked in chat.
+    const prompt = `find PERSONAL data in the text and do a token for pseuddonimiz it , return only the list of DATA as a tokenized format.
+    
 Text:
 ${text}
 `;
@@ -265,7 +253,7 @@ ${text}
             model: OLLAMA_MODEL,
             messages: [{ role: 'user', content: prompt }],
             stream: false,
-            format: 'json',
+            // format: 'json', // REMOVE JSON FORMAT ENFORCEMENT - Let it speak naturally
             options: {
                 temperature: 0.1,
                 num_ctx: 8192
@@ -274,20 +262,49 @@ ${text}
 
         const data = await _extractWithRetry(payload, 2);
         let findings: any[] = [];
+        let rawResponse = data.message?.content || "";
 
-        if (data.message?.content) {
-            console.log("[OllamaLocal] RAW LLM RESPONSE:", data.message.content.substring(0, 500) + "..."); // Valid Log
-            findings = extractJsonFromResponse(data.message.content);
-        } else {
-            console.warn("[OllamaLocal] Empty response content from LLM");
+        console.log("[OllamaLocal] RAW LLM RESPONSE:\n", rawResponse);
+
+        // STRATEGY 1: Try JSON Parse (Just in case)
+        findings = extractJsonFromResponse(rawResponse);
+
+        // STRATEGY 2: Parse Line-by-Line (Key: Value)
+        if (findings.length === 0 && rawResponse.includes(':')) {
+            console.log("[OllamaLocal] JSON failed. Trying Line-by-Line parsing...");
+            const lines = rawResponse.split('\n');
+            for (const line of lines) {
+                // Regex to capture "KEY: VALUE"
+                // Matches: "NAME: Mario Rossi" or "Fiscal Code: GLL..."
+                const match = line.match(/^\s*([A-Za-z0-9_ ]+)\s*[:=]\s*(.+)\s*$/);
+                if (match) {
+                    const key = match[1].trim().toUpperCase();
+                    let val = match[2].trim();
+
+                    // Simple hygiene
+                    if (val.length < 2) continue;
+
+                    // Map generic keys to our CATEGORIES
+                    let type = 'UNKNOWN';
+                    if (key.includes('NAME') || key.includes('NOME')) type = 'NAME';
+                    else if (key.includes('ADDRESS') || key.includes('INDIRIZZO') || key.includes('RESIDENZA') || key.includes('DOMICILIO') || key.includes('LOCATION') || key.includes('COMUNE') || key.includes('PROV')) type = 'ADDRESS';
+                    else if (key.includes('DATE') || key.includes('DATA')) type = 'DATE';
+                    else if (key.includes('IVA') || key.includes('VAT')) type = 'VAT_NUMBER';
+                    else if (key.includes('FISCAL') || key.includes('CODE') || key.includes('CF') || key.includes('TAX')) type = 'TAX_ID';
+                    else if (key.includes('MAIL') || key.includes('PHONE') || key.includes('TEL')) type = 'CONTACT';
+                    else if (key.includes('ORGANIZATION') || key.includes('COMPANY') || key.includes('SOCIETA')) type = 'ORGANIZATION';
+                    else type = key; // Fallback to the key itself (e.g. RECORD_ID)
+
+                    findings.push({ value: val, type: type });
+                }
+            }
         }
 
-        // AUTO-CORRECT: If findings is a single object { value: ... }, wrap it in an array.
+        // AUTO-CORRECT: Single object wrapper (Legacy check)
         if (findings && !Array.isArray(findings) && typeof findings === 'object') {
             // @ts-ignore
             if (findings.value) {
                 findings = [findings];
-                console.log("[OllamaLocal] Single object response wrapped in array.");
             }
         }
 
@@ -301,11 +318,11 @@ ${text}
             }
         }
 
-        console.log(`[OllamaLocal] LLM found ${findings.length} potential items.`);
+        console.log(`[OllamaLocal] LLM parsed ${findings.length} items from response.`);
 
         // Merge findings
         for (const finding of findings) {
-            if (finding.value && finding.value.length > 2) {
+            if (finding.value && finding.value.length > 1) {
                 const val = finding.value.trim();
 
                 // Skip if we already found it via Regex (Triple check)
