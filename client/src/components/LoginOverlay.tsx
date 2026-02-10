@@ -84,8 +84,8 @@ export function LoginOverlay() {
                     <li>
                         <a href="#" className="flex items-center gap-3 hover:text-white hover:underline transition-colors group">
                             <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors shrink-0" />
-                            <HelpCircle className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity shrink-0" />
                             Supporto Clienti
+                            <HelpCircle className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity shrink-0 ml-auto sm:ml-0" />
                         </a>
                     </li>
                 </ul>

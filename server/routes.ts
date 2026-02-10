@@ -48,7 +48,9 @@ const aiService = new AiService(process.env.GCP_PROJECT_ID || 'compilator-479214
 configureBucketLifecycle().catch(err => console.error('[GCS] Failed to configure lifecycle:', err));
 
 // Configurazione CORS per permettere richieste dal frontend su GitHub Pages
-const FRONTEND_URL = process.env.FRONTEND_URL || "https://*.github.io";
+let FRONTEND_URL = process.env.FRONTEND_URL || "https://therealgalli.github.io/compilator";
+// Clean trailing slash if present to avoid double slashes in redirects
+if (FRONTEND_URL.endsWith('/')) FRONTEND_URL = FRONTEND_URL.slice(0, -1);
 
 // Max file size for multimodal processing (20MB to avoid memory issues)
 const MAX_FILE_SIZE_MB = 250;
@@ -752,21 +754,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.session());
 
   // ========== AUTH FLOW 1: Passport Login (email+profile only) ==========
-  app.get('/api/auth/google', passport.authenticate('google', { scope: LOGIN_SCOPES }));
+  // We Ensure strategy is initialized before routes start.
+  // Actually, Passport Strategy can be added at any time, but requests will fail if not ready.
+  // We've moved credentials fetching to be part of server startup in main.ts/app.ts context if possible
+  // but for now we'll just ensure the route handler waits or is only registered after init.
 
-  app.get('/api/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL || 'https://therealgalli.github.io/compilator/'}?error=auth_failed` }),
-    (req, res) => {
-      // Standard Redirect Flow (Pass user to session)
-      // Redirect back to the frontend (GitHub Pages)
-      // Fallback to the known production URL if env is missing
-      const frontendUrl = process.env.FRONTEND_URL || 'https://therealgalli.github.io/compilator/';
+  const credentials = await getGoogleCredentials();
+  if (credentials.clientId && credentials.clientSecret) {
+    passport.use(new GoogleStrategy({
+      clientID: credentials.clientId,
+      clientSecret: credentials.clientSecret,
+      callbackURL: process.env.NODE_ENV === 'production'
+        ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
+        : 'http://localhost:5001/api/auth/google/callback',
+      passReqToCallback: true
+    },
+      async (req, accessToken, refreshToken, profile, done) => {
+        try {
+          const email = profile.emails?.[0]?.value;
+          if (!email) return done(new Error("No email found in Google profile"));
 
-      console.log(`[Auth] Login successful for user: ${(req.user as any)?.email || 'unknown'}. Redirecting to: ${frontendUrl}`);
+          let user = await storage.getUserByGoogleId(profile.id);
+          if (!user) {
+            user = await storage.getUserByEmail(email);
+            if (!user) {
+              user = await storage.createUser({
+                email,
+                googleId: profile.id,
+                planTier: 'free'
+              });
+            } else if (!user.googleId) {
+              // Link GoogleID to existing user if found by email
+              await storage.updateUser(user.id, { googleId: profile.id });
+            }
+          }
+          return done(null, user);
+        } catch (err) {
+          return done(err as Error);
+        }
+      }
+    ));
 
-      res.redirect(frontendUrl);
-    }
-  );
+    app.get('/api/auth/google', passport.authenticate('google', { scope: LOGIN_SCOPES }));
+
+    app.get('/api/auth/google/callback',
+      passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}?error=auth_failed` }),
+      (req, res) => {
+        console.log(`[Auth] Login successful for user: ${(req.user as any)?.email || 'unknown'}. Redirecting to: ${FRONTEND_URL}`);
+        res.redirect(FRONTEND_URL);
+      }
+    );
+  } else {
+    console.warn("[Auth] Google Credentials missing. Auth routes disabled.");
+    app.get('/api/auth/google', (req, res) => res.status(501).json({ error: "Auth non configurata sul server." }));
+  }
 
   // ========== AUTH FLOW 2: Manual OAuth for Gmail/Drive Integrations ==========
   app.get('/api/auth/gmail/connect', async (req, res) => {
