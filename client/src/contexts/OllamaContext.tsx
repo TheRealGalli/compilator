@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { testOllamaConnection } from '@/lib/ollama';
+import { useQuery } from '@tanstack/react-query';
 
 type OllamaStatus = 'loading' | 'connected' | 'disconnected';
 
@@ -14,12 +15,24 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
     const [status, setStatus] = useState<OllamaStatus>('loading');
     const isChecking = useRef(false);
 
+    // Auth Guard: Only check Ollama if user is logged in
+    const { data: user, isFetched: isAuthAttempted } = useQuery({
+        queryKey: ['/api/user'],
+        retry: false,
+        refetchOnWindowFocus: false,
+    });
+
     const checkStatus = useCallback(async () => {
+        // Fallback: Don't check if not authenticated or not yet attempted
+        if (!isAuthAttempted || !user) {
+            console.log('[OllamaContext] Check saltato: utente non autenticato.');
+            setStatus('disconnected');
+            return;
+        }
+
         if (isChecking.current) return;
         isChecking.current = true;
 
-        // Non resettiamo lo stato a 'loading' se siamo già connessi per evitare flickering UI
-        // Ma facciamo comunque il controllo in background
         try {
             console.log('[OllamaContext] Verifica connessione locale...');
             const isDirectReachable = await testOllamaConnection();
@@ -37,12 +50,14 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
         } finally {
             isChecking.current = false;
         }
-    }, []);
+    }, [isAuthAttempted, user]);
 
-    // Primo controllo all'avvio
+    // Primo controllo all'avvio (o quando l'autenticazione cambia)
     useEffect(() => {
-        checkStatus();
-    }, [checkStatus]);
+        if (isAuthAttempted) {
+            checkStatus();
+        }
+    }, [checkStatus, isAuthAttempted]);
 
     // Controllo periodico separato (ogni 30 secondi)
     // Usiamo una ref per accedere allo stato corrente senza triggerare l'effect
