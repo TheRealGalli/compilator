@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { SiGoogle } from "react-icons/si";
 import { ShieldCheck, FileText, HelpCircle, Info } from "lucide-react";
 
+import { API_BASE_URL } from "@/lib/api-config";
+
 export function LoginOverlay() {
     const handleGoogleLogin = () => {
-        window.location.href = "/api/auth/google";
+        window.location.href = `${API_BASE_URL}/api/auth/google`;
     };
 
     return (
