@@ -24,7 +24,7 @@ export function LoadingScreen({ isVisible }: LoadingScreenProps) {
                             strokeWidth={3}
                         />
                         <Asterisk
-                            className="text-blue-600 animate-turbo-spin"
+                            className="text-blue-600"
                             width={32}
                             height={32}
                             strokeWidth={3}
