@@ -719,11 +719,17 @@ getGoogleCredentials().then(({ clientId, clientSecret }) => {
   ));
 });
 
-const GOOGLE_SCOPES = [
+// Login scopes (Passport) - ONLY for app access
+const LOGIN_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
-  'https://www.googleapis.com/auth/gmail.readonly', // Keep existing function
-  'https://www.googleapis.com/auth/drive.readonly'  // Keep existing function
+];
+
+// Integration scopes (Manual OAuth) - for Gmail/Drive data access
+const INTEGRATION_SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/drive.metadata.readonly'
 ];
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -745,36 +751,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Gmail Auth Routes (Replaced with Passport)
-  app.get('/api/auth/google', passport.authenticate('google', { scope: GOOGLE_SCOPES }));
+  // ========== AUTH FLOW 1: Passport Login (email+profile only) ==========
+  app.get('/api/auth/google', passport.authenticate('google', { scope: LOGIN_SCOPES }));
 
   app.get('/api/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/login?error=auth_failed' }),
     (req, res) => {
-      // Successful authentication
-      // We can also send the script message if the frontend expects it for popup flow
-      // But standard redirect is better for Login
-
-      // If purely using popup opener pattern:
-      res.send(`
-        <script>
-          const user = ${JSON.stringify(req.user)};
-          window.opener.postMessage({ type: 'AUTH_SUCCESS', user }, '*');
-          window.close();
-        </script>
-      `);
+      res.redirect('/');
     }
   );
 
-  app.get('/api/auth/check', (req, res) => {
-    if (req.isAuthenticated()) {
-      res.json({ isConnected: true, user: req.user });
-    } else {
-      res.json({ isConnected: false });
+  // ========== AUTH FLOW 2: Manual OAuth for Gmail/Drive Integrations ==========
+  app.get('/api/auth/gmail/connect', async (req, res) => {
+    console.log(`[OAuth-Integration] Request from origin: ${req.headers.origin || 'unknown'}`);
+    const client = await getOAuth2Client();
+
+    if (!client._clientId || !client._clientSecret) {
+      console.error('[OAuth-Integration] CRITICAL: Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
+      return res.status(500).json({ error: 'Configurazione OAuth mancante sul server.' });
+    }
+
+    const redirectUri = process.env.NODE_ENV === 'production'
+      ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/gmail/callback'
+      : 'http://localhost:5001/api/auth/gmail/callback';
+
+    const url = client.generateAuthUrl({
+      access_type: 'offline',
+      scope: INTEGRATION_SCOPES,
+      prompt: 'consent',
+      redirect_uri: redirectUri
+    });
+
+    console.log('[OAuth-Integration] Generated URL');
+    res.json({ url });
+  });
+
+  app.get('/api/auth/gmail/callback', async (req, res) => {
+    const client = await getOAuth2Client();
+    const { code } = req.query;
+    if (!code) return res.status(400).json({ error: 'Code missing' });
+
+    try {
+      const redirectUri = process.env.NODE_ENV === 'production'
+        ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/gmail/callback'
+        : 'http://localhost:5001/api/auth/gmail/callback';
+
+      console.log('[OAuth-Integration] Exchanging code for tokens...');
+      const { tokens } = await client.getToken({
+        code: code as string,
+        redirect_uri: redirectUri
+      });
+      console.log('[OAuth-Integration] Tokens retrieved successfully');
+      (req.session as any).tokens = tokens;
+
+      // Close popup and notify opener
+      res.send(`
+        <script>
+          const tokens = ${JSON.stringify(tokens)};
+          window.opener.postMessage({ type: 'GMAIL_AUTH_SUCCESS', tokens: tokens }, '*');
+          window.close();
+        </script>
+      `);
+    } catch (error: any) {
+      console.error('[OAuth-Integration] Token exchange FAILED:', error.message);
+      res.status(500).send(`Authentication failed: ${error.message}`);
     }
   });
 
+  // ========== Combined Status & Logout ==========
+  app.get('/api/auth/check', (req, res) => {
+    const isLoggedIn = req.isAuthenticated();
+    const isConnected = !!((req.session as any)?.tokens || req.headers['x-gmail-tokens']);
+    res.json({ isLoggedIn, isConnected, user: isLoggedIn ? req.user : null });
+  });
+
   app.post('/api/auth/logout', (req, res, next) => {
+    // Clear integration tokens
+    (req.session as any).tokens = null;
+    // Clear Passport session
     req.logout((err) => {
       if (err) return next(err);
       res.json({ success: true });

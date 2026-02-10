@@ -114,7 +114,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
 
     const connect = async () => {
         try {
-            const res = await apiRequest('GET', '/api/auth/google');
+            const res = await apiRequest('GET', '/api/auth/gmail/connect');
             const data = await res.json();
             if (data.url) {
                 const width = 500;
