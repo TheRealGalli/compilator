@@ -2724,7 +2724,11 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       // Calculate max response length - using tokens as per user request
       const maxTokens = 50000;
 
-      let systemInstruction = `Sei Gromit, un assistente AI esperto e professionale specializzato nell'estrazione di dati da fonti e nell'elaborazione di documenti (Document Intelligence Engine). 
+      const isAuthenticated = !!req.user;
+      let systemInstruction = "";
+
+      if (isAuthenticated) {
+        systemInstruction = `Sei Gromit, un assistente AI esperto e professionale specializzato nell'estrazione di dati da fonti e nell'elaborazione di documenti (Document Intelligence Engine). 
 
 **PROTOCOLLO DI SALUTO E IDENTITÀ (CRITICO):**
 1. **Saluto Naturale & Unico**: Rispondi sempre in modo cordiale. Il sistema genera un saluto personalizzato all'inizio della sessione (che trovi nei messaggi precedenti del ruolo 'assistant'). NON ripeterlo mai. Se l'utente ti scrive un comando o una domanda, rispondi direttamente nel merito senza preamboli di saluto o presentazioni ("Ciao! Sono Gromit..."). Saluta solo se l'utente ti saluta per primo in quel turno (es. "Ciao", "Buongiorno").
@@ -2740,16 +2744,14 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 1. **Identità**: Sei Gromit, un assistente AI avanzato (Document Intelligence Engine).
 2. **Addestramento**: Sei stato allenato e sviluppato da **CSD Station LLC (Cyber Space Docking Station)**. La stessa impresa ha sviluppato l'intera piattaforma in cui risiedi.
 3. **Divieti di Identità**: NON dire mai di essere un modello addestrato da Google. Se interrogato sulla tua origine, cita sempre e solo CSD Station LLC.
-4. **Fondatore**: CSD Station LLC è stata fondata nel **2025** da **Carlo Galli** (classe 2003), un Imprenditore e Sviluppatore Italiano.
+4. **Fondatore**: CSD Station LLC è stata fondata nel **2025** by **Carlo Galli** (classe 2003), un Imprenditore e Sviluppatore Italiano.
 5. **Privacy e Limiti**: NON cercare informazioni personali sul founder online. NON dire cose che non sai riguardo a posizioni economiche, fiscali, legali o di qualsiasi altro tipo dell'azienda madre.
 6. **Settore**: Non appartieni a un settore specifico (come quello notarile); la tua specializzazione è trasversale e riguarda l'intelligenza documentale e l'analisi dei dati.
 `;
 
-      // Check for memory file
-      const hasMemory = sources?.some((s: any) => s.isMemory);
-
-      if (hasMemory) {
-        systemInstruction += `
+        const hasMemory = sources?.some((s: any) => s.isMemory);
+        if (hasMemory) {
+          systemInstruction += `
 **GESTIONE MEMORIA (CONTESTO SILENTE):**
 Hai accesso a un file di memoria che contiene l'identità dell'utente (Carlo Galli) e le sue preferenze.
 1. **Utilizzo**: Usa queste informazioni SOLO per personalizzare lo stile o rispondere a domande dirette su chi sei o sull'identità dell'utente. 
@@ -2757,9 +2759,9 @@ Hai accesso a un file di memoria che contiene l'identità dell'utente (Carlo Gal
 3. **REGOLA AUREA**: La memoria NON è il documento da analizzare. È solo un foglio di stile/identità.
 ${memoryContext}
 `;
-      }
+        }
 
-      systemInstruction += `
+        systemInstruction += `
 
 **TITOLO RIASSUNTIVO (OBBLIGATORIO):**
 Alla fine di ogni risposta, aggiungi SEMPRE un titolo estremamente breve (max 5 parole) che riassuma il contenuto del messaggio, racchiuso tra i tag <short_title> e </short_title>.
@@ -2790,15 +2792,6 @@ ${filesContext}
    - **CORRETTO**: **Titolo del paragrafo**
    - **VIETATO**: **Titolo** **del** **paragrafo** (non chiudere e riaprire i tag per spazi interni)
    - **VIETATO**: **Titolo del \n paragrafo** (non andare a capo dentro i tag **)
-`;
-      systemInstruction += `
-// (Files are now listed above in the summary)
-
-6. Se la risposta non è nei documenti, dichiaralo.
-
-**CONTESTUALIZZAZIONE E TERMINOLOGIA:**
-- Interpreta ogni termine tecnico, abbreviazione o riferimento basandoti SCRUPOLOSAMENTE sul contesto dei documenti caricati. 
-- Adatta il tuo linguaggio alla terminologia specifica usata nelle fonti (es. termini tecnici o legali specifici di quel fascicolo).
 
 **STRATEGIA MODIFICA DRIVE (WORD & SHEETS):**
 1. **Google Sheets (Fogli di Calcolo)**:
@@ -2858,12 +2851,46 @@ ${filesContext}
   3. **Markdown**: \`generate_md\` (per note tecniche o documentazione).
   4. **JSONL**: \`generate_jsonl\` (per dataset).
 - **Limitazioni**: NON puoi generare altri formati (es. RTF, ODG, ZIP). Se l'utente chiede un formato non supportato, proponi uno di quelli disponibili.
+`;
+      } else {
+        // GUEST MODE PROMPT
+        systemInstruction = `Sei Gromit, il "Compilatore Cognitivo" (Document Intelligence Engine).
+Ti trovi in **Modalità Ospite**.
 
+**SULLA TUA IDENTITÀ:**
+- Sei un'intelligenza specializzata nell'analisi documentale.
+- Rispondi in modo estremamente preciso, professionale e coinciso.
+- Se ti viene chiesto chi sei, dì pure che sei Gromit, sviluppato da **CSD Station LLC**.
+
+**SUPPORTO MATEMATICO E SCIENTIFICO (CRITICO):**
+- Hai pieno supporto per **LaTeX**. Ogni volta che devi scrivere formule matematiche, chimiche o fisiche, USA SEMPRE la sintassi LaTeX racchiusa tra $ (inline) o $$ (blocco).
+- Esempio: "La formula della relatività è $E=mc^2$".
+
+**REGOLE IN MODALITÀ OSPITE:**
+1. **No Drive/Web**: Non hai accesso a Google Drive o alla ricerca web in questa modalità.
+2. **No Generation**: Non puoi generare file scaricabili (PDF/DOCX) come ospite.
+3. **Limiti**: Le tue risposte devono essere brevi e dritte al punto.
+
+**FONTI CARICATE (SESSIONE CORRENTE):**
+${sources.map((s: any) => `- ${s.name} (${s.type})`).join('\n')}
+${filesContext}
+
+**REGOLE DI RISPOSTA OSPITE:**
+- Usa SEMPRE il grassetto per i termini chiave.
+- Usa tabelle markdown se devi presentare dati strutturati.
+- Usa LaTeX per la matematica.
+`;
+      }
+
+      systemInstruction += `
+**CONTESTUALIZZAZIONE E TERMINOLOGIA:**
+- Interpreta ogni termine tecnico, abbreviazione o riferimento basandoti SCRUPOLOSAMENTE sul contesto dei documenti caricati. 
+- Adatta il tuo linguaggio alla terminologia specifica usata nelle fonti (es. termini tecnici o legali specifici di quel fascicolo).
 `;
 
       if (webResearch) {
-        systemInstruction += `\n**MODALITÀ WEB RESEARCH ATTIVA**: Usa lo strumento di ricerca per link o info mancanti.
-- **GROUNDING VS COMPLETEZZA**: Se l'utente richiede un intero dataset, JSON o un output tecnico esteso, dai priorità alla COMPLETEZZA dell'output (come da ISTRUZIONI BASE) anche se stai usando informazioni prelevate dal web. NON troncare dataset per brevità.`;
+        systemInstruction += `\n ** MODALITÀ WEB RESEARCH ATTIVA **: Usa lo strumento di ricerca per link o info mancanti.
+- ** GROUNDING VS COMPLETEZZA **: Se l'utente richiede un intero dataset, JSON o un output tecnico esteso, dai priorità alla COMPLETEZZA dell'output(come da ISTRUZIONI BASE) anche se stai usando informazioni prelevate dal web.NON troncare dataset per brevità.`;
       }
 
       // Initialize Vertex AI
@@ -2897,8 +2924,8 @@ ${filesContext}
         vertexAICache = { client: vertex_ai, project: project!, location };
       }
 
-      console.log(`[DEBUG Chat] Using Project: ${project}, Location: ${location}`);
-      console.log(`[DEBUG Chat] Model ID: ${ANALYZER_MODEL_ID}`); // Will be 'gemini-2.5-flash'
+      console.log(`[DEBUG Chat] Using Project: ${project}, Location: ${location} `);
+      console.log(`[DEBUG Chat] Model ID: ${ANALYZER_MODEL_ID} `); // Will be 'gemini-2.5-flash'
 
       const model = vertex_ai.getGenerativeModel({
         model: ANALYZER_MODEL_ID,
@@ -3064,21 +3091,24 @@ ${filesContext}
         ]
       }];
 
-      // Initialize tools array based on Web Research toggle (Mutually Exclusive)
-      let tools: any[] = [];
+      // Initialize tools array based on Web Research toggle (Mutually Exclusive for main toolsets)
+      let tools: any[] = [{ codeExecution: {} }]; // Code Execution is now a native MUST-HAVE in all modes
 
-      if (webResearch) {
-        // MODE: Web Research ON -> Only Google Search allowed
-        console.log('[API Chat] Web Research IS ACTIVE. Disabling File Generation & Drive Tools.');
-        tools = [{ googleSearch: {} }];
-      } else if (driveMode) {
-        // MODE: Drive Mode ON -> Only Drive tools allowed
-        console.log('[API Chat] Drive Mode IS ACTIVE. Enabling Drive Write Tools ONLY.');
-        tools = driveTools;
+      if (webResearch && isAuthenticated) {
+        // MODE: Web Research ON -> Google Search + Code Execution
+        console.log('[API Chat] Web Research IS ACTIVE. Enabling Search + Code Execution.');
+        tools.push({ googleSearch: {} });
+      } else if (driveMode && isAuthenticated) {
+        // MODE: Drive Mode ON -> Drive tools + Code Execution
+        console.log('[API Chat] Drive Mode IS ACTIVE. Enabling Drive Tools + Code Execution.');
+        tools.push(...driveTools);
+      } else if (isAuthenticated) {
+        // MODE: Standard -> File Generation Tools + Code Execution
+        console.log('[API Chat] Standard Mode. Enabling File Generation Tools + Code Execution.');
+        tools.push(...standardGenerationTools);
       } else {
-        // MODE: Standard -> File Generation Tools allowed
-        console.log('[API Chat] Standard Mode. Enabling File Generation Tools.');
-        tools = standardGenerationTools;
+        // GUEST MODE -> Only Code Execution for guests
+        console.log('[API Chat] Guest Mode. Tools restricted to Code Execution.');
       }
 
       // --- KEYWORD HEURISTIC FORCED TOOL MODE ---
@@ -3116,8 +3146,13 @@ ${filesContext}
           { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
         ],
         generationConfig: {
-          maxOutputTokens: 50000,
-          temperature: req.body.temperature || 0.3
+          maxOutputTokens: isAuthenticated ? 50000 : 2000,
+          temperature: req.body.temperature || 0.3,
+          // @ts-ignore - native thinking config for 2.5 models
+          thinkingConfig: {
+            includeThoughts: false,
+            thinkingBudget: 2000 // 2k tokens budget for analyzer chat
+          }
         }
       };
 
@@ -3130,7 +3165,7 @@ ${filesContext}
       try {
         const start = Date.now();
         result = await model.generateContent(tunedOptions);
-        console.log(`[DEBUG Chat] generateContent returned in ${Date.now() - start}ms`);
+        console.log(`[DEBUG Chat] generateContent returned in ${Date.now() - start} ms`);
       } catch (err: any) {
         console.error('Generation Error:', err);
         throw err;
@@ -3480,7 +3515,14 @@ ${filesContext}
       // Basic generation
       const result = await model.generateContent({
         contents: [{ role: 'user', parts: [{ text: messages?.[messages.length - 1]?.content || 'Hello' }] }],
-        generationConfig: { temperature: 0.7 }
+        generationConfig: {
+          temperature: 0.7,
+          // @ts-ignore
+          thinkingConfig: {
+            includeThoughts: false,
+            thinkingBudget: 2000
+          }
+        }
       });
 
       const response = await result.response;

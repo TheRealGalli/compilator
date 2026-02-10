@@ -435,11 +435,19 @@ ${text} [/INST]`;
 
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
-                tools,
+                tools: [
+                    ...tools,
+                    { codeExecution: {} } // Enable native code execution for calculations/validation
+                ],
                 toolConfig,
                 generationConfig: {
                     maxOutputTokens: 50000,
-                    temperature: 0.2
+                    temperature: 0.2,
+                    // @ts-ignore - thinkingConfig is part of the 2026 Vertex AI SDK
+                    thinkingConfig: {
+                        includeThoughts: false, // Thoughts are internal to the model
+                        thinkingBudget: 4000     // 4k tokens budget for the compiler
+                    }
                 }
             });
 
@@ -511,7 +519,12 @@ ${params.draftContent}`;
                 contents: [{ role: 'user', parts: messageParts }],
                 generationConfig: {
                     maxOutputTokens: 50000,
-                    temperature: 0.1
+                    temperature: 0.1,
+                    // @ts-ignore
+                    thinkingConfig: {
+                        includeThoughts: false,
+                        thinkingBudget: 2000 // Lower budget for formatting refactor
+                    }
                 }
             });
 
