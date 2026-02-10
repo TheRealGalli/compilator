@@ -8,7 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
 import { useGmail } from "@/contexts/GmailContext";
@@ -18,10 +18,22 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useGoogleDrive, DriveCategory } from "@/contexts/GoogleDriveContext";
+import { useQuery } from "@tanstack/react-query";
+import { LoginOverlay } from "./LoginOverlay";
 
 
 export function DocumentsSection() {
   const [view, setView] = useState<'main' | 'gmail' | 'drive'>('main');
+
+  // Auth Check
+  const { data: user, isLoading: isLoadingAuth } = useQuery({
+    queryKey: ['/api/user'],
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const isAuthenticated = !!user;
+
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState<string | null>(null);
   const { toast } = useToast();
@@ -637,12 +649,18 @@ export function DocumentsSection() {
         </div>
       </div>
 
-      <FileUploadZone
-        onFilesSelected={handleFilesSelected}
-        disabled={isUploading}
-      />
+      <div className="relative">
+        {!isAuthenticated && !isLoadingAuth && <LoginOverlay />}
 
-      {isConnected && (
+        <div className={!isAuthenticated && !isLoadingAuth ? "opacity-30 pointer-events-none filter blur-sm transition-all duration-500" : ""}>
+          <FileUploadZone
+            onFilesSelected={handleFilesSelected}
+            disabled={isUploading || !isAuthenticated}
+          />
+        </div>
+      </div>
+
+      {isAuthenticated && isConnected && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
