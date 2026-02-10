@@ -19,7 +19,7 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick
   const handleLogoClick = () => {
     setIsSpinning(true);
     if (onHomeClick) onHomeClick();
-    setTimeout(() => setIsSpinning(false), 1000); // 1s spin animation
+    setTimeout(() => setIsSpinning(false), 2000); // 2s smooth spin cycle
   };
 
   return (

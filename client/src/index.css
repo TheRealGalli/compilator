@@ -286,7 +286,7 @@
 }
 
 .animate-turbo-spin {
-  animation: turbo-spin 1s ease-in-out infinite;
+  animation: turbo-spin 2s linear infinite;
   transform-origin: center;
   display: flex;
   align-items: center;
@@ -296,10 +296,12 @@
 @keyframes turbo-spin {
   0% {
     transform: rotate(0deg);
+    animation-timing-function: ease-in-out;
   }
 
   50% {
     transform: rotate(-360deg);
+    animation-timing-function: ease-in-out;
   }
 
   100% {
