@@ -615,7 +615,7 @@ export function DocumentCompilerSection({
 
                 token = `[${category}_${nextIndex}]`;
                 vMap.set(token, value);
-                console.log(`[DocumentCompiler] Vault registered: ${token} -> ${value}`);
+                console.log(`[DocumentCompiler] Vault registered: ${token} (Redacted Value)`);
               }
 
               // Count total occurrences of this value (via its unique token)
@@ -803,7 +803,7 @@ export function DocumentCompilerSection({
 
                 token = `[${category}_${nextIndex}]`;
                 vaultMap.set(token, rawValue);
-                console.log(`[DocumentCompiler] Vault registered: ${token} -> ${rawValue}`);
+                console.log(`[DocumentCompiler] Vault registered: ${token} (Redacted Value)`);
               }
               vaultCounts.set(token, (vaultCounts.get(token) || 0) + 1);
             }
@@ -1733,7 +1733,7 @@ export function DocumentCompilerSection({
               Analisi Privacy Local (Zero-Data)
             </DialogTitle>
             <DialogDescription className="text-slate-600">
-              Abbiamo individuato i seguenti dati sensibili. Questi dati <strong>non lasceranno mai il tuo computer</strong> e verranno sostituiti con dei token durante l&apos;elaborazione AI.
+              Abbiamo individuato i seguenti dati sensibili. Puoi <strong>modificare</strong>, <strong>aggiungere</strong> o <strong>rimuovere</strong> i campi prima della compilazione.
             </DialogDescription>
           </DialogHeader>
 
@@ -1742,64 +1742,97 @@ export function DocumentCompilerSection({
               <table className="w-full text-sm border-collapse">
                 <thead className="bg-slate-100/80 backdrop-blur sticky top-0 z-10 border-b">
                   <tr>
-                    <th className="text-left py-3 px-4 font-bold text-slate-700 w-1/3">Token Privacy</th>
-                    <th className="text-left py-3 px-4 font-bold text-slate-700 w-2/3">Valore Originale</th>
+                    <th className="text-left py-3 px-4 font-bold text-slate-700 w-[35%]">Token Privacy</th>
+                    <th className="text-left py-3 px-4 font-bold text-slate-700 w-[55%]">Valore Originale</th>
+                    <th className="text-center py-3 px-2 font-bold text-slate-700 w-[10%]"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y bg-white">
-                  {Object.entries(reportVault).length > 0 ? (
-                    (() => {
-                      const sortedEntries = Object.entries(reportVault).sort((a, b) => a[0].localeCompare(b[0]));
-                      return sortedEntries.map(([token, value]) => {
-                        const count = reportVaultCounts[token] || 0;
-                        // Estrai la categoria dal token [CATEGORIA_X]
-                        const category = token.substring(1, token.lastIndexOf('_'));
-
-                        return (
-                          <tr key={token} className="hover:bg-blue-50/30 transition-colors group">
-                            <td className="py-3 px-4 align-top">
-                              <div className="flex flex-col gap-1">
-                                <span className="font-mono text-xs text-blue-700 font-bold px-2 py-0.5 bg-blue-50 border border-blue-100 rounded inline-block w-fit">
-                                  {token}
-                                </span>
-                                <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold ml-1">
-                                  {category}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 align-top">
-                              <div className="text-slate-900 font-semibold break-words leading-relaxed">
-                                {value}
-                                {count > 1 && (
-                                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border">
-                                    {count} occorrenze
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })()
-                  ) : (
+                  {Object.entries(reportVault).sort((a, b) => a[0].localeCompare(b[0])).map(([token, value]) => (
+                    <tr key={token} className="hover:bg-blue-50/30 transition-colors group">
+                      <td className="py-2 px-2 align-top">
+                        <Input
+                          value={token}
+                          onChange={(e) => {
+                            const newToken = e.target.value.toUpperCase();
+                            const newVault = { ...reportVault };
+                            const val = newVault[token];
+                            delete newVault[token];
+                            newVault[newToken] = val;
+                            setReportVault(newVault);
+                            // Also update guardrailVault immediately to keep sync
+                            setGuardrailVault(newVault);
+                          }}
+                          className="font-mono text-xs font-bold text-blue-700 h-8 bg-blue-50/50 border-blue-200 focus:border-blue-500"
+                        />
+                      </td>
+                      <td className="py-2 px-2 align-top">
+                        <Input
+                          value={value}
+                          onChange={(e) => {
+                            const newVal = e.target.value;
+                            const newVault = { ...reportVault, [token]: newVal };
+                            setReportVault(newVault);
+                            setGuardrailVault(newVault);
+                          }}
+                          className="text-sm text-slate-900 font-semibold h-8 border-slate-200 focus:border-blue-500"
+                        />
+                      </td>
+                      <td className="py-2 px-2 align-middle text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                          onClick={() => {
+                            const newVault = { ...reportVault };
+                            delete newVault[token];
+                            setReportVault(newVault);
+                            setGuardrailVault(newVault);
+                          }}
+                          title="Rimuovi dato"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {Object.keys(reportVault).length === 0 && (
                     <tr>
-                      <td colSpan={2} className="py-12 text-center text-slate-400 italic bg-white">
-                        Nessun dato sensibile rilevato nel documento.
+                      <td colSpan={3} className="py-8 text-center text-slate-400 italic bg-white">
+                        Nessun dato sensibile rilevato. Aggiungine uno manualmente.
                       </td>
                     </tr>
                   )}
+                  {/* ADD ROW BUTTON ROW */}
+                  <tr className="bg-slate-50/50 border-t border-slate-200">
+                    <td colSpan={3} className="py-2 px-2 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-dashed border-slate-300 hover:border-blue-300"
+                        onClick={() => {
+                          const nextIdx = Object.keys(reportVault).length + 1;
+                          const newToken = `[NUOVO_CAMPO_${nextIdx}]`;
+                          const newVault = { ...reportVault, [newToken]: "" };
+                          setReportVault(newVault);
+                          setGuardrailVault(newVault);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" /> Aggiungi Campo Manuale
+                      </Button>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
           </ScrollArea>
 
           <p className="text-[10px] text-muted-foreground px-1 mt-2 leading-relaxed">
-            I dati originali non vengono inviati all&apos;intelligenza artificiale. Verranno salvati solo in questa sessione
-            nel tuo browser per essere riaggiunti automaticamente al documento finale, garantendo la tua privacy.
+            Modifica i token o i valori se necessario. I dati originali non vengono inviati all&apos;IA.
           </p>
 
           <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-amber-700 text-[10px] leading-tight">
-            <strong>NOTA:</strong> Le immagini, le foto e i file audio non sono attualmente coperte dall&apos;anonimizzazione automatica, in quanto supportiamo soltanto il testo.
+            <strong>NOTA:</strong> Le immagini, le foto e i file audio non sono attualmente coperte dall&apos;anonimizzazione automatica.
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
@@ -1816,7 +1849,7 @@ export function DocumentCompilerSection({
               className="bg-blue-600 hover:bg-blue-700 text-white"
               onClick={() => {
                 setIsAnonymizationReportOpen(false);
-                // The state isWaitingForPawnApproval is still true, so the next handleCompile will bypass the check
+                // Confirm: guardrailVault is already properly updated by the inputs
                 handleCompile();
               }}
             >

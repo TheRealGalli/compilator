@@ -248,8 +248,7 @@ Text:
 ${text}
 `;
 
-    // DEBUG: Log the exact prompt to see what the LLM sees
-    console.log("[OllamaLocal] PROMPT DEBUG:\n", prompt);
+    // DEBUG: Removed sensitive prompt log
 
     try {
         const payload = {
@@ -267,7 +266,7 @@ ${text}
         let findings: any[] = [];
         let rawResponse = data.message?.content || "";
 
-        console.log("[OllamaLocal] RAW LLM RESPONSE:\n", rawResponse);
+        // DEBUG: Removed sensitive raw response log
 
         // Helper to parse a single line "KEY: VALUE"
         const parseLine = (line: string): { value: string, type: string, label: string } | null => {
@@ -344,10 +343,8 @@ ${text}
                     const existing = unifiedFindings.get(val);
                     // If existing is generic (label == type) and new is specific (label != type), UPGRADE IT
                     if (existing && existing.label === existing.type && finding.label && finding.label !== finding.category) {
-                        console.log(`[OllamaLocal] UPGRADING duplicate: ${val} from [${existing.label}] to [${finding.label}]`);
+                        console.log(`[OllamaLocal] UPGRADING duplicate for label: [${finding.label}]`);
                         unifiedFindings.set(val, { type: finding.type, label: finding.label });
-                    } else {
-                        console.log(`[OllamaLocal] Skipping duplicate value: ${val} (Already mapped as ${existing?.label})`);
                     }
                     continue;
                 }
@@ -356,7 +353,7 @@ ${text}
                 // Use the Captured Label if available, otherwise fallback to Type
                 const finalLabel = finding.label || finding.type;
                 unifiedFindings.set(val, { type: finding.type, label: finalLabel });
-                console.log(`[OllamaLocal] + NEW FINDING: ${val} (${finding.type}) [Label: ${finalLabel}]`);
+                console.log(`[OllamaLocal] + NEW FINDING (${finding.type}) [Label: ${finalLabel}]`);
             }
         }
 
