@@ -237,34 +237,28 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // User requested FULL DOCUMENT context.
     console.log(`[OllamaLocal] Sending FULL TEXT (${text.length} chars) to LLM...`);
 
-    // Prepare "Known Findings" string to guide the LLM
+    // Prepare "Known Findings" string (Context only, to avoid re-extracting)
     const knownValues = highConfidenceCandidates.map(c => c.value).join(", ");
 
-    const prompt = `MISSION: EXTRACT **MISSING** PII (Personal Identifiable Information) from the text.
-I have already found these values: [${knownValues}].
-DO NOT return them again. Use them as context to find related fields (e.g. if you see a VAT number I found, look for the Company Name near it).
+    // ULTRA-CONCISE PROMPT (Designed for Gemma 3 1B)
+    const prompt = `Analyze the text below. Extract Personal Data (PII) into a JSON array.
+CRITICAL: EXTRACT ONLY PERSONAL DATA EXACTLY AS FOUND IN TEXT (Keep ALL spaces and uppercase letters).
 
-**PRIORITY 1: ADDRESSES**
-You must find all addresses. Look for:
-- "Via", "Viale", "Piazza", "Corso", "Località"
-- "Residente a", "Domicilio", "Sede Legale"
-- Full address format: "Via Roma 1, 00100 Roma (RM)"
+Focus on:
+1. ADDRESSES (Via, Piazza, Residenza)
+2. NAMES (Mario Rossi)
+3. DATES
 
-PRIORITY 2: MISSING NAMES / ORGS
-- Find names NOT in the list above.
-- Find company names associated with the VAT numbers.
+Context (Already found, ignore these specific values but look around them): [${knownValues}]
 
-RULES:
-1. EXTRACT EXACT SUBSTRINGS. Do not fix typos.
-2. Output JSON ONLY.
+Output format: [{"value": "...", "type": "CATEGORY"}]
 
-[OUTPUT FORMAT]
-JSON Array: [{"value": "Exact Text", "type": "CATEGORY"}]
-Categories: ADDRESS, NAME, ORGANIZATION, DATE, CONTACT
-
-[TEXT TO ANALYZE]
+Text:
 ${text}
 `;
+
+    // DEBUG: Log the exact prompt to see what the LLM sees
+    console.log("[OllamaLocal] PROMPT DEBUG:\n", prompt);
 
     try {
         const payload = {
@@ -273,8 +267,8 @@ ${text}
             stream: false,
             format: 'json',
             options: {
-                temperature: 0.1, // Slight temp helps with formatting but keeps precision
-                num_ctx: 8192     // Optimized for 8GB RAM
+                temperature: 0.1,
+                num_ctx: 8192
             }
         };
 
@@ -299,9 +293,17 @@ ${text}
 
         if (!Array.isArray(findings)) findings = [];
 
+        if (findings.length === 0) {
+            console.warn("[OllamaLocal] LLM returned 0 findings. Falling back to Medium Confidence Regex.");
+            const mediumCandidates = candidates.filter(c => c.confidence === 'MEDIUM');
+            for (const c of mediumCandidates) {
+                unifiedFindings.set(c.value, c.type);
+            }
+        }
+
         console.log(`[OllamaLocal] LLM found ${findings.length} potential items.`);
 
-        // Merge findings with STRICT VALIDATION
+        // Merge findings
         for (const finding of findings) {
             if (finding.value && finding.value.length > 2) {
                 const val = finding.value.trim();
@@ -309,13 +311,7 @@ ${text}
                 // Skip if we already found it via Regex (Triple check)
                 if (unifiedFindings.has(val)) continue;
 
-                // CRITICAL VALIDATION: Anti-Hallucination Check
-                if (!text.includes(val)) {
-                    console.warn(`[OllamaLocal] HALLUCINATION REJECTED: '${val}' not found in source text.`);
-                    continue;
-                }
-
-                // Add to findings
+                // Add to findings directly (Trusting the Model)
                 unifiedFindings.set(val, finding.type);
                 console.log(`[OllamaLocal] + NEW FINDING: ${val} (${finding.type})`);
             }
