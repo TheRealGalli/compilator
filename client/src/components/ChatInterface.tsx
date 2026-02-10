@@ -256,6 +256,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         groundingMetadata: data.groundingMetadata,
         searchEntryPoint: data.searchEntryPoint,
         shortTitle: data.shortTitle,
+        aiMetadata: data.aiMetadata,
       };
 
       if (data.file) {

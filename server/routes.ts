@@ -1607,6 +1607,11 @@ Devi compilare il template sottostante utilizzando le informazioni fornite nei d
 - **COERENZA TERMINOLOGICA**: Devi adattare ogni termine, abbreviazione o riferimento alla terminologia specifica presente nei documenti caricati (Fascicolo).
 - **CONTESTO DOCUMENTALE**: Interpreta i placeholder e il contenuto basandoti sul linguaggio tecnico e professionale rilevato nelle fonti (es. se la controparte è definita "Promissario Acquirente" in una fonte, usa quel termine con coerenza).
 
+**STRUMENTO CODE EXECUTION (Python):**
+- Hai a disposizione uno strumento di esecuzione codice Python per calcoli e validazione dati.
+- Valuta se utilizzarlo quando: devi sommare voci di fattura, verificare totali, calcolare IVA/ritenute, convertire date o valute, o manipolare dati tabulari estratti dai documenti.
+- Se il calcolo è immediato, procedi direttamente. Se è complesso o critico per l'accuratezza del documento, usa lo strumento.
+
 ${isPawnActive ? `
 **⚠️ PROTOCOLLO PAWN ATTIVO (PRIVACY ZERO-DATA) - ISTRUZIONE CRITICA:**
 1. I documenti forniti sono stati **PSEUDONIMIZZATI** localmente.
@@ -1970,7 +1975,7 @@ ISTRUZIONI OUTPUT:
       }
 
       console.log(`[DEBUG Compile] Calling AiService.compileDocument (Unified Pass, AutonomousSearch: ${useAutonomousWebSearch})...`);
-      const { content: finalContent, groundingMetadata } = await aiService.compileDocument({
+      const { content: finalContent, groundingMetadata, aiMetadata } = await aiService.compileDocument({
         systemPrompt,
         userPrompt,
         multimodalFiles: multimodalFiles || [],
@@ -1992,6 +1997,7 @@ ISTRUZIONI OUTPUT:
         success: true,
         compiledContent: restoredContent,
         groundingMetadata,
+        aiMetadata,
         fetchedCompilerContext, // For tracing
         extractedFields,
         manualAnnotations,
@@ -2886,6 +2892,10 @@ ${filesContext}
 **CONTESTUALIZZAZIONE E TERMINOLOGIA:**
 - Interpreta ogni termine tecnico, abbreviazione o riferimento basandoti SCRUPOLOSAMENTE sul contesto dei documenti caricati. 
 - Adatta il tuo linguaggio alla terminologia specifica usata nelle fonti (es. termini tecnici o legali specifici di quel fascicolo).
+
+**STRUMENTO CODE EXECUTION (Python):**
+- Hai a disposizione uno strumento di esecuzione codice Python. Valuta se utilizzarlo quando devi: verificare somme, calcolare percentuali, IVA, ritenute, conversioni, o manipolare dati strutturati.
+- NON sei obbligato a usarlo sempre: se il calcolo è banale (es. 2+2), rispondi direttamente. Se è complesso o richiede precisione (es. sommare 15 voci, calcolare percentuali composite), USA lo strumento per garantire accuratezza.
 `;
 
       if (webResearch) {
@@ -3374,6 +3384,28 @@ ${filesContext}
         }
       }
 
+      // Extract Code Execution metadata from response parts
+      const codeExecutionResults: Array<{ code: string, output: string }> = [];
+      const allParts = response.candidates?.[0]?.content?.parts || [];
+      for (let i = 0; i < allParts.length; i++) {
+        const part = allParts[i];
+        if (part.executableCode) {
+          const nextPart = allParts[i + 1];
+          codeExecutionResults.push({
+            code: part.executableCode.code || '',
+            output: nextPart?.codeExecutionResult?.output || ''
+          });
+        }
+      }
+
+      const aiMetadata = codeExecutionResults.length > 0
+        ? { codeExecutionResults }
+        : undefined;
+
+      if (codeExecutionResults.length > 0) {
+        console.log(`[API Chat] Code Execution detected: ${codeExecutionResults.length} block(s)`);
+      }
+
 
       let shortTitle = "";
       const titleMatch = text.match(/<short_title>([\s\S]*?)<\/short_title>/);
@@ -3382,7 +3414,7 @@ ${filesContext}
         text = text.replace(/<short_title>[\s\S]*?<\/short_title>/, "").trim();
       }
 
-      res.json({ text, groundingMetadata, searchEntryPoint, shortTitle });
+      res.json({ text, groundingMetadata, searchEntryPoint, shortTitle, aiMetadata });
 
     } catch (error: any) {
       console.error('Errore durante chat:', error);

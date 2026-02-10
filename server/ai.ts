@@ -405,7 +405,7 @@ ${text} [/INST]`;
         preProcessedParts?: any[],
         preProcessedMasterParts?: any[],
         webResearch?: boolean
-    }): Promise<{ content: string, groundingMetadata?: any, parts?: any[] }> {
+    }): Promise<{ content: string, groundingMetadata?: any, parts?: any[], aiMetadata?: { codeExecutionResults?: Array<{ code: string, output: string }> } }> {
         try {
             const model = this.vertex_ai.getGenerativeModel({
                 model: this.modelId,
@@ -462,7 +462,27 @@ ${text} [/INST]`;
                 }
             }
 
-            return { content, groundingMetadata, parts: multimodalParts };
+            // Extract code execution metadata from response parts
+            const codeExecutionResults: Array<{ code: string, output: string }> = [];
+            const allParts = (candidate?.content?.parts || []) as any[];
+            for (let i = 0; i < allParts.length; i++) {
+                const part = allParts[i];
+                if (part.executableCode) {
+                    const nextPart = allParts[i + 1];
+                    codeExecutionResults.push({
+                        code: part.executableCode.code || '',
+                        output: nextPart?.codeExecutionResult?.output || ''
+                    });
+                }
+            }
+
+            if (codeExecutionResults.length > 0) {
+                console.log(`[AiService] Code Execution detected: ${codeExecutionResults.length} block(s)`);
+            }
+
+            const aiMetadata = codeExecutionResults.length > 0 ? { codeExecutionResults } : undefined;
+
+            return { content, groundingMetadata, parts: multimodalParts, aiMetadata };
 
         } catch (error) {
             console.error('[AiService] compileDocument error:', error);

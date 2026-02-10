@@ -1,4 +1,4 @@
-import { Bot, User, Copy, FilePlus, Asterisk } from "lucide-react";
+import { Bot, User, Copy, FilePlus, Asterisk, Code, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FormattedMessage } from "./FormattedMessage";
@@ -17,6 +17,9 @@ interface ChatMessageProps {
   searchEntryPoint?: string;
   userInitial?: string;
   shortTitle?: string;
+  aiMetadata?: {
+    codeExecutionResults?: Array<{ code: string; output: string }>;
+  };
 }
 
 export function ChatMessage({
@@ -28,12 +31,14 @@ export function ChatMessage({
   groundingMetadata,
   searchEntryPoint,
   userInitial,
-  shortTitle
+  shortTitle,
+  aiMetadata
 }: ChatMessageProps) {
   const { toast } = useToast();
   const { addSource } = useSources();
   const isUser = role === "user";
   const [isSpinning, setIsSpinning] = useState(false);
+  const [isCodeExpanded, setIsCodeExpanded] = useState(false);
 
   const handleIconClick = () => {
     setIsSpinning(true);
@@ -167,6 +172,46 @@ export function ChatMessage({
                 </a>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* AI Metadata Badge (Code Execution) */}
+        {aiMetadata?.codeExecutionResults && aiMetadata.codeExecutionResults.length > 0 && (
+          <div className="mt-3 border-t pt-3 w-full">
+            <button
+              onClick={() => setIsCodeExpanded(!isCodeExpanded)}
+              className="flex items-center gap-1.5 group/exec cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <div className="w-4 h-4 flex items-center justify-center rounded-sm bg-violet-50 border border-violet-200">
+                <Code className="w-2.5 h-2.5 text-violet-600" />
+              </div>
+              <span className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">
+                Code Execution · {aiMetadata.codeExecutionResults.length} blocco{aiMetadata.codeExecutionResults.length > 1 ? 'hi' : ''}
+              </span>
+              {isCodeExpanded
+                ? <ChevronUp className="w-3 h-3 text-violet-400" />
+                : <ChevronDown className="w-3 h-3 text-violet-400" />
+              }
+            </button>
+            {isCodeExpanded && (
+              <div className="mt-2 space-y-2">
+                {aiMetadata.codeExecutionResults.map((exec, i) => (
+                  <div key={i} className="rounded-md border border-violet-100 bg-violet-50/50 overflow-hidden">
+                    {exec.code && (
+                      <pre className="text-[10px] text-violet-800 p-2 overflow-x-auto font-mono leading-relaxed">
+                        <code>{exec.code}</code>
+                      </pre>
+                    )}
+                    {exec.output && (
+                      <div className="border-t border-violet-100 bg-violet-50 p-2">
+                        <span className="text-[9px] text-violet-500 font-semibold uppercase">Output:</span>
+                        <pre className="text-[10px] text-violet-700 mt-0.5 font-mono whitespace-pre-wrap">{exec.output}</pre>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

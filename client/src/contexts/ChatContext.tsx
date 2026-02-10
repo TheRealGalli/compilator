@@ -12,6 +12,9 @@ export interface Message {
     groundingMetadata?: any;
     searchEntryPoint?: string;
     shortTitle?: string;
+    aiMetadata?: {
+        codeExecutionResults?: Array<{ code: string; output: string }>;
+    };
 }
 
 interface ChatContextType {
