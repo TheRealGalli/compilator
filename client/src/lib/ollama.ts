@@ -225,13 +225,14 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // We run regex first to catch obvious things (IBAN, Email, CF) which are mathematically verifiable.
     const { scanTextCandidates } = await import('./regex-patterns');
     const candidates = scanTextCandidates(text);
-    const highConfidenceCandidates = candidates.filter(c => c.confidence === 'HIGH');
+    // User requested opening up to MEDIUM and LOW confidence
+    const regexCandidates = candidates.filter(c => ['HIGH', 'MEDIUM', 'LOW'].includes(c.confidence));
 
-    console.log(`[OllamaLocal] Regex found ${highConfidenceCandidates.length} HIGH confidence items.`);
+    console.log(`[OllamaLocal] Regex found ${regexCandidates.length} items (High/Medium/Low).`);
 
-    // Auto-accept High Confidence (IBAN, CF, Dictionary Names)
-    for (const c of highConfidenceCandidates) {
-        unifiedFindings.set(c.value, { type: c.type, label: c.type }); // Default label = type for regex
+    // Auto-accept Regex Candidates
+    for (const c of regexCandidates) {
+        unifiedFindings.set(c.value, { type: c.type, label: c.type });
     }
 
     // 2. LLM SWEEPER (Full Text Discovery)
@@ -267,57 +268,67 @@ ${text}
 
         console.log("[OllamaLocal] RAW LLM RESPONSE:\n", rawResponse);
 
-        // STRATEGY 1: Try JSON Parse (Just in case)
-        findings = extractJsonFromResponse(rawResponse);
+        // Helper to parse a single line "KEY: VALUE"
+        const parseLine = (line: string): { value: string, type: string, label: string } | null => {
+            // Matches: "NAME: Mario Rossi", "P.IVA: 123", "INIZIO ATTIVITA': 01..."
+            // Accepts dots, apostrophes, hyphens, and accented chars in the KEY
+            const match = line.match(/^\s*([A-Za-z0-9_ \-\.\'àèìòùÀÈÌÒÙ]+)\s*[:=]\s*(.+)\s*$/);
+            if (!match) return null;
 
-        // STRATEGY 2: Parse Line-by-Line (Key: Value)
+            const key = match[1].trim().toUpperCase();
+            let val = match[2].trim();
+
+            // Simple hygiene
+            if (val.length < 2) return null;
+            if (key.includes("EXPLANATION") || key.includes("NOTE")) return null;
+
+            // Map generic keys to our CATEGORIES
+            let type = 'UNKNOWN';
+            if (key.includes('NAME') || key.includes('NOME') || key.includes('TITOLARE') || key.includes('SOGGETTO') || key.includes('COGNOME') || key.includes('SURNAME')) type = 'NAME';
+            else if (key.includes('ADDRESS') || key.includes('INDIRIZZO') || key.includes('RESIDENZA') || key.includes('DOMICILIO') || key.includes('LUOGO') || key.includes('COMUNE') || key.includes('PROV') || key.includes('CITY') || key.includes('LOCATION')) type = 'ADDRESS';
+            else if (key.includes('DATE') || key.includes('DATA') || key.includes('INIZIO') || key.includes('FINE')) type = 'DATE';
+            else if (key.includes('IVA') || key.includes('VAT') || key.includes('PIVA')) type = 'VAT_NUMBER';
+            else if (key.includes('FISCAL') || key.includes('CODE') || key.includes('CF') || key.includes('TAX') || key.includes('CODICE')) type = 'TAX_ID';
+            else if (key.includes('MAIL') || key.includes('EMAIL')) type = 'EMAIL_ADDRESS';
+            else if (key.includes('PHONE') || key.includes('TEL') || key.includes('CELL')) type = 'PHONE_NUMBER';
+            else if (key.includes('ORGANIZATION') || key.includes('COMPANY') || key.includes('DITTA') || key.includes('SOCIETA') || key.includes('BUSINESS') || key.includes('DENOMINAZIONE')) type = 'ORGANIZATION';
+            else if (key.includes('IBAN') || key.includes('BANK') || key.includes('CONTO')) type = 'IBAN';
+            else type = 'GENERIC_PII';
+
+            // NORMALIZED LABEL
+            const normalizedLabel = key.replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+            return { value: val, type, label: normalizedLabel };
+        };
+
+        // STRATEGY 1: Try JSON Parse
+        const jsonResult = extractJsonFromResponse(rawResponse);
+
+        // Handle JSON Array of Strings (common output for this prompt)
+        if (Array.isArray(jsonResult) && jsonResult.length > 0) {
+            if (typeof jsonResult[0] === 'string') {
+                console.log("[OllamaLocal] JSON returned array of strings. Parsing each string...");
+                for (const str of jsonResult) {
+                    const parsed = parseLine(str);
+                    if (parsed) findings.push(parsed);
+                }
+            } else {
+                // Already objects?
+                findings = jsonResult;
+            }
+        }
+
+        // STRATEGY 2: Parse Line-by-Line (Fallback if JSON failed or returned nothing)
         if (findings.length === 0 && rawResponse.includes(':')) {
-            console.log("[OllamaLocal] JSON failed. Trying Line-by-Line parsing...");
+            console.log("[OllamaLocal] JSON failed or empty. Trying Line-by-Line parsing...");
             const lines = rawResponse.split('\n');
             for (const line of lines) {
-                // Regex to capture "KEY: VALUE"
-                // Matches: "NAME: Mario Rossi", "P.IVA: 123", "INIZIO ATTIVITA': 01..."
-                // Now accepts dots, apostrophes, hyphens, and accented chars in the KEY
-                const match = line.match(/^\s*([A-Za-z0-9_ \-\.\'àèìòùÀÈÌÒÙ]+)\s*[:=]\s*(.+)\s*$/);
-                if (match) {
-                    const key = match[1].trim().toUpperCase();
-                    let val = match[2].trim();
-
-                    // Simple hygiene
-                    if (val.length < 2) continue;
-
-                    // Map generic keys to our CATEGORIES
-                    let type = 'UNKNOWN';
-                    if (key.includes('NAME') || key.includes('NOME')) type = 'NAME';
-                    else if (key.includes('ADDRESS') || key.includes('INDIRIZZO') || key.includes('RESIDENZA') || key.includes('DOMICILIO') || key.includes('LOCATION') || key.includes('COMUNE') || key.includes('PROV')) type = 'ADDRESS';
-                    else if (key.includes('DATE') || key.includes('DATA')) type = 'DATE';
-                    else if (key.includes('IVA') || key.includes('VAT')) type = 'VAT_NUMBER';
-                    else if (key.includes('FISCAL') || key.includes('CODE') || key.includes('CF') || key.includes('TAX')) type = 'TAX_ID';
-                    else if (key.includes('MAIL') || key.includes('PHONE') || key.includes('TEL')) type = 'CONTACT';
-                    else if (key.includes('ORGANIZATION') || key.includes('COMPANY') || key.includes('SOCIETA')) type = 'ORGANIZATION';
-                    else type = key; // Fallback to the key itself (e.g. RECORD_ID)
-
-                    findings.push({ value: val, type: type });
-                }
+                const parsed = parseLine(line);
+                if (parsed) findings.push(parsed);
             }
-        }
-
-        // AUTO-CORRECT: Single object wrapper (Legacy check)
-        if (findings && !Array.isArray(findings) && typeof findings === 'object') {
-            // @ts-ignore
-            if (findings.value) {
-                findings = [findings];
-            }
-        }
-
-        if (!Array.isArray(findings)) findings = [];
+        } if (!Array.isArray(findings)) findings = [];
 
         if (findings.length === 0) {
-            console.warn("[OllamaLocal] LLM returned 0 findings. Falling back to Medium Confidence Regex.");
-            const mediumCandidates = candidates.filter(c => c.confidence === 'MEDIUM');
-            for (const c of mediumCandidates) {
-                unifiedFindings.set(c.value, { type: c.type, label: c.type });
-            }
+            console.warn("[OllamaLocal] LLM returned 0 findings (after parsing).");
         }
 
         console.log(`[OllamaLocal] LLM parsed ${findings.length} items from response.`);
