@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import signature from "cookie-signature";
 import { createServer, type Server } from "http";
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
@@ -801,6 +802,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}?error=auth_failed` }),
       (req, res) => {
         console.log(`[Auth] Login successful for user: ${(req.user as any)?.email || 'unknown'}. Redirecting to: ${FRONTEND_URL}`);
+
+        // FALLBACK: Sign the session ID and pass it in the URL for Incognito/Cross-site support
+        if (req.sessionID) {
+          const signedSid = `s:${signature.sign(req.sessionID, 'csd-station-gmail-session-secret')}`;
+          return res.redirect(`${FRONTEND_URL}?sid=${encodeURIComponent(signedSid)}`);
+        }
+
         res.redirect(FRONTEND_URL);
       }
     );

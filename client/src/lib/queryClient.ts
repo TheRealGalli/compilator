@@ -23,6 +23,12 @@ export async function apiRequest(
     ...(extraHeaders || {})
   };
 
+  // FALLBACK: Add session ID from localStorage if cookies are blocked (Incognito)
+  const sessionId = localStorage.getItem('csd_sid');
+  if (sessionId) {
+    headers['x-session-id'] = sessionId;
+  }
+
   const res = await fetch(fullUrl, {
     method,
     headers,
@@ -45,8 +51,15 @@ export const getQueryFn: <T>(options: {
       const url = queryKey[0] as string;
       const fullUrl = url.startsWith('http') ? url : getApiUrl(url);
 
+      const headers: Record<string, string> = {};
+      const sessionId = localStorage.getItem('csd_sid');
+      if (sessionId) {
+        headers['x-session-id'] = sessionId;
+      }
+
       const res = await fetch(fullUrl, {
         credentials: "include",
+        headers
       });
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {

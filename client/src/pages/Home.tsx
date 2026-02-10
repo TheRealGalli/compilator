@@ -18,10 +18,23 @@ export default function Home() {
   const { sources, removeSource, toggleSource, toggleMaster, toggleBypass } = useSources();
 
   // Global Auth Loading Check to prevent "Login Flash"
-  const { isFetched: isAuthAttempted } = useQuery({
+  const { isFetched: isAuthAttempted, refetch: refetchUser } = useQuery({
     queryKey: ['/api/user'],
     retry: false,
     refetchOnWindowFocus: false,
+  });
+
+  // FALLBACK: Handle session ID from URL (Incognito/Cross-domain)
+  useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get('sid');
+    if (sid) {
+      localStorage.setItem('csd_sid', sid);
+      // Clean URL
+      const newUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
+      console.log("[Auth] Session Handshake: sid captured and stored");
+    }
   });
 
   const renderSection = () => {
