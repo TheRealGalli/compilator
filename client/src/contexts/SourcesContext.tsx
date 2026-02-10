@@ -45,17 +45,6 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     const [sources, setSources] = useState<Source[]>([]);
 
     const addSource = useCallback(async (file: File, options?: { isMemory?: boolean; driveId?: string }): Promise<'success' | 'limit_reached' | 'duplicate' | 'file_too_large' | 'invalid_format' | 'error'> => {
-        if (!options?.isMemory) {
-            const userSources = sources.filter(s => !s.isMemory);
-            if (userSources.length >= MAX_SOURCES) {
-                return 'limit_reached';
-            }
-        }
-
-        if (sources.some(s => s.name === file.name)) {
-            return 'duplicate';
-        }
-
         if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
             console.warn(`File too large: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
             return 'file_too_large';
@@ -123,16 +112,9 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                         producer.includes('LiveCycle');
 
                     // --- CALIBRATION LOGIC ---
-                    // RED (isXfa = true):
-                    // - Explicitly Dynamic (NeedsRendering = true)
-                    // - Encrypted
-                    // - Signed (Read-only for us)
                     if (isDynamic || pdfDoc.isEncrypted || isSigned) {
                         isXfa = true;
                     }
-                    // Note: If hasXfaKey or isAdobeDesigner is true but NOT dynamic/signed/encrypted,
-                    // we DON'T mark it as Red (isXfa = false). It will be Green or Orange based on fields.
-                    // This fixes the "Red-Shift" for standard IRS forms.
                 } catch (e) {
                     console.warn('[SourcesContext] Adobe DNA check failed:', e);
                 }
@@ -166,7 +148,6 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 }).length;
 
                 // --- CALIBRATION LOGIC 3.0 ---
-                // If text fields exist but NONE are editable, it's a strongly finalized/locked form (False Orange resolution).
                 const allTextLocked = textFields.length > 0 && editableTextFieldsCount === 0;
 
                 if (isSigned || hasSignatureValue || allTextLocked || (fillableFields.length > 0 && editableFieldsCount === 0)) {
@@ -214,21 +195,44 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 reader.readAsDataURL(file);
             });
 
-            const newSource: Source = {
-                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                name: file.name,
-                selected: true,
-                type: mimeType || file.type,
-                size: file.size,
-                base64: base64,
-                isMemory: options?.isMemory,
-                isFillable: isFillable,
-                isAlreadyFilled: isAlreadyFilled,
-                isXfa: isXfa,
-                driveId: options?.driveId
-            };
+            // Functional state update to handle parallel uploads correctly
+            let limitReached = false;
+            let duplicateFound = false;
 
-            setSources(prev => [...prev, newSource]);
+            setSources(prev => {
+                if (!options?.isMemory) {
+                    const userSources = prev.filter(s => !s.isMemory);
+                    if (userSources.length >= MAX_SOURCES) {
+                        limitReached = true;
+                        return prev;
+                    }
+                }
+
+                if (prev.some(s => s.name === file.name)) {
+                    duplicateFound = true;
+                    return prev;
+                }
+
+                const newSource: Source = {
+                    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    name: file.name,
+                    selected: true,
+                    type: mimeType || file.type,
+                    size: file.size,
+                    base64: base64,
+                    isMemory: options?.isMemory,
+                    isFillable: isFillable,
+                    isAlreadyFilled: isAlreadyFilled,
+                    isXfa: isXfa,
+                    driveId: options?.driveId
+                };
+
+                return [...prev, newSource];
+            });
+
+            if (limitReached) return 'limit_reached';
+            if (duplicateFound) return 'duplicate';
+
             return 'success';
         } catch (error) {
             console.error('Error reading file:', error);

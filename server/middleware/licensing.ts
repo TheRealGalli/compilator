@@ -10,7 +10,8 @@ const LIMITS = {
 export const checkLimit = (resourceType: 'compilation' | 'chat') => {
     return async (req: Request, res: Response, next: NextFunction) => {
         // 1. Auth Check (Critical)
-        if (!req.isAuthenticated() || !req.user) {
+        // Guest mode for Analyzer: Allow 'chat' without authentication
+        if (resourceType !== 'chat' && (!req.isAuthenticated() || !req.user)) {
             return res.status(401).json({ error: "Unauthorized" });
         }
 

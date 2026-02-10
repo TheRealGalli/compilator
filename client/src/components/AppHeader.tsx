@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Moon, Sun, User, Asterisk } from "lucide-react";
+import { User, Asterisk } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useTheme } from "./ThemeProvider";
+
 import { ThreeStars } from "@/components/ui/three-stars";
 import { useGoogleDrive } from "@/contexts/GoogleDriveContext";
 import { useQuery } from "@tanstack/react-query";
@@ -15,7 +15,6 @@ interface AppHeaderProps {
 
 export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick }: AppHeaderProps) {
   const { data: user } = useQuery({ queryKey: ['/api/user'] });
-  const { theme, toggleTheme } = useTheme();
   const { userIdentity } = useGoogleDrive();
   const [isSpinning, setIsSpinning] = useState(false);
 
@@ -55,11 +54,6 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1 mr-2">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full w-8 h-8">
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-        </div>
 
         {!!user && (
           <Button

@@ -588,17 +588,10 @@ export function DocumentsSection() {
   }
 
   return (
-    <div className={`h-full p-6 flex flex-col gap-6 relative ${!isAuthenticated ? 'overflow-hidden' : 'overflow-auto'}`}>
+    <div className={`h-full p-6 flex flex-col gap-6 relative ${!isAuthenticated ? 'overflow-auto' : 'overflow-auto'}`}>
 
-      {/* Login Overlay - Fixed over everything in this section */}
-      {!isAuthenticated && (
-        <div className="absolute inset-6 z-50 rounded-xl overflow-hidden shadow-2xl">
-          <LoginOverlay />
-        </div>
-      )}
-
-      {/* Main Content - Blurred when locked */}
-      <div className={`flex flex-col gap-6 h-full transition-all duration-500 ${!isAuthenticated ? 'filter blur-sm opacity-40 pointer-events-none select-none' : ''}`}>
+      {/* Main Content */}
+      <div className={`flex flex-col gap-6 h-full transition-all duration-500`}>
         <div className="flex items-center justify-between">
           {/* Header content... */}
           <div>
@@ -611,7 +604,11 @@ export function DocumentsSection() {
           <div className="flex items-center gap-2">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={`gap-2 shrink-0 ${memoryFile ? 'border-blue-500/50 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10' : ''}`}>
+                <Button
+                  variant="outline"
+                  className={`gap-2 shrink-0 ${memoryFile ? 'border-blue-500/50 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10' : ''}`}
+                  disabled={!isAuthenticated}
+                >
                   <FaChessKing className="w-4 h-4 text-blue-500 -translate-y-[1.5px]" />
                   Gromit Memory
                   {memoryFile && <span className="flex h-2 w-2 rounded-full bg-green-500" />}
@@ -666,41 +663,65 @@ export function DocumentsSection() {
           disabled={isUploading || !isAuthenticated}
         />
 
-        {isConnected && (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
-              <div className="h-[1px] w-full bg-border/60" />
-            </div>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="gap-2 border-red-50 hover:bg-red-50 hover:text-red-600 transition-all hover:border-red-200 shadow-sm"
-                onClick={() => {
-                  fetchMessages();
-                  setView('gmail');
-                }}
-              >
-                <GmailLogo className="w-4 h-4" />
-                Gmail
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
-                onClick={() => {
-                  fetchFiles();
-                  setView('drive');
-                }}
-              >
-                <DriveLogo className="w-4 h-4" />
-                Google Drive
-              </Button>
-            </div>
+        <div className="flex flex-col gap-4 relative">
+          <div className="flex items-center gap-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
+            <div className="h-[1px] w-full bg-border/60" />
           </div>
-        )}
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="gap-2 border-red-50 hover:bg-red-50 hover:text-red-600 transition-all hover:border-red-200 shadow-sm"
+              onClick={() => {
+                if (!isAuthenticated) return;
+                fetchMessages();
+                setView('gmail');
+              }}
+              disabled={!isAuthenticated}
+            >
+              <GmailLogo className="w-4 h-4" />
+              Gmail
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
+              onClick={() => {
+                if (!isAuthenticated) return;
+                fetchFiles();
+                setView('drive');
+              }}
+              disabled={!isAuthenticated}
+            >
+              <DriveLogo className="w-4 h-4" />
+              Google Drive
+            </Button>
+          </div>
+
+          {!isAuthenticated && (
+            <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-[1px] flex items-center justify-center rounded-lg border border-dashed border-muted-foreground/20">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Info className="w-3 h-3" /> Login richiesto per le integrazioni cloud
+              </p>
+            </div>
+          )}
+        </div>
 
         {sources.filter(s => !s.isMemory).length > 0 && (
-          <div className="flex-1 overflow-auto">
+          <div
+            className="flex-1 overflow-auto"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const files = Array.from(e.dataTransfer.files);
+              if (files.length > 0) {
+                handleFilesSelected(files);
+              }
+            }}
+          >
             <h3 className="text-lg font-semibold mb-4">
               Fonti Caricate ({sources.filter(s => !s.isMemory).length}/{maxSources})
             </h3>
@@ -719,7 +740,21 @@ export function DocumentsSection() {
         )}
 
         {sources.filter(s => !s.isMemory).length === 0 && (
-          <div className="flex-1 flex items-center justify-center text-center px-4">
+          <div
+            className="flex-1 flex items-center justify-center text-center px-4"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const files = Array.from(e.dataTransfer.files);
+              if (files.length > 0) {
+                handleFilesSelected(files);
+              }
+            }}
+          >
             <div className="max-w-md">
               <p className="text-muted-foreground">
                 Nessuna fonte caricata. Trascina file qui sopra o clicca per selezionarli.

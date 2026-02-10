@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { FileText, Image, Music, Pin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCompiler } from "@/contexts/CompilerContext";
+import { useSources } from "@/contexts/SourcesContext";
+import { useToast } from "@/hooks/use-toast";
 import {
   Tooltip,
   TooltipContent,
@@ -31,9 +34,64 @@ interface SourceSelectorProps {
 
 export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypass }: SourceSelectorProps) {
   const { isLocked, frozenColor } = useCompiler();
+  const { addSource } = useSources();
+  const [isDragging, setIsDragging] = useState(false);
+  const { toast } = useToast();
+
   // Filter out memory files from the UI list
   const visibleSources = sources.filter(s => !s.isMemory);
   const selectedCount = visibleSources.filter(s => s.selected).length;
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    for (const file of files) {
+      const result = await addSource(file);
+      if (result === 'limit_reached') {
+        toast({
+          title: "Limite raggiunto",
+          description: "Massimo 10 fonti per sessione.",
+          variant: "destructive"
+        });
+        break;
+      } else if (result === 'duplicate') {
+        toast({
+          title: "File già presente",
+          description: `${file.name} è già stato caricato.`,
+        });
+      } else if (result === 'file_too_large') {
+        toast({
+          title: "File troppo grande",
+          description: `${file.name} supera il limite di 30MB.`,
+          variant: "destructive"
+        });
+      } else if (result === 'error') {
+        toast({
+          title: "Errore caricamento",
+          description: `Impossibile caricare ${file.name}.`,
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+
 
   const getFileIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase() || '';
@@ -49,7 +107,13 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
   };
 
   return (
-    <div className="h-full flex flex-col border rounded-lg bg-background overflow-hidden">
+    <div
+      className={`h-full flex flex-col border rounded-lg bg-background overflow-hidden transition-all duration-200 ${isDragging ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/20' : ''
+        }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={(e) => { setIsDragging(false); handleDrop(e); }}
+    >
       <div className="border-b px-4 py-3 bg-muted/30 flex items-center justify-between flex-shrink-0">
         <h3 className="text-sm font-medium">Fonti Disponibili</h3>
         <Badge variant="secondary" data-testid="badge-selected-count">
