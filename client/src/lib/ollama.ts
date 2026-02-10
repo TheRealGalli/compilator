@@ -6,6 +6,7 @@
 export interface PIIFinding {
     value: string;
     category: string;
+    label?: string;
 }
 
 let currentBaseUrl = 'http://localhost:11434';
