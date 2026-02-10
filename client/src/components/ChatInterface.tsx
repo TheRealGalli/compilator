@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import { getApiUrl } from "@/lib/api-config";
 import { useSources } from "@/contexts/SourcesContext";
 import { useGoogleDrive } from "@/contexts/GoogleDriveContext";
@@ -32,6 +33,9 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [isDriveMode, setIsDriveMode] = useState(false);
   const { toast } = useToast();
   const { selectedSources, masterSource } = useSources();
+
+  const { data: user } = useQuery({ queryKey: ['/api/user'] });
+  const isAuthenticated = !!user;
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -372,16 +376,19 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
             <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2">
+                  <div className={`flex items-center gap-2 ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <Globe className={`w-4 h-4 ${webResearch ? 'text-blue-600' : 'text-muted-foreground'}`} />
-                    <Label htmlFor="web-research-chat" className="text-xs cursor-pointer">
+                    <Label htmlFor="web-research-chat" className={`text-xs ${!isAuthenticated ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                       Web Research
                     </Label>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs text-xs">
-                    Abilita ricerca Google in tempo reale per informazioni aggiornate
+                    {isAuthenticated
+                      ? "Abilita ricerca Google in tempo reale per informazioni aggiornate"
+                      : "Login richiesto per la ricerca web"
+                    }
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -389,6 +396,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                 id="web-research-chat"
                 checked={webResearch}
                 onCheckedChange={setWebResearch}
+                disabled={!isAuthenticated}
               />
 
               <div className="w-px h-4 bg-border mx-2" />
@@ -400,13 +408,13 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                     size="icon"
                     className={`rounded-full w-8 h-8 ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted-foreground'}`}
                     onClick={toggleRecording}
-                    disabled={isLoading || isTranscribing}
+                    disabled={isLoading || isTranscribing || !isAuthenticated}
                   >
                     {isRecording ? <Square className="w-4 h-4 fill-current" /> : <Mic className="w-4 h-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{isRecording ? "Ferma registrazione e invia" : "Attiva input vocale (STT)"}</p>
+                  <p>{!isAuthenticated ? "Login richiesto" : isRecording ? "Ferma registrazione e invia" : "Attiva input vocale (STT)"}</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -420,13 +428,13 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                         size="icon"
                         className={`rounded-full w-8 h-8 ${isDriveMode ? 'bg-green-100' : ''}`}
                         onClick={() => setIsDriveMode(!isDriveMode)}
-                        disabled={isLoading || isTranscribing}
+                        disabled={isLoading || isTranscribing || !isAuthenticated}
                       >
                         <DriveLogo className={`w-5 h-5 ${!isDriveMode ? 'opacity-50 grayscale' : ''}`} />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{isDriveMode ? "Drive Mode ATTIVO (Modifica file)" : "Attiva Drive Mode"}</p>
+                      <p>{!isAuthenticated ? "Login richiesto" : isDriveMode ? "Drive Mode ATTIVO (Modifica file)" : "Attiva Drive Mode"}</p>
                     </TooltipContent>
                   </Tooltip>
                 </>
@@ -438,7 +446,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione audio..." : "Fai una domanda sui tuoi documenti..."}
+                placeholder={!isAuthenticated ? "Fai una domanda (Funzioni avanzate disabilitate)..." : webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione audio..." : "Fai una domanda sui tuoi documenti..."}
                 className="resize-none min-h-[60px]"
                 data-testid="input-chat"
                 disabled={isRecording || isTranscribing}
