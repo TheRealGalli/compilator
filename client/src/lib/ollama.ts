@@ -239,6 +239,7 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // 2. LLM SWEEPER (Full Text Discovery)
     // User requested FULL DOCUMENT context.
     console.log(`[OllamaLocal] Sending FULL TEXT (${text.length} chars) to LLM...`);
+    console.log("[OllamaLocal] Full Extracted Text Preview:\n", text); // Re-enabled for verification
 
     // ULTRA-CONCISE PROMPT (User's Proven Prompt)
     // We use the exact phrasing that worked in chat.

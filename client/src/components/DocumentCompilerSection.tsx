@@ -430,6 +430,10 @@ export function DocumentCompilerSection({
     let result = text;
     // Order by value length descending to avoid partial matches
     const sortedValues = Object.entries(vault).sort((a, b) => b[1].length - a[1].length);
+
+    // DEBUG: Log start of sweep
+    // console.log(`[Pawn] Starting Global Sweep on ${text.length} chars with ${sortedValues.length} tokens.`);
+
     for (const [token, value] of sortedValues) {
       if (!value || value.length < 2) continue;
       // Escape for regex (simple version)
@@ -437,7 +441,12 @@ export function DocumentCompilerSection({
       // CRITICAL: Use 'gi' for Case-Insensitive Global replacement
       // If vault has "ROSSI" and text has "Rossi", we want to catch it.
       const regex = new RegExp(escapedValue, 'gi');
-      result = result.replace(regex, token);
+
+      // Check if replacement will happen (for logging)
+      if (regex.test(result)) {
+        console.log(`[Pawn] Replacing '${value}' -> '${token}'`);
+        result = result.replace(regex, token);
+      }
     }
     return result;
   };
@@ -868,9 +877,18 @@ export function DocumentCompilerSection({
 
         // 2. Prepare Sources (Text Only - Anonymized)
         const getAnonymizedText = async (source: any) => {
-          // Try to find in cache first (which contains ANONYMIZED text after Phase 2)
+          // Try to find in cache first
           const cached = sourceTextCache.current.find(d => d.name === source.name);
+
+          // CRITICAL FIX: If we have ORIGINAL text, re-anonymize it with the UPDATED vault (post-user-edits)
+          if (cached && cached.originalText) {
+            console.log(`[Pawn] Re-anonymizing cached source '${source.name}' with updated vault...`);
+            return performMechanicalGlobalSweep(cached.originalText, guardrailVault);
+          }
+
+          // Fallback: Use previously anonymized text if original is missing (shouldn't happen for text docs)
           if (cached && cached.text) {
+            console.warn(`[Pawn] Warning: Using cached anonymized text for '${source.name}' (No re-sweep possible).`);
             return cached.text;
           }
 
