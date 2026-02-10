@@ -1,4 +1,4 @@
-import { Asterisk, FileText, ChevronUp, Wand2, Menu, Type, ChevronDown, Printer, Download, X, Check, Copy, Settings2, Sparkles, Zap, BookOpen, Scale, Loader2 } from "lucide-react";
+import { Asterisk, FileText, ChevronUp, Wand2, Menu, Type, ChevronDown, Printer, Download, X, Check, Copy, Settings2, Sparkles, Zap, BookOpen, Scale, Loader2, Trash2, Plus } from "lucide-react";
 import { RefineChat } from "./RefineChat";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThreeStars } from "@/components/ui/three-stars"; // Gromit Core Branding
@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSources } from "@/contexts/SourcesContext";
 import { useCompiler } from "@/contexts/CompilerContext";
+import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 // import {
 //   DropdownMenu,
