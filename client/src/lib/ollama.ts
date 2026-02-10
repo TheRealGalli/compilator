@@ -243,9 +243,21 @@ ${text}
 
         try {
             if (data.message?.content) {
-                console.log("[OllamaLocal] RAW LLM RESPONSE:", data.message.content); // DEBUG LOG
-                findings = JSON.parse(data.message.content);
+                console.log("[OllamaLocal] RAW LLM RESPONSE:", data.message.content.substring(0, 500) + "..."); // Valid Log
+                findings = extractJsonFromResponse(data.message.content);
+            } else {
+                console.warn("[OllamaLocal] Empty response content from LLM");
             }
+
+            // AUTO-CORRECT: If findings is a single object { value: ... }, wrap it in an array.
+            if (findings && !Array.isArray(findings) && typeof findings === 'object') {
+                // @ts-ignore
+                if (findings.value) {
+                    findings = [findings];
+                    console.log("[OllamaLocal] Single object response wrapped in array.");
+                }
+            }
+
             if (!Array.isArray(findings)) findings = [];
         } catch (e) {
             console.warn("[OllamaLocal] Failed to parse JSON response:", data.message?.content);
