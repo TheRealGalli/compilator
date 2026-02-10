@@ -818,9 +818,7 @@ export function DocumentCompilerSection({
                   nextIndex = Math.max(...existingIndices) + 1;
                 }
 
-                token = `[${category}_${nextIndex}]`;
-                vaultMap.set(token, rawValue);
-                console.log(`[DocumentCompiler] Vault registered: ${token} (Redacted Value)`);
+                // console.log(`[DocumentCompiler] Vault registered: ${token} (Redacted Value)`);
               }
               vaultCounts.set(token, (vaultCounts.get(token) || 0) + 1);
             }
@@ -965,7 +963,7 @@ export function DocumentCompilerSection({
 
       } else {
         // Standard Flow (Send Base64) - Legacy or Non-Pawn
-        console.log('[DocumentCompiler] Preparing Standard Payload (Base64)...');
+        // console.log('[DocumentCompiler] Preparing Standard Payload (Base64)...');
         finalSources = selectedSources.map((source) => ({
           name: source.name,
           type: source.type,

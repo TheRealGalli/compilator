@@ -1493,8 +1493,9 @@ ${hasMemory ? `
 2. **ZERO ALLUCINAZIONI & REGOLE DI ESTRAZIONE (Direttiva Assoluta):**
    - **REGOLA D'ORO**: NON inventare MAI nomi di persone, date, cifre, indirizzi o fatti non esplicitamente presenti nei documenti caricati o nella memoria.
    - Prima di dichiarare un dato come mancante, controlla SCRUPOLOSAMENTE: **Memoria di Sistema**, tutti i **Documenti allegati**, la **Fonte Master** e il testo del **Template** stesso (che potrebbe contenere dati precompilati).
-   - Se un dato è presente in QUALSIASI di queste fonti: **USALO**.
-   - Solo se il dato è assolutamente assente ovunque: SCRIVI "[DATO MANCANTE]".
+   - **ECCEZIONE CRITICA PAWN**: Se trovi un token pseudonimizzato (es. **[NOME_1]**, **[DATA_1]**), consideralo un DATO PRESENTE e VALIDO. **NON** sostituirlo con "[DATO MANCANTE]". Riportalo fedelmente.
+   - Se un dato è presente in QUALSIASI di queste fonti (o è un token Pawn): **USALO**.
+   - Solo se il dato è assolutamente assente ovunque (E NON è un token Pawn): SCRIVI "[DATO MANCANTE]".
    - **DIRETTIVA RIGOROSA**: È tassativamente vietato usare la tua conoscenza interna per "ipotizzare" dati che dovrebbero essere nelle fonti. Se le fonti non forniscono il dato, il tuo output DEVE essere "[DATO MANCANTE]".
    - Se non è fornita NESSUNA fonte, NESSUNA nota e NESSUN master source, DEVI rifiutare la compilazione o produrre un documento composto esclusivamente da "[DATO MANCANTE]" nei campi variabili.
 
