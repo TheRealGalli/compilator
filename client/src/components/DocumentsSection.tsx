@@ -588,10 +588,16 @@ export function DocumentsSection() {
   }
 
   return (
-    <div className={`h-full p-6 flex flex-col gap-6 relative ${!isAuthenticated ? 'overflow-auto' : 'overflow-auto'}`}>
+    <div className={`h-full p-6 flex flex-col gap-6 relative ${!isAuthenticated ? 'overflow-hidden' : 'overflow-auto'}`}>
+
+      {!isAuthenticated && (
+        <div className="absolute inset-6 z-50 rounded-xl overflow-hidden shadow-2xl">
+          <LoginOverlay />
+        </div>
+      )}
 
       {/* Main Content */}
-      <div className={`flex flex-col gap-6 h-full transition-all duration-500`}>
+      <div className={`flex flex-col gap-6 h-full transition-all duration-500 ${!isAuthenticated ? 'filter blur-sm opacity-40 pointer-events-none select-none' : ''}`}>
         <div className="flex items-center justify-between">
           {/* Header content... */}
           <div>
