@@ -425,6 +425,8 @@ export function DocumentCompilerSection({
   /**
    * Performs a purely mechanical replacement of sensitive values with tokens.
    * Based on the "Global Sweep" strategy to ensure 100% consistency.
+   * NOW ROBUST: Handles "spaced out" values (e.g. "G A L L I") and case-insensitivity.
+   * STRICT BOUNDARIES: Uses \\b to avoid partial matches (e.g. GALLI inside GALLIPOLI).
    */
   const performMechanicalGlobalSweep = (text: string, vault: Record<string, string>): string => {
     if (!text || Object.keys(vault).length === 0) return text;
@@ -437,15 +439,20 @@ export function DocumentCompilerSection({
 
     for (const [token, value] of sortedValues) {
       if (!value || value.length < 2) continue;
-      // Escape for regex (simple version)
-      const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      const chars = value.split('');
+      const escapedChars = chars.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      // Allow spaces, slashes, dots, dashes between characters
+      const separator = '[\\s\\/\\.\\-]*';
+      // Use Word Boundaries \\b to ensure we match the exact word/value and not a substring
+      const robustPattern = '\\b' + escapedChars.join(separator) + '\\b';
+
       // CRITICAL: Use 'gi' for Case-Insensitive Global replacement
-      // If vault has "ROSSI" and text has "Rossi", we want to catch it.
-      const regex = new RegExp(escapedValue, 'gi');
+      const regex = new RegExp(robustPattern, 'gi');
 
       // Check if replacement will happen (for logging)
       if (regex.test(result)) {
-        console.log(`[Pawn] Replacing '${value}' -> '${token}'`);
+        console.log(`[Pawn] Replacing '${value}' (Pattern: ${robustPattern}) -> '${token}'`);
         result = result.replace(regex, token);
       }
     }

@@ -1453,7 +1453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // --- Helper: Build System Prompt (Shared between Compile and Refine) ---
   const buildSystemPrompt = (ctx: any) => {
-    const { dateTimeIT, hasMemory, extractedFields, manualAnnotations, masterSource, detailedAnalysis, webResearch, multimodalFiles, fetchedCompilerContext, hasExternalSources } = ctx;
+    const { dateTimeIT, hasMemory, extractedFields, manualAnnotations, masterSource, detailedAnalysis, webResearch, multimodalFiles, fetchedCompilerContext, hasExternalSources, isPawnActive } = ctx;
 
     return `Data e ora corrente: ${dateTimeIT}
 
@@ -1469,6 +1469,20 @@ Devi compilare il template sottostante utilizzando le informazioni fornite nei d
 **CONTESTUALIZZAZIONE E TERMINOLOGIA:**
 - **COERENZA TERMINOLOGICA**: Devi adattare ogni termine, abbreviazione o riferimento alla terminologia specifica presente nei documenti caricati (Fascicolo).
 - **CONTESTO DOCUMENTALE**: Interpreta i placeholder e il contenuto basandoti sul linguaggio tecnico e professionale rilevato nelle fonti (es. se la controparte è definita "Promissario Acquirente" in una fonte, usa quel termine con coerenza).
+
+${isPawnActive ? `
+**⚠️ PROTOCOLLO PAWN ATTIVO (PRIVACY ZERO-DATA) - ISTRUZIONE CRITICA:**
+1. I documenti forniti sono stati **PSEUDONIMIZZATI** localmente.
+2. Troverai token come **[NOME_1]**, **[DATA_1]**, **[PIVA_1]**, **[IBAN_1]** ecc.
+3. **QUESTI NON SONO DATI MANCANTI**. Rappresentano dati REALI e VALIDI che l'utente possiede.
+4. **NON** provare a "indovinare" o riempire questi token.
+5. **TRATTALI COME VALORI DEFINITIVI**. Inseriscili nel documento finale ESATTAMENTE come li trovi.
+6. Costruisci le frasi attorno a questi token in modo naturale.
+
+**ECCEZIONE DI VALIDAZIONE CONTESTUALE (FALSO POSITIVO):**
+- **SOLO SE** un token appare in un contesto **PALESEMENTE ILLOGICO** (es. "Il muro era color [NOME_1]"), considera l'opzione che il sistema locale abbia sbagliato (es. confondendo la parola "GIALLI" con il cognome "GALLI").
+- **IN QUESTO CASO SPECIFICO**: Ignora il token e trattalo come la parola originale più probabile dal contesto (depseudonimizzazione logica), senza avvisare l'utente.
+` : ''}
 
 **ISTRUZIONI GESTIONE MEMORIA & DATI:**
 ${hasMemory ? `
@@ -1770,7 +1784,8 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
         webResearch,
         multimodalFiles,
         fetchedCompilerContext,
-        hasExternalSources
+        hasExternalSources,
+        isPawnActive // Pass the flag to the system prompt builder
       });
 
       // Build User Prompt
@@ -1907,7 +1922,8 @@ ISTRUZIONI OUTPUT:
         webResearch: compileContext.webResearch,
         multimodalFiles,
         fetchedCompilerContext,
-        hasExternalSources
+        hasExternalSources,
+        isPawnActive // Pass the flag to the system prompt builder
       });
 
       // Format mentions for the AI using the new label system (#C1, #T1) and position offsets
