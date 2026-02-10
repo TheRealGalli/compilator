@@ -743,15 +743,17 @@ export function DocumentCompilerSection({
 
             for (const f of res.findings) {
               const rawValue = f.value.trim();
-              let category = f.category.toUpperCase().replace(/[^A-Z_]/g, '_');
+
+              // 1. Determine Category: Prefer dynamic Label, otherwise standard Category
+              let category = f.label ? f.label : f.category.toUpperCase().replace(/[^A-Z_]/g, '_');
 
               if (!rawValue || rawValue.length < 2) continue;
               // Grounding Check: Ignore values that look like prompt artifacts or codes
               if (rawValue.includes('[') || rawValue.includes(']') || rawValue.includes('<')) continue;
               if (rawValue.toLowerCase() === 'null' || rawValue.toLowerCase() === 'undefined') continue;
 
-              // 2. Category normalization (English-First)
-              if (!ALLOWED.includes(category)) {
+              // 2. Category normalization (English-First) - ONLY if no custom label provided
+              if (!f.label && !ALLOWED.includes(category)) {
                 if (category.includes('NAME') || category.includes('PERSON') || category.includes('NOME')) category = 'FULL_NAME';
                 else if (category.includes('SUR') || category.includes('LAST') || category.includes('COGN')) category = 'SURNAME';
                 else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA') || category.includes('CORP')) category = 'ORGANIZATION';

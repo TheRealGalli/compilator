@@ -218,7 +218,8 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
     console.log(`[OllamaLocal] Starting Hybrid PII Extraction on ${text.length} chars...`);
-    const unifiedFindings = new Map<string, string>(); // Value -> Type
+    // Value -> { type, label }
+    const unifiedFindings = new Map<string, { type: string, label?: string }>();
 
     // 1. REGEX SNIPER (Trusted High Confidence)
     // We run regex first to catch obvious things (IBAN, Email, CF) which are mathematically verifiable.
@@ -230,7 +231,7 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
 
     // Auto-accept High Confidence (IBAN, CF, Dictionary Names)
     for (const c of highConfidenceCandidates) {
-        unifiedFindings.set(c.value, c.type);
+        unifiedFindings.set(c.value, { type: c.type, label: c.type }); // Default label = type for regex
     }
 
     // 2. LLM SWEEPER (Full Text Discovery)
@@ -314,7 +315,7 @@ ${text}
             console.warn("[OllamaLocal] LLM returned 0 findings. Falling back to Medium Confidence Regex.");
             const mediumCandidates = candidates.filter(c => c.confidence === 'MEDIUM');
             for (const c of mediumCandidates) {
-                unifiedFindings.set(c.value, c.type);
+                unifiedFindings.set(c.value, { type: c.type, label: c.type });
             }
         }
 
@@ -329,8 +330,9 @@ ${text}
                 if (unifiedFindings.has(val)) continue;
 
                 // Add to findings directly (Trusting the Model)
-                unifiedFindings.set(val, finding.type);
-                console.log(`[OllamaLocal] + NEW FINDING: ${val} (${finding.type})`);
+                // Use the Captured Label if available, otherwise fallback to Type
+                unifiedFindings.set(val, { type: finding.type, label: finding.label || finding.type });
+                console.log(`[OllamaLocal] + NEW FINDING: ${val} (${finding.type}) [${finding.label}]`);
             }
         }
 
@@ -341,8 +343,8 @@ ${text}
 
     // 3. Convert Map to Array
     const finalResults: PIIFinding[] = [];
-    for (const [value, category] of unifiedFindings.entries()) {
-        finalResults.push({ value, category });
+    for (const [value, data] of unifiedFindings.entries()) {
+        finalResults.push({ value, category: data.type, label: data.label });
     }
 
     console.log(`[OllamaLocal] Discovery Complete. Total Unique PII: ${finalResults.length}`);
