@@ -588,145 +588,152 @@ export function DocumentsSection() {
   }
 
   return (
-    <div className="h-full p-6 flex flex-col gap-6 overflow-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Gestione Documenti</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Carica fino a {maxSources} fonti per l'analisi (solo sessione corrente)
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={`gap-2 shrink-0 ${memoryFile ? 'border-blue-500/50 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10' : ''}`}>
-                <FaChessKing className="w-4 h-4 text-blue-500 -translate-y-[1.5px]" />
-                Gromit Memory
-                {memoryFile && <span className="flex h-2 w-2 rounded-full bg-green-500" />}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 p-4" align="end">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 border-b pb-3">
-                  <FaChessKing className="w-5 h-5 text-blue-500 -translate-y-[3px]" />
-                  <h4 className="font-semibold">Gromit Memory</h4>
-                </div>
+    <div className={`h-full p-6 flex flex-col gap-6 relative ${!isAuthenticated ? 'overflow-hidden' : 'overflow-auto'}`}>
 
-                {memoryFile ? (
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
-                    <div className="flex items-start gap-3">
-                      <div className="bg-blue-500/20 p-2 rounded shrink-0">
-                        <DriveLogo className="w-4 h-4 text-blue-600" />
+      {/* Login Overlay - Fixed over everything in this section */}
+      {!isAuthenticated && (
+        <div className="absolute inset-6 z-50 rounded-xl overflow-hidden shadow-2xl">
+          <LoginOverlay />
+        </div>
+      )}
+
+      {/* Main Content - Blurred when locked */}
+      <div className={`flex flex-col gap-6 h-full transition-all duration-500 ${!isAuthenticated ? 'filter blur-sm opacity-40 pointer-events-none select-none' : ''}`}>
+        <div className="flex items-center justify-between">
+          {/* Header content... */}
+          <div>
+            <h2 className="text-2xl font-semibold">Gestione Documenti</h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Carica fino a {maxSources} fonti per l'analisi (solo sessione corrente)
+            </p>
+          </div>
+          {/* ... rest of header */}
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={`gap-2 shrink-0 ${memoryFile ? 'border-blue-500/50 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10' : ''}`}>
+                  <FaChessKing className="w-4 h-4 text-blue-500 -translate-y-[1.5px]" />
+                  Gromit Memory
+                  {memoryFile && <span className="flex h-2 w-2 rounded-full bg-green-500" />}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-4" align="end">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 border-b pb-3">
+                    <FaChessKing className="w-5 h-5 text-blue-500 -translate-y-[3px]" />
+                    <h4 className="font-semibold">Gromit Memory</h4>
+                  </div>
+
+                  {memoryFile ? (
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-blue-500/20 p-2 rounded shrink-0">
+                          <DriveLogo className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{memoryFile.name}</p>
+                          <p className="text-xs text-muted-foreground">Memoria di sistema attiva</p>
+                        </div>
                       </div>
-                      <div className="space-y-1 min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{memoryFile.name}</p>
-                        <p className="text-xs text-muted-foreground">Memoria di sistema attiva</p>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full mt-3 text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8"
+                        onClick={() => handleRemove(memoryFile.id)}
+                      >
+                        <Trash2 className="w-3 h-3 mr-2" />
+                        Disattiva Memoria
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full mt-3 text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8"
-                      onClick={() => handleRemove(memoryFile.id)}
-                    >
-                      <Trash2 className="w-3 h-3 mr-2" />
-                      Disattiva Memoria
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="text-center py-4 space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Nessuna memoria di sistema attiva.
-                    </p>
-                    <p className="text-xs text-muted-foreground/70">
-                      Collega Google Drive per caricare automaticamente "Gromit-Memory.pdf".
-                    </p>
-                  </div>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-      </div>
-
-      <div className="relative">
-        {!isAuthenticated && <LoginOverlay />}
-
-        <div className={!isAuthenticated ? "opacity-20 pointer-events-none filter blur-md transition-all duration-500" : ""}>
-          <FileUploadZone
-            onFilesSelected={handleFilesSelected}
-            disabled={isUploading || !isAuthenticated}
-          />
-        </div>
-      </div>
-
-      {isAuthenticated && isConnected && (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-4">
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
-            <div className="h-[1px] w-full bg-border/60" />
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="gap-2 border-red-50 hover:bg-red-50 hover:text-red-600 transition-all hover:border-red-200 shadow-sm"
-              onClick={() => {
-                fetchMessages();
-                setView('gmail');
-              }}
-            >
-              <GmailLogo className="w-4 h-4" />
-              Gmail
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
-              onClick={() => {
-                fetchFiles();
-                setView('drive');
-              }}
-            >
-              <DriveLogo className="w-4 h-4" />
-              Google Drive
-            </Button>
+                  ) : (
+                    <div className="text-center py-4 space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Nessuna memoria di sistema attiva.
+                      </p>
+                      <p className="text-xs text-muted-foreground/70">
+                        Collega Google Drive per caricare automaticamente "Gromit-Memory.pdf".
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
-      )}
 
-      {sources.filter(s => !s.isMemory).length > 0 && (
-        <div className="flex-1 overflow-auto">
-          <h3 className="text-lg font-semibold mb-4">
-            Fonti Caricate ({sources.filter(s => !s.isMemory).length}/{maxSources})
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sources.filter(s => !s.isMemory).map((source) => (
-              <FileCard
-                key={source.id}
-                name={source.name}
-                size={formatSize(source.size)}
-                isMemory={source.isMemory}
-                onRemove={() => handleRemove(source.id)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+        <FileUploadZone
+          onFilesSelected={handleFilesSelected}
+          disabled={isUploading || !isAuthenticated}
+        />
 
-      {sources.filter(s => !s.isMemory).length === 0 && (
-        <div className="flex-1 flex items-center justify-center text-center px-4">
-          <div className="max-w-md">
-            <p className="text-muted-foreground">
-              Nessuna fonte caricata. Trascina file qui sopra o clicca per selezionarli.
-            </p>
-            <p className="text-sm text-muted-foreground mt-2 opacity-70">
-              Le fonti sono temporanee e verranno rimosse al refresh della pagina.
-            </p>
-            <div className="mt-8 p-3 px-4 rounded-full bg-orange-500/5 text-orange-500/80 text-[10px] font-bold uppercase tracking-widest inline-block border border-orange-500/10">
-              ⚠ I modelli possono allucinare, verificare sempre i dati.
+        {isConnected && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
+              <div className="h-[1px] w-full bg-border/60" />
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="gap-2 border-red-50 hover:bg-red-50 hover:text-red-600 transition-all hover:border-red-200 shadow-sm"
+                onClick={() => {
+                  fetchMessages();
+                  setView('gmail');
+                }}
+              >
+                <GmailLogo className="w-4 h-4" />
+                Gmail
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
+                onClick={() => {
+                  fetchFiles();
+                  setView('drive');
+                }}
+              >
+                <DriveLogo className="w-4 h-4" />
+                Google Drive
+              </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {sources.filter(s => !s.isMemory).length > 0 && (
+          <div className="flex-1 overflow-auto">
+            <h3 className="text-lg font-semibold mb-4">
+              Fonti Caricate ({sources.filter(s => !s.isMemory).length}/{maxSources})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sources.filter(s => !s.isMemory).map((source) => (
+                <FileCard
+                  key={source.id}
+                  name={source.name}
+                  size={formatSize(source.size)}
+                  isMemory={source.isMemory}
+                  onRemove={() => handleRemove(source.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {sources.filter(s => !s.isMemory).length === 0 && (
+          <div className="flex-1 flex items-center justify-center text-center px-4">
+            <div className="max-w-md">
+              <p className="text-muted-foreground">
+                Nessuna fonte caricata. Trascina file qui sopra o clicca per selezionarli.
+              </p>
+              <p className="text-sm text-muted-foreground mt-2 opacity-70">
+                Le fonti sono temporanee e verranno rimosse al refresh della pagina.
+              </p>
+              <div className="mt-8 p-3 px-4 rounded-full bg-orange-500/5 text-orange-500/80 text-[10px] font-bold uppercase tracking-widest inline-block border border-orange-500/10">
+                ⚠ I modelli possono allucinare, verificare sempre i dati.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

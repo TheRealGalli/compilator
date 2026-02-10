@@ -9,11 +9,11 @@ export function LoginOverlay() {
     };
 
     return (
-        <div className="absolute inset-0 z-50 flex items-stretch bg-[#002aff]/95 backdrop-blur-sm animate-in fade-in duration-500">
+        <div className="absolute inset-0 z-50 flex items-stretch bg-[#002aff] animate-in fade-in duration-500">
             {/* LEFT COLUMN: Greeting (1/3) */}
-            <div className="flex-1 flex flex-col justify-center px-12 text-white border-r border-white/10">
-                <h1 className="text-4xl font-bold mb-4 tracking-tight">Benvenuto in Gromit</h1>
-                <p className="text-lg opacity-90 leading-relaxed max-w-md">
+            <div className="flex-1 flex flex-col justify-center p-8 text-white border-r border-white/10 overflow-hidden">
+                <h1 className="text-3xl font-bold mb-4 tracking-tight">Benvenuto in Gromit</h1>
+                <p className="text-base opacity-90 leading-relaxed">
                     La piattaforma avanzata per l'analisi e la compilazione dei tuoi documenti.
                     Accedi per iniziare a lavorare con la potenza dell'Intelligenza Artificiale.
                 </p>
@@ -32,7 +32,7 @@ export function LoginOverlay() {
                 {/* Subtle dynamic background effect could go here */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
-                <h2 className="text-2xl font-semibold text-white mb-8 z-10">Accedi al tuo account</h2>
+                <h2 className="text-2xl font-semibold text-white mb-8 z-10 text-center">Accedi al tuo account</h2>
 
                 <Button
                     size="lg"
@@ -43,13 +43,13 @@ export function LoginOverlay() {
                     Continua con Google
                 </Button>
 
-                <p className="mt-6 text-white/60 text-sm z-10">
+                <p className="mt-6 text-white/60 text-sm z-10 text-center">
                     Non serve password. Semplice e veloce.
                 </p>
             </div>
 
             {/* RIGHT COLUMN: Information & Links (1/3) */}
-            <div className="flex-1 flex flex-col justify-center px-12 border-l border-white/10 bg-black/10">
+            <div className="flex-1 flex flex-col justify-center p-8 border-l border-white/10 bg-black/10">
                 <h3 className="text-xl font-medium text-white mb-6 flex items-center gap-2">
                     <Info className="w-5 h-5" /> Informazioni
                 </h3>
@@ -57,32 +57,32 @@ export function LoginOverlay() {
                 <ul className="space-y-4 text-white/80">
                     <li>
                         <a href="#" className="flex items-center gap-3 hover:text-white hover:underline transition-colors group">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors shrink-0" />
                             Privacy Policy
                         </a>
                     </li>
                     <li>
                         <a href="#" className="flex items-center gap-3 hover:text-white hover:underline transition-colors group">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors shrink-0" />
                             Termini di Servizio
                         </a>
                     </li>
                     <li>
                         <a href="#" className="flex items-center gap-3 hover:text-white hover:underline transition-colors group">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors shrink-0" />
                             I Nostri Piani
                         </a>
                     </li>
                     <li>
                         <a href="#" className="flex items-center gap-3 hover:text-white hover:underline transition-colors group">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors shrink-0" />
                             Chi Siamo
                         </a>
                     </li>
                     <li>
                         <a href="#" className="flex items-center gap-3 hover:text-white hover:underline transition-colors group">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors" />
-                            <HelpCircle className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors shrink-0" />
+                            <HelpCircle className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity shrink-0" />
                             Supporto Clienti
                         </a>
                     </li>
