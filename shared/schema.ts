@@ -1,17 +1,21 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  googleId: text("google_id").unique(),
+  planTier: text("plan_tier", { enum: ['free', 'pro', 'enterprise'] }).default('free').notNull(),
+  usageMetrics: jsonb("usage_metrics").$type<{ total_compilations: number, last_reset: string }>().default({ total_compilations: 0, last_reset: new Date().toISOString() }),
+  subscriptionStatus: text("subscription_status").default('active'),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+  email: true,
+  googleId: true,
+  planTier: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

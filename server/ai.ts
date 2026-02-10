@@ -139,7 +139,7 @@ export class AiService {
 
                 // 2. BLACKLIST FILTER: Skip common Italian words misidentified as PII
                 if (value.length < 15 && this.italianBlacklist.has(value.toLowerCase())) {
-                    console.log(`[AiService] Skipping blacklisted finding: "${value}" (${infoType})`);
+                    console.log(`[AiService] Skipping blacklisted finding: [REDACTED] (${infoType})`);
                     continue;
                 }
 
@@ -164,7 +164,7 @@ export class AiService {
                     }
                     token = `[${typeKey}_${count + 1}]`;
                     vault.set(token, value);
-                    console.log(`[AiService] Created new token: ${token} -> ${value}`);
+                    console.log(`[AiService] Created new token: ${token} -> [REDACTED]`);
                 }
 
                 // Add text after the finding
@@ -296,7 +296,7 @@ ${text} [/INST]`;
                     }
                     token = `[${category}_${count + 1}]`;
                     vault.set(token, value);
-                    console.log(`[AiService] New vault entry (Ollama + Code): ${token} -> ${value}`);
+                    console.log(`[AiService] New vault entry (Ollama + Code): ${token} -> [REDACTED]`);
                 }
 
                 // Global replacement of the value with the token
@@ -747,7 +747,7 @@ Gromit, ricordati anche di divertirti! Buona fortuna."
 
             const candidate = result.response.candidates?.[0];
             const rawContent = candidate?.content?.parts?.map((p: any) => p.text || '').join('') || '';
-            console.log(`[AiService] Full Response:\n${rawContent}`);
+            console.log(`[AiService] Full Response received (Length: ${rawContent.length})`);
 
             // 1. EXTRACT THOUGHTS (Handling potential truncation)
             let thought = "Nessun ragionamento fornito.";

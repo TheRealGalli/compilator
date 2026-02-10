@@ -8,6 +8,10 @@ import express, {
 } from "express";
 import compression from "compression";
 import session from "express-session";
+import pgSession from "connect-pg-simple";
+import pg from "pg";
+const PgStore = pgSession(session);
+
 
 import { registerRoutes } from "./routes";
 
@@ -93,10 +97,20 @@ function createApp() {
   app.set('trust proxy', 1);
 
   // Configure session for OAuth storage
+  if (!process.env.DATABASE_URL) {
+    console.warn("DATABASE_URL not set, falling back to MemoryStore for session (NOT FOR PRODUCTION)");
+  }
+
   app.use(session({
+    store: process.env.DATABASE_URL ? new PgStore({
+      conObject: {
+        connectionString: process.env.DATABASE_URL,
+      },
+      createTableIfMissing: true
+    }) : undefined,
     secret: 'csd-station-gmail-session-secret',
-    resave: true, // Forcing resave to help session persistence
-    saveUninitialized: true, // Save empty sessions to ensure cookie is set
+    resave: false,
+    saveUninitialized: false,
     name: 'csd.sid', // Custom cookie name
     cookie: {
       secure: true, // MUST be true for SameSite: none

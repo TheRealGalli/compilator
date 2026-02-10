@@ -15,6 +15,13 @@ import * as cheerio from 'cheerio';
 import { chunkText, type ChunkedDocument, selectRelevantChunks, formatContextWithCitations, type DocumentChunk } from './rag-utils';
 import { google } from 'googleapis';
 import crypto from 'crypto';
+import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+
+import { db } from "./db"; // Used for session store if needed, but storage hides it
+import session from "express-session";
+import pgSession from "connect-pg-simple";
+import { checkLimit } from "./middleware/licensing";
 import { getPdfFormFields, proposePdfFieldValues, fillNativePdf } from './form-compiler-pro';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { getSecret } from './gcp-secrets';
@@ -91,6 +98,38 @@ const upload = multer({
     fileSize: MAX_FILE_SIZE_BYTES, // 20MB max (reduced from 50MB)
   },
 });
+
+/**
+ * Helper to get a configured OAuth2 client for backend calls (Gmail/Drive).
+ * Uses credentials from env or Secret Manager.
+ */
+async function getOAuth2Client() {
+  const { clientId, clientSecret } = await getGoogleCredentials();
+
+  if (!clientId || !clientSecret) {
+    console.warn("[OAuth] Credentials missing for backend calls.");
+    return new google.auth.OAuth2();
+  }
+
+  const redirectUri = process.env.NODE_ENV === 'production'
+    ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
+    : 'http://localhost:5001/api/auth/google/callback';
+
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+}
+
+// Ensure context length stays within limits for Gemini 1.5 Flash
+const MAX_CONTEXT_TOKENS = 120000; // Safe limit below 1M
+const ESTIMATED_CHARS_PER_TOKEN = 4;
+
+function enforceTokenLimit(context: string): string {
+  if (context.length < MAX_CONTEXT_TOKENS * ESTIMATED_CHARS_PER_TOKEN) {
+    return context;
+  }
+  // Truncate if too long (keep beginning and end usually, or just beginning)
+  console.warn(`[Token Limit] Truncating context of length ${context.length}`);
+  return context.substring(0, MAX_CONTEXT_TOKENS * ESTIMATED_CHARS_PER_TOKEN);
+}
 
 const BUCKET_NAME = process.env.GCP_STORAGE_BUCKET || 'notebooklm-compiler-files';
 
@@ -600,70 +639,91 @@ async function getDocumentsContext(selectedDocuments: string[]): Promise<string>
   return context;
 }
 
-// Google OAuth2 Config - placeholder to be initialized dynamically
-let oauth2Client: any = null;
+// Passport Setup
+passport.serializeUser((user: any, done) => {
+  done(null, user.id);
+});
 
-async function getOAuth2Client() {
-  if (oauth2Client) return oauth2Client;
+passport.deserializeUser(async (id: number, done) => {
+  try {
+    const user = await storage.getUser(id);
+    done(null, user);
+  } catch (err) {
+    done(err);
+  }
+});
 
-  // Rimuove spazi, virgolette, barre verticali e residui di URL encoding
-  const cleanKey = (key: string | undefined) => key?.replace(/[\s"'|]|%20/g, '');
+// Helper to ensure Google credentials exist
+const getGoogleCredentials = async () => {
+  let clientId = process.env.GOOGLE_CLIENT_ID;
+  let clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-  let clientId = cleanKey(process.env.GOOGLE_CLIENT_ID);
-  let clientSecret = cleanKey(process.env.GOOGLE_CLIENT_SECRET);
-  let source = 'environment variables';
-
-  if (process.env.NODE_ENV === 'production' && (!clientId || !clientSecret)) {
-    console.log('[OAuth] Missing credentials in environment, attempting Secret Manager fallback...');
+  if (!clientId || !clientSecret) {
     try {
-      if (!clientId) {
-        const secret = await getSecret('GOOGLE_CLIENT_ID');
-        clientId = cleanKey(secret);
-        if (clientId) source = 'Secret Manager';
-      }
-      if (!clientSecret) {
-        const secret = await getSecret('GOOGLE_CLIENT_SECRET');
-        clientSecret = cleanKey(secret);
-        if (clientSecret) source = 'Secret Manager';
-      }
-    } catch (e: any) {
-      console.error('[OAuth] Secret Manager retrieval failed:', e.message);
+      clientId = await getSecret('GOOGLE_CLIENT_ID');
+      clientSecret = await getSecret('GOOGLE_CLIENT_SECRET');
+    } catch (e) {
+      console.warn("[Auth] Failed to fetch secrets from Secret Manager");
     }
   }
+  return { clientId, clientSecret };
+};
 
-  if (clientId) {
-    const maskedId = `${clientId.substring(0, 10)}...${clientId.substring(clientId.length - 10)}`;
-    console.log(`[OAuth] Client ID from ${source}: ${maskedId} (Length: ${clientId.length})`);
-  } else {
-    console.warn('[OAuth] Client ID is MISSING');
+// Initialize Passport Strategy
+getGoogleCredentials().then(({ clientId, clientSecret }) => {
+  if (!clientId || !clientSecret) {
+    console.warn("[Auth] Skipping Google Strategy init - missing credentials");
+    return;
   }
 
-  if (clientSecret) {
-    const maskedSecret = `${clientSecret.substring(0, 5)}... (Total Length: ${clientSecret.length})`;
-    console.log(`[OAuth] Client Secret from ${source}: ${maskedSecret}`);
-  } else {
-    console.warn('[OAuth] Client Secret is MISSING');
-  }
+  passport.use(new GoogleStrategy({
+    clientID: clientId,
+    clientSecret: clientSecret,
+    callbackURL: process.env.NODE_ENV === 'production'
+      ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
+      : 'http://localhost:5001/api/auth/google/callback',
+    passReqToCallback: true
+  },
+    async (req, accessToken, refreshToken, profile, done) => {
+      try {
+        const email = profile.emails?.[0]?.value;
+        if (!email) return done(new Error("No email found in Google profile"));
 
-  const redirectUri = process.env.NODE_ENV === 'production'
-    ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
-    : 'http://localhost:5001/api/auth/google/callback';
+        let user = await storage.getUserByGoogleId(profile.id);
 
-  console.log(`[OAuth] Configured with Redirect URI: ${redirectUri}`);
+        if (!user) {
+          // Check if user exists by email to link (optional, security implication: account takeover if email not verified)
+          // Google emails are generally verified.
+          user = await storage.getUserByEmail(email);
+          if (user) {
+            // Link existing user? For now, we assume if googleId is missing but email exists, we might want to update it OR fail.
+            // Let's create new user if not found by GoogleID to avoid complexity, but usually we check email.
+            // Since we only have Google Auth now, creation is safe.
+          } else {
+            user = await storage.createUser({
+              email,
+              googleId: profile.id,
+              planTier: 'free'
+            });
+          }
+        }
 
-  oauth2Client = new google.auth.OAuth2(
-    clientId,
-    clientSecret,
-    redirectUri
-  );
+        // Store tokens in session for Gmail usage if needed (optional)
+        // (req.session as any).tokens = { access_token: accessToken, refresh_token: refreshToken }; 
 
-  return oauth2Client;
-}
+        return done(null, user);
+      } catch (err) {
+        return done(err as Error);
+      }
+    }
+  ));
+});
 
 const GOOGLE_SCOPES = [
-  'https://www.googleapis.com/auth/gmail.readonly',
-  'https://www.googleapis.com/auth/drive',
-  'https://www.googleapis.com/auth/drive.metadata.readonly'
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/gmail.readonly', // Keep existing function
+  'https://www.googleapis.com/auth/drive.readonly'  // Keep existing function
 ];
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -681,83 +741,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return null;
   };
 
-  // Gmail Auth Routes
-  app.get('/api/auth/google', async (req, res) => {
-    console.log(`[OAuth] Request to /api/auth/google from origin: ${req.headers.origin || 'unknown'}`);
-    const client = await getOAuth2Client();
+  // Initialize Passport Middleware
+  app.use(passport.initialize());
+  app.use(passport.session());
 
-    if (!client._clientId || !client._clientSecret) {
-      console.error('[OAuth] CRITICAL ERROR: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is not set.');
-      return res.status(500).json({
-        error: 'Configurazione OAuth mancante sul server. Assicurati che GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET siano impostate su Cloud Run o Secret Manager.'
-      });
-    }
+  // Gmail Auth Routes (Replaced with Passport)
+  app.get('/api/auth/google', passport.authenticate('google', { scope: GOOGLE_SCOPES }));
 
-    const redirectUri = process.env.NODE_ENV === 'production'
-      ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
-      : 'http://localhost:5001/api/auth/google/callback';
+  app.get('/api/auth/google/callback',
+    passport.authenticate('google', { failureRedirect: '/login?error=auth_failed' }),
+    (req, res) => {
+      // Successful authentication
+      // We can also send the script message if the frontend expects it for popup flow
+      // But standard redirect is better for Login
 
-    console.log('[OAuth] Generating URL with redirect_uri:', redirectUri);
-
-    const url = client.generateAuthUrl({
-      access_type: 'offline',
-      scope: GOOGLE_SCOPES,
-      prompt: 'consent',
-      redirect_uri: redirectUri
-    });
-
-    console.log('[OAuth] Generated URL:', url);
-    res.json({ url });
-  });
-
-  app.get('/api/auth/google/callback', async (req, res) => {
-    const client = await getOAuth2Client();
-    const { code } = req.query;
-    if (!code) return res.status(400).json({ error: 'Code missing' });
-
-    try {
-      const redirectUri = process.env.NODE_ENV === 'production'
-        ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
-        : 'http://localhost:5001/api/auth/google/callback';
-
-      try {
-        console.log('[OAuth] Exchanging code for tokens with Redirect URI:', redirectUri);
-        const { tokens } = await client.getToken({
-          code: code as string,
-          redirect_uri: redirectUri
-        });
-        console.log('[OAuth] Tokens successfully retrieved');
-        (req.session as any).tokens = tokens;
-
-        // Redirect back to connectors page with tokens in postMessage to survive session issues
-        res.send(`
+      // If purely using popup opener pattern:
+      res.send(`
         <script>
-          const tokens = ${JSON.stringify(tokens)};
-          window.opener.postMessage({ type: 'GMAIL_AUTH_SUCCESS', tokens: tokens }, '*');
+          const user = ${JSON.stringify(req.user)};
+          window.opener.postMessage({ type: 'AUTH_SUCCESS', user }, '*');
           window.close();
         </script>
       `);
-      } catch (error: any) {
-        const errorData = error.response?.data;
-        console.error('[OAuth] Token exchange FAILED:', errorData || error.message);
-        console.error('[OAuth] Error details:', JSON.stringify(errorData, null, 2));
-        res.status(500).send(`Authentication failed: ${error.message}`);
-      }
-    } catch (e: any) {
-      console.error('[OAuth] Outer callback error:', e.message);
-      res.status(500).send('Internal Server Error');
+    }
+  );
+
+  app.get('/api/auth/check', (req, res) => {
+    if (req.isAuthenticated()) {
+      res.json({ isConnected: true, user: req.user });
+    } else {
+      res.json({ isConnected: false });
     }
   });
 
-  app.get('/api/auth/check', (req, res) => {
-    // Check session or header (if provided in a test way, but check is usually for initial UI)
-    const isConnected = !!((req.session as any).tokens || req.headers['x-gmail-tokens']);
-    res.json({ isConnected });
+  app.post('/api/auth/logout', (req, res, next) => {
+    req.logout((err) => {
+      if (err) return next(err);
+      res.json({ success: true });
+    });
   });
 
-  app.post('/api/auth/logout', (req, res) => {
-    (req.session as any).tokens = null;
-    res.json({ success: true });
+  // User & License Routes
+  app.get('/api/user', (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    res.json(req.user);
   });
 
 
@@ -1648,7 +1675,7 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
     }
   });
 
-  app.post('/api/compile', async (req: Request, res: Response) => {
+  app.post('/api/compile', checkLimit('compilation'), async (req: Request, res: Response) => {
     try {
       const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations, activeGuardrails, guardrailVault } = req.body;
 
@@ -1861,6 +1888,11 @@ ISTRUZIONI OUTPUT:
         guardrailVault: Object.fromEntries(vault)
       });
 
+      // Increment usage count if middleware attached method
+      if ((req as any).incrementUsage) {
+        await (req as any).incrementUsage();
+      }
+
     } catch (error: any) {
       console.error('Errore durante compilazione:', error);
       res.status(500).json({
@@ -1870,11 +1902,11 @@ ISTRUZIONI OUTPUT:
   });
 
   // --- NEW: Refine / Chat Endpoint ---
-  app.post('/api/refine', async (req: Request, res: Response) => {
+  app.post('/api/refine', checkLimit('chat'), async (req: Request, res: Response) => {
     try {
       const { compileContext, currentContent, userInstruction, chatHistory, mentions, mentionRegistry, webResearch, guardrailVault: refinementVault } = req.body;
 
-      console.log(`[API refine] Request: "${userInstruction.substring(0, 50)}..." | Mentions: ${mentions?.length || 0} | Registry: ${mentionRegistry?.length || 0}`);
+      console.log(`[API refine] Request received | Mentions: ${mentions?.length || 0} | Registry: ${mentionRegistry?.length || 0}`);
 
       // Reconstruct Context
       const multimodalFiles = compileContext.sources || [];
@@ -2024,6 +2056,11 @@ ISTRUZIONI OPERATIVE:
         guardrailVault: Object.fromEntries(vault)
       });
 
+      // Increment usage count
+      if ((req as any).incrementUsage) {
+        await (req as any).incrementUsage();
+      }
+
     } catch (error: any) {
       console.error('Errore durante refine:', error);
       res.status(500).json({ error: error.message });
@@ -2094,7 +2131,7 @@ ISTRUZIONI OPERATIVE:
       const response = await result.response;
       let text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-      console.log(`[DEBUG Transcribe] Transcription result: ${text.substring(0, 50)}...`);
+      console.log(`[DEBUG Transcribe] Transcription result length: ${text.length} chars`);
 
       res.json({ text: text.trim() });
 
@@ -2191,7 +2228,7 @@ ISTRUZIONI OPERATIVE:
         return res.status(400).json({ error: 'Descrizione template richiesta' });
       }
 
-      console.log(`[DEBUG Template Gen]Request: ${prompt.substring(0, 50)}... Notes incl: ${!!notes} `);
+      console.log(`[DEBUG Template Gen]Request received. Notes incl: ${!!notes} `);
 
       // Initialize Vertex AI
       const project = process.env.GCP_PROJECT_ID;
@@ -3262,7 +3299,7 @@ ${filesContext}
       const response = await result.response;
       const text = response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('');
 
-      console.log('[API Identity] Extraction result:', text);
+      console.log(`[API Identity] Extraction result length: ${text.length}`);
 
       let identity = null;
       if (text) {
