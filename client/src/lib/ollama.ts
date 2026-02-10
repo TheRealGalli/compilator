@@ -176,6 +176,40 @@ async function getBridgeVersion(retries = 2): Promise<string> {
     return "0.0.0";
 }
 
+/**
+ * Helper to extract JSON from a potentially messy LLM response.
+ * Handles markdown blocks, pre-text, post-text, and raw JSON.
+ */
+function extractJsonFromResponse(text: string): any[] {
+    try {
+        // 1. Try direct parse
+        return JSON.parse(text);
+    } catch (e) {
+        // 2. Try extracting from markdown code blocks ```json ... ```
+        const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+            try {
+                return JSON.parse(jsonMatch[1]);
+            } catch (e2) {
+                console.warn("[OllamaLocal] JSON in markdown block failed parse:", e2);
+            }
+        }
+
+        // 3. Try finding the first '[' and last ']'
+        const start = text.indexOf('[');
+        const end = text.lastIndexOf(']');
+        if (start !== -1 && end !== -1 && end > start) {
+            try {
+                return JSON.parse(text.substring(start, end + 1));
+            } catch (e3) {
+                console.warn("[OllamaLocal] JSON bracket extraction failed parse:", e3);
+            }
+        }
+
+        return [];
+    }
+}
+
 // Validator Prompt for Strict Mode
 // Note: The actual prompt is now generated dynamically inside extractPIILocal
 
@@ -203,24 +237,30 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // User requested FULL DOCUMENT context.
     console.log(`[OllamaLocal] Sending FULL TEXT (${text.length} chars) to LLM...`);
 
-    const prompt = `MISSION: EXTRACT PII (EXACT MATCHES ONLY).
-I needs you to list every PII (Personal Identifiable Information) found in the text.
-RULES:
-1. EXTRACT EXACT SUBSTRINGS. Do not fix typos, do not reformat dates.
-2. If a name is "MARIO ROSSI", return "MARIO ROSSI".
-3. Ignore field labels like "Name:", "Date:". Extract only the VALUE.
+    // Prepare "Known Findings" string to guide the LLM
+    const knownValues = highConfidenceCandidates.map(c => c.value).join(", ");
 
-[TARGET ENTITIES]
-- NAMES (Person names, Signatories)
-- ADDRESSES (Street, City, Zip, State)
-- ORGANIZATIONS (Company names)
-- DATES (Birth, Signature)
-- CODES (Tax ID, SSN, VAT, IBAN)
-- CONTACTS (Email, Phone)
+    const prompt = `MISSION: EXTRACT **MISSING** PII (Personal Identifiable Information) from the text.
+I have already found these values: [${knownValues}].
+DO NOT return them again. Use them as context to find related fields (e.g. if you see a VAT number I found, look for the Company Name near it).
+
+**PRIORITY 1: ADDRESSES**
+You must find all addresses. Look for:
+- "Via", "Viale", "Piazza", "Corso", "Località"
+- "Residente a", "Domicilio", "Sede Legale"
+- Full address format: "Via Roma 1, 00100 Roma (RM)"
+
+PRIORITY 2: MISSING NAMES / ORGS
+- Find names NOT in the list above.
+- Find company names associated with the VAT numbers.
+
+RULES:
+1. EXTRACT EXACT SUBSTRINGS. Do not fix typos.
+2. Output JSON ONLY.
 
 [OUTPUT FORMAT]
-JSON Array only.
-[{"value": "Exact Text", "type": "CATEGORY"}]
+JSON Array: [{"value": "Exact Text", "type": "CATEGORY"}]
+Categories: ADDRESS, NAME, ORGANIZATION, DATE, CONTACT
 
 [TEXT TO ANALYZE]
 ${text}
@@ -233,7 +273,7 @@ ${text}
             stream: false,
             format: 'json',
             options: {
-                temperature: 0.0, // Zero temp for MAXIMUM PRECISION
+                temperature: 0.1, // Slight temp helps with formatting but keeps precision
                 num_ctx: 8192     // Optimized for 8GB RAM
             }
         };
@@ -241,52 +281,49 @@ ${text}
         const data = await _extractWithRetry(payload, 2);
         let findings: any[] = [];
 
-        try {
-            if (data.message?.content) {
-                console.log("[OllamaLocal] RAW LLM RESPONSE:", data.message.content.substring(0, 500) + "..."); // Valid Log
-                findings = extractJsonFromResponse(data.message.content);
-            } else {
-                console.warn("[OllamaLocal] Empty response content from LLM");
-            }
-
-            // AUTO-CORRECT: If findings is a single object { value: ... }, wrap it in an array.
-            if (findings && !Array.isArray(findings) && typeof findings === 'object') {
-                // @ts-ignore
-                if (findings.value) {
-                    findings = [findings];
-                    console.log("[OllamaLocal] Single object response wrapped in array.");
-                }
-            }
-
-            if (!Array.isArray(findings)) findings = [];
-        } catch (e) {
-            console.warn("[OllamaLocal] Failed to parse JSON response:", data.message?.content);
+        if (data.message?.content) {
+            console.log("[OllamaLocal] RAW LLM RESPONSE:", data.message.content.substring(0, 500) + "..."); // Valid Log
+            findings = extractJsonFromResponse(data.message.content);
+        } else {
+            console.warn("[OllamaLocal] Empty response content from LLM");
         }
+
+        // AUTO-CORRECT: If findings is a single object { value: ... }, wrap it in an array.
+        if (findings && !Array.isArray(findings) && typeof findings === 'object') {
+            // @ts-ignore
+            if (findings.value) {
+                findings = [findings];
+                console.log("[OllamaLocal] Single object response wrapped in array.");
+            }
+        }
+
+        if (!Array.isArray(findings)) findings = [];
+
+        console.log(`[OllamaLocal] LLM found ${findings.length} potential items.`);
 
         // Merge findings with STRICT VALIDATION
         for (const finding of findings) {
             if (finding.value && finding.value.length > 2) {
                 const val = finding.value.trim();
 
+                // Skip if we already found it via Regex (Triple check)
+                if (unifiedFindings.has(val)) continue;
+
                 // CRITICAL VALIDATION: Anti-Hallucination Check
-                // If the text does not contain the EXACT sub-string, we reject it.
-                // This prevents "Mario Rossi" if the text says "Mario Ross".
                 if (!text.includes(val)) {
                     console.warn(`[OllamaLocal] HALLUCINATION REJECTED: '${val}' not found in source text.`);
-                    // Relaxed Match attempt for simple spacing issues
-                    // if (text.replace(/\s+/g, ' ').includes(val.replace(/\s+/g, ' '))) { ... }
                     continue;
                 }
 
-                // Upsert: LLM context is usually better for 'Type' than Regex Low Confidence.
-                if (!unifiedFindings.has(val)) {
-                    unifiedFindings.set(val, finding.type);
-                }
+                // Add to findings
+                unifiedFindings.set(val, finding.type);
+                console.log(`[OllamaLocal] + NEW FINDING: ${val} (${finding.type})`);
             }
         }
 
     } catch (err) {
         console.error(`[OllamaLocal] Full Text Extraction failed:`, err);
+        // On fatal error, ensure we at least keep strict regex findings
     }
 
     // 3. Convert Map to Array
