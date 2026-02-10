@@ -27,7 +27,7 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick
       <div className="flex items-center gap-3">
         <div className="flex items-center -space-x-3 mr-2 cursor-pointer group" onClick={handleLogoClick}>
           <Asterisk
-            className={`text-blue-600 ${isSpinning ? 'animate-turbo-spin' : ''}`}
+            className={`text-blue-600 transition-transform duration-1000 ease-in-out ${isSpinning ? 'rotate-[360deg]' : 'rotate-0'}`}
             width={32}
             height={32}
             strokeWidth={3}
