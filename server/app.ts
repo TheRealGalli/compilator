@@ -67,7 +67,7 @@ function createApp() {
     }
 
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-gmail-tokens, Accept, Origin');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-gmail-tokens, x-session-id, x-session-data, Accept, Origin');
 
     if (req.method === 'OPTIONS') {
       console.log(`[DEBUG CORS] Handling OPTIONS for ${req.path}`);
