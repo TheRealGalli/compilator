@@ -286,7 +286,7 @@
 }
 
 .animate-turbo-spin {
-  animation: turbo-spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+  animation: turbo-spin 1s ease-in-out infinite;
   transform-origin: center;
   display: flex;
   align-items: center;
@@ -298,20 +298,12 @@
     transform: rotate(0deg);
   }
 
-  20% {
-    transform: rotate(180deg);
-  }
-
   50% {
-    transform: rotate(1800deg);
-  }
-
-  80% {
-    transform: rotate(3420deg);
+    transform: rotate(360deg);
   }
 
   100% {
-    transform: rotate(3600deg);
+    transform: rotate(0deg);
   }
 }
 
