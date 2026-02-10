@@ -755,9 +755,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/auth/google', passport.authenticate('google', { scope: LOGIN_SCOPES }));
 
   app.get('/api/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login?error=auth_failed' }),
+    passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL || 'https://therealgalli.github.io/compilator/'}?error=auth_failed` }),
     (req, res) => {
-      res.redirect('/');
+      // Standard Redirect Flow (Pass user to session)
+      // Redirect back to the frontend (GitHub Pages)
+      // Fallback to the known production URL if env is missing
+      const frontendUrl = process.env.FRONTEND_URL || 'https://therealgalli.github.io/compilator/';
+
+      console.log(`[Auth] Login successful for user: ${(req.user as any)?.email || 'unknown'}. Redirecting to: ${frontendUrl}`);
+
+      res.redirect(frontendUrl);
     }
   );
 

@@ -7,6 +7,8 @@ import { DocumentCompilerSection } from "@/components/DocumentCompilerSection";
 import { GeneratedContentSection } from "@/components/GeneratedContentSection";
 import { ConnectorsSection } from "../components/ConnectorsSection";
 import { useSources } from "@/contexts/SourcesContext";
+import { useQuery } from "@tanstack/react-query";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 type Section = "documents" | "chat" | "compiler" | "generated" | "connectors";
 
@@ -14,6 +16,13 @@ export default function Home() {
   const [activeSection, setActiveSection] = useState<Section>("documents");
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>('gemini');
   const { sources, removeSource, toggleSource, toggleMaster, toggleBypass } = useSources();
+
+  // Global Auth Loading Check to prevent "Login Flash"
+  const { isLoading: isLoadingAuth } = useQuery({
+    queryKey: ['/api/user'],
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const renderSection = () => {
     switch (activeSection) {
@@ -34,6 +43,8 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col overflow-x-auto overflow-y-hidden bg-background">
+      <LoadingScreen isVisible={isLoadingAuth} />
+
       <div className="min-w-[1360px] flex-1 flex flex-col overflow-hidden">
         <AppHeader notebookTitle="Gromit" onHomeClick={() => setActiveSection("documents")} />
         <div className="flex-1 flex overflow-hidden">

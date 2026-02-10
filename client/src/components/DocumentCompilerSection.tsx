@@ -282,7 +282,7 @@ export function DocumentCompilerSection({
   const [reportVault, setReportVault] = useState<Record<string, string>>({});
   const [reportVaultCounts, setReportVaultCounts] = useState<Record<string, number>>({});
   const [isWaitingForPawnApproval, setIsWaitingForPawnApproval] = useState(false);
-  const sourceTextCache = useRef<Array<{ name: string; text: string }>>([]);
+  const sourceTextCache = useRef<Array<{ name: string; text: string; originalText?: string }>>([]);
 
   const handleMention = (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => {
     setMentionCounts(prev => {
@@ -699,10 +699,10 @@ export function DocumentCompilerSection({
             }
 
             const rawDocs = [
-              ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent }] : []),
-              ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes }] : []),
-              ...(localExtractedSources || []),
-              ...(localExtractedMaster ? [localExtractedMaster] : [])
+              ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent, originalText: templateContent }] : []),
+              ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes, originalText: notes }] : []),
+              ...(localExtractedSources.map(s => ({ ...s, originalText: s.text })) || []),
+              ...(localExtractedMaster ? [{ ...localExtractedMaster, originalText: localExtractedMaster.text }] : [])
             ];
             // Deduplicate by name to avoid processing the same document twice
             const seenNames = new Set<string>();
