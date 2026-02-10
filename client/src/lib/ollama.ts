@@ -276,8 +276,9 @@ ${text}
             const lines = rawResponse.split('\n');
             for (const line of lines) {
                 // Regex to capture "KEY: VALUE"
-                // Matches: "NAME: Mario Rossi" or "Fiscal Code: GLL..."
-                const match = line.match(/^\s*([A-Za-z0-9_ ]+)\s*[:=]\s*(.+)\s*$/);
+                // Matches: "NAME: Mario Rossi", "P.IVA: 123", "INIZIO ATTIVITA': 01..."
+                // Now accepts dots, apostrophes, hyphens, and accented chars in the KEY
+                const match = line.match(/^\s*([A-Za-z0-9_ \-\.\'àèìòùÀÈÌÒÙ]+)\s*[:=]\s*(.+)\s*$/);
                 if (match) {
                     const key = match[1].trim().toUpperCase();
                     let val = match[2].trim();
@@ -326,13 +327,24 @@ ${text}
             if (finding.value && finding.value.length > 1) {
                 const val = finding.value.trim();
 
-                // Skip if we already found it via Regex (Triple check)
-                if (unifiedFindings.has(val)) continue;
+                // CHECK FOR DUPLICATES
+                if (unifiedFindings.has(val)) {
+                    const existing = unifiedFindings.get(val);
+                    // If existing is generic (label == type) and new is specific (label != type), UPGRADE IT
+                    if (existing && existing.label === existing.type && finding.label && finding.label !== finding.category) {
+                        console.log(`[OllamaLocal] UPGRADING duplicate: ${val} from [${existing.label}] to [${finding.label}]`);
+                        unifiedFindings.set(val, { type: finding.type, label: finding.label });
+                    } else {
+                        console.log(`[OllamaLocal] Skipping duplicate value: ${val} (Already mapped as ${existing?.label})`);
+                    }
+                    continue;
+                }
 
                 // Add to findings directly (Trusting the Model)
                 // Use the Captured Label if available, otherwise fallback to Type
-                unifiedFindings.set(val, { type: finding.type, label: finding.label || finding.type });
-                console.log(`[OllamaLocal] + NEW FINDING: ${val} (${finding.type}) [${finding.label}]`);
+                const finalLabel = finding.label || finding.type;
+                unifiedFindings.set(val, { type: finding.type, label: finalLabel });
+                console.log(`[OllamaLocal] + NEW FINDING: ${val} (${finding.type}) [Label: ${finalLabel}]`);
             }
         }
 
