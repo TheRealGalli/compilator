@@ -18,7 +18,7 @@ export default function Home() {
   const { sources, removeSource, toggleSource, toggleMaster, toggleBypass } = useSources();
 
   // Global Auth Loading Check to prevent "Login Flash"
-  const { isLoading: isLoadingAuth } = useQuery({
+  const { isFetched: isAuthAttempted } = useQuery({
     queryKey: ['/api/user'],
     retry: false,
     refetchOnWindowFocus: false,
@@ -43,7 +43,7 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col overflow-x-auto overflow-y-hidden bg-background">
-      <LoadingScreen isVisible={isLoadingAuth} />
+      <LoadingScreen isVisible={!isAuthAttempted} />
 
       <div className="min-w-[1360px] flex-1 flex flex-col overflow-hidden">
         <AppHeader notebookTitle="Gromit" onHomeClick={() => setActiveSection("documents")} />
