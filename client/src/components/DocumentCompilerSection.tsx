@@ -459,11 +459,23 @@ export function DocumentCompilerSection({
     // Replaces tokens [CAT_X] with their values
     for (const [token, value] of Object.entries(vault)) {
       // Escape token for regex (they contain brackets [NAME_1])
-      // We modify the regex to be lenient with spaces: \[ ?NAME_1 ?\]
       const coreToken = token.replace(/^\[|\]$/g, ''); // Extract 'NAME_1' from '[NAME_1]'
-      // Regex: \[ \s* NAME_1 \s* \]
-      const regex = new RegExp(`\\[\\s*${coreToken}\\s*\\]`, 'g');
-      result = result.replace(regex, value);
+
+      // ROBUST REGEX:
+      // 1. Escape special regex chars in coreToken
+      // 2. Replace underscores with pattern matching underscores OR spaces/dashes
+      const flexibleTokenPattern = coreToken
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // Escape regex chars
+        .replace(/_/g, '[_\\s\\-]+'); // Allow _ or space or -
+
+      // Regex: \[ \s* FLEXIBLE_TOKEN \s* \]
+      // Flags: 'gi' (Global + Case Insensitive)
+      const regex = new RegExp(`\\[\\s*${flexibleTokenPattern}\\s*\\]`, 'gi');
+
+      if (regex.test(result)) {
+        console.log(`[Pawn] Restoring '${token}' -> '${value}' (Matches found: ${result.match(regex)?.length})`);
+        result = result.replace(regex, value);
+      }
     }
     return result;
   };
@@ -1020,6 +1032,8 @@ export function DocumentCompilerSection({
 
         // Restoration of original values for the user (Reverse Sweep)
         let finalContent = sanitizedContent;
+        console.log('[DocumentCompiler] Raw Content from LLM (First 500 chars):', sanitizedContent.substring(0, 500));
+
         if (activeGuardrails.includes('pawn')) {
           finalContent = performMechanicalReverseSweep(sanitizedContent, guardrailVault);
           console.log('[DocumentCompiler] De-anonymization complete.');
