@@ -650,9 +650,9 @@ export function DocumentsSection() {
       </div>
 
       <div className="relative">
-        {!isAuthenticated && !isLoadingAuth && <LoginOverlay />}
+        {!isAuthenticated && <LoginOverlay />}
 
-        <div className={!isAuthenticated && !isLoadingAuth ? "opacity-30 pointer-events-none filter blur-sm transition-all duration-500" : ""}>
+        <div className={!isAuthenticated ? "opacity-20 pointer-events-none filter blur-md transition-all duration-500" : ""}>
           <FileUploadZone
             onFilesSelected={handleFilesSelected}
             disabled={isUploading || !isAuthenticated}

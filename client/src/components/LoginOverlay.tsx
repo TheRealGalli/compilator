@@ -82,7 +82,7 @@ export function LoginOverlay() {
                     <li>
                         <a href="#" className="flex items-center gap-3 hover:text-white hover:underline transition-colors group">
                             <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors" />
-                            <HelpCircle className="w-4 h-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <HelpCircle className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" />
                             Supporto Clienti
                         </a>
                     </li>
