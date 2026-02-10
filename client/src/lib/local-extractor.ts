@@ -127,7 +127,7 @@ async function extractPdfText(file: File): Promise<string> {
 
     // DEBUG: Print start of text to check quality
     const finalContent = cleanText(fullText + formText);
-    console.log(`[LocalExtractor] Extracted Text Preview (First 200 chars):\n${finalContent.substring(0, 200)}...`);
+    console.log(`[LocalExtractor] Extracted Text Preview (Full):\n${finalContent}`);
     return finalContent;
 }
 
