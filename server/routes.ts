@@ -2897,7 +2897,7 @@ ${filesContext}
 
 **STRUMENTO CODE EXECUTION (Python):**
 - Hai a disposizione uno strumento di esecuzione codice Python. Valuta se utilizzarlo quando devi: verificare somme, calcolare percentuali, IVA, ritenute, conversioni, o manipolare dati strutturati.
-- NON sei obbligato a usarlo sempre: se il calcolo è banale (es. 2+2), rispondi direttamente. Se è complesso o richiede precisione (es. sommare 15 voci, calcolare percentuali composite), USA lo strumento per garantire accuratezza.
+- **PREFERENZA ESECUZIONE (FONDAMENTALE)**: Ogni volta che devi eseguire dei calcoli matematici, conteggi, verifiche di somme o operazioni finanziarie, **DEVI PREFERIRE SEMPRE SE ATTIVATO** l'utilizzo dello strumento di esecuzione codice Python piuttosto che eseguirli mentalmente. Questo garantisce precisione e affidabilità dei dati forniti all'utente, specialmente per calcoli complessi o che coinvolgono dati estratti dalle fonti.
 `;
 
       if (webResearch) {
@@ -3146,8 +3146,13 @@ ${filesContext}
         const lowerMsg = lastUserMsg.content.toLowerCase();
         // Updated keywords to be action-oriented to avoid false positives on "Analyze this file"
         const fileKeywords = ['scarica', 'download', 'crea un file', 'genera file', 'generate file', 'export', 'dammi il pdf', 'dammi il docx', 'dammi il json', 'voglio il file', 'aggiorna', 'modifica', 'update', 'sovrascrivi', 'save to drive', 'salva su drive'];
-        if (!webResearch && fileKeywords.some(kw => lowerMsg.includes(kw))) {
-          console.log('[API Chat] File intent detected in user query -> FORCING tool mode to ANY');
+        const calculationKeywords = ['calcola', 'totale', 'somma', 'fai la somma', 'conteggio', 'percentuale', 'iva', 'ritenuta'];
+
+        if (!webResearch && (
+          fileKeywords.some(kw => lowerMsg.includes(kw)) ||
+          (userToolMode === 'run' && calculationKeywords.some(kw => lowerMsg.includes(kw)))
+        )) {
+          console.log('[API Chat] File or Calculation intent detected in user query -> FORCING tool mode to ANY');
           toolMode = 'ANY';
         }
       }

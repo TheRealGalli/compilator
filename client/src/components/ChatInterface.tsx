@@ -500,7 +500,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={!isAuthenticated ? "Fai una domanda (Funzioni avanzate disabilitate)..." : webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione audio..." : "Fai una domanda sui tuoi documenti..."}
+                placeholder={!isAuthenticated ? "Fai una domanda.." : webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione audio..." : "Fai una domanda sui tuoi documenti..."}
                 className="resize-none min-h-[60px]"
                 data-testid="input-chat"
                 disabled={isRecording || isTranscribing}
