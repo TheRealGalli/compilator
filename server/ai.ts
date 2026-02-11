@@ -433,12 +433,15 @@ ${text} [/INST]`;
                 }
             } : undefined;
 
+            // NOTE: Vertex AI does NOT allow mixing codeExecution with googleSearch.
+            // Only enable Code Execution when web research is OFF.
+            const finalTools = params.webResearch
+                ? tools  // Web Research mode: googleSearch only
+                : [...tools, { codeExecution: {} }]; // Standard mode: function declarations + code execution
+
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],
-                tools: [
-                    ...tools,
-                    { codeExecution: {} } // Enable native code execution for calculations/validation
-                ],
+                tools: finalTools,
                 toolConfig,
                 generationConfig: {
                     maxOutputTokens: 50000,

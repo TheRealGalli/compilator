@@ -3101,24 +3101,27 @@ ${filesContext}
         ]
       }];
 
-      // Initialize tools array based on Web Research toggle (Mutually Exclusive for main toolsets)
-      let tools: any[] = [{ codeExecution: {} }]; // Code Execution is now a native MUST-HAVE in all modes
+      // Initialize tools array based on Web Research toggle (Mutually Exclusive)
+      // NOTE: Vertex AI does NOT allow mixing codeExecution with googleSearch or functionDeclarations.
+      // Code Execution is only available in Guest Mode (no other tools).
+      let tools: any[] = [];
 
       if (webResearch && isAuthenticated) {
-        // MODE: Web Research ON -> Google Search + Code Execution
-        console.log('[API Chat] Web Research IS ACTIVE. Enabling Search + Code Execution.');
-        tools.push({ googleSearch: {} });
+        // MODE: Web Research ON -> Only Google Search allowed
+        console.log('[API Chat] Web Research IS ACTIVE. Enabling Search ONLY.');
+        tools = [{ googleSearch: {} }];
       } else if (driveMode && isAuthenticated) {
-        // MODE: Drive Mode ON -> Drive tools + Code Execution
-        console.log('[API Chat] Drive Mode IS ACTIVE. Enabling Drive Tools + Code Execution.');
-        tools.push(...driveTools);
+        // MODE: Drive Mode ON -> Only Drive tools allowed
+        console.log('[API Chat] Drive Mode IS ACTIVE. Enabling Drive Tools ONLY.');
+        tools = driveTools;
       } else if (isAuthenticated) {
-        // MODE: Standard -> File Generation Tools + Code Execution
-        console.log('[API Chat] Standard Mode. Enabling File Generation Tools + Code Execution.');
-        tools.push(...standardGenerationTools);
+        // MODE: Standard -> File Generation Tools allowed
+        console.log('[API Chat] Standard Mode. Enabling File Generation Tools.');
+        tools = standardGenerationTools;
       } else {
-        // GUEST MODE -> Only Code Execution for guests
-        console.log('[API Chat] Guest Mode. Tools restricted to Code Execution.');
+        // GUEST MODE -> Code Execution only (no conflict since no other tools)
+        console.log('[API Chat] Guest Mode. Enabling Code Execution only.');
+        tools = [{ codeExecution: {} }];
       }
 
       // --- KEYWORD HEURISTIC FORCED TOOL MODE ---
