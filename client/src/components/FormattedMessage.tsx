@@ -17,33 +17,70 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
     // Helper to format inline text (bold **...**)
     const formatInline = (text: string, lineIndex: number | string) => {
         const parts: (string | JSX.Element)[] = [];
-        const currentText = text;
+        let currentText = text;
         let keyCounter = 0;
 
-        // We'll replace bold first, then handle checkboxes within the remaining parts
-        const boldRegex = /\*\*(.+?)\*\*/g;
-        let lastIndex = 0;
-        let match;
+        // 1. Handle Inline Math ($...$)
+        const mathRegex = /\$([^$]+)\$/g;
+        let lastMathIdx = 0;
+        let mathMatch;
+        let mathCounter = 0;
 
-        while ((match = boldRegex.exec(currentText)) !== null) {
-            if (match.index > lastIndex) {
-                const textPart = currentText.substring(lastIndex, match.index);
-                parts.push(...renderLinks(textPart, `text-${lineIndex}-${keyCounter++}`));
+        // Collect math parts first
+        const mathSegments: { type: 'text' | 'math', content: string, key: string }[] = [];
+        while ((mathMatch = mathRegex.exec(currentText)) !== null) {
+            if (mathMatch.index > lastMathIdx) {
+                mathSegments.push({ type: 'text', content: currentText.substring(lastMathIdx, mathMatch.index), key: `math-text-${lineIndex}-${keyCounter++}` });
             }
-            parts.push(
-                <strong key={`bold-${lineIndex}-${keyCounter++}`} className="font-semibold text-foreground">
-                    {formatInline(match[1], `bold-inner-${lineIndex}-${keyCounter}`)}
-                </strong>
-            );
-            lastIndex = match.index + match[0].length;
+            mathSegments.push({ type: 'math', content: mathMatch[1], key: `math-${lineIndex}-${mathCounter++}` });
+            lastMathIdx = mathMatch.index + mathMatch[0].length;
         }
 
-        if (lastIndex < currentText.length) {
-            const textPart = currentText.substring(lastIndex);
-            parts.push(...renderLinks(textPart, `text-end-${lineIndex}-${keyCounter++}`));
+        if (lastMathIdx < currentText.length) {
+            mathSegments.push({ type: 'text', content: currentText.substring(lastMathIdx), key: `math-text-end-${lineIndex}-${keyCounter++}` });
         }
 
-        return parts.length > 0 ? parts : currentText;
+        if (mathSegments.length === 0) {
+            // No math found, treat the whole text as a single segment
+            mathSegments.push({ type: 'text', content: currentText, key: `full-text-${lineIndex}-${keyCounter++}` });
+        }
+
+        // Process each segment for bolding and links
+        for (const segment of mathSegments) {
+            if (segment.type === 'math') {
+                parts.push(
+                    <span key={segment.key} className="font-serif italic text-blue-800 bg-blue-50/50 px-0.5 rounded">
+                        {segment.content}
+                    </span>
+                );
+            } else {
+                // 2. Handle Bold (**...**) within the text segment
+                const boldRegex = /\*\*(.+?)\*\*/g;
+                let lastBoldIdx = 0;
+                let boldMatch;
+                const segmentText = segment.content;
+
+                while ((boldMatch = boldRegex.exec(segmentText)) !== null) {
+                    if (boldMatch.index > lastBoldIdx) {
+                        const textPart = segmentText.substring(lastBoldIdx, boldMatch.index);
+                        parts.push(...renderLinks(textPart, `text-${lineIndex}-${keyCounter++}`));
+                    }
+                    parts.push(
+                        <strong key={`bold-${lineIndex}-${keyCounter++}`} className="font-semibold text-foreground">
+                            {formatInline(boldMatch[1], `bold-inner-${lineIndex}-${keyCounter}`)}
+                        </strong>
+                    );
+                    lastBoldIdx = boldMatch.index + boldMatch[0].length;
+                }
+
+                if (lastBoldIdx < segmentText.length) {
+                    const textPart = segmentText.substring(lastBoldIdx);
+                    parts.push(...renderLinks(textPart, `text-end-${lineIndex}-${keyCounter++}`));
+                }
+            }
+        }
+
+        return parts.length > 0 ? parts : [currentText]; // Return an array of elements or the original text wrapped in an array
     };
 
     // Helper to render links [text](url)
