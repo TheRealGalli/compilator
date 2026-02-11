@@ -431,15 +431,20 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => {
-                      if (webResearch || isDriveMode) return;
+                      if (webResearch || isDriveMode) {
+                        // Re-activate: disable Web Research / Drive Mode
+                        setWebResearch(false);
+                        setIsDriveMode(false);
+                        return;
+                      }
                       setToolMode(toolMode === 'allegati' ? 'run' : 'allegati');
                     }}
-                    disabled={isLoading || webResearch || isDriveMode}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${webResearch || isDriveMode
-                        ? 'opacity-40 cursor-not-allowed bg-muted text-muted-foreground'
-                        : toolMode === 'run'
-                          ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
-                          : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                    disabled={isLoading}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${webResearch || isDriveMode
+                      ? 'opacity-50 bg-muted text-muted-foreground hover:opacity-70'
+                      : toolMode === 'run'
+                        ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                       }`}
                   >
                     {webResearch || isDriveMode ? (
