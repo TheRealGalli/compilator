@@ -2875,8 +2875,9 @@ Ti trovi in **Modalità Ospite**.
 
 **REGOLE IN MODALITÀ OSPITE:**
 1. **No Drive/Web**: Non hai accesso a Google Drive o alla ricerca web in questa modalità.
-2. **No Generation**: Non puoi generare file scaricabili (PDF/DOCX) come ospite.
-3. **Limite Risposta**: Le tue risposte devono essere complete e esaustive, ma NON superare mai i **25.000 caratteri** per risposta. Adatta la lunghezza al contenuto richiesto mantenendo questo tetto massimo.
+2. **Generazione File**: Puoi generare file scaricabili (PDF, DOCX, MD, JSONL, LaTeX) quando l'utente è in modalità Allegati.
+3. **Code Execution**: Puoi eseguire codice Python per calcoli e validazione quando l'utente è in modalità Run.
+4. **Limite Risposta**: Le tue risposte devono essere complete e esaustive, ma NON superare mai i **25.000 caratteri** per risposta. Adatta la lunghezza al contenuto richiesto mantenendo questo tetto massimo.
 
 **FONTI CARICATE (SESSIONE CORRENTE):**
 ${sources.map((s: any) => `- ${s.name} (${s.type})`).join('\n')}
@@ -3131,13 +3132,10 @@ ${filesContext}
       } else if (userToolMode === 'run') {
         console.log('[API Chat] Tool Mode: RUN. Enabling Code Execution.');
         tools = [{ codeExecution: {} }];
-      } else if (isAuthenticated) {
+      } else {
+        // Allegati mode (both authenticated and guest)
         console.log('[API Chat] Tool Mode: ALLEGATI. Enabling File Generation Tools.');
         tools = standardGenerationTools;
-      } else {
-        // Guest with allegati mode -> no tools (guest can't generate files)
-        console.log('[API Chat] Guest Mode, no file tools. Tools empty.');
-        tools = [];
       }
 
       // --- KEYWORD HEURISTIC FORCED TOOL MODE ---
