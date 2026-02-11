@@ -14,47 +14,46 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
     const lines = content.split('\n');
     const elements: JSX.Element[] = [];
 
-    // Helper to format inline text (bold **...** and math $...$)
+    // Helper to format inline text (bold **...**, math $...$, links [...](...))
     const formatInline = (text: string, lineIndex: number | string) => {
         const parts: (string | JSX.Element)[] = [];
         let currentText = text;
         let keyCounter = 0;
 
         // 1. Handle Inline Math ($...$)
-        // We look for $...$ but avoid matching if it looks like currency (e.g. $100) - simple check: space after opening $
-        // Better regex: \$([^$]+)\$ matches content between $ signs. 
-        // We use a specific regex to avoid matching currency like $50. Context matters.
-        // For simplicity in this context, we assume $...$ is math if not followed by a digit immediately or if clearly paired.
-        // Let's stick to the previous regex but use KaTeX for rendering.
-        const mathRegex = /\$([^$]+)\$/g;
+        // We look for $...$ but avoid matching if it looks like currency (e.g. $100)
+        // Regex: \$([^$\n]+?)\$  -> Non-greedy match, no newlines allowed in inline math
+        const mathRegex = /\$([^$\n]+?)\$/g;
         let lastMathIdx = 0;
         let mathMatch;
         let mathCounter = 0;
 
-        // Collect math parts first
-        const mathSegments: { type: 'text' | 'math', content: string, key: string }[] = [];
+        // Collect parts
+        const segments: { type: 'text' | 'math' | 'bold' | 'link', content: string, key: string }[] = [];
+
+        // We process ONLY math first, because math can contain characters that look like other markdown
         while ((mathMatch = mathRegex.exec(currentText)) !== null) {
-            // Simple heuristic to avoid currency: if capture group starts with a digit and has no spaces, ignore? 
-            // Only strictly if user typed $100. But $E=mc^2$ works. 
-            // Let's rely on KaTeX to throw or render.
-            if (mathMatch.index > lastMathIdx) {
-                mathSegments.push({ type: 'text', content: currentText.substring(lastMathIdx, mathMatch.index), key: `math-text-${lineIndex}-${keyCounter++}` });
+            // Check if it looks like currency: $ followed by digit
+            if (mathMatch[1].match(/^\d/)) {
+                continue; // Skip, treat as text
             }
-            mathSegments.push({ type: 'math', content: mathMatch[1], key: `math-${lineIndex}-${mathCounter++}` });
+
+            if (mathMatch.index > lastMathIdx) {
+                segments.push({ type: 'text', content: currentText.substring(lastMathIdx, mathMatch.index), key: `text-pre-${lineIndex}-${keyCounter++}` });
+            }
+            segments.push({ type: 'math', content: mathMatch[1], key: `math-${lineIndex}-${mathCounter++}` });
             lastMathIdx = mathMatch.index + mathMatch[0].length;
         }
-
         if (lastMathIdx < currentText.length) {
-            mathSegments.push({ type: 'text', content: currentText.substring(lastMathIdx), key: `math-text-end-${lineIndex}-${keyCounter++}` });
+            segments.push({ type: 'text', content: currentText.substring(lastMathIdx), key: `text-rem-${lineIndex}-${keyCounter++}` });
         }
 
-        if (mathSegments.length === 0) {
-            // No math found, treat the whole text as a single segment
-            mathSegments.push({ type: 'text', content: currentText, key: `full-text-${lineIndex}-${keyCounter++}` });
+        if (segments.length === 0) {
+            segments.push({ type: 'text', content: currentText, key: `text-full-${lineIndex}-${keyCounter++}` });
         }
 
-        // Process each segment for bolding and links
-        for (const segment of mathSegments) {
+        // Now process text segments for Bold and Links
+        for (const segment of segments) {
             if (segment.type === 'math') {
                 try {
                     const html = katex.renderToString(segment.content, {
@@ -65,44 +64,37 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                         <span
                             key={segment.key}
                             dangerouslySetInnerHTML={{ __html: html }}
-                            className="inline-math"
+                            className="inline-math text-base mx-1"
                         />
                     );
                 } catch (e) {
-                    // Fallback if KaTeX fails
-                    parts.push(
-                        <span key={segment.key} className="font-serif italic text-blue-800 bg-blue-50/50 px-0.5 rounded">
-                            ${segment.content}$
-                        </span>
-                    );
+                    parts.push(<span key={segment.key} className="text-red-500 text-xs">${segment.content}$</span>);
                 }
             } else {
-                // 2. Handle Bold (**...**) within the text segment
+                // Process Bold (**...**)
                 const boldRegex = /\*\*(.+?)\*\*/g;
                 let lastBoldIdx = 0;
                 let boldMatch;
-                const segmentText = segment.content;
+                const text = segment.content;
 
-                while ((boldMatch = boldRegex.exec(segmentText)) !== null) {
+                while ((boldMatch = boldRegex.exec(text)) !== null) {
                     if (boldMatch.index > lastBoldIdx) {
-                        const textPart = segmentText.substring(lastBoldIdx, boldMatch.index);
-                        parts.push(...renderLinks(textPart, `text-${lineIndex}-${keyCounter++}`));
+                        parts.push(...renderLinks(text.substring(lastBoldIdx, boldMatch.index), `link-${lineIndex}-${keyCounter++}`));
                     }
                     parts.push(
-                        <strong key={`bold-${lineIndex}-${keyCounter++}`} className="font-semibold text-foreground">
-                            {formatInline(boldMatch[1], `bold-inner-${lineIndex}-${keyCounter}`)}
+                        <strong key={`bold-${lineIndex}-${keyCounter++}`} className="font-bold text-foreground">
+                            {formatInline(boldMatch[1], `nested-${lineIndex}-${keyCounter}`)}
                         </strong>
                     );
                     lastBoldIdx = boldMatch.index + boldMatch[0].length;
                 }
-
-                if (lastBoldIdx < segmentText.length) {
-                    const textPart = segmentText.substring(lastBoldIdx);
-                    parts.push(...renderLinks(textPart, `text-end-${lineIndex}-${keyCounter++}`));
+                if (lastBoldIdx < text.length) {
+                    parts.push(...renderLinks(text.substring(lastBoldIdx), `link-end-${lineIndex}-${keyCounter++}`));
                 }
             }
         }
 
+        // Flatten if needed, or return array
         return parts.length > 0 ? parts : [currentText];
     };
 
@@ -119,18 +111,15 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                 linkParts.push(text.substring(lastIdx, match.index));
             }
 
-            const linkText = match[1];
-            const linkUrl = match[2];
-
             linkParts.push(
                 <a
-                    key={`${baseKey}-link-${counter++}`}
-                    href={linkUrl}
+                    key={`${baseKey}-${counter++}`}
+                    href={match[2]}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline font-medium break-all"
+                    className="text-blue-600 hover:underline font-medium"
                 >
-                    {linkText}
+                    {match[1]}
                 </a>
             );
             lastIdx = match.index + match[0].length;
@@ -139,16 +128,61 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         if (lastIdx < text.length) {
             linkParts.push(text.substring(lastIdx));
         }
-
         return linkParts;
     };
+
 
     let i = 0;
     while (i < lines.length) {
         const line = lines[i].trim();
 
-        // 0. Detect Code Blocks (```) or Math Blocks ($$)
-        // We treat ```latex as math block now, and also support $$ ... $$ if found on one line or multiline
+        // 1. Detect Block Math ($$ ... $$) - Single and Multi-line
+        if (line.startsWith('$$')) {
+            let mathContent = '';
+            let j = i;
+
+            // Single line $$ ... $$
+            if (line.endsWith('$$') && line.length > 4) {
+                mathContent = line.slice(2, -2).trim();
+                j = i; // same line
+            } else {
+                // Multi-line $$ ...
+                // Collect lines until we find $$
+                const blockLines: string[] = [];
+                if (line.length > 2) blockLines.push(line.slice(2)); // Content after initial $$
+                j++;
+
+                while (j < lines.length) {
+                    const nextLine = lines[j].trim();
+                    if (nextLine.endsWith('$$')) {
+                        if (nextLine.length > 2) blockLines.push(nextLine.slice(0, -2));
+                        break;
+                    } else if (nextLine === '$$') {
+                        break;
+                    }
+                    blockLines.push(lines[j]); // preserve standard indentation logic if needed, but here we trim usually OK for math
+                    j++;
+                }
+                mathContent = blockLines.join('\n');
+            }
+
+            try {
+                const html = katex.renderToString(mathContent, {
+                    throwOnError: false,
+                    displayMode: true
+                });
+                elements.push(
+                    <div key={`math-display-${i}`} className="my-6 overflow-x-auto flex justify-center p-2 rounded hover:bg-muted/30 transition-colors" dangerouslySetInnerHTML={{ __html: html }} />
+                );
+            } catch (e) {
+                // Fallback detection
+                elements.push(<div key={`math-error-${i}`} className="text-red-500 font-mono text-sm p-4 border border-red-200 rounded block">{mathContent}</div>);
+            }
+            i = j + 1;
+            continue;
+        }
+
+        // 2. Detect Code Blocks (```) including ```latex
         if (line.startsWith('```')) {
             const lang = line.slice(3).trim().toLowerCase();
             const codeLines: string[] = [];
@@ -158,11 +192,9 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                 j++;
             }
 
-            const isLatex = lang === 'latex' || lang === 'tex';
-            // Also check for 'math' language just in case
-            const isMath = isLatex || lang === 'math';
+            const isLatex = lang === 'latex' || lang === 'tex' || lang === 'math';
 
-            if (isMath) {
+            if (isLatex) {
                 const latexContent = codeLines.join('\n');
                 try {
                     const html = katex.renderToString(latexContent, {
@@ -170,13 +202,12 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                         displayMode: true
                     });
                     elements.push(
-                        <div key={`math-block-${i}`} className="my-4 overflow-x-auto p-4 flex justify-center bg-gray-50/50 rounded-lg border border-gray-100/50" dangerouslySetInnerHTML={{ __html: html }} />
+                        <div key={`math-block-${i}`} className="my-6 overflow-x-auto flex justify-center p-4 bg-gray-50/50 rounded-lg border border-gray-100/50" dangerouslySetInnerHTML={{ __html: html }} />
                     );
                 } catch (e) {
-                    // Fallback
                     elements.push(
-                        <div key={`code-${i}`} className={cn("my-4 relative group bg-blue-50/30 rounded-xl border-blue-100 shadow-sm")}>
-                            <pre className="p-4 bg-transparent border-none text-center italic text-blue-900 overflow-x-visible whitespace-pre-wrap select-all font-serif italic text-base">
+                        <div key={`code-${i}`} className="my-4 relative group">
+                            <pre className="p-4 bg-muted/40 rounded-lg border border-border overflow-x-auto text-xs font-mono">
                                 <code>{latexContent}</code>
                             </pre>
                         </div>
@@ -198,54 +229,23 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             continue;
         }
 
-        // Detect explicit display math $$ ... $$
-        if (line.startsWith('$$') && line.endsWith('$$') && line.length > 4) {
-            const mathContent = line.slice(2, -2).trim();
-            try {
-                const html = katex.renderToString(mathContent, {
-                    throwOnError: false,
-                    displayMode: true
-                });
-                elements.push(
-                    <div key={`display-math-${i}`} className="my-4 overflow-x-auto p-4 flex justify-center" dangerouslySetInnerHTML={{ __html: html }} />
-                );
-                i++;
-                continue;
-            } catch (e) {
-                // ignore, fallback to text
-            }
-        }
-
-        // 1. Detect Tables (| col | col ...)
-        // More lenient detection: line starts with | or contains at least two pipes
+        // 3. Tables
         const isTableLine = (str: string) => str.trim().startsWith('|') || (str.split('|').length > 2);
-
         if (isTableLine(line)) {
             const tableRows: string[][] = [];
             let j = i;
-
             while (j < lines.length) {
                 const rawLine = lines[j].trim();
                 if (!isTableLine(rawLine)) break;
-
-                // Skip separator lines (| --- | --- | or --- | ---)
-                // Also skip lines that are just dashes/colon inside pipes
-                if (rawLine.match(/^[|\s\-:.]+$/)) {
-                    j++;
-                    continue;
-                }
+                if (rawLine.match(/^[|\s\-:.]+$/)) { j++; continue; }
 
                 let cells = rawLine.split('|');
-                // Remove first and last empty elements if they exist (standard |cell| format)
                 if (cells[0] === '') cells.shift();
                 if (cells[cells.length - 1] === '') cells.pop();
 
-                if (cells.length > 0) {
-                    tableRows.push(cells.map(c => c.trim()));
-                }
+                if (cells.length > 0) tableRows.push(cells.map(c => c.trim()));
                 j++;
             }
-
             if (tableRows.length > 0) {
                 elements.push(
                     <div key={`table-${i}`} className="my-4 overflow-x-auto rounded-lg border border-border shadow-sm">
@@ -253,7 +253,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                             <thead>
                                 <tr className="bg-muted/50 border-b border-border">
                                     {tableRows[0].map((cell, idx) => (
-                                        <th key={`th-${idx}`} className="p-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                        <th key={`th-${idx}`} className="p-3 text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
                                             {formatInline(cell, `th-${i}-${idx}`)}
                                         </th>
                                     ))}
@@ -263,7 +263,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                                 {tableRows.slice(1).map((row, rowIdx) => (
                                     <tr key={`tr-${rowIdx}`} className="hover:bg-muted/30 transition-colors">
                                         {row.map((cell, colIdx) => (
-                                            <td key={`td-${colIdx}`} className="p-3 text-sm">
+                                            <td key={`td-${colIdx}`} className="p-3 text-sm min-w-[100px]">
                                                 {formatInline(cell, `td-${i}-${rowIdx}-${colIdx}`)}
                                             </td>
                                         ))}
@@ -278,7 +278,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             }
         }
 
-        // 2. Detect Headers
+        // 4. Headers
         const headerMatch = line.match(/^(#{1,6})\s+(.*)/);
         if (headerMatch) {
             const [, hashes, title] = headerMatch;
@@ -286,7 +286,6 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             const sizeClass = level === 1 ? "text-2xl font-bold mt-8 mb-4 border-b border-border pb-2" :
                 level === 2 ? "text-xl font-bold mt-6 mb-3 border-b border-border/50 pb-1" :
                     "text-lg font-bold mt-5 mb-2";
-
             elements.push(
                 <div key={`header-${i}`} className={`${sizeClass} text-foreground`}>
                     {formatInline(title, `header-${i}`)}
@@ -296,7 +295,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             continue;
         }
 
-        // 3. Detect Bullet Points
+        // 5. Bullets
         const bulletMatch = line.match(/^(\s*)([\*\-\•])(\s+)(.*)/);
         if (bulletMatch) {
             const [, indent, bullet, space, content] = bulletMatch;
@@ -312,18 +311,18 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             continue;
         }
 
-        // 4. Regular Lines
+        // 6. Regular Paragraphs
         if (line === '') {
             elements.push(<div key={`empty-${i}`} className="h-4" />);
         } else {
-            // General cleanup of escapes for display (e.g. \[ -> [) if not handled above
             const displayLine = lines[i].replace(/\\([\[\]\-\*])/g, '$1');
             elements.push(
-                <div key={`p-${i}`} className="whitespace-pre-wrap leading-relaxed text-foreground/90">
+                <div key={`p-${i}`} className="whitespace-pre-wrap leading-relaxed text-foreground/90 min-h-[1.5em]">
                     {formatInline(displayLine, `p-${i}`)}
                 </div>
             );
         }
+
         i++;
     }
 
