@@ -32,7 +32,7 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType, Ta
 // [pdfjs-dist removed - using client-side extraction instead]
 import { AiService } from './ai'; // Import new AI Service
 import type { FormField } from './form-compiler';
-import { generatePDF, generateDOCX, generateMD, generateJSONL } from './tools/fileGenerator'; // Import Generators
+import { generatePDF, generateDOCX, generateMD, generateJSONL, generateLaTeX } from './tools/fileGenerator'; // Import Generators
 import {
   updateDriveFile,
   downloadDriveFile,
@@ -2856,6 +2856,7 @@ ${filesContext}
   2. **DOCX**: \`generate_docx\` (per documenti modificabili Word).
   3. **Markdown**: \`generate_md\` (per note tecniche o documentazione).
   4. **JSONL**: \`generate_jsonl\` (per dataset).
+  5. **LaTeX**: \`generate_latex\` (per documenti scientifici, tesi, paper accademici).
 - **Limitazioni**: NON puoi generare altri formati (es. RTF, ODG, ZIP). Se l'utente chiede un formato non supportato, proponi uno di quelli disponibili.
 `;
       } else {
@@ -3019,6 +3020,18 @@ ${filesContext}
                 filename: { type: "STRING", description: "The desired filename (e.g., dataset.jsonl)." }
               },
               required: ["data", "filename"]
+            }
+          },
+          {
+            name: "generate_latex",
+            description: "Generates a downloadable LaTeX (.tex) file. Use this for scientific documents, academic papers, theses, and technical publications.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                content: { type: "STRING", description: "The LaTeX source code content." },
+                filename: { type: "STRING", description: "The desired filename (e.g., paper.tex)." }
+              },
+              required: ["content", "filename"]
             }
           }
         ]
@@ -3327,6 +3340,8 @@ ${filesContext}
               filePath = await generateMD((args as any).content, (args as any).filename);
             } else if (call.name === 'generate_jsonl') {
               filePath = await generateJSONL((args as any).data, (args as any).filename);
+            } else if (call.name === 'generate_latex') {
+              filePath = await generateLaTeX((args as any).content, (args as any).filename);
             }
 
             if (filePath) {

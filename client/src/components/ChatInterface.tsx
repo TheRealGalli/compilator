@@ -461,7 +461,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                     {webResearch || isDriveMode
                       ? "Disattivato: Web Research o Drive Mode è attivo"
                       : toolMode === 'allegati'
-                        ? "Modalità Allegati: il modello può generare file (PDF, DOCX)"
+                        ? "Modalità Allegati: genera file scaricabili (PDF, DOCX, MD, JSONL, LaTeX)"
                         : "Modalità Run: il modello può eseguire codice Python per calcoli e validazione"
                     }
                   </p>

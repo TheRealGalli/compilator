@@ -255,3 +255,15 @@ export async function generateJSONL(data: string, filename: string): Promise<str
     console.log(`[FileGen] JSONL generated in ${Date.now() - start}ms: ${filePath}`);
     return filePath;
 }
+
+/**
+ * Generates a LaTeX (.tex) file.
+ */
+export async function generateLaTeX(content: string, filename: string): Promise<string> {
+    const start = Date.now();
+    const safeFilename = filename.endsWith('.tex') ? filename : `${filename}.tex`;
+    const filePath = path.join('/tmp', safeFilename);
+    fs.writeFileSync(filePath, content, 'utf8');
+    console.log(`[FileGen] LaTeX generated in ${Date.now() - start}ms: ${filePath}`);
+    return filePath;
+}
