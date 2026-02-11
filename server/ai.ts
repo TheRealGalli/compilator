@@ -433,11 +433,10 @@ ${text} [/INST]`;
                 }
             } : undefined;
 
-            // NOTE: Vertex AI does NOT allow mixing codeExecution with googleSearch.
-            // Only enable Code Execution when web research is OFF.
-            const finalTools = params.webResearch
-                ? tools  // Web Research mode: googleSearch only
-                : [...tools, { codeExecution: {} }]; // Standard mode: function declarations + code execution
+            // VERTEX AI CONSTRAINT: codeExecution CANNOT coexist with ANY other tool.
+            // When tools (googleSearch or functions) are present, skip codeExecution.
+            // ThinkingMode still handles reasoning improvement.
+            const finalTools = tools.length > 0 ? tools : [{ codeExecution: {} }];
 
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: messageParts }],

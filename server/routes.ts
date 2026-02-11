@@ -3102,25 +3102,25 @@ ${filesContext}
       }];
 
       // Initialize tools array based on Web Research toggle (Mutually Exclusive)
-      // NOTE: Vertex AI does NOT allow mixing codeExecution with googleSearch.
-      // codeExecution CAN coexist with functionDeclarations (Standard + Drive modes).
+      // VERTEX AI CONSTRAINT: codeExecution CANNOT coexist with ANY other tool type
+      // (not googleSearch, not functionDeclarations). It must be the ONLY tool.
       let tools: any[] = [];
 
       if (webResearch && isAuthenticated) {
-        // MODE: Web Research ON -> Only Google Search (CANNOT mix with codeExecution)
+        // MODE: Web Research ON -> Only Google Search
         console.log('[API Chat] Web Research IS ACTIVE. Enabling Search ONLY.');
         tools = [{ googleSearch: {} }];
       } else if (driveMode && isAuthenticated) {
-        // MODE: Drive Mode ON -> Drive tools + Code Execution
-        console.log('[API Chat] Drive Mode IS ACTIVE. Enabling Drive Tools + Code Execution.');
-        tools = [...driveTools, { codeExecution: {} }];
+        // MODE: Drive Mode ON -> Only Drive tools
+        console.log('[API Chat] Drive Mode IS ACTIVE. Enabling Drive Tools.');
+        tools = driveTools;
       } else if (isAuthenticated) {
-        // MODE: Standard -> File Generation Tools + Code Execution
-        console.log('[API Chat] Standard Mode. Enabling File Generation Tools + Code Execution.');
-        tools = [...standardGenerationTools, { codeExecution: {} }];
+        // MODE: Standard -> File Generation Tools
+        console.log('[API Chat] Standard Mode. Enabling File Generation Tools.');
+        tools = standardGenerationTools;
       } else {
-        // GUEST MODE -> Code Execution only
-        console.log('[API Chat] Guest Mode. Enabling Code Execution only.');
+        // GUEST MODE -> Code Execution only (the only mode where it can live alone)
+        console.log('[API Chat] Guest Mode. Enabling Code Execution.');
         tools = [{ codeExecution: {} }];
       }
 
