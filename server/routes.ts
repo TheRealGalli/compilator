@@ -2902,26 +2902,24 @@ ${filesContext}
 
 --- STATO SISTEMA (TURNO CORRENTE) ---
 **MODALITÀ ATTIVA CORRENTE: ${activeModeName}**
-- Solo UN tipo di strumento è disponibile per turno. NON tentare di usare strumenti di una modalità diversa da quella attiva.
+- Solo UN tipo di strumento è disponibile per turno.
 ${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Python (codeExecution).
-- **MANDATO DI VERIFICA (OBBLIGATORIO)**: Per QUALSIASI calcolo matematico, statistico, finanziario o scientifico, DEVI eseguire il codice Python per verificare il risultato. Non fidarti del calcolo mentale.
-- **RISULTATO FINALE**: Una volta ottenuto il risultato dal codice, riportalo nella chat in modo chiaro e leggibile.`
-          : activeModeName === 'ALLEGATI' ? `- **Strumenti disponibili**: Generazione file (generate_pdf, generate_docx, generate_md, generate_jsonl, generate_latex).
-- **NON HAI accesso all'esecuzione di codice Python in questa modalità.**
-- Se l'utente chiede calcoli complessi, fornisci una stima cognitiva avvisando che potrebbe non essere precisa e suggerisci di passare alla modalità **Run** (icona Play).`
-            : activeModeName === 'WEB RESEARCH' ? `- **Strumenti disponibili**: Ricerca Google (googleSearch).
-- **NON HAI accesso a generazione file o esecuzione codice.**`
-              : `- **Strumenti disponibili**: Strumenti Drive (list_drive_files, update_drive_file, etc.).
-- **NON HAI accesso a generazione file locale o esecuzione codice.**`}
+- **MANDATO DI VERIFICA (OBBLIGATORIO)**: Per QUALSIASI calcolo (matematico, statistico, finanziario), DEVI SCRIVERE ED ESEGUIRE codice Python.
+- **OUTPUT**: Una volta eseguito il codice, usa i risultati per rispondere. Se il codice fallisce, correggilo e riprova.`
+          : activeModeName === 'ALLEGATI' ? `- **Strumenti disponibili**: Generazione file (generate_pdf, etc.).
+- **NO EXECUTION**: Non puoi eseguire codice Python. Se servono calcoli complessi, fornisci una stima e suggerisci la modalità Run.`
+            : activeModeName === 'WEB RESEARCH' ? `- **Strumenti disponibili**: Ricerca Google (googleSearch).`
+              : `- **Strumenti disponibili**: Strumenti Drive.`}
 --- FINE STATO SISTEMA ---
 
 **CONTESTUALIZZAZIONE E TERMINOLOGIA:**
-- Interpreta ogni termine tecnico, abbreviazione o riferimento basandoti SCRUPOLOSAMENTE sul contesto dei documenti caricati. 
-- Adatta il tuo linguaggio alla terminologia specifica usata nelle fonti (es. termini tecnici o legali specifici di quel fascicolo).
+- Interpreta ogni termine tecnico basandoti sul contesto dei documenti.
 
-**SUPPORTO MATEMATICO E SCIENTIFICO (CRITICO):**
-- **DIVIETO ASSOLUTO**: NON usare mai la sintassi LaTeX racchiusa tra $ (inline) o $$ (blocco) direttamente nel testo della chat.
-- **RAGIONAMENTO MATEMATICO**: Se devi presentare ragionamenti o formule, USA ESCLUSIVAMENTE blocchi di codice LaTeX (es: \`\`\`latex ... \`\`\`).
+**SUPPORTO MATEMATICO E SCIENTIFICO (OUTPUT FORMAT):**
+- **LaTeX OBBLIGATORIO**: Per qualsiasi formula matematica, equazione o variabile, DEVI usare LaTeX.
+- **Inline Math**: Usa il singolo dollaro per formue in linea (es. $E = mc^2$).
+- **Display Math**: Usa il doppio dollaro per formule centrate (es. $$ \frac{a}{b} $$) oppure blocchi \`\`\`latex.
+- **NON** usare testo semplice per la matematica (es. no "x^2", usa $x^2$).
 `;
 
       if (webResearch) {

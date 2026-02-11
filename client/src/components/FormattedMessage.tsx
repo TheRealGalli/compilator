@@ -1,12 +1,12 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 interface FormattedMessageProps {
     content: string;
     className?: string;
 }
-
-
 
 export function FormattedMessage({ content, className = '' }: FormattedMessageProps) {
     if (!content) return null;
@@ -14,13 +14,18 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
     const lines = content.split('\n');
     const elements: JSX.Element[] = [];
 
-    // Helper to format inline text (bold **...**)
+    // Helper to format inline text (bold **...** and math $...$)
     const formatInline = (text: string, lineIndex: number | string) => {
         const parts: (string | JSX.Element)[] = [];
         let currentText = text;
         let keyCounter = 0;
 
         // 1. Handle Inline Math ($...$)
+        // We look for $...$ but avoid matching if it looks like currency (e.g. $100) - simple check: space after opening $
+        // Better regex: \$([^$]+)\$ matches content between $ signs. 
+        // We use a specific regex to avoid matching currency like $50. Context matters.
+        // For simplicity in this context, we assume $...$ is math if not followed by a digit immediately or if clearly paired.
+        // Let's stick to the previous regex but use KaTeX for rendering.
         const mathRegex = /\$([^$]+)\$/g;
         let lastMathIdx = 0;
         let mathMatch;
@@ -29,6 +34,9 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         // Collect math parts first
         const mathSegments: { type: 'text' | 'math', content: string, key: string }[] = [];
         while ((mathMatch = mathRegex.exec(currentText)) !== null) {
+            // Simple heuristic to avoid currency: if capture group starts with a digit and has no spaces, ignore? 
+            // Only strictly if user typed $100. But $E=mc^2$ works. 
+            // Let's rely on KaTeX to throw or render.
             if (mathMatch.index > lastMathIdx) {
                 mathSegments.push({ type: 'text', content: currentText.substring(lastMathIdx, mathMatch.index), key: `math-text-${lineIndex}-${keyCounter++}` });
             }
@@ -48,11 +56,26 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         // Process each segment for bolding and links
         for (const segment of mathSegments) {
             if (segment.type === 'math') {
-                parts.push(
-                    <span key={segment.key} className="font-serif italic text-blue-800 bg-blue-50/50 px-0.5 rounded">
-                        {segment.content}
-                    </span>
-                );
+                try {
+                    const html = katex.renderToString(segment.content, {
+                        throwOnError: false,
+                        displayMode: false
+                    });
+                    parts.push(
+                        <span
+                            key={segment.key}
+                            dangerouslySetInnerHTML={{ __html: html }}
+                            className="inline-math"
+                        />
+                    );
+                } catch (e) {
+                    // Fallback if KaTeX fails
+                    parts.push(
+                        <span key={segment.key} className="font-serif italic text-blue-800 bg-blue-50/50 px-0.5 rounded">
+                            ${segment.content}$
+                        </span>
+                    );
+                }
             } else {
                 // 2. Handle Bold (**...**) within the text segment
                 const boldRegex = /\*\*(.+?)\*\*/g;
@@ -80,7 +103,7 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             }
         }
 
-        return parts.length > 0 ? parts : [currentText]; // Return an array of elements or the original text wrapped in an array
+        return parts.length > 0 ? parts : [currentText];
     };
 
     // Helper to render links [text](url)
@@ -124,34 +147,73 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
     while (i < lines.length) {
         const line = lines[i].trim();
 
-        // 0. Detect Code Blocks (```)
+        // 0. Detect Code Blocks (```) or Math Blocks ($$)
+        // We treat ```latex as math block now, and also support $$ ... $$ if found on one line or multiline
         if (line.startsWith('```')) {
-            const lang = line.slice(3).trim();
+            const lang = line.slice(3).trim().toLowerCase();
             const codeLines: string[] = [];
             let j = i + 1;
             while (j < lines.length && !lines[j].trim().startsWith('```')) {
                 codeLines.push(lines[j]);
                 j++;
             }
-            const isLatex = lang.toLowerCase() === 'latex';
-            elements.push(
-                <div key={`code-${i}`} className={cn("my-4 relative group", isLatex && "bg-blue-50/30 rounded-xl border-blue-100 shadow-sm")}>
-                    <div className={cn(
-                        "absolute top-0 right-0 px-2 py-1 text-[10px] font-mono text-muted-foreground bg-muted/50 rounded-bl rounded-tr-lg uppercase tracking-wider",
-                        isLatex && "bg-blue-100/50 text-blue-600"
-                    )}>
-                        {lang || 'code'}
+
+            const isLatex = lang === 'latex' || lang === 'tex';
+            // Also check for 'math' language just in case
+            const isMath = isLatex || lang === 'math';
+
+            if (isMath) {
+                const latexContent = codeLines.join('\n');
+                try {
+                    const html = katex.renderToString(latexContent, {
+                        throwOnError: false,
+                        displayMode: true
+                    });
+                    elements.push(
+                        <div key={`math-block-${i}`} className="my-4 overflow-x-auto p-4 flex justify-center bg-gray-50/50 rounded-lg border border-gray-100/50" dangerouslySetInnerHTML={{ __html: html }} />
+                    );
+                } catch (e) {
+                    // Fallback
+                    elements.push(
+                        <div key={`code-${i}`} className={cn("my-4 relative group bg-blue-50/30 rounded-xl border-blue-100 shadow-sm")}>
+                            <pre className="p-4 bg-transparent border-none text-center italic text-blue-900 overflow-x-visible whitespace-pre-wrap select-all font-serif italic text-base">
+                                <code>{latexContent}</code>
+                            </pre>
+                        </div>
+                    );
+                }
+            } else {
+                elements.push(
+                    <div key={`code-${i}`} className="my-4 relative group">
+                        <div className="absolute top-0 right-0 px-2 py-1 text-[10px] font-mono text-muted-foreground bg-muted/50 rounded-bl rounded-tr-lg uppercase tracking-wider">
+                            {lang || 'code'}
+                        </div>
+                        <pre className="p-4 bg-muted/40 rounded-lg border border-border overflow-x-auto text-xs font-mono leading-relaxed">
+                            <code>{codeLines.join('\n')}</code>
+                        </pre>
                     </div>
-                    <pre className={cn(
-                        "p-4 bg-muted/40 rounded-lg border border-border overflow-x-auto text-xs font-mono leading-relaxed",
-                        isLatex && "bg-transparent border-none text-center italic text-blue-900 overflow-x-visible whitespace-pre-wrap select-all font-serif italic text-base"
-                    )}>
-                        <code>{codeLines.join('\n')}</code>
-                    </pre>
-                </div>
-            );
+                );
+            }
             i = j + 1;
             continue;
+        }
+
+        // Detect explicit display math $$ ... $$
+        if (line.startsWith('$$') && line.endsWith('$$') && line.length > 4) {
+            const mathContent = line.slice(2, -2).trim();
+            try {
+                const html = katex.renderToString(mathContent, {
+                    throwOnError: false,
+                    displayMode: true
+                });
+                elements.push(
+                    <div key={`display-math-${i}`} className="my-4 overflow-x-auto p-4 flex justify-center" dangerouslySetInnerHTML={{ __html: html }} />
+                );
+                i++;
+                continue;
+            } catch (e) {
+                // ignore, fallback to text
+            }
         }
 
         // 1. Detect Tables (| col | col ...)
@@ -221,12 +283,12 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
         if (headerMatch) {
             const [, hashes, title] = headerMatch;
             const level = hashes.length;
-            const sizeClass = level === 1 ? "text-2xl font-bold mt-8 mb-4" :
-                level === 2 ? "text-xl font-bold mt-6 mb-3" :
+            const sizeClass = level === 1 ? "text-2xl font-bold mt-8 mb-4 border-b border-border pb-2" :
+                level === 2 ? "text-xl font-bold mt-6 mb-3 border-b border-border/50 pb-1" :
                     "text-lg font-bold mt-5 mb-2";
 
             elements.push(
-                <div key={`header-${i}`} className={`${sizeClass} text-foreground border-b border-border/40 pb-2`}>
+                <div key={`header-${i}`} className={`${sizeClass} text-foreground`}>
                     {formatInline(title, `header-${i}`)}
                 </div>
             );
@@ -234,31 +296,6 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
             continue;
         }
 
-        /* 2.5 Detect Task List Items (Standard or Escaped)
-        // We match both `[ ]` and `\[ ]` because some models might escape them, 
-        // and we want to render them as checkboxes regardless.
-        const taskMatch = line.match(/^(\s*)([\-\*])\s+\\?\[([ xX])\\?\](.*)/);
-        if (taskMatch) {
-            const [, indent, bulletChar, checkState, contentRaw] = taskMatch;
-            const content = contentRaw.trim();
-            const isChecked = checkState.toLowerCase() === 'x';
-            elements.push(
-                <div key={`task-${i}`} className="flex items-start gap-2 ml-4">
-                    <span className="mt-1 flex-shrink-0 inline-flex items-center justify-center">
-                        {isChecked ? (
-                            <span className="w-4 h-4 rounded border border-blue-500 bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold">✓</span>
-                        ) : (
-                            <span className="w-4 h-4 rounded border border-muted-foreground/40 bg-muted/20 flex items-center justify-center" />
-                        )}
-                    </span>
-                    <div className="flex-1 whitespace-pre-wrap leading-relaxed text-foreground/90">
-                        {formatInline(content, `task-${i}`)}
-                    </div>
-                </div>
-            );
-            i++;
-            continue;
-        } */
         // 3. Detect Bullet Points
         const bulletMatch = line.match(/^(\s*)([\*\-\•])(\s+)(.*)/);
         if (bulletMatch) {
