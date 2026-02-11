@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, Bot, Globe, Mic, Square, Asterisk, HardDrive } from "lucide-react";
+import { Send, Bot, Globe, Mic, Square, Asterisk, HardDrive, Paperclip, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,6 +31,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [isLoading, setIsLoading] = useState(false);
   const [webResearch, setWebResearch] = useState(false);
   const [isDriveMode, setIsDriveMode] = useState(false);
+  const [toolMode, setToolMode] = useState<'allegati' | 'run'>('allegati');
   const { toast } = useToast();
   const { selectedSources, masterSource } = useSources();
 
@@ -234,6 +235,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         temperature: 0.7,
         webResearch: webResearch,
         driveMode: isDriveMode,
+        toolMode: (webResearch || isDriveMode) ? undefined : toolMode,
         masterSource: masterSource ? {
           name: masterSource.name,
           type: masterSource.type,
@@ -396,7 +398,10 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
               <Switch
                 id="web-research-chat"
                 checked={webResearch}
-                onCheckedChange={setWebResearch}
+                onCheckedChange={(checked) => {
+                  setWebResearch(checked);
+                  if (checked) setIsDriveMode(false);
+                }}
                 disabled={!isAuthenticated}
               />
 
@@ -409,13 +414,52 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                     size="icon"
                     className={`rounded-full w-8 h-8 ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted-foreground'}`}
                     onClick={toggleRecording}
-                    disabled={isLoading || isTranscribing || !isAuthenticated}
+                    disabled={isLoading || isTranscribing}
                   >
                     {isRecording ? <Square className="w-4 h-4 fill-current" /> : <Mic className="w-4 h-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>{!isAuthenticated ? "Login richiesto" : isRecording ? "Ferma registrazione e invia" : "Attiva input vocale (STT)"}</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <div className="w-px h-4 bg-border mx-2" />
+
+              {/* Tool Mode Selector: Allegati / Run */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      if (webResearch || isDriveMode) return;
+                      setToolMode(toolMode === 'allegati' ? 'run' : 'allegati');
+                    }}
+                    disabled={isLoading || webResearch || isDriveMode}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${webResearch || isDriveMode
+                        ? 'opacity-40 cursor-not-allowed bg-muted text-muted-foreground'
+                        : toolMode === 'run'
+                          ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+                          : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                      }`}
+                  >
+                    {webResearch || isDriveMode ? (
+                      <span className="text-[10px]">Disattivato</span>
+                    ) : toolMode === 'allegati' ? (
+                      <><Paperclip className="w-3 h-3" /> Allegati</>
+                    ) : (
+                      <><Play className="w-3 h-3" /> Run</>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs text-xs">
+                    {webResearch || isDriveMode
+                      ? "Disattivato: Web Research o Drive Mode è attivo"
+                      : toolMode === 'allegati'
+                        ? "Modalità Allegati: il modello può generare file (PDF, DOCX)"
+                        : "Modalità Run: il modello può eseguire codice Python per calcoli e validazione"
+                    }
+                  </p>
                 </TooltipContent>
               </Tooltip>
 
@@ -428,7 +472,11 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                         variant="ghost"
                         size="icon"
                         className={`rounded-full w-8 h-8 ${isDriveMode ? 'bg-green-100' : ''}`}
-                        onClick={() => setIsDriveMode(!isDriveMode)}
+                        onClick={() => {
+                          const next = !isDriveMode;
+                          setIsDriveMode(next);
+                          if (next) setWebResearch(false);
+                        }}
                         disabled={isLoading || isTranscribing || !isAuthenticated}
                       >
                         <DriveLogo className={`w-5 h-5 ${!isDriveMode ? 'opacity-50 grayscale' : ''}`} />

@@ -2875,7 +2875,7 @@ Ti trovi in **Modalità Ospite**.
 **REGOLE IN MODALITÀ OSPITE:**
 1. **No Drive/Web**: Non hai accesso a Google Drive o alla ricerca web in questa modalità.
 2. **No Generation**: Non puoi generare file scaricabili (PDF/DOCX) come ospite.
-3. **Limiti**: Le tue risposte devono essere brevi e dritte al punto.
+3. **Limite Risposta**: Le tue risposte devono essere complete e esaustive, ma NON superare mai i **25.000 caratteri** per risposta. Adatta la lunghezza al contenuto richiesto mantenendo questo tetto massimo.
 
 **FONTI CARICATE (SESSIONE CORRENTE):**
 ${sources.map((s: any) => `- ${s.name} (${s.type})`).join('\n')}
@@ -3101,27 +3101,30 @@ ${filesContext}
         ]
       }];
 
-      // Initialize tools array based on Web Research toggle (Mutually Exclusive)
-      // VERTEX AI CONSTRAINT: codeExecution CANNOT coexist with ANY other tool type
-      // (not googleSearch, not functionDeclarations). It must be the ONLY tool.
+      // Initialize tools array based on mode priority:
+      // 1. Web Research (highest priority) -> googleSearch only
+      // 2. Drive Mode -> driveTools only
+      // 3. toolMode selector: 'run' -> codeExecution, 'allegati' -> standardGenerationTools
+      // VERTEX AI CONSTRAINT: codeExecution CANNOT coexist with ANY other tool type.
+      const userToolMode = req.body.toolMode || 'allegati';
       let tools: any[] = [];
 
       if (webResearch && isAuthenticated) {
-        // MODE: Web Research ON -> Only Google Search
         console.log('[API Chat] Web Research IS ACTIVE. Enabling Search ONLY.');
         tools = [{ googleSearch: {} }];
       } else if (driveMode && isAuthenticated) {
-        // MODE: Drive Mode ON -> Only Drive tools
         console.log('[API Chat] Drive Mode IS ACTIVE. Enabling Drive Tools.');
         tools = driveTools;
+      } else if (userToolMode === 'run') {
+        console.log('[API Chat] Tool Mode: RUN. Enabling Code Execution.');
+        tools = [{ codeExecution: {} }];
       } else if (isAuthenticated) {
-        // MODE: Standard -> File Generation Tools
-        console.log('[API Chat] Standard Mode. Enabling File Generation Tools.');
+        console.log('[API Chat] Tool Mode: ALLEGATI. Enabling File Generation Tools.');
         tools = standardGenerationTools;
       } else {
-        // GUEST MODE -> Code Execution only (the only mode where it can live alone)
-        console.log('[API Chat] Guest Mode. Enabling Code Execution.');
-        tools = [{ codeExecution: {} }];
+        // Guest with allegati mode -> no tools (guest can't generate files)
+        console.log('[API Chat] Guest Mode, no file tools. Tools empty.');
+        tools = [];
       }
 
       // --- KEYWORD HEURISTIC FORCED TOOL MODE ---
@@ -3159,7 +3162,7 @@ ${filesContext}
           { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
         ],
         generationConfig: {
-          maxOutputTokens: isAuthenticated ? 50000 : 2000,
+          maxOutputTokens: isAuthenticated ? 50000 : 8000,
           temperature: req.body.temperature || 0.3,
           // @ts-ignore - native thinking config for 2.5 models
           thinkingConfig: {
