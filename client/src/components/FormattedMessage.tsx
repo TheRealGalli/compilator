@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface FormattedMessageProps {
     content: string;
@@ -95,12 +96,19 @@ export function FormattedMessage({ content, className = '' }: FormattedMessagePr
                 codeLines.push(lines[j]);
                 j++;
             }
+            const isLatex = lang.toLowerCase() === 'latex';
             elements.push(
-                <div key={`code-${i}`} className="my-4 relative group">
-                    <div className="absolute top-0 right-0 px-2 py-1 text-[10px] font-mono text-muted-foreground bg-muted/50 rounded-bl rounded-tr-lg uppercase tracking-wider">
+                <div key={`code-${i}`} className={cn("my-4 relative group", isLatex && "bg-blue-50/30 rounded-xl border-blue-100 shadow-sm")}>
+                    <div className={cn(
+                        "absolute top-0 right-0 px-2 py-1 text-[10px] font-mono text-muted-foreground bg-muted/50 rounded-bl rounded-tr-lg uppercase tracking-wider",
+                        isLatex && "bg-blue-100/50 text-blue-600"
+                    )}>
                         {lang || 'code'}
                     </div>
-                    <pre className="p-4 bg-muted/40 rounded-lg border border-border overflow-x-auto text-xs font-mono leading-relaxed">
+                    <pre className={cn(
+                        "p-4 bg-muted/40 rounded-lg border border-border overflow-x-auto text-xs font-mono leading-relaxed",
+                        isLatex && "bg-transparent border-none text-center italic text-blue-900 overflow-x-visible whitespace-pre-wrap select-all font-serif italic text-base"
+                    )}>
                         <code>{codeLines.join('\n')}</code>
                     </pre>
                 </div>

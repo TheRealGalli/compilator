@@ -2870,8 +2870,9 @@ Ti trovi in **Modalità Ospite**.
 - Se ti viene chiesto chi sei, dì pure che sei Gromit, sviluppato da **CSD Station LLC**.
 
 **SUPPORTO MATEMATICO E SCIENTIFICO (CRITICO):**
-- Hai pieno supporto per **LaTeX**. Ogni volta che devi scrivere formule matematiche, chimiche o fisiche, USA SEMPRE la sintassi LaTeX racchiusa tra $ (inline) o $$ (blocco).
-- Esempio: "La formula della relatività è $E=mc^2$".
+- Hai pieno supporto per **LaTeX**. Per garantire la massima leggibilità e precisione, ogni volta che devi presentare ragionamenti matematici, formule o calcoli complessi, **DEVI** racchiuderli in blocchi di codice specificando il linguaggio (es: \`\`\`latex ... \`\`\`).
+- Per brevi formule inline, puoi continuare a usare la sintassi LaTeX racchiusa tra $ (es: $E=mc^2$).
+- **PRECISIONE**: Non provare a risolvere problemi complessi "a mente". Usa sempre lo strumento Run se attivato.
 
 **REGOLE IN MODALITÀ OSPITE:**
 1. **No Drive/Web**: Non hai accesso a Google Drive o alla ricerca web in questa modalità.
@@ -2898,6 +2899,7 @@ ${filesContext}
 **STRUMENTO CODE EXECUTION (Python):**
 - Hai a disposizione uno strumento di esecuzione codice Python. Valuta se utilizzarlo quando devi: verificare somme, calcolare percentuali, IVA, ritenute, conversioni, o manipolare dati strutturati.
 - **PREFERENZA ESECUZIONE (FONDAMENTALE)**: Ogni volta che devi eseguire dei calcoli matematici, conteggi, verifiche di somme o operazioni finanziarie, **DEVI PREFERIRE SEMPRE SE ATTIVATO** l'utilizzo dello strumento di esecuzione codice Python piuttosto che eseguirli mentalmente. Questo garantisce precisione e affidabilità dei dati forniti all'utente, specialmente per calcoli complessi o che coinvolgono dati estratti dalle fonti.
+- **OBBLIGO ESECUZIONE**: Se l'utente ti chiede di "risolvere", "calcolare", trovare un "risultato" o analizzare un "problema" matematico/scientifico e lo strumento Run è attivato, **È OBBLIGATORIO** usarlo per i calcoli intermedi e finali.
 `;
 
       if (webResearch) {
@@ -3146,7 +3148,11 @@ ${filesContext}
         const lowerMsg = lastUserMsg.content.toLowerCase();
         // Updated keywords to be action-oriented to avoid false positives on "Analyze this file"
         const fileKeywords = ['scarica', 'download', 'crea un file', 'genera file', 'generate file', 'export', 'dammi il pdf', 'dammi il docx', 'dammi il json', 'voglio il file', 'aggiorna', 'modifica', 'update', 'sovrascrivi', 'save to drive', 'salva su drive'];
-        const calculationKeywords = ['calcola', 'totale', 'somma', 'fai la somma', 'conteggio', 'percentuale', 'iva', 'ritenuta'];
+        const calculationKeywords = [
+          'calcola', 'totale', 'somma', 'fai la somma', 'conteggio', 'percentuale', 'iva', 'ritenuta',
+          'risultato', 'risolvi', 'massimo', 'minimo', 'funzione', 'derivata', 'integrale', 'limite',
+          'equazione', 'espressione', 'problema', 'matematica', 'operazione', 'conto'
+        ];
 
         if (!webResearch && (
           fileKeywords.some(kw => lowerMsg.includes(kw)) ||
@@ -3596,3 +3602,4 @@ ${filesContext}
 
   return httpServer;
 }
+dei risultati 
