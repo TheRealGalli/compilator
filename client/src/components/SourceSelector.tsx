@@ -30,9 +30,10 @@ interface SourceSelectorProps {
   onToggle?: (id: string) => void;
   onToggleMaster?: (id: string) => void;
   onToggleBypass?: (id: string) => void;
+  isAuthenticated?: boolean;
 }
 
-export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypass }: SourceSelectorProps) {
+export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypass, isAuthenticated = true }: SourceSelectorProps) {
   const { isLocked, frozenColor } = useCompiler();
   const { addSource } = useSources();
   const [isDragging, setIsDragging] = useState(false);
@@ -141,22 +142,24 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
                   <TooltipTrigger asChild>
                     <Icon
                       onClick={() => !(isLocked && source.isMaster) && onToggleBypass?.(source.id)}
-                      className={`w-3.5 h-3.5 flex-shrink-0 transition-all ${isLocked && source.isMaster ? 'cursor-default' : 'cursor-pointer hover:scale-110 active:scale-95'} ${isLocked && source.isMaster && frozenColor
-                        ? frozenColor
-                        : source.isBypass
-                          ? 'text-muted-foreground'
-                          : source.isXfa
-                            ? 'text-red-500 fill-red-500/20'
-                            : source.isAlreadyFilled
-                              ? 'text-orange-500 fill-orange-500/20'
-                              : source.isFillable
-                                ? 'text-green-500 fill-green-500/20'
-                                : 'text-muted-foreground'
+                      className={`w-3.5 h-3.5 flex-shrink-0 transition-all ${isLocked && source.isMaster ? 'cursor-default' : 'cursor-pointer hover:scale-110 active:scale-95'} ${!isAuthenticated
+                        ? 'text-muted-foreground'
+                        : isLocked && source.isMaster && frozenColor
+                          ? frozenColor
+                          : source.isBypass
+                            ? 'text-muted-foreground'
+                            : source.isXfa
+                              ? 'text-red-500 fill-red-500/20'
+                              : source.isAlreadyFilled
+                                ? 'text-orange-500 fill-orange-500/20'
+                                : source.isFillable
+                                  ? 'text-green-500 fill-green-500/20'
+                                  : 'text-muted-foreground'
                         }`}
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    <p>{isLocked && source.isMaster ? 'Fonte congelata dalla sessione' : source.isBypass ? 'Ripristina analisi intelligente' : 'Forza modalità standard (Grigio)'}</p>
+                    <p>{!isAuthenticated ? 'Login richiesto per funzioni avanzate' : isLocked && source.isMaster ? 'Fonte congelata dalla sessione' : source.isBypass ? 'Ripristina analisi intelligente' : 'Forza modalità standard (Grigio)'}</p>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip delayDuration={300}>

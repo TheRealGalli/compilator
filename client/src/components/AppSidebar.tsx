@@ -84,6 +84,7 @@ export function AppSidebar({
           onToggle={onToggleSource}
           onToggleMaster={onToggleMaster}
           onToggleBypass={onToggleBypass}
+          isAuthenticated={isAuthenticated}
         />
       </div>
     </aside>

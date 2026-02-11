@@ -19,12 +19,15 @@ export function LoginOverlay() {
                     La piattaforma avanzata per l'analisi e la compilazione dei tuoi documenti.
                     Accedi per iniziare a lavorare con la potenza dell'Intelligenza Artificiale.
                 </p>
-                <div className="mt-8 flex gap-4 opacity-75">
-                    <div className="flex items-center gap-2 text-sm">
-                        <ShieldCheck className="w-4 h-4" /> Sicuro
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                        <FileText className="w-4 h-4" /> Illimitato
+                <div className="mt-8 flex flex-col gap-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-50">Powered by</p>
+                    <div className="flex gap-4 opacity-75">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                            <ShieldCheck className="w-4 h-4" /> Vertex AI
+                        </div>
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                            <FileText className="w-4 h-4" /> Ollama
+                        </div>
                     </div>
                 </div>
             </div>
@@ -90,8 +93,8 @@ export function LoginOverlay() {
                     </li>
                 </ul>
 
-                <div className="mt-12 text-white/40 text-xs">
-                    © 2024 CSD Station LLC. All rights reserved.
+                <div className="mt-12 text-white/40 text-xs text-center border-t border-white/5 pt-6">
+                    © 2025 CSD Station LLC. All rights reserved.
                 </div>
             </div>
         </div>
