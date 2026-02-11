@@ -2731,6 +2731,18 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       const maxTokens = 50000;
 
       const isAuthenticated = !!req.user;
+      const userToolMode = req.body.toolMode || 'allegati';
+
+      // Determine the active mode label for the system prompt
+      let activeModeName = 'ALLEGATI';
+      if (webResearch && isAuthenticated) {
+        activeModeName = 'WEB RESEARCH';
+      } else if (driveMode && isAuthenticated) {
+        activeModeName = 'DRIVE';
+      } else if (userToolMode === 'run') {
+        activeModeName = 'RUN';
+      }
+
       let systemInstruction = "";
 
       if (isAuthenticated) {
@@ -2869,21 +2881,10 @@ Ti trovi in **Modalità Ospite**.
 - Rispondi in modo estremamente preciso, professionale e coinciso.
 - Se ti viene chiesto chi sei, dì pure che sei Gromit, sviluppato da **CSD Station LLC**.
 
-**SUPPORTO MATEMATICO E SCIENTIFICO (CRITICO):**
-- **DIVIETO ASSOLUTO**: NON usare mai la sintassi LaTeX racchiusa tra $ (inline) o $$ (blocco) direttamente nel testo della chat. Questo rende la risposta illeggibile.
-- **RAGIONAMENTO MATEMATICO**: Se devi presentare ragionamenti, formule o passaggi matematici, USA ESCLUSIVAMENTE blocchi di codice LaTeX (es: \`\`\`latex ... \`\`\`).
-- **ACCURATEZZA E MODALITÀ**:
-    1. **Se lo strumento Run (Python) è ATTIVO**: **DEVI** utilizzarlo per verificare ogni calcolo complesso (derivate, limiti, massimi, minimi, etc.). Non fidarti del calcolo mentale.
-    2. **Se lo strumento Run NON è attivo** (es. sei in modalità Allegati):
-        - Puoi procedere con un'analisi "cognitiva" (mentale) del problema.
-        - **DEVI** avvisare l'utente: "Ti fornisco una stima basata sul calcolo mentale, che potrebbe non essere precisa al 100%."
-        - **DEVI** concludere la risposta suggerendo esplicitamente: *"Per un calcolo verificato ed estremamente preciso, ti consiglio di passare alla modalità **Run** (icona Play)."*
-
 **REGOLE IN MODALITÀ OSPITE:**
 1. **No Drive/Web**: Non hai accesso a Google Drive o alla ricerca web in questa modalità.
-2. **Generazione File**: Puoi generare file scaricabili (PDF, DOCX, MD, JSONL, LaTeX) quando l'utente è in modalità Allegati.
-3. **Code Execution**: Puoi eseguire codice Python per calcoli e validazione quando l'utente è in modalità Run.
-4. **Limite Risposta**: Le tue risposte devono essere complete e esaustive, ma NON superare mai i **25.000 caratteri** per risposta. Adatta la lunghezza al contenuto richiesto mantenendo questo tetto massimo.
+2. **Capacità Correnti**: ${activeModeName === 'RUN' ? 'Puoi eseguire codice Python per calcoli e validazione (Modalità RUN).' : 'Puoi generare file scaricabili (PDF, DOCX, MD, JSONL, LaTeX) (Modalità ALLEGATI).'}
+3. **Limite Risposta**: Le tue risposte devono essere complete e esaustive, ma NON superare mai i **25.000 caratteri** per risposta. Adatta la lunghezza al contenuto richiesto mantenendo questo tetto massimo.
 
 **FONTI CARICATE (SESSIONE CORRENTE):**
 ${sources.map((s: any) => `- ${s.name} (${s.type})`).join('\n')}
@@ -2896,20 +2897,36 @@ ${filesContext}
 `;
       }
 
+      // === MODE AWARENESS INJECTION ===
       systemInstruction += `
+
+--- STATO SISTEMA (TURNO CORRENTE) ---
+**MODALITÀ ATTIVA CORRENTE: ${activeModeName}**
+- Solo UN tipo di strumento è disponibile per turno. NON tentare di usare strumenti di una modalità diversa da quella attiva.
+${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Python (codeExecution).
+- **MANDATO DI VERIFICA (OBBLIGATORIO)**: Per QUALSIASI calcolo matematico, statistico, finanziario o scientifico, DEVI eseguire il codice Python per verificare il risultato. Non fidarti del calcolo mentale.
+- **RISULTATO FINALE**: Una volta ottenuto il risultato dal codice, riportalo nella chat in modo chiaro e leggibile.`
+          : activeModeName === 'ALLEGATI' ? `- **Strumenti disponibili**: Generazione file (generate_pdf, generate_docx, generate_md, generate_jsonl, generate_latex).
+- **NON HAI accesso all'esecuzione di codice Python in questa modalità.**
+- Se l'utente chiede calcoli complessi, fornisci una stima cognitiva avvisando che potrebbe non essere precisa e suggerisci di passare alla modalità **Run** (icona Play).`
+            : activeModeName === 'WEB RESEARCH' ? `- **Strumenti disponibili**: Ricerca Google (googleSearch).
+- **NON HAI accesso a generazione file o esecuzione codice.**`
+              : `- **Strumenti disponibili**: Strumenti Drive (list_drive_files, update_drive_file, etc.).
+- **NON HAI accesso a generazione file locale o esecuzione codice.**`}
+--- FINE STATO SISTEMA ---
+
 **CONTESTUALIZZAZIONE E TERMINOLOGIA:**
 - Interpreta ogni termine tecnico, abbreviazione o riferimento basandoti SCRUPOLOSAMENTE sul contesto dei documenti caricati. 
 - Adatta il tuo linguaggio alla terminologia specifica usata nelle fonti (es. termini tecnici o legali specifici di quel fascicolo).
 
-**STRUMENTO CODE EXECUTION (Python):**
-- Hai a disposizione uno strumento di esecuzione codice Python.
-- **MANDATO DI VERIFICA (OBBLIGATORIO)**: Se il problema riguarda analisi matematica, geometria, calcoli finanziari o statistici, **DEVI** utilizzare lo strumento Run per eseguire i calcoli e verificare il risultato. 
-- **RISULTATO FINALE**: Una volta ottenuto il risultato dal codice, riportalo nella chat in modo chiaro e leggibile, evitando passaggi matematici grezzi nel testo principale.
+**SUPPORTO MATEMATICO E SCIENTIFICO (CRITICO):**
+- **DIVIETO ASSOLUTO**: NON usare mai la sintassi LaTeX racchiusa tra $ (inline) o $$ (blocco) direttamente nel testo della chat.
+- **RAGIONAMENTO MATEMATICO**: Se devi presentare ragionamenti o formule, USA ESCLUSIVAMENTE blocchi di codice LaTeX (es: \`\`\`latex ... \`\`\`).
 `;
 
       if (webResearch) {
-        systemInstruction += `\n ** MODALITÀ WEB RESEARCH ATTIVA **: Usa lo strumento di ricerca per link o info mancanti.
-- ** GROUNDING VS COMPLETEZZA **: Se l'utente richiede un intero dataset, JSON o un output tecnico esteso, dai priorità alla COMPLETEZZA dell'output(come da ISTRUZIONI BASE) anche se stai usando informazioni prelevate dal web.NON troncare dataset per brevità.`;
+        systemInstruction += `\n**MODALITÀ WEB RESEARCH ATTIVA**: Usa lo strumento di ricerca per link o info mancanti.
+- **GROUNDING VS COMPLETEZZA**: Se l'utente richiede un intero dataset, JSON o un output tecnico esteso, dai priorità alla COMPLETEZZA dell'output (come da ISTRUZIONI BASE) anche se stai usando informazioni prelevate dal web. NON troncare dataset per brevità.`;
       }
 
       // Initialize Vertex AI
@@ -3127,7 +3144,7 @@ ${filesContext}
       // 2. Drive Mode -> driveTools only
       // 3. toolMode selector: 'run' -> codeExecution, 'allegati' -> standardGenerationTools
       // VERTEX AI CONSTRAINT: codeExecution CANNOT coexist with ANY other tool type.
-      const userToolMode = req.body.toolMode || 'allegati';
+      // userToolMode is already declared earlier for system prompt construction.
       let tools: any[] = [];
 
       if (webResearch && isAuthenticated) {
@@ -3208,11 +3225,20 @@ ${filesContext}
 
       let response = await result.response;
 
-      // Log Finish Reason for debugging
+      // Log Finish Reason and Candidate Content for debugging
       if (response.candidates && response.candidates.length > 0) {
-        console.log('[DEBUG Chat] Finish Reason:', response.candidates[0].finishReason);
-        if (response.candidates[0].safetyRatings) {
-          console.log('[DEBUG Chat] Safety Ratings:', JSON.stringify(response.candidates[0].safetyRatings));
+        const candidate = response.candidates[0];
+        console.log('[DEBUG Chat] Finish Reason:', candidate.finishReason);
+        console.log('[DEBUG Chat] Active Mode:', activeModeName);
+        if (candidate.content && candidate.content.parts) {
+          for (const part of candidate.content.parts) {
+            if (part.functionCall) {
+              console.log('[DEBUG Chat] Function Call Attempted:', JSON.stringify(part.functionCall));
+            }
+          }
+        }
+        if (candidate.safetyRatings) {
+          console.log('[DEBUG Chat] Safety Ratings:', JSON.stringify(candidate.safetyRatings));
         }
       } else {
         console.warn('[DEBUG Chat] No candidates in response!', JSON.stringify(response));
