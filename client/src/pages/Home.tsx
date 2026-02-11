@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { setSessionId } from "@/lib/queryClient";
 import { AppSidebar } from "@/components/AppSidebar";
 import { DocumentsSection } from "@/components/DocumentsSection";
 import { ChatInterface } from "@/components/ChatInterface";
@@ -29,13 +30,29 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     const sid = params.get('sid');
     if (sid) {
-      localStorage.setItem('csd_sid', sid);
+      setSessionId(sid);
       // Clean URL
       const newUrl = window.location.pathname + window.location.hash;
       window.history.replaceState({}, '', newUrl);
-      console.log("[Auth] Session Handshake: sid captured and stored");
+      console.log("[Auth] Session Handshake: sid captured and stored in memory");
     }
   });
+
+  // Ensure session reset on full refresh
+  useEffect(() => {
+    // If we land here without a sid in URL, we might want to clear old localStorage 
+    // ghost sid to ensure a fresh session for the AI.
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get('sid')) {
+      // We clear it only on mount. If a sid was just captured in useState, 
+      // it would be in memory now.
+      // But wait, if we want a TRULY new session on refresh, 
+      // we should probably just let the server generate a new one if no cookie is present.
+      // So we clear the localStorage 'csd_sid' on every mount.
+      localStorage.removeItem('csd_sid');
+      console.log("[Session] Page refresh detected. Clearing localStorage session ghost.");
+    }
+  }, []);
 
   const renderSection = () => {
     switch (activeSection) {

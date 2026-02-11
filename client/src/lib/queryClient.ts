@@ -8,6 +8,15 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// In-memory session ID to survive React updates but reset on full page refresh
+let inMemorySessionId: string | null = localStorage.getItem('csd_sid');
+
+// Export a function to update it (e.g. from Home context)
+export function setSessionId(sid: string) {
+  inMemorySessionId = sid;
+  localStorage.setItem('csd_sid', sid);
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -23,10 +32,9 @@ export async function apiRequest(
     ...(extraHeaders || {})
   };
 
-  // FALLBACK: Add session ID from localStorage if cookies are blocked (Incognito)
-  const sessionId = localStorage.getItem('csd_sid');
-  if (sessionId) {
-    headers['x-session-id'] = sessionId;
+  // FALLBACK: Add session ID if cookies are blocked (Incognito)
+  if (inMemorySessionId) {
+    headers['x-session-id'] = inMemorySessionId;
   }
 
   const res = await fetch(fullUrl, {
@@ -52,9 +60,8 @@ export const getQueryFn: <T>(options: {
       const fullUrl = url.startsWith('http') ? url : getApiUrl(url);
 
       const headers: Record<string, string> = {};
-      const sessionId = localStorage.getItem('csd_sid');
-      if (sessionId) {
-        headers['x-session-id'] = sessionId;
+      if (inMemorySessionId) {
+        headers['x-session-id'] = inMemorySessionId;
       }
 
       const res = await fetch(fullUrl, {
