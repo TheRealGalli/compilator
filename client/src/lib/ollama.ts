@@ -60,6 +60,7 @@ async function fetchViaBridge(url: string, options: any): Promise<any> {
  */
 async function smartFetch(url: string, options: any = {}): Promise<any> {
     if (isBridgeAvailable()) {
+        console.log(`[OllamaLocal] Using GROMIT BRIDGE for ${url}`);
         const bridgeResult = await fetchViaBridge(url, options);
         if (bridgeResult && bridgeResult.success) {
             return {
@@ -407,13 +408,17 @@ ${text}
  * Esegue l'estrazione con logica di retry per gestire errori 503 (Ollama sovraccarico o in caricamento)
  */
 async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promise<any> {
+    console.log(`[OllamaLocal] _extractWithRetry starting... (Model: ${payload.model})`);
     for (let i = 0; i < retries; i++) {
         try {
+            console.log(`[OllamaLocal] Attempt ${i + 1}/${retries}: Sending request to ${currentBaseUrl}...`);
             const response = await smartFetch(`${currentBaseUrl}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            console.log(`[OllamaLocal] Attempt ${i + 1} response status: ${response.status}`);
 
             if (response.status === 503) {
                 console.warn(`[OllamaLocal] Ollama occupato (503). Tentativo ${i + 1}/${retries} tra ${delay}ms...`);
@@ -426,8 +431,11 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promi
                 throw new Error(`Ollama non raggiungibile (Status: ${response.status})`);
             }
 
-            return await response.json();
+            const json = await response.json();
+            console.log(`[OllamaLocal] Response JSON received (Length: ${JSON.stringify(json).length})`);
+            return json;
         } catch (err) {
+            console.error(`[OllamaLocal] Attempt ${i + 1} failed:`, err);
             if (i === retries - 1) throw err;
             console.warn(`[OllamaLocal] Errore connessione, riprovo... (${i + 1}/${retries})`);
             await new Promise(r => setTimeout(r, delay));

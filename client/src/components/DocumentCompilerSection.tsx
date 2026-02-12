@@ -608,16 +608,46 @@ export function DocumentCompilerSection({
               let token = "";
               const normalizedValue = value.toLowerCase();
 
-              // GLOBAL DEDUPLICATION: If this EXACT value already exists in the vault, use that token.
-              for (const [existingToken, existingValue] of vMap.entries()) {
-                if (existingValue.toLowerCase() === normalizedValue) {
-                  token = existingToken;
+              // GLOBAL DEDUPLICATION & UPGRADE SCHEME (User-Dictated "LLM Supremacy")
+              // Rule: If the VALUE exists, we must align with the LLM's categorization, 
+              // effectively overwriting the "dumber" Regex/Generic extraction.
+
+              let existingTokenToNuke = "";
+              let existingValue = ""; // To store the value associated with existingTokenToNuke
+
+              for (const [t, v] of vMap.entries()) {
+                // Loose matching: case-insensitive, trim spaces
+                if (v.toLowerCase().trim() === normalizedValue.trim()) {
+                  token = t;
+                  existingValue = v; // Store the existing value
+
+                  // DECISION: Do we upgrade?
+                  // If the current token is generic (e.g. ORGANIZATION) 
+                  // and the new category is specific/custom (e.g. TITOLO)
+                  // OR even if just different, if LLM is confident (implicit), we prefer LLM's context.
+                  // User said: "If Regex found X, and LLM found X but calls it Y, we use Y".
+
+                  const currentCategory = t.replace(/^\[|_\d+\]$/g, '');
+                  const newCategory = category;
+
+                  // If categories mismatch and the new one is not just a synonym but likely better
+                  if (currentCategory !== newCategory) {
+                    // We decide to UPGRADE to the LLM's definition.
+                    existingTokenToNuke = t;
+                    token = ""; // Force creation of new token below
+                  }
                   break;
                 }
               }
 
+              if (existingTokenToNuke) {
+                console.log(`[DocumentCompiler] LEVELLING UP '${existingValue}': ${existingTokenToNuke} -> [${category}_...]`);
+                vMap.delete(existingTokenToNuke);
+                // effectively removing the old key, so the code below will generate a fresh one
+              }
+
               if (!token) {
-                // VALUE IS NEW: Create a new token for this category.
+                // VALUE IS NEW OR UPGRADED: Create a new token for this category.
                 // Find how many tokens already exist for THIS category to increment the index.
                 let nextIndex = 1;
                 const existingIndices = Array.from(vMap.keys())
