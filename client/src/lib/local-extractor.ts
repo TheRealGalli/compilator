@@ -57,6 +57,7 @@ async function extractViaBridge(file: File): Promise<string> {
                 const response = event.detail.response;
 
                 if (response.success) {
+                    console.log(`[LocalExtractor] Extracted Text Preview (from Bridge):\n${response.text.substring(0, 500)}...\n[...${response.text.length} chars total]`);
                     resolve(response.text);
                 } else {
                     reject(new Error(response.error || "Unknown Bridge Error"));
