@@ -136,7 +136,7 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
                   onCheckedChange={() => !(isLocked && source.isMaster) && onToggle?.(source.id)}
                   disabled={isLocked && source.isMaster}
                   data-testid={`checkbox-source-${source.id}`}
-                  className="w-3.5 h-3.5"
+                  className="w-3.5 h-3.5 data-[state=checked]:flex data-[state=checked]:items-center data-[state=checked]:justify-center [&>span]:flex [&>span]:items-center [&>span]:justify-center"
                 />
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>

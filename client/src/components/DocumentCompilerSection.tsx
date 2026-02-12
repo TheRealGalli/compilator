@@ -1674,7 +1674,7 @@ export function DocumentCompilerSection({
                         ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
                         : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`))
                   }
-                  placeholder="Inserisci qui il testo o il template..."
+                  placeholder=""
                   enableMentions={isReviewing || !!compiledContent}
                   onMention={(text, start, end) => handleMention(text, isReviewing ? 'anteprema' : 'template', start, end)}
                   headerRight={isReviewing ? (
@@ -1699,7 +1699,12 @@ export function DocumentCompilerSection({
                       </Button>
                     </div>
                   ) : null}
-                />
+                >
+                  <div className="space-y-4 max-w-sm mt-10">
+                    <p className="font-medium text-foreground">Seleziona un template preimpostato o carica il tuo, aggiungi documenti di contesto (visure, contratti, foto), e l'AI compilerà automaticamente tutti i placeholder con le informazioni estratte dai tuoi file.</p>
+                    <p className="text-xs">Perfetto per: contratti, relazioni tecniche, privacy policy, documenti legali.</p>
+                  </div>
+                </TemplateEditor>
 
                 {/* CUSTOM TOGGLE HANDLE (Dynamically centered in gutter or gap) */}
                 <div

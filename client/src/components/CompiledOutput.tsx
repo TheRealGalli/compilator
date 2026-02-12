@@ -1,4 +1,4 @@
-import { Copy, Download } from "lucide-react";
+import { Copy, Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormattedMessage } from "./FormattedMessage";
@@ -48,10 +48,11 @@ export function CompiledOutput({ content, onCopy, onDownload, readOnly = false }
             <FormattedMessage content={content} />
           </div>
         ) : (
-          <div className="text-sm text-muted-foreground space-y-2">
+          <div className="text-sm text-muted-foreground space-y-4">
             <p className="font-medium">Il Compilatore AI trasforma template in documenti completi.</p>
-            <p>Seleziona un template preimpostato o carica il tuo, aggiungi documenti di contesto (visure, contratti, foto), e l'AI compilerà automaticamente tutti i placeholder con le informazioni estratte dai tuoi file.</p>
-            <p className="text-xs">Perfetto per: contratti, relazioni tecniche, privacy policy, documenti legali.</p>
+            <div className="p-4 border border-dashed rounded-lg bg-muted/50 text-center">
+              <p className="text-xs">Inserisci qui il testo o il template</p>
+            </div>
           </div>
         )}
       </CardContent>
