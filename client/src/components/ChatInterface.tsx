@@ -40,15 +40,60 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const toggleRecording = async () => {
+  const handleMicClick = () => {
+    if (isLoading || isTranscribing) return;
+
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+
+    clickTimeoutRef.current = setTimeout(() => {
+      if (!isRecording) {
+        startRecording();
+      } else {
+        togglePause();
+      }
+      clickTimeoutRef.current = null;
+    }, 250); // Small delay to distinguish single vs double click
+  };
+
+  const handleMicDoubleClick = () => {
+    if (isLoading || isTranscribing) return;
+
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+
     if (isRecording) {
       stopRecording();
-    } else {
-      startRecording();
+    }
+  };
+
+  const togglePause = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      if (mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.pause();
+        setIsPaused(true);
+        toast({
+          title: "Registrazione in Pausa",
+          description: "Clicca ancora per riprendere, doppio click per terminare.",
+        });
+      } else if (mediaRecorderRef.current.state === 'paused') {
+        mediaRecorderRef.current.resume();
+        setIsPaused(false);
+        toast({
+          title: "Registrazione Ripresa",
+          description: "Sto registrando...",
+        });
+      }
     }
   };
 
@@ -73,6 +118,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
       recorder.start();
       setIsRecording(true);
+      setIsPaused(false);
     } catch (error) {
       console.error("Error accessing microphone:", error);
       toast({
@@ -87,6 +133,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      setIsPaused(false);
     }
   };
 
@@ -412,15 +459,38 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`rounded-full w-8 h-8 ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted-foreground'}`}
-                    onClick={toggleRecording}
+                    className={`rounded-full w-8 h-8 transition-all duration-300 ${isRecording
+                        ? isPaused
+                          ? 'bg-amber-100 text-amber-600' // Paused State
+                          : 'bg-red-100 text-red-600 animate-pulse' // Recording State
+                        : 'text-muted-foreground' // Idle State
+                      }`}
+                    onClick={handleMicClick}
+                    onDoubleClick={handleMicDoubleClick}
                     disabled={isLoading || isTranscribing}
                   >
-                    {isRecording ? <Square className="w-4 h-4 fill-current" /> : <Mic className="w-4 h-4" />}
+                    {isRecording ? (
+                      isPaused ? (
+                        <Play className="w-3 h-3 fill-current ml-0.5" />
+                      ) : (
+                        <Mic className="w-4 h-4" /> // Keep Mic icon while recording, maybe change to Pause icon if desired, but user asked for "pause" functionality behavior. 
+                        // Actually standard UI is: click to pause -> shows Play/Resume. 
+                        // While recording -> shows Pause? Or just Mic pulsing? 
+                        // User said: "clicchiamo una volta si mette in pausa".
+                        // Let's use a Pause icon when recording to indicate "Click to Pause"? 
+                        // Or just keep Mic pulsing. 
+                        // Visually: 
+                        // Recording: Red Pulse (Standard)
+                        // Paused: Amber Static (Standard)
+                        // To resume: Click again.
+                      )
+                    ) : (
+                      <Mic className="w-4 h-4" />
+                    )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{!isAuthenticated ? "Login richiesto" : isRecording ? "Ferma registrazione e invia" : "Attiva input vocale (STT)"}</p>
+                  <p>{!isAuthenticated ? "Login richiesto" : isRecording ? (isPaused ? "In Pausa (Click: Riprendi, DblClick: Fine)" : "Registrando (Click: Pausa, DblClick: Fine)") : "Attiva input vocale (STT)"}</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -500,7 +570,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={!isAuthenticated ? "Fai una domanda.." : webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione audio..." : "Fai una domanda sui tuoi documenti..."}
+                placeholder={!isAuthenticated ? "Fai una domanda.." : webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? (isPaused ? "Registrazione in pausa..." : "Registrazione in corso...") : isTranscribing ? "Trascrizione audio..." : "Fai una domanda sui tuoi documenti..."}
                 className="resize-none min-h-[60px]"
                 data-testid="input-chat"
                 disabled={isRecording || isTranscribing}

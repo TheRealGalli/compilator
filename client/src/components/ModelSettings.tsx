@@ -58,9 +58,62 @@ export function ModelSettings({
   const { status: ollamaStatus } = useOllama();
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMicClick = () => {
+    if (isTranscribing) return;
+
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+
+    clickTimeoutRef.current = setTimeout(() => {
+      if (!isRecording) {
+        startRecording();
+      } else {
+        togglePause();
+      }
+      clickTimeoutRef.current = null;
+    }, 250);
+  };
+
+  const handleMicDoubleClick = () => {
+    if (isTranscribing) return;
+
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+
+    if (isRecording) {
+      stopRecording();
+    }
+  };
+
+  const togglePause = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      if (mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.pause();
+        setIsPaused(true);
+        toast({
+          title: "Registrazione in Pausa",
+          description: "Clicca ancora per riprendere, doppio click per terminare.",
+        });
+      } else if (mediaRecorderRef.current.state === 'paused') {
+        mediaRecorderRef.current.resume();
+        setIsPaused(false);
+        toast({
+          title: "Registrazione Ripresa",
+          description: "Sto registrando...",
+        });
+      }
+    }
+  };
 
   const startRecording = async () => {
     try {
@@ -82,7 +135,9 @@ export function ModelSettings({
       };
 
       recorder.start();
+      recorder.start();
       setIsRecording(true);
+      setIsPaused(false);
     } catch (error) {
       console.error("Error accessing microphone:", error);
       toast({
@@ -96,7 +151,9 @@ export function ModelSettings({
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stop();
       setIsRecording(false);
+      setIsPaused(false);
     }
   };
 
@@ -207,15 +264,16 @@ export function ModelSettings({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={`h-6 w-6 rounded-full transition-all ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted-foreground hover:text-blue-600 hover:bg-blue-50'}`}
-                          onClick={() => isRecording ? stopRecording() : startRecording()}
+                          className={`h-6 w-6 rounded-full transition-all duration-300 ${isRecording ? (isPaused ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600 animate-pulse') : 'text-muted-foreground hover:text-blue-600 hover:bg-blue-50'}`}
+                          onClick={handleMicClick}
+                          onDoubleClick={handleMicDoubleClick}
                           disabled={isTranscribing}
                         >
                           {isRecording ? <Square className="w-2.5 h-2.5 fill-current" /> : <Mic className="w-3.5 h-3.5" />}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="left">
-                        <p className="text-[10px]">{isRecording ? "Ferma e trascrivi" : "Attiva input vocale"}</p>
+                        <p className="text-[10px]">{isRecording ? (isPaused ? "Pausa (Click: Riprendi, DblClick: Fine)" : "Reg. (Click: Pausa, DblClick: Fine)") : "Attiva input vocale"}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -224,7 +282,7 @@ export function ModelSettings({
                   id="notes"
                   value={notes}
                   onChange={(e) => onNotesChange?.(e.target.value)}
-                  placeholder={isRecording ? "Registrazione in corso..." : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
+                  placeholder={isRecording ? (isPaused ? "Registrazione in pausa..." : "Registrazione in corso...") : isTranscribing ? "Trascrizione..." : "Formati supportati:\nTesto: PDF, DOCX, TXT, CSV\nImmagini: JPG, PNG, WebP\nAudio: MP3, WAV, FLAC"}
                   className="text-xs resize-none min-h-[175px]"
                   data-testid="textarea-notes"
                   disabled={isRecording || isTranscribing}
