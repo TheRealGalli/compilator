@@ -20,7 +20,7 @@ const PARALLEL_SLOTS = 4;
 // Actually, pdfjs-dist often includes a worker. Let's try standard import.
 // FIX: Explicitly disable worker for extension environment to avoid "No workerSrc specified" error
 // FIX: Use local bundled worker to avoid "import() is disallowed" error in Service Worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.mjs');
+pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.js');
 
 chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: any) => {
 

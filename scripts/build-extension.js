@@ -5,7 +5,11 @@ import fs from 'fs';
 const isWatch = process.argv.includes('--watch');
 
 const buildOptions = {
-    entryPoints: ['extension_src/background.ts', 'extension_src/content.ts'],
+    entryPoints: {
+        background: 'extension_src/background.ts',
+        content: 'extension_src/content.ts',
+        'pdf.worker': 'node_modules/pdfjs-dist/build/pdf.worker.mjs'
+    },
     bundle: true,
     outdir: 'client/public/extension',
     platform: 'browser',
@@ -20,17 +24,7 @@ const buildOptions = {
     define: {
         'process.env.NODE_ENV': '"production"'
     },
-    plugins: [{
-        name: 'copy-pdf-worker',
-        setup(build) {
-            build.onEnd(() => {
-                const workerSrc = path.resolve('node_modules/pdfjs-dist/build/pdf.worker.min.mjs');
-                const workerDest = path.resolve('client/public/extension/pdf.worker.min.mjs');
-                fs.copyFileSync(workerSrc, workerDest);
-                console.log('Copied pdf.worker.min.mjs to extension folder');
-            });
-        }
-    }],
+    plugins: [],
     alias: {
         // Add aliases if needed
     }

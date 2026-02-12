@@ -89664,7 +89664,7 @@ var version2 = XLSX.version;
 
 // extension_src/background.ts
 var BRIDGE_VERSION = "4.0.0";
-__webpack_exports__GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("pdf.worker.min.mjs");
+__webpack_exports__GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("pdf.worker.js");
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "GET_VERSION") {
     sendResponse({ version: BRIDGE_VERSION });
