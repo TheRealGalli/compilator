@@ -27,12 +27,13 @@ const buildOptions = {
 };
 
 async function build() {
-    // 1. Build Background and Content scripts (ESM)
+    // 1. Build Background, Content, and Offscreen scripts (ESM)
     const extensionCtx = await esbuild.context({
         ...buildOptions,
         entryPoints: {
             background: 'extension_src/background.ts',
             content: 'extension_src/content.ts',
+            offscreen: 'extension_src/offscreen.ts'
         },
         format: 'esm',
     });
@@ -44,13 +45,21 @@ async function build() {
             'pdf.worker': 'node_modules/pdfjs-dist/build/pdf.worker.mjs'
         },
         format: 'iife',
-        // Ensure global name doesn't conflict, though usually not needed for worker
+        // Ensure global name doesn't conflict
     });
+
+    // 3. Copy offscreen.html
+    const copyOffscreenHtml = () => {
+        fs.copyFileSync('extension_src/offscreen.html', 'client/public/extension/offscreen.html');
+        console.log('Copied offscreen.html');
+    };
+    copyOffscreenHtml();
 
     if (isWatch) {
         await extensionCtx.watch();
         await workerCtx.watch();
         console.log('Watching for extension changes...');
+        // Watch offscreen.html? manual reload for now is fine
     } else {
         await extensionCtx.rebuild();
         await workerCtx.rebuild();

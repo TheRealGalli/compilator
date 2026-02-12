@@ -11,7 +11,8 @@
     },
     "permissions": [
         "declarativeNetRequest",
-        "declarativeNetRequestFeedback"
+        "declarativeNetRequestFeedback",
+        "offscreen"
     ],
     "declarative_net_request": {
         "rule_resources": [
