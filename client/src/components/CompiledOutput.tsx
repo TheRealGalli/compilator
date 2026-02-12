@@ -50,9 +50,6 @@ export function CompiledOutput({ content, onCopy, onDownload, readOnly = false }
         ) : (
           <div className="text-sm text-muted-foreground space-y-4">
             <p className="font-medium">Il Compilatore AI trasforma template in documenti completi.</p>
-            <div className="p-4 border border-dashed rounded-lg bg-muted/50 text-center">
-              <p className="text-xs">Inserisci qui il testo o il template</p>
-            </div>
           </div>
         )}
       </CardContent>

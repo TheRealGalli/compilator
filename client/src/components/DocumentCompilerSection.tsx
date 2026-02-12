@@ -1700,7 +1700,7 @@ export function DocumentCompilerSection({
                     </div>
                   ) : null}
                 >
-                  <div className="space-y-4 max-w-sm mt-10">
+                  <div className="space-y-4 max-w-sm mt-0">
                     <p className="font-medium text-foreground">Seleziona un template preimpostato o carica il tuo, aggiungi documenti di contesto (visure, contratti, foto), e l'AI compilerà automaticamente tutti i placeholder con le informazioni estratte dai tuoi file.</p>
                     <p className="text-xs">Perfetto per: contratti, relazioni tecniche, privacy policy, documenti legali.</p>
                   </div>
