@@ -326,7 +326,11 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
 
     // ULTRA-CONCISE PROMPT (User's Proven Prompt)
     // We use the exact phrasing that worked in chat.
+    // ULTRA-CONCISE PROMPT (User's Proven Prompt)
+    // We use the exact phrasing that worked in chat.
     const prompt = `find PERSONAL data in the text and do a token for pseuddonimiz it , return only the list of DATA as a tokenized format.
+    
+    IMPORTANT: Look for data in "Key: Value" format (e.g. "Name: John Doe") which represents form fields.
     
 Text:
 ${text}
@@ -438,9 +442,10 @@ ${text}
                 // CHECK FOR DUPLICATES
                 if (unifiedFindings.has(val)) {
                     const existing = unifiedFindings.get(val);
-                    // If existing is generic (label == type) and new is specific (label != type), UPGRADE IT
-                    if (existing && existing.label === existing.type && finding.label && finding.label !== finding.category) {
-                        console.log(`[OllamaLocal] UPGRADING duplicate for label: [${finding.label}]`);
+                    // Always UPGRADE if the new finding has a valid label and the existing one was likely Generic/Regex
+                    // We trust the LLM's context awareness more than the initial Regex scan.
+                    if (existing && finding.label && finding.label !== 'UNKNOWN') {
+                        console.log(`[OllamaLocal] UPGRADING duplicate '${val}': [${existing.label}] -> [${finding.label}]`);
                         unifiedFindings.set(val, { type: finding.type, label: finding.label });
                     }
                     continue;
