@@ -91040,8 +91040,11 @@ async function extractPdfText(arrayBuffer) {
         } else if (field instanceof PDFRadioGroup_default) {
           value = field.getSelected() || "";
         }
-        if (value && value.trim() !== "") {
-          tempHeader += `[CAMPO] ${name}: ${value}
+        let cleanName = name.split(".").pop() || name;
+        cleanName = cleanName.replace(/\[\d+\]/g, "");
+        cleanName = cleanName.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim();
+        if (value && value.trim().length > 0) {
+          tempHeader += `${cleanName}: ${value}
 `;
           validFieldsCount++;
         }
@@ -91049,10 +91052,9 @@ async function extractPdfText(arrayBuffer) {
       }
     });
     if (validFieldsCount > 0) {
-      formHeader += "--- [GROMIT INSIGHT] DATI MODULO RILEVATI (AcroForm) ---\n";
-      formHeader += "NOTA: Questi dati sono stati estratti dai campi interattivi del PDF.\n\n";
+      formHeader += "--- [GROMIT INSIGHT] DATI MODULO (Contesto) ---\n";
       formHeader += tempHeader;
-      formHeader += "--- FINE DATI MODULO ---\n\n";
+      formHeader += "--- FINE CONTESTO MODULO ---\n\n";
     }
   } catch (e) {
     console.warn("[GromitOffscreen] AcroForm extraction failed:", e);

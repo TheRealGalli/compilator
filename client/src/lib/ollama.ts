@@ -64,18 +64,27 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
         const bridgeResult = await fetchViaBridge(url, options);
         if (bridgeResult && bridgeResult.success) {
             return {
-                ok: bridgeResult.ok,
-                status: bridgeResult.status,
-                json: async () => bridgeResult.data
+                ok: true,
+                status: 200,
+                json: async () => {
+                    console.log(`[OllamaLocal] Bridge response data length: ${bridgeResult.data?.length}`);
+                    try {
+                        const parsed = JSON.parse(bridgeResult.data);
+                        console.log(`[OllamaLocal] Bridge response parsed successfully.`);
+                        return parsed;
+                    } catch (e) {
+                        console.error(`[OllamaLocal] Bridge response parse error:`, e);
+                        throw e;
+                    }
+                }
+            };
+        } else {       // Se il bridge fallisce, restituiamo l'errore specifico (es. 408 Timeout o 503)
+            return {
+                ok: false,
+                status: bridgeResult?.status || 503,
+                json: async () => ({ error: bridgeResult?.error || 'Bridge error' })
             };
         }
-
-        // Se il bridge fallisce, restituiamo l'errore specifico (es. 408 Timeout o 503)
-        return {
-            ok: false,
-            status: bridgeResult?.status || 503,
-            json: async () => ({ error: bridgeResult?.error || 'Bridge error' })
-        };
     }
 
     // Solo se l'estensione manca, proviamo la fetch standard

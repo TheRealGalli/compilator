@@ -107,18 +107,28 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
                     value = field.getSelected() || "";
                 }
 
-                if (value && value.trim() !== "") {
-                    tempHeader += `[CAMPO] ${name}: ${value}\n`;
+                // HEURISTIC: Clean up the field name to make it look like a "Question"
+                // 1. Remove XFA path noise (topmostSubform[0]...)
+                let cleanName = name.split('.').pop() || name;
+                // 2. Remove array indices [0]
+                cleanName = cleanName.replace(/\[\d+\]/g, '');
+                // 3. Split camelCase or snake_case into words
+                cleanName = cleanName.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+
+                // STRICT CHECK: Only include if value is non-empty and non-trivial
+                if (value && value.trim().length > 0) {
+                    // Format: "QUESTION: ANSWER"
+                    // We treat the cleaned field name as the "Question" context for the LLM
+                    tempHeader += `${cleanName}: ${value}\n`;
                     validFieldsCount++;
                 }
             } catch (err) { /* Ignore specific field error */ }
         });
 
         if (validFieldsCount > 0) {
-            formHeader += "--- [GROMIT INSIGHT] DATI MODULO RILEVATI (AcroForm) ---\n";
-            formHeader += "NOTA: Questi dati sono stati estratti dai campi interattivi del PDF.\n\n";
+            formHeader += "--- [GROMIT INSIGHT] DATI MODULO (Contesto) ---\n";
             formHeader += tempHeader;
-            formHeader += "--- FINE DATI MODULO ---\n\n";
+            formHeader += "--- FINE CONTESTO MODULO ---\n\n";
         }
     } catch (e) {
         console.warn("[GromitOffscreen] AcroForm extraction failed:", e);
