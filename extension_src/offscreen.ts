@@ -142,25 +142,25 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
                     value = field.getText() || "";
                 } else if (field instanceof PDFCheckBox) {
                     value = field.isChecked() ? "Sì" : "No";
-                } else if (field instanceof PDFDropdown || field instanceof PDFOptionList) {
                     const selected = field.getSelected();
                     value = selected ? selected.join(', ') : "";
                 } else if (field instanceof PDFRadioGroup) {
                     value = field.getSelected() || "";
                 }
 
-                // HEURISTIC: Clean up the field name to make it look like a "Question"
+                // HEURISTIC: Clean up the field name to make it look like a "Question" or Label
                 // 1. Remove XFA path noise (topmostSubform[0]...)
                 let cleanName = name.split('.').pop() || name;
                 // 2. Remove array indices [0]
                 cleanName = cleanName.replace(/\[\d+\]/g, '');
-                // 3. Split camelCase or snake_case into words
-                cleanName = cleanName.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+                // 3. Remove prefixes like "f1_" or "c1_" if present (common in IRS forms)
+                cleanName = cleanName.replace(/^[fc]\d+_/, '');
+                // 4. Split camelCase or snake_case into words, but keep it tight
+                cleanName = cleanName.replace(/_/g, ' ').trim();
 
-                // STRICT CHECK: Only include if value is non-empty and non-trivial
-                if (value && value.trim().length > 0) {
-                    // Format: "QUESTION: ANSWER"
-                    // We treat the cleaned field name as the "Question" context for the LLM
+                // STRICT CHECK: Only include if value is non-empty and meaningful
+                if (value && value.trim().length > 0 && value !== "Off") {
+                    // Format: "LABEL: VALUE" (Simple and Direct)
                     tempHeader += `${cleanName}: ${value}\n`;
                     validFieldsCount++;
                 }
@@ -168,9 +168,10 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
         });
 
         if (validFieldsCount > 0) {
-            formHeader += "--- [GROMIT INSIGHT] DATI MODULO (Contesto) ---\n";
+            // Use a very simple header that looks like document text
+            formHeader += "--- [GROMIT INSIGHT] DATI ESTRATTI DAL MODULO ---\n";
             formHeader += tempHeader;
-            formHeader += "--- FINE CONTESTO MODULO ---\n\n";
+            formHeader += "--- FINE DATI MODULO ---\n\n";
         }
     } catch (e) {
         console.warn("[GromitOffscreen] AcroForm extraction failed:", e);
