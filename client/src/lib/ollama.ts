@@ -182,33 +182,74 @@ async function getBridgeVersion(retries = 2): Promise<string> {
  * Helper to extract JSON from a potentially messy LLM response.
  * Handles markdown blocks, pre-text, post-text, and raw JSON.
  */
+/**
+ * Helper to extract JSON from a potentially messy LLM response.
+ * Handles markdown blocks, pre-text, post-text, and concatenated JSON arrays.
+ */
 function extractJsonFromResponse(text: string): any[] {
+    const results: any[] = [];
+
+    // 0. Helper to safely parse and merge
+    const tryParse = (str: string) => {
+        try {
+            const parsed = JSON.parse(str);
+            if (Array.isArray(parsed)) results.push(...parsed);
+            else if (typeof parsed === 'object') results.push(parsed);
+        } catch (e) {
+            // If strict parse fails, it might be multiple objects/arrays concatenated
+            // e.g. [A][B] or {"a":1}{"b":2}
+            // We use a regex to find all balanced brackets/braces? 
+            // Regex for balanced JSON is hard, so we just log and skip for now
+            // But we can try to rescue the "Unexpected token" case?
+            // Actually, let logic below handle specific patterns.
+        }
+    };
+
     try {
-        // 1. Try direct parse
+        // 1. Try direct parse (Best Case)
         return JSON.parse(text);
     } catch (e) {
         // 2. Try extracting from markdown code blocks ```json ... ```
-        const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-        if (jsonMatch && jsonMatch[1]) {
-            try {
-                return JSON.parse(jsonMatch[1]);
-            } catch (e2) {
-                console.warn("[OllamaLocal] JSON in markdown block failed parse:", e2);
+        const markdownRegex = /```(?:json)?\s*([\s\S]*?)\s*```/g;
+        let mdMatch;
+        let foundMd = false;
+        while ((mdMatch = markdownRegex.exec(text)) !== null) {
+            foundMd = true;
+            tryParse(mdMatch[1]);
+        }
+        if (foundMd && results.length > 0) return results;
+
+        // 3. Balanced Bracket Extractor (Surgical)
+        // Scans the string for top-level [...] arrays.
+        let depth = 0;
+        let start = -1;
+
+        for (let i = 0; i < text.length; i++) {
+            if (text[i] === '[') {
+                if (depth === 0) start = i;
+                depth++;
+            } else if (text[i] === ']') {
+                depth--;
+                if (depth === 0 && start !== -1) {
+                    // Found a complete top-level bracket pair
+                    const chunk = text.substring(start, i + 1);
+                    tryParse(chunk);
+                    start = -1;
+                }
             }
         }
 
-        // 3. Try finding the first '[' and last ']'
-        const start = text.indexOf('[');
-        const end = text.lastIndexOf(']');
-        if (start !== -1 && end !== -1 && end > start) {
-            try {
-                return JSON.parse(text.substring(start, end + 1));
-            } catch (e3) {
-                console.warn("[OllamaLocal] JSON bracket extraction failed parse:", e3);
-            }
+        if (results.length > 0) return results;
+
+        // 4. Fallback: Try identifying the LARGEST bracket pair if balanced failed (mismatched text)
+        // e.g. "Here is data: [ ... ]"
+        const firstOpen = text.indexOf('[');
+        const lastClose = text.lastIndexOf(']');
+        if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+            tryParse(text.substring(firstOpen, lastClose + 1));
         }
 
-        return [];
+        return results;
     }
 }
 
@@ -294,13 +335,18 @@ ${text}
 
         // Helper to parse a single line "KEY: VALUE"
         const parseLine = (line: string): { value: string, type: string, label: string } | null => {
-            // Matches: "NAME: Mario Rossi", "P.IVA: 123", "INIZIO ATTIVITA': 01..."
-            // Accepts dots, apostrophes, hyphens, and accented chars in the KEY
-            const match = line.match(/^\s*([A-Za-z0-9_ \-\.\'àèìòùÀÈÌÒÙ]+)\s*[:=]\s*(.+)\s*$/);
+            // Pre-clean: Remove generic list markers, quotes, trailing commas
+            let cleanLine = line.trim().replace(/^[-*]\s+/, '').replace(/^"|",?$/g, '').replace(/^'|',?$/g, '');
+
+            // Matches: "NAME: Mario Rossi", "P.IVA: 123"
+            const match = cleanLine.match(/^\s*([A-Za-z0-9_ \-\.\'àèìòùÀÈÌÒÙ]+)\s*[:=]\s*(.+)\s*$/);
             if (!match) return null;
 
             const key = match[1].trim().toUpperCase();
             let val = match[2].trim();
+
+            // Remove potential trailing quotes/comma from value if regex missed them
+            val = val.replace(/",?$/, '').replace(/',?$/, '');
 
             // Simple hygiene
             if (val.length < 2) return null;
