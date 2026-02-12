@@ -1,11 +1,4 @@
-import * as pdfjsLib from 'pdfjs-dist';
-import mammoth from 'mammoth';
-import * as XLSX from 'xlsx';
-import { PDFDocument, PDFName, PDFTextField, PDFCheckBox, PDFDropdown, PDFOptionList, PDFRadioGroup } from 'pdf-lib';
-
-// Initialize PDF.js worker
-const PDFJS_VERSION = pdfjsLib.version;
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.mjs`;
+import { toast } from "@/hooks/use-toast";
 
 export interface ExtractedDocument {
     name: string;
@@ -14,171 +7,122 @@ export interface ExtractedDocument {
 }
 
 /**
- * Extracts raw text from a File object entirely within the browser.
+ * Checks if the Gromit Bridge extension is available in the DOM.
  */
-export async function extractTextLocally(file: File): Promise<string> {
-    const fileType = file.type;
-    const fileName = file.name.toLowerCase();
-
-    try {
-        if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
-            return await extractPdfText(file);
-        } else if (
-            fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-            fileName.endsWith('.docx')
-        ) {
-            return await extractDocxText(file);
-        } else if (
-            fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-            fileType === 'application/vnd.ms-excel' ||
-            fileName.endsWith('.xlsx') ||
-            fileName.endsWith('.xls')
-        ) {
-            return await extractXlsxText(file);
-        } else if (
-            fileType.startsWith('text/') ||
-            fileName.endsWith('.txt') ||
-            fileName.endsWith('.md') ||
-            fileName.endsWith('.csv') ||
-            fileName.endsWith('.json') ||
-            fileName.endsWith('.xml') ||
-            fileName.endsWith('.html')
-        ) {
-            return await extractPlainText(file);
-        } else {
-            console.warn(`[LocalExtractor] Unsupported file type for local text extraction: ${fileType}`);
-            return `[ERRORE: Tipo file non supportato per estrazione locale: ${fileName}]`;
-        }
-    } catch (error) {
-        console.error(`[LocalExtractor] Error extracting text from ${fileName}:`, error);
-        return `[ERRORE: Impossibile leggere il file ${fileName}. Dettagli: ${error}]`;
-    }
-}
-
-async function extractPdfText(file: File): Promise<string> {
-    const arrayBuffer = await file.arrayBuffer();
-
-    // 1. Standard text extraction (PDF.js)
-    const loadingTask = pdfjsLib.getDocument({
-        data: arrayBuffer.slice(0), // Clone buffer as it might be detached
-        useWorkerFetch: true,
-        isEvalSupported: false,
-        useSystemFonts: true
-    });
-
-    const doc = await loadingTask.promise;
-    let fullText = "";
-
-    for (let i = 1; i <= doc.numPages; i++) {
-        const page = await doc.getPage(i);
-        const content = await page.getTextContent();
-        const pageText = content.items
-            .map((item: any) => item.str)
-            .join(' ');
-        fullText += pageText + "\n";
-    }
-
-    // 2. Form Fields Extraction (pdf-lib) - "AcroForms"
-    let formText = "";
-    try {
-        const pdfDoc = await PDFDocument.load(arrayBuffer);
-        const form = pdfDoc.getForm();
-        const fields = form.getFields();
-
-        console.log(`[LocalExtractor] Found ${fields.length} AcroForm fields.`);
-
-        if (fields.length > 0) {
-            formText += "\n\n--- DATI MODULO (ACROFORM) ---\n";
-            fields.forEach(field => {
-                try {
-                    const name = field.getName();
-                    let value = "";
-
-                    if (field instanceof PDFTextField) {
-                        value = field.getText() || "";
-                    } else if (field instanceof PDFCheckBox) {
-                        value = field.isChecked() ? "Sì" : "No";
-                    } else if (field instanceof PDFDropdown) {
-                        const selected = field.getSelected();
-                        value = selected ? selected.join(', ') : "";
-                    } else if (field instanceof PDFOptionList) {
-                        const selected = field.getSelected();
-                        value = selected ? selected.join(', ') : "";
-                    } else if (field instanceof PDFRadioGroup) {
-                        value = field.getSelected() || "";
-                    }
-
-                    // Debug log for each field
-                    // console.log(`[LocalExtractor] Field '${name}': '${value}'`);
-
-                    if (value && value.trim() !== "") {
-                        formText += `${name}: ${value}\n`;
-                    }
-                } catch (fieldError) {
-                    console.warn(`[LocalExtractor] Error reading field:`, fieldError);
-                }
-            });
-            formText += "--- FINE DATI MODULO ---\n";
-        }
-    } catch (e) {
-        console.warn("[LocalExtractor] Errore estrazione AcroForm:", e);
-        // Don't fail the whole extraction if forms fail
-    }
-
-    // DEBUG: Print start of text to check quality
-    const finalContent = cleanText(fullText + formText);
-    console.log(`[LocalExtractor] Extracted Text Preview (Full):\n${finalContent}`);
-    return finalContent;
-}
-
-async function extractDocxText(file: File): Promise<string> {
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    return cleanText(result.value);
-}
-
-async function extractXlsxText(file: File): Promise<string> {
-    const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    let fullText = "";
-
-    workbook.SheetNames.forEach(sheetName => {
-        const sheet = workbook.Sheets[sheetName];
-        const sheetText = XLSX.utils.sheet_to_txt(sheet); // Simple text dump
-        if (sheetText.trim()) {
-            fullText += `[FOGLIO: ${sheetName}]\n${sheetText}\n\n`;
-        }
-    });
-
-    return cleanText(fullText);
+function isBridgeAvailable(): boolean {
+    return (
+        document.documentElement.getAttribute('data-gromit-bridge-active') === 'true' ||
+        (window as any).__GROMIT_BRIDGE_ACTIVE__ === true
+    );
 }
 
 /**
- * Cleans extracted text to remove noise and normalize whitespace.
- * Helps regex/LLM processing by ensuring consistent formatting.
+ * Helper to convert File to Base64 (for extension messaging)
  */
-function cleanText(text: string): string {
-    return text
-        .replace(/\r\n/g, '\n')           // Normalize newlines
-        .replace(/\u00A0/g, ' ')          // Replace non-breaking spaces
-        .replace(/[ \t]+/g, ' ')          // Collapse multiple spaces/tabs
-        .replace(/\n\s+\n/g, '\n\n')      // Collapse spaces in empty lines
-        .replace(/\n{3,}/g, '\n\n')       // Max 2 newlines
-        .trim();
+function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            // Remove Data URI prefix (e.g., "data:application/pdf;base64,")
+            const base64 = result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = error => reject(error);
+    });
 }
 
-// --- HYBRID PII EXTRACTION REMOVED ---
-// Redirected to ollama.ts for Full Context Strategy
+/**
+ * Sends a message to the Gromit Bridge extension to extract text.
+ */
+async function extractViaBridge(file: File): Promise<string> {
+    if (!isBridgeAvailable()) {
+        throw new Error("Gromit Bridge extension not found. Please install or activate it.");
+    }
 
+    const fileBase64 = await fileToBase64(file);
 
+    return new Promise((resolve, reject) => {
+        const requestId = Math.random().toString(36).substring(7);
+        const timeout = setTimeout(() => {
+            window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+            reject(new Error("Timeout waiting for Gromit Bridge extraction (60s)."));
+        }, 60000); // 60s timeout for heavy extraction
 
-// Helper for local plaintext extraction
+        const handler = (event: any) => {
+            if (event.detail.requestId === requestId) {
+                clearTimeout(timeout);
+                window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+                const response = event.detail.response;
+
+                if (response.success) {
+                    resolve(response.text);
+                } else {
+                    reject(new Error(response.error || "Unknown Bridge Error"));
+                }
+            }
+        };
+
+        window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+        window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
+            detail: {
+                detail: {
+                    type: 'EXTRACT_AND_ANALYZE',
+                    fileBase64,
+                    fileName: file.name,
+                    fileType: file.type
+                },
+                requestId
+            }
+        }));
+    });
+}
+
+/**
+ * Extracts raw text from a File using the Gromit Bridge Extension ("Sanctuary").
+ */
+export async function extractTextLocally(file: File): Promise<string> {
+    const fileName = file.name.toLowerCase();
+
+    // Fallback for plain text files (can be done locally without libs)
+    if (
+        file.type.startsWith('text/') ||
+        fileName.endsWith('.txt') ||
+        fileName.endsWith('.md') ||
+        fileName.endsWith('.csv') ||
+        fileName.endsWith('.json') ||
+        fileName.endsWith('.xml') ||
+        fileName.endsWith('.html')
+    ) {
+        return await extractPlainText(file);
+    }
+
+    try {
+        if (isBridgeAvailable()) {
+            console.log(`[LocalExtractor] Offloading ${fileName} to Gromit Bridge "Sanctuary"...`);
+            return await extractViaBridge(file);
+        } else {
+            console.warn(`[LocalExtractor] Bridge missing. Cannot extract complex file: ${fileName}`);
+            toast({
+                title: "Estensione Mancante",
+                description: "Per analizzare PDF/Excel/Docx in sicurezza locale, l'estensione Gromit Bridge è necessaria.",
+                variant: "destructive"
+            });
+            return `[ERRORE: Estensione Gromit Bridge non attiva. Impossibile leggere ${fileName} in modalità sicura.]`;
+        }
+    } catch (error: any) {
+        console.error(`[LocalExtractor] Error extracting text from ${fileName}:`, error);
+        return `[ERRORE: Impossibile leggere il file ${fileName}. Dettagli: ${error.message}]`;
+    }
+}
+
+// Helper for local plaintext extraction (Zero-Dependency)
 async function extractPlainText(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(cleanText(reader.result as string));
+        reader.onload = () => resolve((reader.result as string).trim());
         reader.onerror = reject;
         reader.readAsText(file);
     });
 }
-

@@ -818,7 +818,9 @@ export function DocumentCompilerSection({
                   nextIndex = Math.max(...existingIndices) + 1;
                 }
 
-                // console.log(`[DocumentCompiler] Vault registered: ${token} (Redacted Value)`);
+                token = `[${category}_${nextIndex}]`;
+                vaultMap.set(token, rawValue);
+                console.log(`[DocumentCompiler] Vault registered: ${token} (Redacted Value)`);
               }
               vaultCounts.set(token, (vaultCounts.get(token) || 0) + 1);
             }

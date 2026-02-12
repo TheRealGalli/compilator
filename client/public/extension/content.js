@@ -1,19 +1,13 @@
-// Segnala la presenza dell'estensione alla pagina web tramite attributo DOM
-// Più sicuro e compatibile con le CSP restrittive
-document.documentElement.setAttribute('data-gromit-bridge-active', 'true');
-console.log('[GromitBridge] Content Script inizializzato.');
-
-// In ascolto di eventi dalla pagina web
-window.addEventListener('GROMIT_BRIDGE_REQUEST', (event) => {
-    const { detail, requestId } = event.detail;
-
-    // Inoltra il messaggio al background script dell'estensione
-    chrome.runtime.sendMessage(detail, (response) => {
-        // Restituisce la risposta alla pagina web tramite un altro evento
-        window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_RESPONSE', {
-            detail: { response, requestId }
-        }));
-    });
+// extension_src/content.ts
+document.documentElement.setAttribute("data-gromit-bridge-active", "true");
+console.log("[GromitBridge] Content Script inizializzato.");
+window.addEventListener("GROMIT_BRIDGE_REQUEST", (event) => {
+  const { detail, requestId } = event.detail;
+  chrome.runtime.sendMessage(detail, (response) => {
+    window.dispatchEvent(new CustomEvent("GROMIT_BRIDGE_RESPONSE", {
+      detail: { response, requestId }
+    }));
+  });
 });
-
-console.log('[GromitBridge] Content Script attivo e pronto.');
+console.log("[GromitBridge] Content Script attivo e pronto.");
+//# sourceMappingURL=content.js.map
