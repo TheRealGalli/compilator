@@ -16,9 +16,10 @@ const PARALLEL_SLOTS = 4;
 
 // CONFIGURATION: Set worker to null to force main thread (simplest for extension environment)
 // or point to a local worker file if needed. For now, let's try standard main thread.
-// pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.mjs'); // Requires bundling worker
 // For now, we will try running without worker or reliable local worker.
 // Actually, pdfjs-dist often includes a worker. Let's try standard import.
+// FIX: Explicitly disable worker for extension environment to avoid "No workerSrc specified" error
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: any) => {
 

@@ -670,7 +670,7 @@ export function DocumentsSection() {
           disabled={isUploading || !isAuthenticated}
         />
 
-        {(isConnected || isConnectedDrive) && (
+        {(isConnected) && (
           <div className="flex flex-col gap-4 relative">
             <div className="flex items-center gap-4">
               <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
@@ -692,7 +692,7 @@ export function DocumentsSection() {
                   Gmail
                 </Button>
               )}
-              {isConnectedDrive && (
+              {isConnected && (
                 <Button
                   variant="outline"
                   className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"

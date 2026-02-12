@@ -89666,6 +89666,7 @@ var version2 = XLSX.version;
 var BRIDGE_VERSION = "4.0.0";
 var MAX_CHUNK_CHARS = 15e4;
 var PARALLEL_SLOTS = 4;
+__webpack_exports__GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${__webpack_exports__version}/pdf.worker.min.js`;
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "GET_VERSION") {
     sendResponse({ version: BRIDGE_VERSION });
