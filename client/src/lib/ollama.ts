@@ -211,6 +211,28 @@ function extractJsonFromResponse(text: string): any[] {
     }
 }
 
+/**
+ * Robust JSON Array Extractor
+ * Sometimes models return:
+ * ["Name: Mario", "Date: 2024"]
+ * or
+ * key: value
+ * key: value
+ */
+function normalizeFindings(input: any): any[] {
+    if (!input) return [];
+    if (Array.isArray(input)) return input;
+    if (typeof input === 'object') {
+        // Did it return { "findings": [...] } or { "data": [...] }?
+        if (Array.isArray(input.findings)) return input.findings;
+        if (Array.isArray(input.data)) return input.data;
+        if (Array.isArray(input.result)) return input.result;
+        // Or just a k-v map? Return entries
+        return Object.entries(input).map(([k, v]) => `${k}: ${v}`);
+    }
+    return [];
+}
+
 // Validator Prompt for Strict Mode
 // Note: The actual prompt is now generated dynamically inside extractPIILocal
 
@@ -302,19 +324,27 @@ ${text}
         };
 
         // STRATEGY 1: Try JSON Parse
-        const jsonResult = extractJsonFromResponse(rawResponse);
+        const jsonRaw = extractJsonFromResponse(rawResponse);
+        const jsonResult = normalizeFindings(jsonRaw);
 
         // Handle JSON Array of Strings (common output for this prompt)
         if (Array.isArray(jsonResult) && jsonResult.length > 0) {
-            if (typeof jsonResult[0] === 'string') {
-                console.log("[OllamaLocal] JSON returned array of strings. Parsing each string...");
-                for (const str of jsonResult) {
-                    const parsed = parseLine(str);
+            console.log("[OllamaLocal] JSON parsed successfully. Processing items...");
+            for (const item of jsonResult) {
+                if (typeof item === 'string') {
+                    // "KEY: Value"
+                    const parsed = parseLine(item);
                     if (parsed) findings.push(parsed);
+                } else if (typeof item === 'object') {
+                    // { "type": "NAME", "value": "Mario" }
+                    if (item.value && (item.type || item.category)) {
+                        findings.push({
+                            value: item.value,
+                            type: item.type || item.category || 'UNKNOWN',
+                            label: item.label || item.type || item.category || 'UNKNOWN'
+                        });
+                    }
                 }
-            } else {
-                // Already objects?
-                findings = jsonResult;
             }
         }
 

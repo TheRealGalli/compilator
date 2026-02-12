@@ -452,7 +452,8 @@ export function DocumentCompilerSection({
 
       // Check if replacement will happen (for logging)
       if (regex.test(result)) {
-        console.log(`[Pawn] Replacing '${value}' (Pattern: ${robustPattern}) -> '${token}'`);
+        // console.log(`[Pawn] Replacing '${value}' (Pattern: ${robustPattern}) -> '${token}'`);
+        console.log(`[Pawn] Censoring '${value}' -> '${token}'`);
         result = result.replace(regex, token);
       }
     }
