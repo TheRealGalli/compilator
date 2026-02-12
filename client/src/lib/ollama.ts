@@ -350,7 +350,7 @@ ${text}
         let findings: any[] = [];
         let rawResponse = data.message?.content || "";
 
-        // DEBUG: Removed sensitive raw response log
+        console.log("[OllamaLocal] RAW RESPONSE PREVIEW:", rawResponse.substring(0, 500) + "..."); // DEBUG: Inspect model output
 
         // Helper to parse a single line "KEY: VALUE"
         const parseLine = (line: string): { value: string, type: string, label: string } | null => {
