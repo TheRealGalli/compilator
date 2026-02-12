@@ -264,7 +264,7 @@ export function ModelSettings({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={`h-6 w-6 rounded-full transition-all duration-300 ${isRecording ? (isPaused ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600 animate-pulse') : 'text-muted-foreground hover:text-blue-600 hover:bg-blue-50'}`}
+                          className={`h-6 w-6 rounded-full transition-all duration-300 ${isRecording ? (isPaused ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600') : 'text-muted-foreground hover:text-blue-600 hover:bg-blue-50'}`}
                           onClick={handleMicClick}
                           onDoubleClick={handleMicDoubleClick}
                           disabled={isTranscribing}

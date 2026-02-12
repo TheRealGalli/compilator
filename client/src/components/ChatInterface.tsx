@@ -460,10 +460,10 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
                     variant="ghost"
                     size="icon"
                     className={`rounded-full w-8 h-8 transition-all duration-300 ${isRecording
-                        ? isPaused
-                          ? 'bg-amber-100 text-amber-600' // Paused State
-                          : 'bg-red-100 text-red-600 animate-pulse' // Recording State
-                        : 'text-muted-foreground' // Idle State
+                      ? isPaused
+                        ? 'bg-amber-100 text-amber-600' // Paused State
+                        : 'bg-red-100 text-red-600' // Recording State (Static)
+                      : 'text-muted-foreground' // Idle State
                       }`}
                     onClick={handleMicClick}
                     onDoubleClick={handleMicDoubleClick}
