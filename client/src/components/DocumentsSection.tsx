@@ -45,7 +45,8 @@ export function DocumentsSection() {
     currentCategory: driveCategory, setCategory: setDriveCategory,
     searchQuery: driveSearch, setSearchQuery: setDriveSearch,
     nextPageToken: driveNextToken, currentFolderId, folderPath,
-    navigateToFolder, goToParentFolder, resetNavigation
+    navigateToFolder, goToParentFolder, resetNavigation,
+    isConnected: isConnectedDrive
   } = useGoogleDrive();
   const [localSearch, setLocalSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -669,48 +670,46 @@ export function DocumentsSection() {
           disabled={isUploading || !isAuthenticated}
         />
 
-        <div className="flex flex-col gap-4 relative">
-          <div className="flex items-center gap-4">
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
-            <div className="h-[1px] w-full bg-border/60" />
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="gap-2 border-red-50 hover:bg-red-50 hover:text-red-600 transition-all hover:border-red-200 shadow-sm"
-              onClick={() => {
-                if (!isAuthenticated) return;
-                fetchMessages();
-                setView('gmail');
-              }}
-              disabled={!isAuthenticated}
-            >
-              <GmailLogo className="w-4 h-4" />
-              Gmail
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
-              onClick={() => {
-                if (!isAuthenticated) return;
-                fetchFiles();
-                setView('drive');
-              }}
-              disabled={!isAuthenticated}
-            >
-              <DriveLogo className="w-4 h-4" />
-              Google Drive
-            </Button>
-          </div>
-
-          {!isAuthenticated && (
-            <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-[1px] flex items-center justify-center rounded-lg border border-dashed border-muted-foreground/20">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <Info className="w-3 h-3" /> Login richiesto per le integrazioni cloud
-              </p>
+        {(isConnected || isConnectedDrive) && (
+          <div className="flex flex-col gap-4 relative">
+            <div className="flex items-center gap-4">
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
+              <div className="h-[1px] w-full bg-border/60" />
             </div>
-          )}
-        </div>
+            <div className="flex gap-3">
+              {isConnected && (
+                <Button
+                  variant="outline"
+                  className="gap-2 border-red-50 hover:bg-red-50 hover:text-red-600 transition-all hover:border-red-200 shadow-sm"
+                  onClick={() => {
+                    if (!isAuthenticated) return;
+                    fetchMessages();
+                    setView('gmail');
+                  }}
+                  disabled={!isAuthenticated}
+                >
+                  <GmailLogo className="w-4 h-4" />
+                  Gmail
+                </Button>
+              )}
+              {isConnectedDrive && (
+                <Button
+                  variant="outline"
+                  className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
+                  onClick={() => {
+                    if (!isAuthenticated) return;
+                    fetchFiles();
+                    setView('drive');
+                  }}
+                  disabled={!isAuthenticated}
+                >
+                  <DriveLogo className="w-4 h-4" />
+                  Google Drive
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
         {sources.filter(s => !s.isMemory).length > 0 && (
           <div
