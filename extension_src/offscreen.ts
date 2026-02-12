@@ -142,6 +142,7 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
                     value = field.getText() || "";
                 } else if (field instanceof PDFCheckBox) {
                     value = field.isChecked() ? "Sì" : "No";
+                } else if (field instanceof PDFDropdown || field instanceof PDFOptionList) {
                     const selected = field.getSelected();
                     value = selected ? selected.join(', ') : "";
                 } else if (field instanceof PDFRadioGroup) {

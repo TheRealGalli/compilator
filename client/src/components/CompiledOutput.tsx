@@ -48,7 +48,7 @@ export function CompiledOutput({ content, onCopy, onDownload, readOnly = false }
             <FormattedMessage content={content} />
           </div>
         ) : (
-          <div className="text-sm text-muted-foreground space-y-4">
+          <div className="text-sm text-muted-foreground space-y-4 -mt-2">
             <p className="font-medium">Il Compilatore AI trasforma template in documenti completi.</p>
           </div>
         )}
