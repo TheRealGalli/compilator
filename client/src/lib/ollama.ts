@@ -67,13 +67,23 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
                 ok: true,
                 status: 200,
                 json: async () => {
-                    console.log(`[OllamaLocal] Bridge response data length: ${bridgeResult.data?.length}`);
+                    // Fix: The bridge might return an object directly or a string
+                    const rawData = bridgeResult.data;
+                    console.log(`[OllamaLocal] Bridge raw data type: ${typeof rawData}`);
+
+                    if (typeof rawData === 'object' && rawData !== null) {
+                        console.log(`[OllamaLocal] Bridge returned object directly.`);
+                        return rawData;
+                    }
+
                     try {
-                        const parsed = JSON.parse(bridgeResult.data);
+                        const parsed = JSON.parse(rawData);
                         console.log(`[OllamaLocal] Bridge response parsed successfully.`);
                         return parsed;
                     } catch (e) {
-                        console.error(`[OllamaLocal] Bridge response parse error:`, e);
+                        console.error(`[OllamaLocal] Bridge response parse error. Raw data:`, rawData);
+                        // If it's a string like "[object Object]", it means upstream serialization failed. 
+                        // But we try to return it if it looks like a valid structure or fail.
                         throw e;
                     }
                 }
