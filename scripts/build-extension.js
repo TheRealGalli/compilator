@@ -5,13 +5,9 @@ import fs from 'fs';
 const isWatch = process.argv.includes('--watch');
 
 const buildOptions = {
-    entryPoints: {
-        background: 'extension_src/background.ts',
-        content: 'extension_src/content.ts',
-        'pdf.worker': 'node_modules/pdfjs-dist/build/pdf.worker.mjs'
-    },
     bundle: true,
     outdir: 'client/public/extension',
+    // entryPoints removed here, defined in build() steps
     platform: 'browser',
     target: ['es2020'],
     format: 'esm', // Manifest V3 supports ESM
@@ -31,12 +27,35 @@ const buildOptions = {
 };
 
 async function build() {
+    // 1. Build Background and Content scripts (ESM)
+    const extensionCtx = await esbuild.context({
+        ...buildOptions,
+        entryPoints: {
+            background: 'extension_src/background.ts',
+            content: 'extension_src/content.ts',
+        },
+        format: 'esm',
+    });
+
+    // 2. Build PDF Worker (IIFE - Standalone)
+    const workerCtx = await esbuild.context({
+        ...buildOptions,
+        entryPoints: {
+            'pdf.worker': 'node_modules/pdfjs-dist/build/pdf.worker.mjs'
+        },
+        format: 'iife',
+        // Ensure global name doesn't conflict, though usually not needed for worker
+    });
+
     if (isWatch) {
-        const ctx = await esbuild.context(buildOptions);
-        await ctx.watch();
+        await extensionCtx.watch();
+        await workerCtx.watch();
         console.log('Watching for extension changes...');
     } else {
-        await esbuild.build(buildOptions);
+        await extensionCtx.rebuild();
+        await workerCtx.rebuild();
+        await extensionCtx.dispose();
+        await workerCtx.dispose();
         console.log('Extension built successfully!');
     }
 }
