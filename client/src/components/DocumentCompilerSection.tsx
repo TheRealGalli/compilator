@@ -552,7 +552,7 @@ export function DocumentCompilerSection({
         try {
           // --- PHASE 1: SURGICAL EXTRACTION ---
           // Identify all PII findings from all texts to build a MASTER VAULT
-          console.log('[DocumentCompiler] Phase 1: Surgical Extraction starting (v5.8)...');
+          console.log('[Gromit Frontend] STEP 1: Surgical Extraction starting (v5.8)...');
 
           const vaultMap = new Map<string, string>(Object.entries(guardrailVault));
           const vaultCounts = new Map<string, number>();
@@ -647,7 +647,7 @@ export function DocumentCompilerSection({
             allDocs = sourceTextCache.current;
           } else {
 
-            console.log('[DocumentCompiler] [Local-Privacy] Extracting texts locally (Zero-Data)...');
+            console.log('[Gromit Frontend] STEP 1.1: Extracting texts locally (Zero-Data)...');
 
             // Helper to convert base64 to File for local extraction
             const base64ToFile = (base64: string, filename: string, mimeType: string): File => {
@@ -717,7 +717,7 @@ export function DocumentCompilerSection({
             sourceTextCache.current = allDocs;
           }
 
-          console.log(`[DocumentCompiler] [Surgical 5.8] Avvio Ultra-Drive su ${allDocs.length} sorgenti...`);
+          console.log(`[Gromit Frontend] STEP 2: Avvio Ultra-Drive Analysis su ${allDocs.length} sorgenti...`);
           const startTime = Date.now();
           const DOC_BATCH_SIZE = 1; // Process 1 doc at a time (Safe for 8GB RAM)
           const flatResults = [];
@@ -731,7 +731,8 @@ export function DocumentCompilerSection({
 
             const batchResults = await Promise.all(batch.map(async (doc) => {
               const charCount = doc.text.length;
-              console.log(`[DocumentCompiler] -> Analizzando '${doc.name}' (${charCount} char)...`);
+              console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
+              console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
 
               const findings = await extractPIILocal(doc.text);
 
@@ -829,8 +830,8 @@ export function DocumentCompilerSection({
           const masterVault = Object.fromEntries(vaultMap);
           const masterCounts = Object.fromEntries(vaultCounts);
 
-          // --- PHASE 2: MECHANICAL GLOBAL SWEEP (LOCAL) ---
-          console.log('[DocumentCompiler] Phase 2: Mechanical Global Sweep (Local-Privacy)...');
+          // --- PHASE 3: MECHANICAL GLOBAL SWEEP (LOCAL) ---
+          console.log('[Gromit Frontend] STEP 3: Mechanical Global Sweep (Local-Privacy)...');
 
           // Apply anonymity to ALL documents locally
           const anonymizedDocs = allDocs.map(doc => {
@@ -890,9 +891,9 @@ export function DocumentCompilerSection({
 
           // CRITICAL FIX: If we have ORIGINAL text, re-anonymize it with the UPDATED vault (post-user-edits)
           if (cached && cached.originalText) {
-            console.log(`[Pawn] Re-anonymizing cached source '${source.name}' with updated vault...`);
+            console.log(`[Gromit Frontend] Re-anonymizing cached source '${source.name}' with updated vault...`);
             const reAnonymized = performMechanicalGlobalSweep(cached.originalText, guardrailVault);
-            console.log(`[Pawn] >> FINAL ANONYMIZED PAYLOAD FOR '${source.name}' <<\n${reAnonymized}\n>> END PAYLOAD <<`);
+            console.log(`[Gromit Frontend] >> FINAL ANONYMIZED PAYLOAD FOR '${source.name}' <<\n${reAnonymized}\n>> END PAYLOAD <<`);
             return reAnonymized;
           }
 
@@ -925,7 +926,7 @@ export function DocumentCompilerSection({
 
           // Apply Sweep
           const freshAnonymized = performMechanicalGlobalSweep(text, guardrailVault);
-          console.log(`[Pawn] >> FINAL ANONYMIZED PAYLOAD FOR '${source.name}' (Fresh Extract) <<\n${freshAnonymized}\n>> END PAYLOAD <<`);
+          console.log(`[Gromit Frontend] >> FINAL ANONYMIZED PAYLOAD FOR '${source.name}' (Fresh Extract) <<\n${freshAnonymized}\n>> END PAYLOAD <<`);
           return freshAnonymized;
         };
 
