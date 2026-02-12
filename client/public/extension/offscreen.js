@@ -91024,30 +91024,34 @@ async function extractPdfText(arrayBuffer) {
     const pdfDoc = await PDFDocument_default.load(arrayBuffer);
     const form = pdfDoc.getForm();
     const fields = form.getFields();
-    if (fields.length > 0) {
+    let validFieldsCount = 0;
+    let tempHeader = "";
+    fields.forEach((field) => {
+      try {
+        const name = field.getName();
+        let value = "";
+        if (field instanceof PDFTextField_default) {
+          value = field.getText() || "";
+        } else if (field instanceof PDFCheckBox_default) {
+          value = field.isChecked() ? "S\xEC" : "No";
+        } else if (field instanceof PDFDropdown_default || field instanceof PDFOptionList_default) {
+          const selected = field.getSelected();
+          value = selected ? selected.join(", ") : "";
+        } else if (field instanceof PDFRadioGroup_default) {
+          value = field.getSelected() || "";
+        }
+        if (value && value.trim() !== "") {
+          tempHeader += `[CAMPO] ${name}: ${value}
+`;
+          validFieldsCount++;
+        }
+      } catch (err) {
+      }
+    });
+    if (validFieldsCount > 0) {
       formHeader += "--- [GROMIT INSIGHT] DATI MODULO RILEVATI (AcroForm) ---\n";
       formHeader += "NOTA: Questi dati sono stati estratti dai campi interattivi del PDF.\n\n";
-      fields.forEach((field) => {
-        try {
-          const name = field.getName();
-          let value = "";
-          if (field instanceof PDFTextField_default) {
-            value = field.getText() || "";
-          } else if (field instanceof PDFCheckBox_default) {
-            value = field.isChecked() ? "S\xEC" : "No";
-          } else if (field instanceof PDFDropdown_default || field instanceof PDFOptionList_default) {
-            const selected = field.getSelected();
-            value = selected ? selected.join(", ") : "";
-          } else if (field instanceof PDFRadioGroup_default) {
-            value = field.getSelected() || "";
-          }
-          if (value && value.trim() !== "") {
-            formHeader += `[CAMPO] ${name}: ${value}
-`;
-          }
-        } catch (err) {
-        }
-      });
+      formHeader += tempHeader;
       formHeader += "--- FINE DATI MODULO ---\n\n";
     }
   } catch (e) {
