@@ -647,7 +647,7 @@ export function DocumentCompilerSection({
             allDocs = sourceTextCache.current;
           } else {
 
-            console.log('[Gromit Frontend] STEP 1.1: Extracting texts locally (Zero-Data)...');
+            // console.log('[Gromit Frontend] STEP 1.1: Extracting texts locally (Zero-Data)...');
 
             // Helper to convert base64 to File for local extraction
             const base64ToFile = (base64: string, filename: string, mimeType: string): File => {
@@ -717,7 +717,7 @@ export function DocumentCompilerSection({
             sourceTextCache.current = allDocs;
           }
 
-          console.log(`[Gromit Frontend] STEP 2: Avvio Ultra-Drive Analysis su ${allDocs.length} sorgenti...`);
+          // console.log(`[Gromit Frontend] STEP 2: Avvio Ultra-Drive Analysis su ${allDocs.length} sorgenti...`);
           const startTime = Date.now();
           const DOC_BATCH_SIZE = 1; // Process 1 doc at a time (Safe for 8GB RAM)
           const flatResults = [];
@@ -731,8 +731,8 @@ export function DocumentCompilerSection({
 
             const batchResults = await Promise.all(batch.map(async (doc) => {
               const charCount = doc.text.length;
-              console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
-              console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
+              // console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
+              // console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
 
               const findings = await extractPIILocal(doc.text);
 
@@ -744,7 +744,7 @@ export function DocumentCompilerSection({
           }
 
           const totalTime = (Date.now() - startTime) / 1000;
-          console.log(`[DocumentCompiler] Estrazione completata in ${totalTime.toFixed(1)}s (${(totalTime / allDocs.length).toFixed(1)}s per doc).`);
+          // console.log(`[DocumentCompiler] Estrazione completata in ${totalTime.toFixed(1)}s (${(totalTime / allDocs.length).toFixed(1)}s per doc).`);
 
           // 3. Sequential Vault Registration (Safe Deduplication)
           const ALLOWED = [
@@ -831,7 +831,8 @@ export function DocumentCompilerSection({
           const masterCounts = Object.fromEntries(vaultCounts);
 
           // --- PHASE 3: MECHANICAL GLOBAL SWEEP (LOCAL) ---
-          console.log('[Gromit Frontend] STEP 3: Mechanical Global Sweep (Local-Privacy)...');
+          // --- PHASE 3: MECHANICAL GLOBAL SWEEP (LOCAL) ---
+          // console.log('[Gromit Frontend] STEP 3: Mechanical Global Sweep (Local-Privacy)...');
 
           // Apply anonymity to ALL documents locally
           const anonymizedDocs = allDocs.map(doc => {
@@ -891,7 +892,7 @@ export function DocumentCompilerSection({
 
           // CRITICAL FIX: If we have ORIGINAL text, re-anonymize it with the UPDATED vault (post-user-edits)
           if (cached && cached.originalText) {
-            console.log(`[Gromit Frontend] Re-anonymizing cached source '${source.name}' with updated vault...`);
+            // console.log(`[Gromit Frontend] Re-anonymizing cached source '${source.name}' with updated vault...`);
             const reAnonymized = performMechanicalGlobalSweep(cached.originalText, guardrailVault);
             console.log(`[Gromit Frontend] >> FINAL ANONYMIZED PAYLOAD FOR '${source.name}' <<\n${reAnonymized}\n>> END PAYLOAD <<`);
             return reAnonymized;

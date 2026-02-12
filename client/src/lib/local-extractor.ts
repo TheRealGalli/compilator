@@ -101,7 +101,7 @@ export async function extractTextLocally(file: File): Promise<string> {
 
     try {
         if (isBridgeAvailable()) {
-            console.log(`[Gromit Frontend] Offloading ${fileName} to Gromit Bridge "Sanctuary"...`);
+            // console.log(`[Gromit Frontend] Offloading ${fileName} to Gromit Bridge "Sanctuary"...`);
             return await extractViaBridge(file);
         } else {
             console.warn(`[LocalExtractor] Bridge missing. Cannot extract complex file: ${fileName}`);

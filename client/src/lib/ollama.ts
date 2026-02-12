@@ -95,7 +95,7 @@ export async function testOllamaConnection(): Promise<boolean> {
 
     for (const url of urls) {
         try {
-            console.log(`[OllamaLocal] Prova connessione a ${url}/api/tags...`);
+            // console.log(`[OllamaLocal] Prova connessione a ${url}/api/tags...`);
 
             const response = await smartFetch(`${url}/api/tags`, { method: 'GET' });
 
@@ -117,7 +117,7 @@ export async function testOllamaConnection(): Promise<boolean> {
             );
 
             if (hasModel) {
-                console.log(`[OllamaLocal] PRONTO! Modello ${OLLAMA_MODEL} trovato su ${url}.`);
+                // console.log(`[OllamaLocal] PRONTO! Modello ${OLLAMA_MODEL} trovato su ${url}.`);
                 currentBaseUrl = url;
                 return true;
             } else {
@@ -218,7 +218,7 @@ function extractJsonFromResponse(text: string): any[] {
 export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
-    console.log(`[OllamaLocal] Starting Hybrid PII Extraction on ${text.length} chars...`);
+    // console.log(`[OllamaLocal] Starting Hybrid PII Extraction on ${text.length} chars...`);
     // Value -> { type, label }
     const unifiedFindings = new Map<string, { type: string, label?: string }>();
 
@@ -229,7 +229,7 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // User requested opening up to MEDIUM and LOW confidence
     const regexCandidates = candidates.filter(c => ['HIGH', 'MEDIUM', 'LOW'].includes(c.confidence));
 
-    console.log(`[OllamaLocal] Regex found ${regexCandidates.length} items (High/Medium/Low).`);
+    // console.log(`[OllamaLocal] Regex found ${regexCandidates.length} items (High/Medium/Low).`);
 
     // Auto-accept Regex Candidates
     for (const c of regexCandidates) {
@@ -238,8 +238,8 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
 
     // 2. LLM SWEEPER (Full Text Discovery)
     // User requested FULL DOCUMENT context.
-    console.log(`[OllamaLocal] Sending FULL TEXT (${text.length} chars) to LLM...`);
-    console.log("[OllamaLocal] Full Extracted Text Preview:\n", text); // Re-enabled for verification
+    // console.log(`[OllamaLocal] Sending FULL TEXT (${text.length} chars) to LLM...`);
+    // console.log("[OllamaLocal] Full Extracted Text Preview:\n", text); // Re-enabled for verification
 
     // ULTRA-CONCISE PROMPT (User's Proven Prompt)
     // We use the exact phrasing that worked in chat.
@@ -369,7 +369,7 @@ ${text}
         finalResults.push({ value, category: data.type, label: data.label });
     }
 
-    console.log(`[OllamaLocal] Discovery Complete. Total Unique PII: ${finalResults.length}`);
+    // console.log(`[OllamaLocal] Discovery Complete. Total Unique PII: ${finalResults.length}`);
     return finalResults;
 }
 
