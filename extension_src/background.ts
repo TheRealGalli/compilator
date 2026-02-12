@@ -68,35 +68,25 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
         return true; // Keep channel open
     }
 
-    // --- OLLAMA_FETCH: Simple fetch proxy ---
+    // --- OLLAMA_FETCH: Now Routed via Offscreen to avoid SW termination on long requests ---
     if (request.type === 'OLLAMA_FETCH') {
         const { url, options } = request;
+        console.log('[GromitBridge] Delegating OLLAMA_FETCH to Offscreen:', url);
 
-        console.log('[GromitBridge] Eseguo fetch (Background):', url);
-
-        const fetchOptions: any = {
-            method: options.method || 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: options.body,
-            mode: 'cors',
-            credentials: 'omit',
-            referrerPolicy: 'no-referrer'
-        };
-
-        fetch(url, fetchOptions)
-            .then(async response => {
-                const ok = response.ok;
-                const status = response.status;
-                const data = await response.json().catch(() => ({}));
-                sendResponse({ success: true, ok, status, data });
-            })
-            .catch(error => {
-                console.error('[GromitBridge] Errore Fetch:', error);
+        (async () => {
+            try {
+                await setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
+                const response = await chrome.runtime.sendMessage({
+                    type: 'OLLAMA_FETCH_OFFSCREEN',
+                    url,
+                    options
+                });
+                sendResponse(response);
+            } catch (error: any) {
+                console.error('[GromitBridge] Offscreen Fetch Error:', error);
                 sendResponse({ success: false, error: error.message });
-            });
-
+            }
+        })();
         return true;
     }
 

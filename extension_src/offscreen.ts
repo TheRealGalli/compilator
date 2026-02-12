@@ -53,6 +53,48 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         return true; // Keep channel open
     }
+
+    // --- NEW: OLLAMA_FETCH_OFFSCREEN ---
+    // Executed in DOM context (Offscreen), immune to Service Worker termination
+    if (request.type === 'OLLAMA_FETCH_OFFSCREEN') {
+        const { url, options } = request;
+        console.log(`[GromitOffscreen] Executing fetch for: ${url}`);
+
+        const fetchOptions: any = {
+            method: options.method || 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: options.body,
+            mode: 'cors',
+            credentials: 'omit',
+            referrerPolicy: 'no-referrer'
+        };
+
+        fetch(url, fetchOptions)
+            .then(async response => {
+                const ok = response.ok;
+                const status = response.status;
+                // If it's a 204 No Content, text() might be empty. 
+                // We use text() then try parse to avoid errors on empty bodies.
+                const text = await response.text().catch(() => "");
+                let data = {};
+                try {
+                    data = text ? JSON.parse(text) : {};
+                } catch (e) {
+                    // console.warn("Response was not JSON", text);
+                    data = { raw: text };
+                }
+
+                sendResponse({ success: true, ok, status, data });
+            })
+            .catch(error => {
+                console.error('[GromitOffscreen] Fetch Error:', error);
+                sendResponse({ success: false, error: error.message });
+            });
+
+        return true;
+    }
 });
 
 
