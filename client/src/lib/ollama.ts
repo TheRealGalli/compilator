@@ -263,10 +263,12 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // console.log(`[OllamaLocal] Sending FULL TEXT (${text.length} chars) to LLM...`);
     // console.log("[OllamaLocal] Full Extracted Text Preview:\n", text); // Re-enabled for verification
 
-    // ULTRA-CONCISE PROMPT (User's Proven Prompt)
-    // We use the exact phrasing that worked in chat.
-    const prompt = `find PERSONAL data in the text and do a token for pseuddonimiz it , return only the list of DATA as a tokenized format.
-    
+    // ULTRA-CONCISE PROMPT (User's Proven Prompt - RESTORED & REFINED)
+    // We explicitly ask for "Label: Value" format to capture custom token names.
+    const prompt = `find PERSONAL data in the text.
+Return a list of strictly formatted strings: "LABEL: VALUE"
+Where LABEL is a short, uppercase category name (e.g. PHONE_NUMBER, FISCAL_CODE, DATI_CLIENTE).
+
 Text:
 ${text}
 `;
@@ -319,8 +321,16 @@ ${text}
             else type = 'GENERIC_PII';
 
             // NORMALIZED LABEL
-            const normalizedLabel = key.replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
-            return { value: val, type, label: normalizedLabel };
+            // If the model gives "DITTA_CLIENTE: Galli Carlo", we want label="DITTA_CLIENTE"
+            // The previous logic over-normalized to generic types.
+            // We now Trust The Model's Label if it looks specific.
+            const rawLabel = key.replace(/\s+/g, '_').toUpperCase();
+
+            // If the key is just a generic category name in English, we map it to type.
+            // If it's something specific like "DATI_SOGGETTO", we keep it as label.
+            const finalLabel = rawLabel.length > 2 ? rawLabel : type;
+
+            return { value: val, type, label: finalLabel };
         };
 
         // STRATEGY 1: Try JSON Parse
@@ -382,7 +392,9 @@ ${text}
 
                 // Add to findings directly (Trusting the Model)
                 // Use the Captured Label if available, otherwise fallback to Type
-                const finalLabel = finding.label || finding.type;
+                // CRITICAL FIX: Ensure we use the label from the parser, not just the type
+                const finalLabel = finding.label && finding.label !== 'UNKNOWN' ? finding.label : finding.type;
+
                 unifiedFindings.set(val, { type: finding.type, label: finalLabel });
                 console.log(`[OllamaLocal] + NEW FINDING (${finding.type}) [Label: ${finalLabel}]`);
             }
