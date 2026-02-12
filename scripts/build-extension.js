@@ -20,7 +20,17 @@ const buildOptions = {
     define: {
         'process.env.NODE_ENV': '"production"'
     },
-    plugins: [],
+    plugins: [{
+        name: 'copy-pdf-worker',
+        setup(build) {
+            build.onEnd(() => {
+                const workerSrc = path.resolve('node_modules/pdfjs-dist/build/pdf.worker.min.mjs');
+                const workerDest = path.resolve('client/public/extension/pdf.worker.min.mjs');
+                fs.copyFileSync(workerSrc, workerDest);
+                console.log('Copied pdf.worker.min.mjs to extension folder');
+            });
+        }
+    }],
     alias: {
         // Add aliases if needed
     }
