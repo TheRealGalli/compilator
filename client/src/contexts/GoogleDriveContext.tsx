@@ -36,6 +36,7 @@ interface GoogleDriveContextType {
     goToParentFolder: () => void;
     resetNavigation: () => void;
     userIdentity: { name: string, initial: string } | null;
+    isConnected: boolean;
 }
 
 const GoogleDriveContext = createContext<GoogleDriveContextType | undefined>(undefined);
@@ -267,7 +268,8 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
             navigateToFolder,
             goToParentFolder,
             resetNavigation,
-            userIdentity
+            userIdentity,
+            isConnected: !!sessionStorage.getItem('gmail_tokens')
         }}>
             {children}
         </GoogleDriveContext.Provider>
