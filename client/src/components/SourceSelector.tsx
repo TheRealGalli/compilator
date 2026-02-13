@@ -121,6 +121,19 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
           {selectedCount}/10
         </Badge>
       </div>
+
+      {/* DEBUG OVERLAY - TO BE REMOVED AFTER DIAGNOSIS */}
+      <div className="px-4 py-2 bg-red-500/10 text-[10px] font-mono text-red-500 border-b border-red-500/20">
+        <p>DEBUG INFO (Fai Screenshot):</p>
+        <p>Total Sources: {sources.length}</p>
+        <p>Visible Sources: {visibleSources.length}</p>
+        <p>Selected Count: {selectedCount}</p>
+        <p>First Source State: {visibleSources.length > 0 ? JSON.stringify({
+          id: visibleSources[0].id.substring(0, 8),
+          sel: visibleSources[0].selected,
+          type: typeof visibleSources[0].selected
+        }) : 'None'}</p>
+      </div>
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-2">
           {visibleSources.map((source) => {
