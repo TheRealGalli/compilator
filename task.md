@@ -5,10 +5,11 @@
     - [ ] Verify `pdfjs-dist` worker configuration for performance.
 
 - [ ] **Feature Migration: Pawn Guardrail** (Priority 1)
-    - [/] **Debug Source Counting Bug** (Critical)
-        - [x] Fix race condition in `addSource` (SourcesContext).
-        - [ ] Add Debug Overlay to `SourceSelector` to diagnose "0/10" display issue.
-        - [ ] Verify `Checkbox` state vs `selectedCount` logic.
+    - [x] **Debug Source Counting Display Bug**
+    - [x] Add Debug Overlay to SourceSelector to inspect `sources` prop vs state
+    - [x] Verify checkbox state and selection logic
+    - [x] Fix "Frozen Component" issue (Google Translate interference) by adding `translate="no"`
+    - [x] Hide debug overlay (kept for future use).
     - [ ] Update `DocumentCompilerSection.tsx` to use local extraction.
     - [ ] Remove `/api/pawn-extract` calls.
 
