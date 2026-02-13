@@ -8,35 +8,29 @@ const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // --- OFFSCREEN DOCUMENT MANAGEMENT ---
 
-const OFFSCREEN_LIFETIME_MS = 30 * 1000; // 30 Seconds Self-Destruct
-let offscreenTimer: any = null;
+
+
 let creating: Promise<void> | null = null; // A global promise to avoid concurrency issues
+let activeSessions = 0;
 
-// --- LIFECYCLE MANAGEMENT ---
-
-function startOffscreenTimer() {
-    if (offscreenTimer) clearTimeout(offscreenTimer);
-
-    offscreenTimer = setTimeout(() => {
-        closeOffscreenDocument();
-    }, OFFSCREEN_LIFETIME_MS);
-}
+// --- LIFECYCLE MANAGEMENT (SESSION BASED) ---
 
 async function closeOffscreenDocument() {
     if (!creating) {
         try {
             await chrome.offscreen.closeDocument();
-            console.log(`[GromitBridge] 🛑 Offscreen Document Self-Destructed (Idle > ${OFFSCREEN_LIFETIME_MS}ms). Memory Purged.`);
+            console.log(`[GromitBridge] 🛑 Offscreen Document Closed. Session Ended (Active Sessions: ${activeSessions}).`);
         } catch (err) {
-            // Ignore error if already closed
             console.debug('[GromitBridge] Offscreen already closed or invalid.');
         }
     }
 }
 
+
+
 async function setupOffscreenDocument(path: string) {
     // Reset timer whenever we "touch" the offscreen doc
-    startOffscreenTimer();
+
 
     // Check if an offscreen document has already been created
     const offscreenUrl = chrome.runtime.getURL(path);
@@ -65,9 +59,7 @@ async function setupOffscreenDocument(path: string) {
 
 chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: any) => {
     // Refresh timer on any valid activity
-    if (['EXTRACT_AND_ANALYZE', 'OLLAMA_FETCH'].includes(request.type)) {
-        startOffscreenTimer();
-    }
+
 
     // --- GET_VERSION: Returns bridge version ---
     if (request.type === 'GET_VERSION') {

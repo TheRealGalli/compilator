@@ -3,6 +3,10 @@
 document.documentElement.setAttribute('data-gromit-bridge-active', 'true');
 console.log('[GromitBridge] Content Script inizializzato.');
 
+// --- SESSION LIFECYCLE MANAGEMENT ---
+// Establish a long-lived connection to keep the extension context alive (and detect closure)
+const sessionPort = chrome.runtime.connect({ name: "GROMIT_SESSION" });
+
 // In ascolto di eventi dalla pagina web
 window.addEventListener('GROMIT_BRIDGE_REQUEST', (event: any) => {
     const { detail, requestId } = event.detail;
@@ -16,4 +20,4 @@ window.addEventListener('GROMIT_BRIDGE_REQUEST', (event: any) => {
     });
 });
 
-console.log('[GromitBridge] Content Script attivo e pronto.');
+console.log('[GromitBridge] Content Script attivo e pronto. Session Port aperta.');
