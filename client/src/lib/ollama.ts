@@ -354,8 +354,16 @@ ${text}
 
         // Helper to parse a single line "KEY: VALUE"
         const parseLine = (line: string): { value: string, type: string, label: string } | null => {
-            // Pre-clean: Remove generic list markers, quotes, trailing commas
-            let cleanLine = line.trim().replace(/^[-*]\s+/, '').replace(/^"|",?$/g, '').replace(/^'|',?$/g, '');
+            // Pre-clean: Remove markdown formatting, list markers, quotes, trailing commas
+            let cleanLine = line.trim()
+                .replace(/^#{1,6}\s+/, '')        // Remove markdown headers (# ## ### etc.)
+                .replace(/\*\*/g, '')              // Remove bold **text**
+                .replace(/(?<!\w)\*(?!\*)/g, '')   // Remove italic *text* (not **)
+                .replace(/^[-•]\s+/, '')           // Remove list markers (- •)
+                .replace(/^\d+[\.\)]\s+/, '')      // Remove numbered list markers (1. 2) etc.)
+                .replace(/^"|",?$/g, '').replace(/^'|',?$/g, '')  // Remove surrounding quotes
+                .replace(/`/g, '')                 // Remove inline code backticks
+                .trim();
 
             // Matches: "NAME: Mario Rossi", "P.IVA: 123"
             const match = cleanLine.match(/^\s*([A-Za-z0-9_ \-\.\'àèìòùÀÈÌÒÙ]+)\s*[:=]\s*(.+)\s*$/);
