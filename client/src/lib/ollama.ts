@@ -79,19 +79,22 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
                 json: async () => {
                     // Fix: The bridge might return an object directly or a string
                     const rawData = bridgeResult.data;
-                    // console.log(`[OllamaLocal] Bridge raw data type: ${typeof rawData}`);
+                    // SECURITY: Do not log raw LLM response in production to avoid PII leak
+                    // console.log(`[OllamaLocal] Response JSON received (Length: ${rawData.length})`);
+                    // console.log(`[OllamaLocal] RAW RESPONSE PREVIEW: ${rawData.substring(0, 200)}...`);
 
+                    let data = {};
                     if (typeof rawData === 'object' && rawData !== null) {
-                        return rawData;
+                        data = rawData;
+                    } else {
+                        try {
+                            data = rawData ? JSON.parse(rawData) : {};
+                        } catch (e) {
+                            console.warn("[OllamaLocal] JSON failed or empty. Trying Line-by-Line parsing...");
+                            data = { raw: rawData };
+                        }
                     }
-
-                    try {
-                        const parsed = JSON.parse(rawData);
-                        return parsed;
-                    } catch (e) {
-                        console.error(`[OllamaLocal] Bridge response parse error. Raw data:`, rawData);
-                        throw e;
-                    }
+                    return data;
                 }
             };
         } else {

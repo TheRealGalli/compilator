@@ -261,6 +261,9 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 
             bodyText = ocrFullText; // Replace the empty bodyText with OCR result
 
+            // SECURITY: Clear intermediate variables
+            ocrFullText = "";
+
         } catch (ocrErr: any) {
             console.error("[GromitOffscreen] OCR Failed:", ocrErr);
             formHeader += `\n[ERRORE OCR] ${ocrErr.message}\n`;
@@ -268,7 +271,13 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
     }
 
     // Combined Result: Header (Forms) + Body (Text/OCR)
-    return formHeader + bodyText;
+    const finalResult = formHeader + bodyText;
+
+    // SECURITY: Clear text variables before return (Hint for GC)
+    formHeader = "";
+    bodyText = "";
+
+    return finalResult;
 }
 
 async function extractDocxText(arrayBuffer: ArrayBuffer): Promise<string> {

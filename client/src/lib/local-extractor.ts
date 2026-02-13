@@ -66,6 +66,7 @@ async function extractViaBridge(file: File): Promise<string> {
                 const response = event.detail.response;
 
                 if (response && response.success) {
+                    // SECURITY: Do not log full text content in production
                     // console.log(`[LocalExtractor] Extracted Text Preview (from Bridge):\n${response.text.substring(0, 500)}...\n[...${response.text.length} chars total]`);
                     resolve(response.text);
                 } else {
