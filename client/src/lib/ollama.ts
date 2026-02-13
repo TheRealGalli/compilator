@@ -351,13 +351,14 @@ IMPORTANT RULES:
 2. Return ONLY a list in this format: "TOKEN: VALUE".
 3. If you find a value but don't know the category, use "General_PII".
 4. Do NOT include descriptions, explanations, or markdown formatting like **bold**.
+5. IF NO PII IS FOUND, RETURN AN EMPTY LIST. DO NOT INVENT DATA.
 
 EXAMPLE INPUT:
-"Mario Rossi was born in Rome on 01/01/1980."
+"John Doe was born in New York on 01/01/1980."
 
 EXAMPLE OUTPUT:
-FULL_NAME: Mario Rossi
-PLACE_OF_BIRTH: Rome
+FULL_NAME: John Doe
+PLACE_OF_BIRTH: New York
 DATE_OF_BIRTH: 01/01/1980
 
 Text:

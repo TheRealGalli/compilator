@@ -337,6 +337,21 @@ export function DocumentCompilerSection({
     if (activeGuardrails.includes('pawn')) {
       setIsWaitingForPawnApproval(false);
     }
+
+    // CACHE GC: Sync sourceTextCache with current sources
+    // This prevents "Skipping duplicate" logic from blocking re-uploads of the same file
+    if (sourceTextCache.current) {
+      const currentSourceNames = new Set(selectedSources.map(s => s.name));
+      if (masterSource) currentSourceNames.add(masterSource.name);
+
+      const beforeCount = sourceTextCache.current.length;
+      sourceTextCache.current = sourceTextCache.current.filter(doc => currentSourceNames.has(doc.name));
+      const afterCount = sourceTextCache.current.length;
+
+      if (beforeCount !== afterCount) {
+        console.log(`[DocumentCompiler] Cache GC: Pruned ${beforeCount - afterCount} stale docs.`);
+      }
+    }
   }, [selectedSources, masterSource, activeGuardrails]);
 
   // const fetchDocuments = async () => { // This function is no longer used.
