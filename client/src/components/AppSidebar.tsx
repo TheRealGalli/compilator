@@ -80,10 +80,6 @@ export function AppSidebar({
 
       <div className="flex-1 overflow-hidden flex flex-col p-4">
         <SourceSelector
-          sources={sources}
-          onToggle={onToggleSource}
-          onToggleMaster={onToggleMaster}
-          onToggleBypass={onToggleBypass}
           isAuthenticated={isAuthenticated}
         />
       </div>

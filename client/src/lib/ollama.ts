@@ -337,8 +337,6 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // ULTRA-CONCISE PROMPT (User's Proven Prompt)
     // We use the exact phrasing that worked in chat.
     const prompt = `find PERSONAL data in the text and do a token for pseuddonimiz it , return only the list of DATA as a tokenized format.
-always list the real values found, not descriptions.
-if you find a value but don't know the category, use General_PII.
     
 Text:
 ${llmText}

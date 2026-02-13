@@ -26,22 +26,18 @@ interface Source {
 }
 
 interface SourceSelectorProps {
-  sources: Source[];
-  onToggle?: (id: string) => void;
-  onToggleMaster?: (id: string) => void;
-  onToggleBypass?: (id: string) => void;
-  isAuthenticated?: boolean;
+  isAuthenticated: boolean;
 }
 
-export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypass, isAuthenticated = true }: SourceSelectorProps) {
+export function SourceSelector({ isAuthenticated = true }: SourceSelectorProps) {
   const { isLocked, frozenColor } = useCompiler();
-  const { addSource } = useSources();
+  const { sources, addSource, toggleSource, toggleMaster, toggleBypass } = useSources();
   const [isDragging, setIsDragging] = useState(false);
   const { toast } = useToast();
 
   // Filter out memory files from the UI list
   const visibleSources = sources.filter(s => !s.isMemory);
-  const selectedCount = visibleSources.filter(s => s.selected).length;
+  const selectedCount = visibleSources.filter(s => s.selected === true).length;
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
@@ -124,7 +120,7 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
 
       {/* DEBUG OVERLAY - TO BE REMOVED AFTER DIAGNOSIS */}
       <div className="px-4 py-2 bg-red-500/10 text-[10px] font-mono text-red-500 border-b border-red-500/20">
-        <p>DEBUG INFO (Fai Screenshot):</p>
+        <p>DEBUG INFO (Context-Direct):</p>
         <p>Total Sources: {sources.length}</p>
         <p>Visible Sources: {visibleSources.length}</p>
         <p>Selected Count: {selectedCount}</p>
@@ -146,7 +142,7 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
               >
                 <Checkbox
                   checked={source.selected}
-                  onCheckedChange={() => !(isLocked && source.isMaster) && onToggle?.(source.id)}
+                  onCheckedChange={() => !(isLocked && source.isMaster) && toggleSource(source.id)}
                   disabled={isLocked && source.isMaster}
                   data-testid={`checkbox-source-${source.id}`}
                   className="w-3.5 h-3.5 data-[state=checked]:flex data-[state=checked]:items-center data-[state=checked]:justify-center [&>span]:flex [&>span]:items-center [&>span]:justify-center"
@@ -154,7 +150,7 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>
                     <Icon
-                      onClick={() => !(isLocked && source.isMaster) && onToggleBypass?.(source.id)}
+                      onClick={() => !(isLocked && source.isMaster) && toggleBypass(source.id)}
                       className={`w-3.5 h-3.5 flex-shrink-0 transition-all ${isLocked && source.isMaster ? 'cursor-default' : 'cursor-pointer hover:scale-110 active:scale-95'} ${!isAuthenticated
                         ? 'text-muted-foreground'
                         : isLocked && source.isMaster && frozenColor
@@ -196,7 +192,7 @@ export function SourceSelector({ sources, onToggle, onToggleMaster, onToggleBypa
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => onToggleMaster?.(source.id)}
+                      onClick={() => toggleMaster(source.id)}
                       className={`h-6 w-6 flex-shrink-0 transition-all ${source.isMaster ? 'opacity-100' : isLocked ? 'opacity-0' : 'opacity-0 group-hover:opacity-40'}`}
                     >
                       <Pin className={`w-3.5 h-3.5 ${source.isMaster ? 'text-blue-500 stroke-[3px]' : 'text-muted-foreground'}`} />
