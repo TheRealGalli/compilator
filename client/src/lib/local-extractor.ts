@@ -44,7 +44,7 @@ async function extractViaBridge(file: File): Promise<string> {
         // Retry once after 500ms in case of race condition during load
         await new Promise(r => setTimeout(r, 500));
         if (!isBridgeAvailable()) {
-            throw new Error("Estensione 'Gromit Bridge' non rilevata. Assicurati che sia installata e attiva aggiornando la pagina.");
+            throw new Error("Estensione 'Gromit Bridge' non rilevata. Se sei in navigazione in Incognito, devi abilitare l'estensione nelle impostazioni del browser (Dettagli > Consenti in incognito).");
         }
     }
 
