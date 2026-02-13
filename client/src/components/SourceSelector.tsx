@@ -39,6 +39,10 @@ export function SourceSelector({ isAuthenticated = true }: SourceSelectorProps) 
   const visibleSources = sources.filter(s => !s.isMemory);
   const selectedCount = visibleSources.filter(s => s.selected === true).length;
 
+  // Debug Hooks
+  const instanceId = useState(Math.random().toString(36).slice(2, 7))[0];
+  const renderTime = new Date().toLocaleTimeString();
+
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -121,6 +125,7 @@ export function SourceSelector({ isAuthenticated = true }: SourceSelectorProps) 
       {/* DEBUG OVERLAY - TO BE REMOVED AFTER DIAGNOSIS */}
       <div className="px-4 py-2 bg-red-500/10 text-[10px] font-mono text-red-500 border-b border-red-500/20">
         <p>DEBUG INFO (Context-Direct):</p>
+        <p>Instance: {instanceId} | Time: {renderTime}</p>
         <p>Total Sources: {sources.length}</p>
         <p>Visible Sources: {visibleSources.length}</p>
         <p>Selected Count: {selectedCount}</p>
