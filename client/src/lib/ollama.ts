@@ -322,7 +322,10 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     // 2. LLM SWEEPER (Full Text Discovery)
     // Regex runs on FULL text above, but LLM has a context window limit (num_ctx: 4096 ≈ 3k tokens).
     // We truncate text for the LLM only to avoid 120s timeouts on large documents.
-    const MAX_LLM_CHARS = 6000;
+    // 2. LLM SWEEPER (Full Text Discovery)
+    // Regex runs on FULL text above, but LLM has a context window limit (num_ctx: 4096 ≈ 3k tokens).
+    // We truncate text for the LLM only to avoid 120s timeouts on large documents.
+    const MAX_LLM_CHARS = 4500;
     const llmText = text.length > MAX_LLM_CHARS
         ? text.substring(0, MAX_LLM_CHARS) + '\n[...]'
         : text;
@@ -350,8 +353,11 @@ ${llmText}
             stream: false,
             // format: 'json', // REMOVE JSON FORMAT ENFORCEMENT - Let it speak naturally
             options: {
-                temperature: 0.1,
-                num_ctx: 4096 // Reduced from 8192 to prevent 120s timeouts on local CPU
+                temperature: 0.15, // Slightly bumped to avoid repetitive loops
+                num_ctx: 4096, // Context window
+                num_predict: 1024, // CAP OUTPUT to ~750 words to prevent infinite loops (Critical for 120s timeout)
+                top_k: 20,
+                top_p: 0.9
             }
         };
 

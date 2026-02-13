@@ -5,6 +5,10 @@
     - [ ] Verify `pdfjs-dist` worker configuration for performance.
 
 - [ ] **Feature Migration: Pawn Guardrail** (Priority 1)
+    - [/] **Debug Source Counting Bug** (Critical)
+        - [x] Fix race condition in `addSource` (SourcesContext).
+        - [ ] Add Debug Overlay to `SourceSelector` to diagnose "0/10" display issue.
+        - [ ] Verify `Checkbox` state vs `selectedCount` logic.
     - [ ] Update `DocumentCompilerSection.tsx` to use local extraction.
     - [ ] Remove `/api/pawn-extract` calls.
 
@@ -21,3 +25,4 @@
     - [ ] Verify Pawn flow (GDPR/Privacy check).
     - [ ] Verify Chat/RAG flow (Knowledge retrieval).
     - [ ] Stress test with large PDFs (client-side performance check).
+    - [ ] Verify source counting on low-performance devices.
