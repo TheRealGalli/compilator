@@ -109,7 +109,8 @@ export function SourceSelector({ isAuthenticated = true }: SourceSelectorProps) 
 
   return (
     <div
-      className={`h-full flex flex-col border rounded-lg bg-background overflow-hidden transition-all duration-200 ${isDragging ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/20' : ''
+      translate="no"
+      className={`h-full flex flex-col border rounded-lg bg-background overflow-hidden transition-all duration-200 notranslate ${isDragging ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/20' : ''
         }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

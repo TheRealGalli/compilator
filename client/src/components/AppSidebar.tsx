@@ -50,7 +50,7 @@ export function AppSidebar({
   };
 
   return (
-    <aside className="w-[280px] border-r bg-sidebar flex flex-col h-full">
+    <aside className="w-[280px] border-r bg-sidebar flex flex-col h-full notranslate" translate="no">
       <div className="p-4">
         <h3 className="text-sm font-medium mb-3 text-muted-foreground">Sezioni</h3>
         <div className="flex flex-col gap-1">
