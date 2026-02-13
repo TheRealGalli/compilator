@@ -320,16 +320,23 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
     }
 
     // 2. LLM SWEEPER (Full Text Discovery)
-    // User requested FULL DOCUMENT context.
-    // console.log(`[OllamaLocal] Sending FULL TEXT (${text.length} chars) to LLM...`);
-    // console.log("[OllamaLocal] Full Extracted Text Preview:\n", text); // Re-enabled for verification
+    // Regex runs on FULL text above, but LLM has a context window limit (num_ctx: 4096 ≈ 3k tokens).
+    // We truncate text for the LLM only to avoid 120s timeouts on large documents.
+    const MAX_LLM_CHARS = 6000;
+    const llmText = text.length > MAX_LLM_CHARS
+        ? text.substring(0, MAX_LLM_CHARS) + '\n[...]'
+        : text;
+
+    if (text.length > MAX_LLM_CHARS) {
+        console.log(`[OllamaLocal] Text truncated for LLM: ${text.length} -> ${MAX_LLM_CHARS} chars (regex ran on full text)`);
+    }
 
     // ULTRA-CONCISE PROMPT (User's Proven Prompt)
     // We use the exact phrasing that worked in chat.
     const prompt = `find PERSONAL data in the text and do a token for pseuddonimiz it , return only the list of DATA as a tokenized format.
     
 Text:
-${text}
+${llmText}
 `;
 
     // DEBUG: Removed sensitive prompt log
