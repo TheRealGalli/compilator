@@ -1027,8 +1027,10 @@ export function DocumentCompilerSection({
         formalTone,
         studioFontSize,
         currentMode,
-        // Send the Vault so the Server can use it for consistency if needed
-        pawnVault: activeGuardrails.includes('pawn') ? guardrailVault : undefined
+        // ZERO-DATA: We DO NOT send the vault to the server. 
+        // The server processes tokens (e.g. [NOME_1]) and returns them.
+        // We handle de-anonymization locally upon receipt.
+        pawnVault: undefined
       });
 
       const data = await response.json();

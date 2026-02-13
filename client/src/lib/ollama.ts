@@ -18,8 +18,10 @@ const OLLAMA_MODEL = 'gemma3:1b';
 
 /**
  * Rileva se l'estensione "Gromit Bridge" è caricata tramite flag nel DOM o window prop.
+ * Now checks multiple indicators for robustness (Consistency with local-extractor).
  */
 function isBridgeAvailable(): boolean {
+    if (typeof window === 'undefined') return false;
     return (
         document.documentElement.getAttribute('data-gromit-bridge-active') === 'true' ||
         (window as any).__GROMIT_BRIDGE_ACTIVE__ === true
@@ -35,8 +37,8 @@ async function fetchViaBridge(url: string, options: any): Promise<any> {
         const timeout = setTimeout(() => {
             window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
             console.warn(`[GromitBridge] TIMEOUT su ${url} dopo 120s`);
-            resolve({ success: false, error: 'TIMEOUT', status: 408 });
-        }, 120000); // Alzato a 120s per gestire chunk 8k su modelli pesanti
+            resolve({ success: false, error: 'TIMEOUT (Estensione non risponde)', status: 408 });
+        }, 120000);
 
         const handler = (event: any) => {
             if (event.detail.requestId === requestId) {
@@ -59,7 +61,15 @@ async function fetchViaBridge(url: string, options: any): Promise<any> {
  * 2. Se non c'è, prova fetch diretta (funzionerà solo se OLLAMA_ORIGINS è settato).
  */
 async function smartFetch(url: string, options: any = {}): Promise<any> {
-    if (isBridgeAvailable()) {
+    // 1. Robust Bridge Check with Retry
+    let bridgeActive = isBridgeAvailable();
+    if (!bridgeActive) {
+        // Retry once mainly for init race conditions
+        await new Promise(r => setTimeout(r, 500));
+        bridgeActive = isBridgeAvailable();
+    }
+
+    if (bridgeActive) {
         console.log(`[OllamaLocal] Using GROMIT BRIDGE for ${url}`);
         const bridgeResult = await fetchViaBridge(url, options);
         if (bridgeResult && bridgeResult.success) {
@@ -69,30 +79,26 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
                 json: async () => {
                     // Fix: The bridge might return an object directly or a string
                     const rawData = bridgeResult.data;
-                    console.log(`[OllamaLocal] Bridge raw data type: ${typeof rawData}`);
+                    // console.log(`[OllamaLocal] Bridge raw data type: ${typeof rawData}`);
 
                     if (typeof rawData === 'object' && rawData !== null) {
-                        console.log(`[OllamaLocal] Bridge returned object directly.`);
                         return rawData;
                     }
 
                     try {
                         const parsed = JSON.parse(rawData);
-                        console.log(`[OllamaLocal] Bridge response parsed successfully.`);
                         return parsed;
                     } catch (e) {
                         console.error(`[OllamaLocal] Bridge response parse error. Raw data:`, rawData);
-                        // If it's a string like "[object Object]", it means upstream serialization failed. 
-                        // But we try to return it if it looks like a valid structure or fail.
                         throw e;
                     }
                 }
             };
-        } else {       // Se il bridge fallisce, restituiamo l'errore specifico (es. 408 Timeout o 503)
+        } else {
             return {
                 ok: false,
                 status: bridgeResult?.status || 503,
-                json: async () => ({ error: bridgeResult?.error || 'Bridge error' })
+                json: async () => ({ error: bridgeResult?.error || 'Bridge connection failed' })
             };
         }
     }

@@ -8,8 +8,10 @@ export interface ExtractedDocument {
 
 /**
  * Checks if the Gromit Bridge extension is available in the DOM.
+ * Now checks multiple indicators for robustness.
  */
 function isBridgeAvailable(): boolean {
+    if (typeof window === 'undefined') return false;
     return (
         document.documentElement.getAttribute('data-gromit-bridge-active') === 'true' ||
         (window as any).__GROMIT_BRIDGE_ACTIVE__ === true
@@ -37,18 +39,25 @@ function fileToBase64(file: File): Promise<string> {
  * Sends a message to the Gromit Bridge extension to extract text.
  */
 async function extractViaBridge(file: File): Promise<string> {
+    // 1. Pre-check
     if (!isBridgeAvailable()) {
-        throw new Error("Gromit Bridge extension not found. Please install or activate it.");
+        // Retry once after 500ms in case of race condition during load
+        await new Promise(r => setTimeout(r, 500));
+        if (!isBridgeAvailable()) {
+            throw new Error("Estensione 'Gromit Bridge' non rilevata. Assicurati che sia installata e attiva aggiornando la pagina.");
+        }
     }
 
     const fileBase64 = await fileToBase64(file);
 
     return new Promise((resolve, reject) => {
         const requestId = Math.random().toString(36).substring(7);
+
+        // 2. Timeout Handling
         const timeout = setTimeout(() => {
             window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
-            reject(new Error("Timeout waiting for Gromit Bridge extraction (60s)."));
-        }, 60000); // 60s timeout for heavy extraction
+            reject(new Error("Timeout (60s): L'estensione non ha risposto. Il file potrebbe essere troppo grande o danneggiato."));
+        }, 60000);
 
         const handler = (event: any) => {
             if (event.detail.requestId === requestId) {
@@ -56,16 +65,20 @@ async function extractViaBridge(file: File): Promise<string> {
                 window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
                 const response = event.detail.response;
 
-                if (response.success) {
-                    console.log(`[LocalExtractor] Extracted Text Preview (from Bridge):\n${response.text.substring(0, 500)}...\n[...${response.text.length} chars total]`);
+                if (response && response.success) {
+                    // console.log(`[LocalExtractor] Extracted Text Preview (from Bridge):\n${response.text.substring(0, 500)}...\n[...${response.text.length} chars total]`);
                     resolve(response.text);
                 } else {
-                    reject(new Error(response.error || "Unknown Bridge Error"));
+                    const errorMsg = response?.error || "Errore sconosciuto dall'estensione";
+                    console.error("[LocalExtractor] Bridge Error:", errorMsg);
+                    reject(new Error(`Errore Estensione: ${errorMsg}`));
                 }
             }
         };
 
         window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+
+        // 3. Dispatch Request
         window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
             detail: {
                 detail: {

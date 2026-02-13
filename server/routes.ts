@@ -1986,12 +1986,13 @@ ISTRUZIONI OUTPUT:
       });
 
       console.log('[DEBUG Compile] AI Compilation complete.');
-      if (isPawnActive) {
-        console.log(`[GUARDIAN] Final Vault size: ${vault.size}`);
-      }
+      // if (isPawnActive) {
+      //   console.log(`[GUARDIAN] Final Vault size: ${vault.size}`);
+      // }
 
-      // De-sanitize response if Pawn was active
-      const restoredContent = isPawnActive ? desanitizeText(finalContent, vault) : finalContent;
+      // ZERO-DATA: DO NOT De-sanitize on server. Return tokens to client.
+      // The client holds the Vault and will restore real values.
+      const restoredContent = finalContent;
 
       res.json({
         success: true,

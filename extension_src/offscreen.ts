@@ -195,12 +195,9 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
             // Basic text stitching
             const pageText = content.items.map((item: any) => item.str).join(' ');
 
-            if (pageText.trim().length > 0) {
+            // Only add to bodyText if there is actual content
+            if (pageText.trim().length > 10) {
                 bodyText += `--- PAGINA ${i} ---\n${pageText}\n\n`;
-            } else {
-                // Potential Scanned Page -> Trigger OCR?
-                // For now, we mark it. Tesseract implementation will follow if this is empty.
-                bodyText += `--- PAGINA ${i} (Possibile Scansione) ---\n`;
             }
         }
     } catch (err) {
@@ -208,47 +205,61 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
     }
 
     // 3. OCR Fallback (Tesseract.js)
-    // If bodyText is too short (< 50 chars) and we have pages, it's likely a scan.
+    // Check clean length. If < 50 chars, we assume it's a scan (or just empty).
     if (bodyText.replace(/\s/g, '').length < 50 && doc.numPages > 0) {
-        console.log("[GromitOffscreen] Testo insufficiente. Attivazione OCR Tesseract...");
+        console.log("[GromitOffscreen] Testo insufficiente. Attivazione OCR Tesseract Multipage...");
         try {
             // @ts-ignore
             const { createWorker } = Tesseract;
 
-            // Configure worker to use local files
             const worker = await createWorker('eng', 1, {
                 workerPath: chrome.runtime.getURL('worker.min.js'),
                 corePath: chrome.runtime.getURL('tesseract-core.wasm.js'),
                 logger: m => console.log(m)
             });
 
-            formHeader += "\n[GROMIT VISION] OCR Attivato (Modalità Locale).\n";
+            formHeader += "\n[GROMIT VISION] OCR Attivato (Modalità Locale - Scansione).\n";
 
-            // Convert page 1 to image for OCR (Proof of Concept)
-            // Ideally: Iterate all pages -> Render Canvas -> OCR
-            const page = await doc.getPage(1);
-            const viewport = page.getViewport({ scale: 2.0 });
-            const canvas = document.createElement('canvas');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            const context = canvas.getContext('2d');
+            // OCR Configuration: Iterate up to 5 pages to balance speed/content
+            const MAX_PAGES_OCR = Math.min(doc.numPages, 5);
+            let ocrFullText = "";
 
-            if (context) {
-                await page.render({ canvasContext: context, viewport }).promise;
-                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+            for (let i = 1; i <= MAX_PAGES_OCR; i++) {
+                console.log(`[GromitOffscreen] OCR Processing Page ${i}/${MAX_PAGES_OCR}...`);
+                const page = await doc.getPage(i);
+                const viewport = page.getViewport({ scale: 2.0 }); // High scale for better recognition
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const context = canvas.getContext('2d');
 
-                if (blob) {
-                    // OCR Magic using Local Worker
-                    const { data: { text } } = await worker.recognize(blob);
-                    bodyText += `\n--- PAGINA 1 (OCR) ---\n${text}\n\n`;
-                } else {
-                    formHeader += "\n[ERRORE] Impossibile convertire canvas in blob.\n";
+                if (context) {
+                    await page.render({ canvasContext: context, viewport }).promise;
+                    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+
+                    if (blob) {
+                        const { data: { text } } = await worker.recognize(blob);
+                        // Clean each page's text immediately to save memory
+                        // We want "Flowing Text" essentially
+                        const pageClean = text
+                            .replace(/[\r\n]+/g, ' ') // Flatten lines
+                            .replace(/\s+/g, ' ')      // Collapse spaces
+                            .trim();
+
+                        ocrFullText += pageClean + "\n\n";
+                    }
                 }
-
-                await worker.terminate();
-            } else {
-                formHeader += "\n[ERRORE] Impossibile creare contesto canvas per OCR.\n";
             }
+
+            await worker.terminate();
+
+            // Final Cleanup & Truncation (Max 4500 chars for LLM safety)
+            const TRUNCATION_LIMIT = 4500;
+            if (ocrFullText.length > TRUNCATION_LIMIT) {
+                ocrFullText = ocrFullText.substring(0, TRUNCATION_LIMIT) + "\n...[TESTO TRONCATO PER LIMITI MEMORIA]";
+            }
+
+            bodyText = ocrFullText; // Replace the empty bodyText with OCR result
 
         } catch (ocrErr: any) {
             console.error("[GromitOffscreen] OCR Failed:", ocrErr);
