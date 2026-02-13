@@ -386,6 +386,18 @@ ${llmText}
             if (val.length < 2) return null;
             if (key.includes("EXPLANATION") || key.includes("NOTE")) return null;
 
+            // QUALITY FILTER: Reject values that are descriptions, not actual data.
+            // Real PII: "Carlo Galli", "36-5157311", "VIA CAMPANA 45"
+            // Garbage:  "The country where the corporation is incorporated"
+            const valLower = val.toLowerCase();
+            const DESCRIPTION_STARTERS = /^(the |a |an |whether |if |this |that |it |for |which |where |when |how |used |refers |indicates |specifies |describes |represents |shows )/i;
+            if (DESCRIPTION_STARTERS.test(val)) return null;
+            // Reject values with too many common English words (description pattern)
+            const descWords = valLower.split(/\s+/);
+            const FILLER_WORDS = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'of', 'for', 'to', 'in', 'on', 'at', 'by', 'with', 'from', 'or', 'and', 'not', 'if', 'whether', 'that', 'which', 'where', 'when', 'how', 'has', 'have', 'had', 'does', 'do', 'did']);
+            const fillerCount = descWords.filter(w => FILLER_WORDS.has(w)).length;
+            if (descWords.length >= 4 && fillerCount / descWords.length > 0.4) return null;
+
             // Map generic keys to our CATEGORIES
             let type = 'UNKNOWN';
             if (key.includes('NAME') || key.includes('NOME') || key.includes('TITOLARE') || key.includes('SOGGETTO') || key.includes('COGNOME') || key.includes('SURNAME')) type = 'NAME';

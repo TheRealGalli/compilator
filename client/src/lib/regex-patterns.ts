@@ -37,7 +37,14 @@ export const PII_REGEX_PATTERNS = {
     IP_ADDRESS: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
 
     // URLs (http/https)
-    URL: /\bhttps?:\/\/[^\s/$.?#].[^\s]*\b/g
+    URL: /\bhttps?:\/\/[^\s/$.?#].[^\s]*\b/g,
+
+    // US EIN (Employer Identification Number) - Format: XX-XXXXXXX (2 digits, dash, 7 digits)
+    // Common in IRS forms (5472, W-9, etc.) e.g. 36-5157311
+    US_EIN: /\b\d{2}-\d{7}\b/g,
+
+    // US Date formats (MM/DD/YYYY or MM-DD-YYYY) - Common in US tax forms
+    US_DATE: /\b(0[1-9]|1[012])[-/](0[1-9]|[12][0-9]|3[01])[-/](19|20)\d{2}\b/g
 };
 
 /**
@@ -176,7 +183,8 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
             if (category === 'CREDIT_CARD' && !isValidLuhn(cleanVal)) continue;
 
             let conf: 'HIGH' | 'MEDIUM' | 'LOW' = 'HIGH';
-            if (category === 'PHONE_NUMBER' || category === 'DATE') conf = 'MEDIUM';
+            if (category === 'PHONE_NUMBER' || category === 'DATE' || category === 'US_DATE') conf = 'MEDIUM';
+            if (category === 'US_EIN') conf = 'HIGH';
 
             addCandidate(val, category, match.index, conf);
         }
