@@ -245,7 +245,7 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
                     bodyText = "[[GROMIT_SCAN_DETECTED]]";
                 }
             } catch (err) {
-                console.error("[GromitOffscreen] Native OCR failed:", err);
+                console.debug("[GromitOffscreen] Native OCR silent fallback (Empty/Scan):", err);
                 bodyText = "[[GROMIT_SCAN_DETECTED]]";
             }
         } else {
@@ -279,7 +279,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
         for (let i = 1; i <= doc.numPages; i++) {
             const page = await doc.getPage(i);
-            const viewport = page.getViewport({ scale: 3.5 }); // High scale for better OCR (increased from 2.0)
+            const viewport = page.getViewport({ scale: 1.5 }); // Optimal scale for Vision Framework speed (Instant feel)
 
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');

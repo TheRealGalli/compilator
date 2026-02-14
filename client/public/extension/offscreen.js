@@ -89835,7 +89835,7 @@ ${pageText}
           bodyText = "[[GROMIT_SCAN_DETECTED]]";
         }
       } catch (err) {
-        console.error("[GromitOffscreen] Native OCR failed:", err);
+        console.debug("[GromitOffscreen] Native OCR silent fallback (Empty/Scan):", err);
         bodyText = "[[GROMIT_SCAN_DETECTED]]";
       }
     } else {
@@ -89857,7 +89857,7 @@ async function performNativeOCR(doc) {
     const detector = new window.TextDetector();
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale: 3.5 });
+      const viewport = page.getViewport({ scale: 1.5 });
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
       if (!context) continue;

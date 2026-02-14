@@ -97,7 +97,7 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
             const errorMsg = bridgeResult?.error || 'Bridge connection failed';
 
             // Log specifically if it's a network error
-            console.warn(`[OllamaLocal 5.1.0] Bridge Error for ${url}: ${errorMsg} (Status: ${status})`);
+            console.warn(`[OllamaLocal 5.2.0] Bridge Error for ${url}: ${errorMsg} (Status: ${status})`);
 
             if (status === 0 || errorMsg.includes('Failed to fetch') || errorMsg.includes('Extension context invalidated')) {
                 console.info(`[OllamaLocal] 💡 Suggerimento: Verifica che Ollama sia attivo (ollama list) e che l'URL sia corretto.`);
@@ -488,6 +488,14 @@ ${llmText}
                 if (parsed) findings.push(parsed);
             }
         } if (!Array.isArray(findings)) findings = [];
+
+        // SANITY FILTER: Remove placeholder hallucinations (John Doe, etc.)
+        const isPlaceholder = (val: string) => {
+            const v = val.toLowerCase().trim();
+            const placeholders = ['john doe', 'jane doe', 'mario rossi', 'new york', '01/01/1980', '123 main st', 'san francisco'];
+            return placeholders.some(p => v === p || v.includes(p) && v.length < p.length + 5);
+        };
+        findings = findings.filter(f => !isPlaceholder(f.value));
 
         if (findings.length === 0) {
             console.warn("[OllamaLocal] LLM returned 0 findings (after parsing).");
