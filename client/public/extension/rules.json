@@ -16,7 +16,33 @@
             ]
         },
         "condition": {
-            "urlFilter": "11434"
+            "urlFilter": "*://localhost:11434/*",
+            "resourceTypes": [
+                "xmlhttprequest"
+            ]
+        }
+    },
+    {
+        "id": 2,
+        "priority": 1,
+        "action": {
+            "type": "modifyHeaders",
+            "requestHeaders": [
+                {
+                    "header": "origin",
+                    "operation": "remove"
+                },
+                {
+                    "header": "referer",
+                    "operation": "remove"
+                }
+            ]
+        },
+        "condition": {
+            "urlFilter": "*://127.0.0.1:11434/*",
+            "resourceTypes": [
+                "xmlhttprequest"
+            ]
         }
     }
 ]
