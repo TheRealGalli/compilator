@@ -103,25 +103,44 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
         return true; // Keep channel open
     }
 
-    // --- OLLAMA_FETCH: Now Routed via Offscreen to avoid SW termination on long requests ---
+    // --- OLLAMA_FETCH: Directly in Background for status checks (Fast & Reliable) ---
     if (request.type === 'OLLAMA_FETCH') {
         const { url, options } = request;
-        console.log('[GromitBridge] Delegating OLLAMA_FETCH to Offscreen:', url);
+        console.log('[GromitBridge] Executing OLLAMA_FETCH (Background Strategy):', url);
 
-        (async () => {
-            try {
-                await setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
-                const response = await chrome.runtime.sendMessage({
-                    type: 'OLLAMA_FETCH_OFFSCREEN',
-                    url,
-                    options
-                });
-                sendResponse(response);
-            } catch (error: any) {
-                console.error('[GromitBridge] Offscreen Fetch Error:', error);
+        const fetchOptions: any = {
+            method: options.method || 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(options.headers || {})
+            },
+            mode: 'cors',
+            credentials: 'omit',
+            referrerPolicy: 'no-referrer'
+        };
+
+        if (options.body && fetchOptions.method !== 'GET') {
+            fetchOptions.body = options.body;
+        }
+
+        fetch(url, fetchOptions)
+            .then(async response => {
+                const ok = response.ok;
+                const status = response.status;
+                const text = await response.text().catch(() => "");
+                let data = {};
+                try {
+                    data = text ? JSON.parse(text) : {};
+                } catch (e) {
+                    data = { raw: text };
+                }
+                sendResponse({ success: true, ok, status, data });
+            })
+            .catch(error => {
+                console.error('[GromitBridge] Background Fetch Error:', error);
                 sendResponse({ success: false, error: error.message });
-            }
-        })();
+            });
+
         return true;
     }
 

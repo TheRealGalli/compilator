@@ -73,21 +73,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.type === "OLLAMA_FETCH") {
     const { url, options } = request;
-    console.log("[GromitBridge] Delegating OLLAMA_FETCH to Offscreen:", url);
-    (async () => {
+    console.log("[GromitBridge] Executing OLLAMA_FETCH (Background Strategy):", url);
+    const fetchOptions = {
+      method: options.method || "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers || {}
+      },
+      mode: "cors",
+      credentials: "omit",
+      referrerPolicy: "no-referrer"
+    };
+    if (options.body && fetchOptions.method !== "GET") {
+      fetchOptions.body = options.body;
+    }
+    fetch(url, fetchOptions).then(async (response) => {
+      const ok = response.ok;
+      const status = response.status;
+      const text = await response.text().catch(() => "");
+      let data = {};
       try {
-        await setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
-        const response = await chrome.runtime.sendMessage({
-          type: "OLLAMA_FETCH_OFFSCREEN",
-          url,
-          options
-        });
-        sendResponse(response);
-      } catch (error) {
-        console.error("[GromitBridge] Offscreen Fetch Error:", error);
-        sendResponse({ success: false, error: error.message });
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        data = { raw: text };
       }
-    })();
+      sendResponse({ success: true, ok, status, data });
+    }).catch((error) => {
+      console.error("[GromitBridge] Background Fetch Error:", error);
+      sendResponse({ success: false, error: error.message });
+    });
     return true;
   }
 });
