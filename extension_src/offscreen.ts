@@ -213,7 +213,7 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 
             const worker = await createWorker('eng', 1, {
                 workerPath: chrome.runtime.getURL('worker.min.js'),
-                corePath: chrome.runtime.getURL('tesseract-core.wasm.js'),
+                corePath: chrome.runtime.getURL(''), // Point to extension root for auto-selection
                 logger: m => console.log(m)
             });
 
@@ -265,7 +265,8 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 
         } catch (ocrErr: any) {
             console.error("[GromitOffscreen] OCR Failed:", ocrErr);
-            formHeader += `\n[ERRORE OCR] ${ocrErr.message}\n`;
+            const errDetail = ocrErr.message || (typeof ocrErr === 'string' ? ocrErr : JSON.stringify(ocrErr));
+            formHeader += `\n[ERRORE OCR] ${errDetail}\n`;
         }
     }
 

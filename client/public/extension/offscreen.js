@@ -91117,7 +91117,8 @@ ${pageText}
       const { createWorker } = import_tesseract.default;
       const worker = await createWorker("eng", 1, {
         workerPath: chrome.runtime.getURL("worker.min.js"),
-        corePath: chrome.runtime.getURL("tesseract-core.wasm.js"),
+        corePath: chrome.runtime.getURL(""),
+        // Point to extension root for auto-selection
         logger: (m) => console.log(m)
       });
       formHeader += "\n[GROMIT VISION] OCR Attivato (Modalit\xE0 Locale - Scansione).\n";
@@ -91150,8 +91151,9 @@ ${pageText}
       ocrFullText = "";
     } catch (ocrErr) {
       console.error("[GromitOffscreen] OCR Failed:", ocrErr);
+      const errDetail = ocrErr.message || (typeof ocrErr === "string" ? ocrErr : JSON.stringify(ocrErr));
       formHeader += `
-[ERRORE OCR] ${ocrErr.message}
+[ERRORE OCR] ${errDetail}
 `;
     }
   }
