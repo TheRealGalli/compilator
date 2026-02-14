@@ -553,14 +553,26 @@ export function DocumentCompilerSection({
         const value = f.value.trim();
         if (value.length < 2) return;
 
-        if (!newVault[value]) {
+        // Correct Mapping: [TOKEN] -> Value (Consistent with PDF flow)
+        // Check if value already exists under ANY token to avoid duplicates
+        let existingToken = "";
+        for (const [t, v] of Object.entries(newVault)) {
+          if (v.toLowerCase().trim() === value.toLowerCase().trim()) {
+            existingToken = t;
+            break;
+          }
+        }
+
+        if (!existingToken) {
           const count = (newCounts[category] || 0) + 1;
           newCounts[category] = count;
-          newVault[value] = `[[${category}_${count}]]`;
+          const token = `[${category}_${count}]`;
+          newVault[token] = value;
         }
       });
 
       setReportVault(newVault);
+      setGuardrailVault(newVault); // Sync both
       setReportVaultCounts(newCounts);
 
       // Update source text cache so it's used for the final server call
@@ -1888,23 +1900,25 @@ export function DocumentCompilerSection({
       <Dialog open={isAnonymizationReportOpen} onOpenChange={setIsAnonymizationReportOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between w-full">
+            <DialogTitle className="flex justify-between items-center w-full">
               <div className="flex items-center gap-2 text-xl">
                 <div className="p-2 bg-blue-600 rounded-lg text-white">
                   <FaChessPawn size={20} />
                 </div>
                 Analisi Privacy Local (Zero-Data)
               </div>
+            </DialogTitle>
+            <div className="flex justify-between items-center mt-2">
+              <DialogDescription className="text-slate-600">
+                Abbiamo individuato i seguenti dati sensibili. Puoi <strong>modificare</strong>, <strong>aggiungere</strong> o <strong>rimuovere</strong> i campi prima della compilazione.
+              </DialogDescription>
               {unsupportedSources.length > 0 && (
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 border border-orange-200 text-orange-700 text-[10px] font-bold uppercase tracking-wider animate-pulse shadow-sm">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 border border-orange-200 text-orange-700 text-[10px] font-bold uppercase tracking-wider animate-pulse shadow-sm h-fit">
                   <Info className="w-3 h-3" />
                   Fonti Non Supportate
                 </div>
               )}
-            </DialogTitle>
-            <DialogDescription className="text-slate-600">
-              Abbiamo individuato i seguenti dati sensibili. Puoi <strong>modificare</strong>, <strong>aggiungere</strong> o <strong>rimuovere</strong> i campi prima della compilazione.
-            </DialogDescription>
+            </div>
           </DialogHeader>
 
           <ScrollArea className="max-h-[400px] mt-4 border rounded-xl overflow-hidden shadow-inner bg-slate-50/50">
@@ -2075,17 +2089,17 @@ export function DocumentCompilerSection({
         }
       }}>
         <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0 overflow-hidden bg-white border-none shadow-2xl">
-          <div className="flex items-center justify-between p-6 border-b bg-slate-50/50">
+          <DialogHeader className="p-6 border-b bg-slate-50/50 flex-row items-center justify-between space-y-0">
             <div className="space-y-1">
-              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <div className="p-1.5 bg-amber-500 rounded text-white">
                   <FileText size={18} />
                 </div>
                 Inserimento Manuale Testo Scansione
-              </h2>
-              <p className="text-sm text-slate-500">
+              </DialogTitle>
+              <DialogDescription className="text-sm text-slate-500">
                 Incolla il testo della scansione qui sotto. Verrà anonimizzato localmente prima dell'invio.
-              </p>
+              </DialogDescription>
             </div>
             <Button
               variant="ghost"
@@ -2095,7 +2109,7 @@ export function DocumentCompilerSection({
             >
               <X size={20} />
             </Button>
-          </div>
+          </DialogHeader>
 
           <div className="flex-1 p-6 flex flex-col min-h-0 bg-white">
             <Textarea
