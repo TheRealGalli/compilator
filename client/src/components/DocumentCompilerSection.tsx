@@ -693,7 +693,18 @@ export function DocumentCompilerSection({
             allDocs = sourceTextCache.current;
           } else {
 
-            // console.log('[Gromit Frontend] STEP 1.1: Extracting texts locally (Zero-Data)...');
+            // NEW: Gather all unique sources (Selected + Master) to avoid double extraction
+            const uniqueFiles = new Map<string, { name: string; type: string; base64: string }>();
+
+            selectedSources.forEach(s => {
+              if (s.base64) uniqueFiles.set(s.id || s.name, { name: s.name, type: s.type, base64: s.base64 });
+            });
+
+            if (masterSource && masterSource.base64) {
+              uniqueFiles.set(masterSource.id || masterSource.name, { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 });
+            }
+
+            const localExtractedDocs: any[] = [];
 
             // Helper to convert base64 to File for local extraction
             const base64ToFile = (base64: string, filename: string, mimeType: string): File => {
@@ -707,59 +718,25 @@ export function DocumentCompilerSection({
               return new File([blob], filename, { type: mimeType });
             };
 
-            const localExtractedSources: any[] = [];
-
-            // 1. Extract Selected Sources
-            for (const source of selectedSources) {
-              if (source.base64) {
-                try {
-                  const file = base64ToFile(source.base64, source.name, source.type);
-                  // Skip images for text extraction as per original logic
-                  if (!source.type.startsWith('image/')) {
-                    const text = await extractTextLocally(file);
-                    localExtractedSources.push({ name: source.name, text });
-                  }
-                } catch (e) {
-                  console.error(`[DocumentCompiler] Local extraction failed for ${source.name}:`, e);
-                  toast({
-                    title: "Errore Lettura File",
-                    description: `Impossibile leggere ${source.name} in locale.`,
-                    variant: "destructive"
-                  });
-                }
-              }
-            }
-
-            // 2. Extract Master Source
-            let localExtractedMaster = null;
-            if (masterSource && masterSource.base64) {
+            // Sequential Extraction (Safe for 8GB RAM)
+            for (const source of Array.from(uniqueFiles.values())) {
+              if (source.type.startsWith('image/')) continue;
               try {
-                const file = base64ToFile(masterSource.base64, masterSource.name, masterSource.type);
-                if (!masterSource.type.startsWith('image/')) {
-                  const text = await extractTextLocally(file);
-                  localExtractedMaster = { name: masterSource.name, text };
-                }
+                const file = base64ToFile(source.base64, source.name, source.type);
+                const text = await extractTextLocally(file);
+                localExtractedDocs.push({ name: source.name, text, originalText: text });
               } catch (e) {
-                console.error(`[DocumentCompiler] Local extraction failed for Master ${masterSource.name}:`, e);
+                console.error(`[DocumentCompiler] Local extraction failed for ${source.name}:`, e);
               }
             }
 
             const rawDocs = [
               ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent, originalText: templateContent }] : []),
               ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes, originalText: notes }] : []),
-              ...(localExtractedSources.map(s => ({ ...s, originalText: s.text })) || []),
-              ...(localExtractedMaster ? [{ ...localExtractedMaster, originalText: localExtractedMaster.text }] : [])
+              ...localExtractedDocs
             ];
-            // Deduplicate by name to avoid processing the same document twice
-            const seenNames = new Set<string>();
-            allDocs = rawDocs.filter(doc => {
-              if (seenNames.has(doc.name)) {
-                console.log(`[DocumentCompiler] [Dedup] Skipping duplicate: '${doc.name}'`);
-                return false;
-              }
-              seenNames.add(doc.name);
-              return true;
-            });
+
+            allDocs = rawDocs;
             sourceTextCache.current = allDocs;
           }
 

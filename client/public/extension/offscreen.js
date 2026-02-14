@@ -90978,11 +90978,20 @@ var version2 = XLSX.version;
 
 // extension_src/offscreen.ts
 __webpack_exports__GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("pdf.worker.js");
-console.log("[GromitOffscreen] Initialized.");
+var EXTENSION_ID = chrome.runtime.id;
+var extractionLock = null;
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "EXTRACT_FROM_OFFSCREEN") {
     const { fileBase64, fileName, fileType } = request;
     (async () => {
+      if (extractionLock) {
+        console.log(`[GromitOffscreen] Waiting for previous extraction to finish before starting ${fileName}...`);
+        await extractionLock;
+      }
+      let resolveLock;
+      extractionLock = new Promise((resolve) => {
+        resolveLock = resolve;
+      });
       try {
         console.log(`[GromitOffscreen] Extracting text for ${fileName} (${fileType})...`);
         const arrayBuffer = base64ToArrayBuffer(fileBase64);
@@ -91002,6 +91011,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } catch (error2) {
         console.error("[GromitOffscreen] Extraction Error:", error2);
         sendResponse({ success: false, error: error2.message });
+      } finally {
+        extractionLock = null;
+        if (resolveLock) resolveLock();
       }
     })();
     return true;
@@ -91114,10 +91126,10 @@ ${pageText}
   if (bodyText.replace(/\s/g, "").length < 50 && doc.numPages > 0) {
     console.log("[GromitOffscreen] Testo insufficiente. Attivazione OCR Tesseract Multipage...");
     try {
-      import_tesseract.default.setLogging(false);
+      import_tesseract.default.setLogging(true);
       const wPath = chrome.runtime.getURL("worker.min.js");
       const cPath = chrome.runtime.getURL("");
-      console.log(`[GromitOffscreen] Initializing OCR Scheduler (Parallel Mode)...`);
+      console.log(`[GromitOffscreen] Initializing OCR Scheduler...`);
       const scheduler = import_tesseract.default.createScheduler();
       const workerOptions = {
         workerPath: wPath,
@@ -91125,13 +91137,16 @@ ${pageText}
         workerBlobURL: false,
         logger: (m) => {
           if (m.status === "recognizing text") {
+          } else {
+            console.log(`[TESSERACT] ${m.status}`);
           }
         }
       };
-      const [w1, w2] = await Promise.all([
-        import_tesseract.default.createWorker("eng", 1, workerOptions),
-        import_tesseract.default.createWorker("eng", 1, workerOptions)
-      ]);
+      console.log(`[GromitOffscreen] Booting Worker 1...`);
+      const w1 = await import_tesseract.default.createWorker("eng", 1, workerOptions);
+      console.log(`[GromitOffscreen] Worker 1 Ready. Booting Worker 2...`);
+      const w2 = await import_tesseract.default.createWorker("eng", 1, workerOptions);
+      console.log(`[GromitOffscreen] Worker 2 Ready.`);
       scheduler.addWorker(w1);
       scheduler.addWorker(w2);
       formHeader += "\n[GROMIT VISION] OCR Parallel Engine Attivato.\n";

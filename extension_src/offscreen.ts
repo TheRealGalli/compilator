@@ -11,13 +11,23 @@ import * as XLSX from 'xlsx';
 // In offscreen document, we can use the bundled worker file
 pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.js');
 
-console.log('[GromitOffscreen] Initialized.');
+const EXTENSION_ID = chrome.runtime.id;
+let extractionLock: Promise<void> | null = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'EXTRACT_FROM_OFFSCREEN') {
         const { fileBase64, fileName, fileType } = request;
 
         (async () => {
+            // WAIT for previous extraction to finish (Safety Lock)
+            if (extractionLock) {
+                console.log(`[GromitOffscreen] Waiting for previous extraction to finish before starting ${fileName}...`);
+                await extractionLock;
+            }
+
+            let resolveLock: () => void;
+            extractionLock = new Promise((resolve) => { resolveLock = resolve; });
+
             try {
                 console.log(`[GromitOffscreen] Extracting text for ${fileName} (${fileType})...`);
                 const arrayBuffer = base64ToArrayBuffer(fileBase64);
@@ -48,6 +58,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (error: any) {
                 console.error('[GromitOffscreen] Extraction Error:', error);
                 sendResponse({ success: false, error: error.message });
+            } finally {
+                extractionLock = null;
+                if (resolveLock!) resolveLock();
             }
         })();
 
@@ -210,14 +223,13 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
         console.log("[GromitOffscreen] Testo insufficiente. Attivazione OCR Tesseract Multipage...");
         try {
             // @ts-ignore
-            Tesseract.setLogging(false); // Disable verbose logs for performance
+            Tesseract.setLogging(true);
             const wPath = chrome.runtime.getURL('worker.min.js');
             const cPath = chrome.runtime.getURL('');
 
-            console.log(`[GromitOffscreen] Initializing OCR Scheduler (Parallel Mode)...`);
+            console.log(`[GromitOffscreen] Initializing OCR Scheduler...`);
             const scheduler = Tesseract.createScheduler();
 
-            // Create 2 workers for parallel execution (Safe for 8GB RAM + Ollama)
             const workerOptions = {
                 workerPath: wPath,
                 corePath: cPath,
@@ -225,14 +237,18 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
                 logger: (m: any) => {
                     if (m.status === 'recognizing text') {
                         // console.log(`[TESSERACT] ${m.workerId}: ${Math.round(m.progress * 100)}%`);
+                    } else {
+                        console.log(`[TESSERACT] ${m.status}`);
                     }
                 }
             };
 
-            const [w1, w2] = await Promise.all([
-                Tesseract.createWorker('eng', 1, workerOptions),
-                Tesseract.createWorker('eng', 1, workerOptions)
-            ]);
+            // Sequential creation to avoid RAM spikes on 8GB systems
+            console.log(`[GromitOffscreen] Booting Worker 1...`);
+            const w1 = await Tesseract.createWorker('eng', 1, workerOptions);
+            console.log(`[GromitOffscreen] Worker 1 Ready. Booting Worker 2...`);
+            const w2 = await Tesseract.createWorker('eng', 1, workerOptions);
+            console.log(`[GromitOffscreen] Worker 2 Ready.`);
 
             scheduler.addWorker(w1);
             scheduler.addWorker(w2);
