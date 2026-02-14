@@ -41,6 +41,7 @@ export function ConnectorsSection() {
 
     const [isOllamaModalOpen, setIsOllamaModalOpen] = useState(false);
     const [ollamaEmail, setOllamaEmail] = useState("");
+    const [ollamaToken, setOllamaToken] = useState("");
     const [isConnecting, setIsConnecting] = useState(false);
 
     useEffect(() => {
@@ -57,9 +58,18 @@ export function ConnectorsSection() {
             return;
         }
 
+        if (ollamaToken.length < 10) {
+            toast({
+                title: "Token non valido",
+                description: "Il Token API sembra troppo corto. Verificalo nel tuo profilo ollama.com.",
+                variant: "destructive"
+            });
+            return;
+        }
+
         setIsConnecting(true);
         try {
-            await connectAccount(ollamaEmail);
+            await connectAccount(ollamaEmail, ollamaToken);
             toast({
                 title: "Account Collegato",
                 description: `L'account Ollama (${ollamaEmail}) è stato connesso con successo.`,
@@ -279,17 +289,33 @@ export function ConnectorsSection() {
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="email" className="text-right">
+                            <Label htmlFor="email" className="text-right text-xs">
                                 Email
                             </Label>
                             <Input
                                 id="email"
                                 placeholder="mario.rossi@esempio.it"
-                                className="col-span-3"
+                                className="col-span-3 text-sm"
                                 value={ollamaEmail}
                                 onChange={(e) => setOllamaEmail(e.target.value)}
                             />
                         </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="token" className="text-right text-xs">
+                                API Token
+                            </Label>
+                            <Input
+                                id="token"
+                                type="password"
+                                placeholder="Inserisci il tuo Token Cloud..."
+                                className="col-span-3 text-sm"
+                                value={ollamaToken}
+                                onChange={(e) => setOllamaToken(e.target.value)}
+                            />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground ml-[25%]">
+                            Trovi il tuo token personale nel profilo su <a href="https://ollama.com" target="_blank" className="text-blue-500 underline">ollama.com</a>.
+                        </p>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => setIsOllamaModalOpen(false)}>
