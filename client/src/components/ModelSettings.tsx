@@ -293,10 +293,11 @@ export function ModelSettings({
               {/* Temperature */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium">Temperatura</Label>
+                  <Label htmlFor="temperature" className="text-xs font-medium">Temperatura</Label>
                 </div>
                 <div className="space-y-1.5">
                   <Slider
+                    id="temperature"
                     value={[temperature]}
                     onValueChange={(value) => onTemperatureChange?.(value[0])}
                     min={0}
@@ -419,7 +420,7 @@ export function ModelSettings({
               <div className="flex items-center justify-between p-1.5 rounded-lg border bg-card shrink-0">
                 <div className="flex-1">
                   <div className="flex items-center gap-1.5">
-                    <Label htmlFor="model-provider" className="text-xs font-medium cursor-pointer">
+                    <Label className="text-xs font-medium">
                       Modello
                     </Label>
                     <div className="ml-auto">

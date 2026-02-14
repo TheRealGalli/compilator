@@ -1445,6 +1445,7 @@ export function DocumentCompilerSection({
                       </Button>
                       <input
                         id="template-upload"
+                        name="template-upload"
                         type="file"
                         accept=".txt,.md,.rtf"
                         className="hidden"
@@ -1760,7 +1761,9 @@ export function DocumentCompilerSection({
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <Label htmlFor="generate-template-prompt" className="sr-only">Descrizione del documento</Label>
               <Textarea
+                id="generate-template-prompt"
                 placeholder="Es: Verbale di riunione del consiglio di amministrazione, formale, con elenco partecipanti e deliberazioni..."
                 value={generatePrompt}
                 onChange={(e) => setGeneratePrompt(e.target.value)}
@@ -1814,6 +1817,8 @@ export function DocumentCompilerSection({
                     <tr key={token} className="hover:bg-blue-50/30 transition-colors group">
                       <td className="py-2 px-2 align-top">
                         <Input
+                          id={`token-${token}`}
+                          aria-label={`Token Privacy: ${token}`}
                           value={token}
                           onChange={(e) => {
                             const newToken = e.target.value.toUpperCase();
@@ -1830,6 +1835,8 @@ export function DocumentCompilerSection({
                       </td>
                       <td className="py-2 px-2 align-top">
                         <Input
+                          id={`value-${token}`}
+                          aria-label={`Valore Originale per ${token}`}
                           value={value}
                           onChange={(e) => {
                             const newVal = e.target.value;
