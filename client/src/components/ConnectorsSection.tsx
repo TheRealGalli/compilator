@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Loader2, Cpu } from "lucide-react";
+import { RefreshCw, Loader2, Cpu, LogIn, Link2 } from "lucide-react";
 import { useGmail } from "@/contexts/GmailContext";
 import { useOllama } from "@/contexts/OllamaContext";
 import { useEffect } from "react";
@@ -159,7 +159,7 @@ export function ConnectorsSection() {
                 </Card>
 
                 {/* Ollama Card */}
-                <Card className={`border-2 transition-all flex flex-col ${ollamaStatus === 'connected' ? 'border-blue-200 bg-blue-50/10' : 'opacity-60 border-dashed hover:opacity-100'}`}>
+                <Card className={`border-2 transition-all flex flex-col ${ollamaStatus === 'connected' ? 'border-blue-200 bg-blue-50/20' : 'opacity-60 border-dashed hover:opacity-100'}`}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-slate-900 border border-slate-700 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
@@ -186,8 +186,30 @@ export function ConnectorsSection() {
                         <p className="text-sm text-muted-foreground mb-6">
                             Motore locale per la protezione della privacy e sanitizzazione "Zero-Data".
                         </p>
-                        <div className="mt-auto">
-                            <Button variant="outline" className="w-full" onClick={checkOllama} disabled={ollamaStatus === 'loading'}>
+                        <div className="mt-auto space-y-3">
+                            <Button
+                                variant="secondary"
+                                className={`w-full ${ollamaStatus === 'connected' ? 'bg-slate-700 hover:bg-slate-800 text-white' : 'bg-slate-200 text-slate-500 cursor-not-allowed'}`}
+                                disabled={ollamaStatus !== 'connected'}
+                            >
+                                {ollamaStatus === 'connected' ? (
+                                    <>
+                                        <Link2 className="w-4 h-4 mr-2" />
+                                        Connetti Ollama
+                                    </>
+                                ) : (
+                                    <>
+                                        <LogIn className="w-4 h-4 mr-2" />
+                                        Effettua Login a Ollama
+                                    </>
+                                )}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="w-full"
+                                onClick={checkOllama}
+                                disabled={ollamaStatus === 'loading'}
+                            >
                                 {ollamaStatus === 'connected' ? 'Riconnetti' : 'Rileva Localmente'}
                             </Button>
                         </div>
