@@ -53,11 +53,11 @@ async function extractViaBridge(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
         const requestId = Math.random().toString(36).substring(7);
 
-        // 2. Timeout Handling
+        // 2. Timeout Handling: OCR can be slow, especially on multipage docs.
         const timeout = setTimeout(() => {
             window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
-            reject(new Error("Timeout (60s): L'estensione non ha risposto. Il file potrebbe essere troppo grande o danneggiato."));
-        }, 60000);
+            reject(new Error("Timeout (5m): L'estensione non ha risposto. Il file potrebbe essere troppo grande o richiedere più tempo per l'OCR."));
+        }, 300000); // 5 minutes timeout
 
         const handler = (event: any) => {
             if (event.detail.requestId === requestId) {

@@ -91126,12 +91126,13 @@ ${pageText}
         logger: (m) => console.log("[TESSERACT]", m)
       });
       formHeader += "\n[GROMIT VISION] OCR Attivato (Modalit\xE0 Locale - Scansione).\n";
-      const MAX_PAGES_OCR = Math.min(doc.numPages, 5);
+      const MAX_PAGES_OCR = Math.min(doc.numPages, 3);
       let ocrFullText = "";
+      const startTime = Date.now();
       for (let i = 1; i <= MAX_PAGES_OCR; i++) {
         console.log(`[GromitOffscreen] OCR Processing Page ${i}/${MAX_PAGES_OCR}...`);
         const page = await doc.getPage(i);
-        const viewport = page.getViewport({ scale: 2 });
+        const viewport = page.getViewport({ scale: 1.5 });
         const canvas = document.createElement("canvas");
         canvas.width = viewport.width;
         canvas.height = viewport.height;
@@ -91147,6 +91148,8 @@ ${pageText}
         }
       }
       await worker.terminate();
+      const duration = ((Date.now() - startTime) / 1e3).toFixed(1);
+      console.log(`[GromitOffscreen] OCR Complete in ${duration}s. Chars: ${ocrFullText.length}`);
       const TRUNCATION_LIMIT = 4500;
       if (ocrFullText.length > TRUNCATION_LIMIT) {
         ocrFullText = ocrFullText.substring(0, TRUNCATION_LIMIT) + "\n...[TESTO TRONCATO PER LIMITI MEMORIA]";

@@ -225,14 +225,15 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 
             formHeader += "\n[GROMIT VISION] OCR Attivato (Modalità Locale - Scansione).\n";
 
-            // OCR Configuration: Iterate up to 5 pages to balance speed/content
-            const MAX_PAGES_OCR = Math.min(doc.numPages, 5);
+            // OCR Configuration: Limit pages and adjust scale for performance
+            const MAX_PAGES_OCR = Math.min(doc.numPages, 3);
             let ocrFullText = "";
+            const startTime = Date.now();
 
             for (let i = 1; i <= MAX_PAGES_OCR; i++) {
                 console.log(`[GromitOffscreen] OCR Processing Page ${i}/${MAX_PAGES_OCR}...`);
                 const page = await doc.getPage(i);
-                const viewport = page.getViewport({ scale: 2.0 }); // High scale for better recognition
+                const viewport = page.getViewport({ scale: 1.5 }); // Balanced scale for speed/accuracy
                 const canvas = document.createElement('canvas');
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
@@ -257,6 +258,8 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
             }
 
             await worker.terminate();
+            const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+            console.log(`[GromitOffscreen] OCR Complete in ${duration}s. Chars: ${ocrFullText.length}`);
 
             // Final Cleanup & Truncation (Max 4500 chars for LLM safety)
             const TRUNCATION_LIMIT = 4500;
