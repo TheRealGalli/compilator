@@ -777,8 +777,8 @@ export function DocumentCompilerSection({
 
             const batchResults = await Promise.all(batch.map(async (doc) => {
               const charCount = doc.text.length;
-              // console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
-              // console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
+              console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
+              console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
 
               const findings = await extractPIILocal(doc.text);
 

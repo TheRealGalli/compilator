@@ -1592,7 +1592,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const buildSystemPrompt = (ctx: any) => {
     const { dateTimeIT, hasMemory, extractedFields, manualAnnotations, masterSource, detailedAnalysis, webResearch, multimodalFiles, fetchedCompilerContext, hasExternalSources, isPawnActive } = ctx;
 
+    // Construct File List for Prompt Context
+    const activeFiles = multimodalFiles || [];
+    const filesList = activeFiles.length > 0
+      ? activeFiles.map((f: any, i: number) => `- ${f.name} (${f.mimeType || f.type})`).join('\n')
+      : 'Nessun file aggiuntivo.';
+
     return `Data e ora corrente: ${dateTimeIT}
+
+**CONTESTO FILE DISPONIBILI (Fascicolo):**
+${masterSource ? `MASTER SOURCE: ${masterSource.name} (${masterSource.mimeType || masterSource.type})` : ''}
+ALTRI DOCUMENTI:
+${filesList}
 
 **IDENTITÀ & SVILUPPO (CRITICO):**
 1. Sei Gromit, l'intelligenza documentale (Document Intelligence Engine) sviluppato da **CSD Station**.
@@ -1601,7 +1612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 Sei un assistente AI esperto nella compilazione di documenti.
 
-Devi compilare il template sottostante utilizzando le informazioni fornite nei documenti allegati (PDF, Immagini, Testo) e nelle note dell'utente.
+Devi compilare il template sottostante utilizzando le informazioni fornite nei documenti allegati (elencati sopra) e nelle note dell'utente.
 
 **CONTESTUALIZZAZIONE E TERMINOLOGIA:**
 - **COERENZA TERMINOLOGICA**: Devi adattare ogni termine, abbreviazione o riferimento alla terminologia specifica presente nei documenti caricati (Fascicolo).

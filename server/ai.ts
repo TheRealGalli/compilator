@@ -27,22 +27,23 @@ export class AiService {
      * Public helper to process multimodal files once and reuse across passes.
      */
     async processMultimodalParts(files: any[]): Promise<any[]> {
-        return Promise.all(files.map(async (file) => {
+        const partsArrays = await Promise.all(files.map(async (file) => {
             const mimeType = file.mimeType || file.type || '';
             const base64Data = file.data || file.base64 || '';
+            const fileNameLabel = file.name ? `[FILE: ${file.name}]` : '[FILE: Unknown]';
 
-            if (!mimeType || !base64Data) return null;
+            if (!mimeType || !base64Data) return [];
 
             const isMultimodal =
                 mimeType.startsWith('image/') ||
                 mimeType === 'application/pdf' ||
                 mimeType.startsWith('audio/') ||
                 mimeType.startsWith('video/') ||
-                mimeType === 'text/markdown' ||
-                mimeType === 'application/rtf' ||
-                mimeType === 'text/rtf' ||
-                mimeType === 'application/json' ||
                 mimeType === 'text/html' ||
+                mimeType === 'text/markdown' ||
+                mimeType === 'text/rtf' ||
+                mimeType === 'application/rtf' ||
+                mimeType === 'application/json' ||
                 mimeType === 'application/xml' ||
                 mimeType === 'text/xml';
 
@@ -53,29 +54,41 @@ export class AiService {
                     console.log(`[AiService] Extracting text from DOCX file for Gemini pass...`);
                     const buffer = Buffer.from(base64Data, 'base64');
                     const { value: text } = await mammoth.extractRawText({ buffer });
-                    return { text: `[CONTENUTO DOCUMENTO WORD]:\n${text}` };
+                    return [
+                        { text: fileNameLabel },
+                        { text: `[CONTENUTO DOCUMENTO WORD]:\n${text}` }
+                    ];
                 } catch (err) {
                     console.error('[AiService] Error extracting DOCX text:', err);
-                    return null;
+                    return [];
                 }
             } else if (isMultimodal) {
-                return {
-                    inlineData: {
-                        mimeType: mimeType,
-                        data: base64Data
+                return [
+                    { text: fileNameLabel },
+                    {
+                        inlineData: {
+                            mimeType: mimeType,
+                            data: base64Data
+                        }
                     }
-                };
+                ];
             } else {
                 // Fallback to text decoding for unknown/plain types
                 try {
                     const text = Buffer.from(base64Data, 'base64').toString('utf-8');
-                    return { text: `[CONTENUTO FILE ${mimeType}]:\n${text}` };
+                    return [
+                        { text: fileNameLabel },
+                        { text: `[CONTENUTO FILE ${mimeType}]:\n${text}` }
+                    ];
                 } catch (err) {
                     console.error('[AiService] Fallback text extraction failed:', err);
-                    return null;
+                    return [];
                 }
             }
-        })).then(parts => parts.filter(p => p !== null));
+        }));
+
+        // Flatten the array of arrays into a single array of parts
+        return partsArrays.flat();
     }
 
     private italianBlacklist = new Set([
