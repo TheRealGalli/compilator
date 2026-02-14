@@ -1890,8 +1890,8 @@ export function DocumentCompilerSection({
 
       {/* Anonymization Report Dialog */}
       <Dialog open={isAnonymizationReportOpen} onOpenChange={setIsAnonymizationReportOpen}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
+        <DialogContent className="max-w-xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
             <DialogTitle className="flex justify-between items-center w-full">
               <div className="flex items-center gap-2 text-xl">
                 <div className="p-2 bg-blue-600 rounded-lg text-white">
@@ -1913,144 +1913,146 @@ export function DocumentCompilerSection({
             </div>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[400px] mt-4 border rounded-xl overflow-hidden shadow-inner bg-slate-50/50">
-            <div className="p-0">
-              <table className="w-full text-sm border-collapse">
-                <thead className="bg-slate-100/80 backdrop-blur sticky top-0 z-10 border-b">
-                  <tr>
-                    <th className="text-left py-3 px-4 font-bold text-slate-700 w-[35%]">Token Privacy</th>
-                    <th className="text-left py-3 px-4 font-bold text-slate-700 w-[55%]">Valore Originale</th>
-                    <th className="text-center py-3 px-2 font-bold text-slate-700 w-[10%]"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y bg-white">
-                  {Object.entries(reportVault).sort((a, b) => a[0].localeCompare(b[0])).map(([token, value]) => (
-                    <tr key={token} className="hover:bg-blue-50/30 transition-colors group">
-                      <td className="py-2 px-2 align-top">
-                        <Input
-                          id={`token-${token}`}
-                          aria-label={`Token Privacy: ${token}`}
-                          value={token}
-                          onChange={(e) => {
-                            const newToken = e.target.value.toUpperCase();
-                            const newVault = { ...reportVault };
-                            const val = newVault[token];
-                            delete newVault[token];
-                            newVault[newToken] = val;
-                            setReportVault(newVault);
-                            // Also update guardrailVault immediately to keep sync
-                            setGuardrailVault(newVault);
-                          }}
-                          className="font-mono text-xs font-bold text-blue-700 h-8 bg-blue-50/50 border-blue-200 focus:border-blue-500"
-                        />
-                      </td>
-                      <td className="py-2 px-2 align-top">
-                        <Input
-                          id={`value-${token}`}
-                          aria-label={`Valore Originale per ${token}`}
-                          value={value}
-                          onChange={(e) => {
-                            const newVal = e.target.value;
-                            const newVault = { ...reportVault, [token]: newVal };
-                            setReportVault(newVault);
-                            setGuardrailVault(newVault);
-                          }}
-                          className="text-sm text-slate-900 font-semibold h-8 border-slate-200 focus:border-blue-500"
-                        />
-                      </td>
-                      <td className="py-2 px-2 align-middle text-center">
+          <div className="flex-1 overflow-y-auto px-6 py-2">
+            <ScrollArea className="max-h-[320px] mt-2 border rounded-xl overflow-hidden shadow-inner bg-slate-50/50">
+              <div className="p-0">
+                <table className="w-full text-sm border-collapse">
+                  <thead className="bg-slate-100/80 backdrop-blur sticky top-0 z-10 border-b">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-bold text-slate-700 w-[35%]">Token Privacy</th>
+                      <th className="text-left py-3 px-4 font-bold text-slate-700 w-[55%]">Valore Originale</th>
+                      <th className="text-center py-3 px-2 font-bold text-slate-700 w-[10%]"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y bg-white">
+                    {Object.entries(reportVault).sort((a, b) => a[0].localeCompare(b[0])).map(([token, value]) => (
+                      <tr key={token} className="hover:bg-blue-50/30 transition-colors group">
+                        <td className="py-2 px-2 align-top">
+                          <Input
+                            id={`token-${token}`}
+                            aria-label={`Token Privacy: ${token}`}
+                            value={token}
+                            onChange={(e) => {
+                              const newToken = e.target.value.toUpperCase();
+                              const newVault = { ...reportVault };
+                              const val = newVault[token];
+                              delete newVault[token];
+                              newVault[newToken] = val;
+                              setReportVault(newVault);
+                              // Also update guardrailVault immediately to keep sync
+                              setGuardrailVault(newVault);
+                            }}
+                            className="font-mono text-xs font-bold text-blue-700 h-8 bg-blue-50/50 border-blue-200 focus:border-blue-500"
+                          />
+                        </td>
+                        <td className="py-2 px-2 align-top">
+                          <Input
+                            id={`value-${token}`}
+                            aria-label={`Valore Originale per ${token}`}
+                            value={value}
+                            onChange={(e) => {
+                              const newVal = e.target.value;
+                              const newVault = { ...reportVault, [token]: newVal };
+                              setReportVault(newVault);
+                              setGuardrailVault(newVault);
+                            }}
+                            className="text-sm text-slate-900 font-semibold h-8 border-slate-200 focus:border-blue-500"
+                          />
+                        </td>
+                        <td className="py-2 px-2 align-middle text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                            onClick={() => {
+                              const newVault = { ...reportVault };
+                              delete newVault[token];
+                              setReportVault(newVault);
+                              setGuardrailVault(newVault);
+                            }}
+                            title="Rimuovi dato"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {Object.keys(reportVault).length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="py-8 text-center text-slate-400 italic bg-white">
+                          Nessun dato sensibile rilevato. Aggiungine uno manualmente.
+                        </td>
+                      </tr>
+                    )}
+                    {/* ADD ROW BUTTON ROW */}
+                    <tr className="bg-slate-50/50 border-t border-slate-200">
+                      <td colSpan={3} className="py-2 px-2 text-center">
                         <Button
                           variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                          size="sm"
+                          className="w-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-dashed border-slate-300 hover:border-blue-300"
                           onClick={() => {
-                            const newVault = { ...reportVault };
-                            delete newVault[token];
+                            const nextIdx = Object.keys(reportVault).length + 1;
+                            const newToken = `[NUOVO_CAMPO_${nextIdx}]`;
+                            const newVault = { ...reportVault, [newToken]: "" };
                             setReportVault(newVault);
                             setGuardrailVault(newVault);
                           }}
-                          title="Rimuovi dato"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Plus className="h-4 w-4 mr-2" /> Aggiungi Campo Manuale
                         </Button>
                       </td>
                     </tr>
-                  ))}
-                  {Object.keys(reportVault).length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="py-8 text-center text-slate-400 italic bg-white">
-                        Nessun dato sensibile rilevato. Aggiungine uno manualmente.
-                      </td>
-                    </tr>
-                  )}
-                  {/* ADD ROW BUTTON ROW */}
-                  <tr className="bg-slate-50/50 border-t border-slate-200">
-                    <td colSpan={3} className="py-2 px-2 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-dashed border-slate-300 hover:border-blue-300"
-                        onClick={() => {
-                          const nextIdx = Object.keys(reportVault).length + 1;
-                          const newToken = `[NUOVO_CAMPO_${nextIdx}]`;
-                          const newVault = { ...reportVault, [newToken]: "" };
-                          setReportVault(newVault);
-                          setGuardrailVault(newVault);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" /> Aggiungi Campo Manuale
-                      </Button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </ScrollArea>
-
-          <p className="text-[10px] text-muted-foreground px-1 mt-2 leading-relaxed">
-            Modifica i token o i valori se necessario. I dati originali non vengono inviati all&apos;IA.
-          </p>
-
-          {unsupportedSources.length > 0 && (
-            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-              <div className="flex items-center gap-2 text-amber-800 text-[11px] font-bold uppercase tracking-tight">
-                <Info className="w-3.5 h-3.5" />
-                Dettaglio Fonti Non Supportate dal Sistema Pawn
+                  </tbody>
+                </table>
               </div>
-              <ScrollArea className="max-h-[160px] pr-2">
-                <div className="grid grid-cols-1 gap-1">
-                  {unsupportedSources.map((s, idx) => (
-                    <div key={idx} className="flex flex-col gap-1 text-[10px] text-amber-700 bg-white/50 px-2 py-1.5 rounded border border-amber-100/50">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium truncate max-w-[200px]">{s.name}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="bg-amber-100 px-1.5 py-0.5 rounded text-[9px] font-bold">{s.type}</span>
-                          {s.type === 'Scansione' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-6 px-2 text-[9px] font-bold border-amber-300 text-amber-800 hover:bg-amber-100"
-                              onClick={() => {
-                                setManualInputScanId(s.id);
-                                setIsManualInputOpen(true);
-                              }}
-                            >
-                              Inserisci manualmente
-                            </Button>
-                          )}
+            </ScrollArea>
+
+            <p className="text-[10px] text-muted-foreground px-1 mt-2 leading-relaxed">
+              Modifica i token o i valori se necessario. I dati originali non vengono inviati all&apos;IA.
+            </p>
+
+            {unsupportedSources.length > 0 && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-amber-800 text-[11px] font-bold uppercase tracking-tight">
+                  <Info className="w-3.5 h-3.5" />
+                  Dettaglio Fonti Non Supportate dal Sistema Pawn
+                </div>
+                <ScrollArea className="max-h-[120px] pr-2">
+                  <div className="grid grid-cols-1 gap-1">
+                    {unsupportedSources.map((s, idx) => (
+                      <div key={idx} className="flex flex-col gap-1 text-[10px] text-amber-700 bg-white/50 px-2 py-1.5 rounded border border-amber-100/50">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium truncate max-w-[200px]">{s.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="bg-amber-100 px-1.5 py-0.5 rounded text-[9px] font-bold">{s.type}</span>
+                            {s.type === 'Scansione' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 px-2 text-[9px] font-bold border-amber-300 text-amber-800 hover:bg-amber-100"
+                                onClick={() => {
+                                  setManualInputScanId(s.id);
+                                  setIsManualInputOpen(true);
+                                }}
+                              >
+                                Inserisci manualmente
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-              <p className="text-[9px] text-amber-600 leading-tight italic mt-1">
-                Queste fonti verranno inviate integralmente al server AI poiché il sistema Pawn locale non supporta l&apos;anonimizzazione di immagini, audio o documenti senza testo (scansioni).
-              </p>
-            </div>
-          )}
+                    ))}
+                  </div>
+                </ScrollArea>
+                <p className="text-[9px] text-amber-600 leading-tight italic mt-1">
+                  Queste fonti verranno inviate integralmente al server AI poiché il sistema Pawn locale non supporta l&apos;anonimizzazione di immagini, audio o documenti senza testo (scansioni).
+                </p>
+              </div>
+            )}
+          </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+          <DialogFooter className="flex-col sm:flex-row gap-2 p-6 pt-2 border-t bg-slate-50/50">
             <Button
               variant="outline"
               onClick={() => {
