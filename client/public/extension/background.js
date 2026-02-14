@@ -73,25 +73,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.type === "OLLAMA_FETCH") {
     const { url, options } = request;
-    console.log("[GromitBridge] Eseguo fetch (Background):", url);
+    console.log(`[GromitBridge 4.0] Fetching: ${url}`);
     const fetchOptions = {
       method: options.method || "GET",
       headers: {
         "Content-Type": "application/json"
       },
-      body: options.body,
       mode: "cors",
       credentials: "omit",
       referrerPolicy: "no-referrer"
     };
+    if (options.body && options.method !== "GET") {
+      fetchOptions.body = options.body;
+    }
     fetch(url, fetchOptions).then(async (response) => {
       const ok = response.ok;
       const status = response.status;
-      const data = await response.json().catch(() => ({}));
+      const text = await response.text().catch(() => "");
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        data = { raw: text };
+      }
       sendResponse({ success: true, ok, status, data });
     }).catch((error) => {
-      console.error("[GromitBridge] Errore Fetch:", error);
-      sendResponse({ success: false, error: error.message });
+      console.error("[GromitBridge 4.0] Fetch Error:", error);
+      sendResponse({
+        success: false,
+        error: error.message || "Unknown Network Error",
+        status: 0
+      });
     });
     return true;
   }
