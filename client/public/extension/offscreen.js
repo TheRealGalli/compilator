@@ -91117,8 +91117,7 @@ ${pageText}
       const { createWorker } = import_tesseract.default;
       const worker = await createWorker("eng", 1, {
         workerPath: chrome.runtime.getURL("worker.min.js"),
-        corePath: chrome.runtime.getURL(""),
-        // Point to extension root for auto-selection
+        corePath: chrome.runtime.getURL("tesseract-core-lstm.js"),
         logger: (m) => console.log(m)
       });
       formHeader += "\n[GROMIT VISION] OCR Attivato (Modalit\xE0 Locale - Scansione).\n";

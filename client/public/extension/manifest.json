@@ -54,7 +54,8 @@
                 "offscreen.js"
             ],
             "matches": [
-                "<all_urls>"
+                "<all_urls>",
+                "chrome-extension://*/*"
             ]
         }
     ]

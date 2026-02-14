@@ -213,7 +213,7 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 
             const worker = await createWorker('eng', 1, {
                 workerPath: chrome.runtime.getURL('worker.min.js'),
-                corePath: chrome.runtime.getURL(''), // Point to extension root for auto-selection
+                corePath: chrome.runtime.getURL('tesseract-core-lstm.js'),
                 logger: m => console.log(m)
             });
 
