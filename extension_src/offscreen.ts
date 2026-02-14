@@ -214,6 +214,7 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
             const worker = await createWorker('eng', 1, {
                 workerPath: chrome.runtime.getURL('worker.min.js'),
                 corePath: chrome.runtime.getURL('tesseract-core-lstm.js'),
+                workerBlobURL: false, // CRITICAL: Avoids 'importScripts' error by loading worker directly
                 logger: m => console.log(m)
             });
 
