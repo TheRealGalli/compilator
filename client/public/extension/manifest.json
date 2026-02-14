@@ -37,5 +37,21 @@
     "host_permissions": [
         "http://localhost:11434/*",
         "http://127.0.0.1:11434/*"
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "worker.min.js",
+                "tesseract-core.wasm.js",
+                "tesseract.min.js",
+                "pdf.worker.js",
+                "pdf.worker.min.mjs",
+                "offscreen.html",
+                "offscreen.js"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
     ]
 }
