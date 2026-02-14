@@ -1,9 +1,9 @@
 /// <reference types="chrome"/>
 
-// Gromit Bridge Background Script v5.2.0 (Instant OCR & Sanity Filter)
+// Gromit Bridge Background Script v5.2.1 (Instant parallel OCR)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = '5.2.0';
+const BRIDGE_VERSION = '5.2.1';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state

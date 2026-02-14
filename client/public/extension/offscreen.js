@@ -89849,43 +89849,44 @@ ${pageText}
   return finalResult;
 }
 async function performNativeOCR(doc) {
-  const timeoutPromise = new Promise((_3, reject2) => {
-    setTimeout(() => reject2(new Error("OCR_TIMEOUT")), 2e4);
-  });
-  const ocrTask = (async () => {
-    let fullOcrText = "";
-    const detector = new window.TextDetector();
-    for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-      if (!context) continue;
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-      await page.render({
-        canvasContext: context,
-        viewport
-      }).promise;
+  const detector = new window.TextDetector();
+  const pageTasks = [];
+  console.log(`[GromitOffscreen] Starting Parallel OCR for ${doc.numPages} pages...`);
+  for (let i = 1; i <= doc.numPages; i++) {
+    pageTasks.push((async (pageNum) => {
       try {
-        const results = await detector.detect(canvas);
-        const pageText = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
-        if (pageText.trim()) {
-          fullOcrText += `--- PAGINA ${i} (OCR NATIVO) ---
-${pageText}
+        return await Promise.race([
+          (async () => {
+            const page = await doc.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 1 });
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+            if (!context) return "";
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            await page.render({
+              canvasContext: context,
+              viewport
+            }).promise;
+            const results2 = await detector.detect(canvas);
+            const text = results2.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+            canvas.width = 0;
+            canvas.height = 0;
+            return text.trim() ? `--- PAGINA ${pageNum} (OCR NATIVO) ---
+${text}
 
-`;
-        }
-      } catch (e) {
-        console.warn(`[GromitOffscreen] Failed to detect text on page ${i}`, e);
-      } finally {
-        canvas.width = 0;
-        canvas.height = 0;
+` : "";
+          })(),
+          new Promise((_3, reject2) => setTimeout(() => reject2(new Error(`TIMEOUT_PAGE_${pageNum}`)), 15e3))
+        ]);
+      } catch (err) {
+        console.warn(`[GromitOffscreen] OCR Page ${pageNum} failed:`, err);
+        return "";
       }
-    }
-    return fullOcrText;
-  })();
-  return Promise.race([ocrTask, timeoutPromise]);
+    })(i));
+  }
+  const results = await Promise.all(pageTasks);
+  return results.join("").trim();
 }
 async function extractDocxText(arrayBuffer) {
   const result2 = await import_mammoth.default.extractRawText({ arrayBuffer });
