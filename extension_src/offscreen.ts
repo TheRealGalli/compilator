@@ -215,21 +215,87 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
         console.error("[GromitOffscreen] pdf.js extraction failed:", err);
     }
 
-    // 3. OCR Detection (Removed Tesseract)
+    // 3. OCR Detection (Native TextDetector)
     // Check clean length. If < 50 chars, we assume it's a scan (or just empty).
     if (bodyText.replace(/\s/g, '').length < 50 && doc.numPages > 0) {
-        console.log("[GromitOffscreen] Testo insufficiente. Rilevata possibile scansione.");
-        bodyText = "[[GROMIT_SCAN_DETECTED]]";
+        console.log("[GromitOffscreen] Testo insufficiente. Tentativo OCR Nativo (Shape Detection API)...");
+
+        // Check if TextDetector is available
+        if (typeof (window as any).TextDetector !== 'undefined') {
+            try {
+                const ocrResult = await performNativeOCR(doc);
+                if (ocrResult && ocrResult.trim().length > 10) {
+                    bodyText = ocrResult;
+                } else {
+                    bodyText = "[[GROMIT_SCAN_DETECTED]]";
+                }
+            } catch (err) {
+                console.error("[GromitOffscreen] Native OCR failed:", err);
+                bodyText = "[[GROMIT_SCAN_DETECTED]]";
+            }
+        } else {
+            console.log("[GromitOffscreen] TextDetector non disponibile. Usa fallback manuale.");
+            bodyText = "[[GROMIT_SCAN_DETECTED]]";
+        }
     }
 
     // Combined Result: Header (Forms) + Body (Text/OCR)
-    const finalResult = formHeader + bodyText;
+    const finalResult = (formHeader + bodyText).trim();
 
     // SECURITY: Clear text variables before return (Hint for GC)
     formHeader = "";
     bodyText = "";
 
     return finalResult;
+}
+
+/**
+ * Native OCR using the Shape Detection API (TextDetector)
+ * Leverages OS-level capabilities (Live Text on Mac, Windows OCR on Win)
+ */
+async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
+    const timeoutPromise = new Promise<string>((_, reject) => {
+        setTimeout(() => reject(new Error("OCR_TIMEOUT")), 20000);
+    });
+
+    const ocrTask = (async () => {
+        let fullOcrText = "";
+        const detector = new (window as any).TextDetector();
+
+        for (let i = 1; i <= doc.numPages; i++) {
+            const page = await doc.getPage(i);
+            const viewport = page.getViewport({ scale: 2.0 }); // High scale for better OCR
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            if (!context) continue;
+
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+
+            try {
+                const results = await detector.detect(canvas);
+                const pageText = results.map((r: any) => r.rawValue).join(' ');
+                if (pageText.trim()) {
+                    fullOcrText += `--- PAGINA ${i} (OCR) ---\n${pageText}\n\n`;
+                }
+            } catch (e) {
+                console.warn(`[GromitOffscreen] Failed to detect text on page ${i}`, e);
+            } finally {
+                // Garbage collect canvas
+                canvas.width = 0;
+                canvas.height = 0;
+            }
+        }
+        return fullOcrText;
+    })();
+
+    return Promise.race([ocrTask, timeoutPromise]);
 }
 
 async function extractDocxText(arrayBuffer: ArrayBuffer): Promise<string> {

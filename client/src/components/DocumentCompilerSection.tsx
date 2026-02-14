@@ -282,7 +282,10 @@ export function DocumentCompilerSection({
   const [reportVault, setReportVault] = useState<Record<string, string>>({});
   const [reportVaultCounts, setReportVaultCounts] = useState<Record<string, number>>({});
   const [isWaitingForPawnApproval, setIsWaitingForPawnApproval] = useState(false);
-  const [unsupportedSources, setUnsupportedSources] = useState<Array<{ name: string; type: string }>>([]);
+  const [unsupportedSources, setUnsupportedSources] = useState<Array<{ id: string; name: string; type: string }>>([]);
+  const [isManualInputOpen, setIsManualInputOpen] = useState(false);
+  const [manualInputScanId, setManualInputScanId] = useState<string | null>(null);
+  const [manualInputText, setManualInputText] = useState("");
   const sourceTextCache = useRef<Array<{ name: string; text: string; originalText?: string }>>([]);
 
   const handleMention = (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => {
@@ -534,6 +537,63 @@ export function DocumentCompilerSection({
     }
   };
 
+  const handleSubmitManualInput = async () => {
+    if (!manualInputText.trim() || !manualInputScanId) return;
+
+    setIsCompiling(true); // Show loader if needed
+    try {
+      console.log(`[DocumentCompiler] Processing manual input for scan ${manualInputScanId}...`);
+      const findings = await extractPIILocal(manualInputText);
+
+      const newVault = { ...reportVault };
+      const newCounts = { ...reportVaultCounts };
+
+      findings.forEach(f => {
+        const category = f.category.toUpperCase().replace(/[^A-Z_]/g, '_');
+        const value = f.value.trim();
+        if (value.length < 2) return;
+
+        if (!newVault[value]) {
+          const count = (newCounts[category] || 0) + 1;
+          newCounts[category] = count;
+          newVault[value] = `[[${category}_${count}]]`;
+        }
+      });
+
+      setReportVault(newVault);
+      setReportVaultCounts(newCounts);
+
+      // Update source text cache so it's used for the final server call
+      const scanSource = unsupportedSources.find(s => s.id === manualInputScanId);
+      if (scanSource) {
+        sourceTextCache.current = [
+          ...sourceTextCache.current,
+          { name: scanSource.name, text: manualInputText, originalText: manualInputText }
+        ];
+      }
+
+      // Remove from unsupported
+      setUnsupportedSources(prev => prev.filter(s => s.id !== manualInputScanId));
+      setIsManualInputOpen(false);
+      setManualInputText("");
+      setManualInputScanId(null);
+
+      toast({
+        title: "Testo inserito",
+        description: "Il testo della scansione è stato aggiunto e anonimizzato correttamente.",
+      });
+    } catch (err) {
+      console.error("[DocumentCompiler] Manual input processing failed:", err);
+      toast({
+        title: "Errore",
+        description: "Impossibile processare il testo inserito.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCompiling(false);
+    }
+  };
+
   const handleCompile = async () => {
     if (isCompiling || isPdfMode) return;
 
@@ -720,25 +780,26 @@ export function DocumentCompilerSection({
             };
 
             // Sequential Extraction (Safe for 8GB RAM)
-            const currentUnsupported: Array<{ name: string; type: string }> = [];
+            const currentUnsupported: Array<{ id: string; name: string; type: string }> = [];
 
-            for (const source of Array.from(uniqueFiles.values())) {
-              if (source.type.startsWith('image/') || source.type.startsWith('audio/')) {
-                currentUnsupported.push({ name: source.name, type: source.type.startsWith('image/') ? 'Immagine' : 'Audio' });
+            for (const source of Array.from(uniqueFiles.entries())) {
+              const [id, sData] = source;
+              if (sData.type.startsWith('image/') || sData.type.startsWith('audio/')) {
+                currentUnsupported.push({ id, name: sData.name, type: sData.type.startsWith('image/') ? 'Immagine' : 'Audio' });
                 continue;
               }
               try {
-                const file = base64ToFile(source.base64, source.name, source.type);
+                const file = base64ToFile(sData.base64, sData.name, sData.type);
                 const text = await extractTextLocally(file);
 
                 if (text === "[[GROMIT_SCAN_DETECTED]]") {
-                  currentUnsupported.push({ name: source.name, type: 'Scansione' });
+                  currentUnsupported.push({ id, name: sData.name, type: 'Scansione' });
                   // We don't add scans to localExtractedDocs as they are not supportable by Pawn for anonymization
                 } else {
-                  localExtractedDocs.push({ name: source.name, text, originalText: text });
+                  localExtractedDocs.push({ name: sData.name, text, originalText: text });
                 }
               } catch (e) {
-                console.error(`[DocumentCompiler] Local extraction failed for ${source.name}:`, e);
+                console.error(`[DocumentCompiler] Local extraction failed for ${sData.name}:`, e);
               }
             }
 
@@ -980,26 +1041,48 @@ export function DocumentCompilerSection({
 
         // Construct Sources Payload
         for (const s of selectedSources) {
-          const anonymizedText = await getAnonymizedText(s);
-          finalSources.push({
-            name: s.name,
-            type: 'text/plain', // Force text type so server treats it as raw text
-            base64: toBase64(anonymizedText), // Ensure Server receives content as file
-            anonymizedText: anonymizedText,
-            originalType: s.type
-          });
+          const cached = sourceTextCache.current.find(d => d.name === s.name);
+          // If we have manual text in cache (or it was a text doc), use it
+          if (cached && (cached.originalText || cached.text)) {
+            const anonymizedText = await getAnonymizedText(s);
+            finalSources.push({
+              name: s.name,
+              type: 'text/plain',
+              base64: toBase64(anonymizedText),
+              anonymizedText: anonymizedText,
+              originalType: s.type
+            });
+          } else {
+            // It's an unsupported source (Image, Audio, or unhandled Scan)
+            // Send original base64 as specified in the warning alert
+            finalSources.push({
+              name: s.name,
+              type: s.type,
+              base64: s.base64,
+            });
+          }
         }
 
         // Construct Master Payload
         if (masterSource) {
-          const anonymizedMaster = await getAnonymizedText(masterSource);
-          finalMasterSource = {
-            name: masterSource.name,
-            type: 'text/plain',
-            base64: toBase64(anonymizedMaster), // Ensure Server receives content as file
-            anonymizedText: anonymizedMaster,
-            originalType: masterSource.type
-          };
+          const cached = sourceTextCache.current.find(d => d.name === masterSource.name);
+          if (cached && (cached.originalText || cached.text)) {
+            const anonymizedMaster = await getAnonymizedText(masterSource);
+            finalMasterSource = {
+              name: masterSource.name,
+              type: 'text/plain',
+              base64: toBase64(anonymizedMaster),
+              anonymizedText: anonymizedMaster,
+              originalType: masterSource.type
+            };
+          } else {
+            // Unsupported Master (Image, Audio, or unhandled Scan)
+            finalMasterSource = {
+              name: masterSource.name,
+              type: masterSource.type,
+              base64: masterSource.base64,
+            };
+          }
         }
 
       } else {
@@ -1930,9 +2013,26 @@ export function DocumentCompilerSection({
               </div>
               <div className="grid grid-cols-1 gap-1">
                 {unsupportedSources.map((s, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-[10px] text-amber-700 bg-white/50 px-2 py-1 rounded border border-amber-100/50">
-                    <span className="font-medium truncate max-w-[250px]">{s.name}</span>
-                    <span className="bg-amber-100 px-1.5 py-0.5 rounded text-[9px] font-bold">{s.type}</span>
+                  <div key={idx} className="flex flex-col gap-1 text-[10px] text-amber-700 bg-white/50 px-2 py-1.5 rounded border border-amber-100/50">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium truncate max-w-[200px]">{s.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-amber-100 px-1.5 py-0.5 rounded text-[9px] font-bold">{s.type}</span>
+                        {s.type === 'Scansione' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-[9px] font-bold border-amber-300 text-amber-800 hover:bg-amber-100"
+                            onClick={() => {
+                              setManualInputScanId(s.id);
+                              setIsManualInputOpen(true);
+                            }}
+                          >
+                            Inserisci manualmente
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1963,6 +2063,79 @@ export function DocumentCompilerSection({
               {isWaitingForPawnApproval ? "Conferma e Compila con AI" : "Chiudi"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MANUAL SCAN INPUT DIALOG */}
+      <Dialog open={isManualInputOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsManualInputOpen(false);
+          setManualInputText("");
+          setManualInputScanId(null);
+        }
+      }}>
+        <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0 overflow-hidden bg-white border-none shadow-2xl">
+          <div className="flex items-center justify-between p-6 border-b bg-slate-50/50">
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <div className="p-1.5 bg-amber-500 rounded text-white">
+                  <FileText size={18} />
+                </div>
+                Inserimento Manuale Testo Scansione
+              </h2>
+              <p className="text-sm text-slate-500">
+                Incolla il testo della scansione qui sotto. Verrà anonimizzato localmente prima dell'invio.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full hover:bg-slate-200"
+              onClick={() => setIsManualInputOpen(false)}
+            >
+              <X size={20} />
+            </Button>
+          </div>
+
+          <div className="flex-1 p-6 flex flex-col min-h-0 bg-white">
+            <Textarea
+              autoFocus
+              value={manualInputText}
+              onChange={(e) => setManualInputText(e.target.value)}
+              placeholder="Incolla qui il contenuto testuale del documento..."
+              className="flex-1 text-base leading-relaxed resize-none border-2 border-slate-100 focus-visible:border-blue-500 focus-visible:ring-blue-500/20 rounded-xl p-6 transition-all font-sans"
+            />
+          </div>
+
+          <div className="p-6 border-t bg-slate-50/50 flex justify-between items-center">
+            <div className="flex items-center gap-2 text-[11px] text-slate-500 italic">
+              <Sparkles size={12} className="text-blue-500" />
+              Il testo verrà processato dal sistema Pawn (Ollama) per proteggere la tua privacy.
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="rounded-lg px-6"
+                onClick={() => setIsManualInputOpen(false)}
+              >
+                Annulla
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-8 font-bold shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+                disabled={!manualInputText.trim() || isCompiling}
+                onClick={handleSubmitManualInput}
+              >
+                {isCompiling ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Elaborazione...
+                  </>
+                ) : (
+                  "Conferma ed Estrai Dati"
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
