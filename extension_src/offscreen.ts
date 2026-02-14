@@ -210,30 +210,45 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
         console.log("[GromitOffscreen] Testo insufficiente. Attivazione OCR Tesseract Multipage...");
         try {
             // @ts-ignore
-            Tesseract.setLogging(true);
+            Tesseract.setLogging(false); // Disable verbose logs for performance
             const wPath = chrome.runtime.getURL('worker.min.js');
-            const cPath = chrome.runtime.getURL(''); // Base root for auto-selection of core variants
+            const cPath = chrome.runtime.getURL('');
 
-            console.log(`[GromitOffscreen] OCR Config: workerPath=${wPath}, corePath=${cPath}`);
+            console.log(`[GromitOffscreen] Initializing OCR Scheduler (Parallel Mode)...`);
+            const scheduler = Tesseract.createScheduler();
 
-            const worker = await Tesseract.createWorker('eng', 1, {
+            // Create 2 workers for parallel execution (Safe for 8GB RAM + Ollama)
+            const workerOptions = {
                 workerPath: wPath,
                 corePath: cPath,
-                workerBlobURL: false, // Forcing direct load to bypass blob origin restrictions
-                logger: m => console.log("[TESSERACT]", m)
-            });
+                workerBlobURL: false,
+                logger: (m: any) => {
+                    if (m.status === 'recognizing text') {
+                        // console.log(`[TESSERACT] ${m.workerId}: ${Math.round(m.progress * 100)}%`);
+                    }
+                }
+            };
 
-            formHeader += "\n[GROMIT VISION] OCR Attivato (Modalità Locale - Scansione).\n";
+            const [w1, w2] = await Promise.all([
+                Tesseract.createWorker('eng', 1, workerOptions),
+                Tesseract.createWorker('eng', 1, workerOptions)
+            ]);
 
-            // OCR Configuration: Limit pages and adjust scale for performance
-            const MAX_PAGES_OCR = Math.min(doc.numPages, 3);
+            scheduler.addWorker(w1);
+            scheduler.addWorker(w2);
+
+            formHeader += "\n[GROMIT VISION] OCR Parallel Engine Attivato.\n";
+
+            // OCR Configuration: Limit to 10 pages for speed/RAM
+            const MAX_PAGES_OCR = Math.min(doc.numPages, 10);
             let ocrFullText = "";
             const startTime = Date.now();
+            const jobs: Promise<any>[] = [];
 
             for (let i = 1; i <= MAX_PAGES_OCR; i++) {
-                console.log(`[GromitOffscreen] OCR Processing Page ${i}/${MAX_PAGES_OCR}...`);
-                const page = await doc.getPage(i);
-                const viewport = page.getViewport({ scale: 1.5 }); // Balanced scale for speed/accuracy
+                const pageNum = i;
+                const page = await doc.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1.5 });
                 const canvas = document.createElement('canvas');
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
@@ -244,22 +259,32 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
                     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
 
                     if (blob) {
-                        const { data: { text } } = await worker.recognize(blob);
-                        // Clean each page's text immediately to save memory
-                        // We want "Flowing Text" essentially
-                        const pageClean = text
-                            .replace(/[\r\n]+/g, ' ') // Flatten lines
-                            .replace(/\s+/g, ' ')      // Collapse spaces
-                            .trim();
-
-                        ocrFullText += pageClean + "\n\n";
+                        const blobUrl = URL.createObjectURL(blob);
+                        // Add job to scheduler
+                        const job = scheduler.addJob('recognize', blobUrl).then(result => {
+                            URL.revokeObjectURL(blobUrl); // Cleanup memory immediately
+                            return { pageNum, text: result.data.text };
+                        });
+                        jobs.push(job);
                     }
                 }
             }
 
-            await worker.terminate();
+            // Wait for all pages to finish
+            const results = await Promise.all(jobs);
+            results.sort((a, b) => a.pageNum - b.pageNum);
+
+            results.forEach(res => {
+                const pageClean = res.text
+                    .replace(/[\r\n]+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                ocrFullText += `--- PAGINA ${res.pageNum} ---\n${pageClean}\n\n`;
+            });
+
+            await scheduler.terminate();
             const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-            console.log(`[GromitOffscreen] OCR Complete in ${duration}s. Chars: ${ocrFullText.length}`);
+            console.log(`[GromitOffscreen] Parallel OCR Complete in ${duration}s. Chars: ${ocrFullText.length}`);
 
             // Final Cleanup & Truncation (Max 4500 chars for LLM safety)
             const TRUNCATION_LIMIT = 4500;

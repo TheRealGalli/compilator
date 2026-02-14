@@ -8,6 +8,21 @@ const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // --- OFFSCREEN DOCUMENT MANAGEMENT ---
 
+// Handle long-lived connections from content scripts (GROMIT_SESSION)
+chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === "GROMIT_SESSION") {
+        console.log("[GromitBridge] ⚡ Session Port Connected.");
+        activeSessions++;
+        port.onDisconnect.addListener(() => {
+            activeSessions--;
+            console.log(`[GromitBridge] 📴 Session Port Disconnected (Remaining: ${activeSessions}).`);
+            if (activeSessions <= 0) {
+                closeOffscreenDocument();
+            }
+        });
+    }
+});
+
 
 
 let creating: Promise<void> | null = null; // A global promise to avoid concurrency issues

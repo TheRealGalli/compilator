@@ -1,7 +1,31 @@
 // extension_src/background.ts
 var BRIDGE_VERSION = "4.0.0";
 var OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "GROMIT_SESSION") {
+    console.log("[GromitBridge] \u26A1 Session Port Connected.");
+    activeSessions++;
+    port.onDisconnect.addListener(() => {
+      activeSessions--;
+      console.log(`[GromitBridge] \u{1F4F4} Session Port Disconnected (Remaining: ${activeSessions}).`);
+      if (activeSessions <= 0) {
+        closeOffscreenDocument();
+      }
+    });
+  }
+});
 var creating = null;
+var activeSessions = 0;
+async function closeOffscreenDocument() {
+  if (!creating) {
+    try {
+      await chrome.offscreen.closeDocument();
+      console.log(`[GromitBridge] \u{1F6D1} Offscreen Document Closed. Session Ended (Active Sessions: ${activeSessions}).`);
+    } catch (err) {
+      console.debug("[GromitBridge] Offscreen already closed or invalid.");
+    }
+  }
+}
 async function setupOffscreenDocument(path) {
   const offscreenUrl = chrome.runtime.getURL(path);
   const existingContexts = await chrome.runtime.getContexts({
