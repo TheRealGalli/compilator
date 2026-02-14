@@ -89713,7 +89713,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         ...options.headers || {}
       },
       mode: "cors",
-      credentials: "omit"
+      credentials: "omit",
+      referrerPolicy: "no-referrer"
     };
     if (options.body && fetchOptions.method !== "GET" && fetchOptions.method !== "HEAD") {
       fetchOptions.body = options.body;

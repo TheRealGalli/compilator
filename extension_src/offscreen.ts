@@ -77,7 +77,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 ...(options.headers || {})
             },
             mode: 'cors',
-            credentials: 'omit'
+            credentials: 'omit',
+            referrerPolicy: 'no-referrer'
         };
 
         // Only add body if it's not a GET/HEAD request

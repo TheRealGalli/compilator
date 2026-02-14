@@ -33,10 +33,7 @@
             ]
         },
         "condition": {
-            "urlFilter": "*://localhost:11434/*",
-            "resourceTypes": [
-                "xmlhttprequest"
-            ]
+            "urlFilter": "*://localhost:11434/*"
         }
     },
     {
@@ -73,10 +70,7 @@
             ]
         },
         "condition": {
-            "urlFilter": "*://127.0.0.1:11434/*",
-            "resourceTypes": [
-                "xmlhttprequest"
-            ]
+            "urlFilter": "*://127.0.0.1:11434/*"
         }
     }
 ]
