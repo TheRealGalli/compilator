@@ -49,26 +49,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.type === "OLLAMA_FETCH") {
     const { url, options } = request;
-    console.log("[GromitBridge] Eseguo fetch (Background):", url);
-    const fetchOptions = {
-      method: options.method || "GET",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: options.body,
-      mode: "cors",
-      credentials: "omit",
-      referrerPolicy: "no-referrer"
-    };
-    fetch(url, fetchOptions).then(async (response) => {
-      const ok = response.ok;
-      const status = response.status;
-      const data = await response.json().catch(() => ({}));
-      sendResponse({ success: true, ok, status, data });
-    }).catch((error) => {
-      console.error("[GromitBridge] Errore Fetch:", error);
-      sendResponse({ success: false, error: error.message });
-    });
+    console.log("[GromitBridge] Delegating OLLAMA_FETCH to Offscreen:", url);
+    (async () => {
+      try {
+        await setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
+        const response = await chrome.runtime.sendMessage({
+          type: "OLLAMA_FETCH_OFFSCREEN",
+          url,
+          options
+        });
+        sendResponse(response);
+      } catch (error) {
+        console.error("[GromitBridge] Offscreen Fetch Error:", error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
     return true;
   }
 });
