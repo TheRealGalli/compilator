@@ -14,6 +14,9 @@
         "declarativeNetRequestFeedback",
         "offscreen"
     ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    },
     "declarative_net_request": {
         "rule_resources": [
             {
@@ -42,7 +45,8 @@
         {
             "resources": [
                 "worker.min.js",
-                "tesseract-core.wasm.js",
+                "tesseract-core*.js",
+                "tesseract-core*.wasm",
                 "tesseract.min.js",
                 "pdf.worker.js",
                 "pdf.worker.min.mjs",

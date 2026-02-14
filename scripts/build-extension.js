@@ -48,7 +48,31 @@ async function build() {
         // Ensure global name doesn't conflict
     });
 
-    // 3. Copy offscreen.html
+    // 3. Copy Tesseract Assets (Worker & Core WASM)
+    const copyTesseractAssets = () => {
+        const tessDist = 'node_modules/tesseract.js/dist';
+        const coreDist = 'node_modules/tesseract.js-core';
+        const target = 'client/public/extension';
+
+        const filesToCopy = [
+            { src: path.join(tessDist, 'worker.min.js'), dest: 'worker.min.js' },
+            { src: path.join(tessDist, 'tesseract.min.js'), dest: 'tesseract.min.js' },
+            // Copy ALL tesseract-core files (support for SIMD, etc.)
+            ...fs.readdirSync(coreDist)
+                .filter(f => f.startsWith('tesseract-core'))
+                .map(f => ({ src: path.join(coreDist, f), dest: f }))
+        ];
+
+        filesToCopy.forEach(({ src, dest }) => {
+            const destPath = path.join(target, dest);
+            fs.copyFileSync(src, destPath);
+            // console.log(`Copied ${dest}`);
+        });
+        console.log('Tesseract assets copied.');
+    };
+    copyTesseractAssets();
+
+    // 4. Copy offscreen.html
     const copyOffscreenHtml = () => {
         fs.copyFileSync('extension_src/offscreen.html', 'client/public/extension/offscreen.html');
         console.log('Copied offscreen.html');

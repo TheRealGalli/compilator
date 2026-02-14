@@ -209,22 +209,10 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
     if (bodyText.replace(/\s/g, '').length < 50 && doc.numPages > 0) {
         console.log("[GromitOffscreen] Testo insufficiente. Attivazione OCR Tesseract Multipage...");
         try {
-            // @ts-ignore
             const { createWorker } = Tesseract;
 
-            // FIX: Load worker code manually to create a Blob URL
-            // This bypasses 'importScripts' restrictions in some MV3 contexts
-            console.log("[GromitOffscreen] Loading worker manually to start Blob...");
-            const workerUrl = chrome.runtime.getURL('worker.min.js');
-            const workerResp = await fetch(workerUrl);
-            const workerScript = await workerResp.text();
-            const blob = new Blob([workerScript], { type: 'application/javascript' });
-            const blobWorkerUrl = URL.createObjectURL(blob);
-
-            console.log(`[GromitOffscreen] Worker Blob URL created: ${blobWorkerUrl}`);
-
             const worker = await createWorker('eng', 1, {
-                workerPath: blobWorkerUrl,
+                workerPath: chrome.runtime.getURL('worker.min.js'),
                 corePath: chrome.runtime.getURL('tesseract-core.wasm.js'),
                 logger: m => console.log(m)
             });

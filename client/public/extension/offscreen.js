@@ -91115,15 +91115,8 @@ ${pageText}
     console.log("[GromitOffscreen] Testo insufficiente. Attivazione OCR Tesseract Multipage...");
     try {
       const { createWorker } = import_tesseract.default;
-      console.log("[GromitOffscreen] Loading worker manually to start Blob...");
-      const workerUrl = chrome.runtime.getURL("worker.min.js");
-      const workerResp = await fetch(workerUrl);
-      const workerScript = await workerResp.text();
-      const blob = new Blob([workerScript], { type: "application/javascript" });
-      const blobWorkerUrl = URL.createObjectURL(blob);
-      console.log(`[GromitOffscreen] Worker Blob URL created: ${blobWorkerUrl}`);
       const worker = await createWorker("eng", 1, {
-        workerPath: blobWorkerUrl,
+        workerPath: chrome.runtime.getURL("worker.min.js"),
         corePath: chrome.runtime.getURL("tesseract-core.wasm.js"),
         logger: (m) => console.log(m)
       });
@@ -91140,9 +91133,9 @@ ${pageText}
         const context = canvas.getContext("2d");
         if (context) {
           await page.render({ canvasContext: context, viewport }).promise;
-          const blob2 = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-          if (blob2) {
-            const { data: { text } } = await worker.recognize(blob2);
+          const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+          if (blob) {
+            const { data: { text } } = await worker.recognize(blob);
             const pageClean = text.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
             ocrFullText += pageClean + "\n\n";
           }
