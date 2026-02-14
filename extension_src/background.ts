@@ -6,7 +6,9 @@
 const BRIDGE_VERSION = '4.0.0';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
-// --- OFFSCREEN DOCUMENT MANAGEMENT ---
+// Global state
+let activeSessions = 0;
+let creating: Promise<void> | null = null;
 
 // Handle long-lived connections from content scripts (GROMIT_SESSION)
 chrome.runtime.onConnect.addListener((port) => {
@@ -22,11 +24,6 @@ chrome.runtime.onConnect.addListener((port) => {
         });
     }
 });
-
-
-
-let creating: Promise<void> | null = null; // A global promise to avoid concurrency issues
-let activeSessions = 0;
 
 // --- LIFECYCLE MANAGEMENT (SESSION BASED) ---
 

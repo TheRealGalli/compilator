@@ -1,6 +1,8 @@
 // extension_src/background.ts
 var BRIDGE_VERSION = "4.0.0";
 var OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
+var activeSessions = 0;
+var creating = null;
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "GROMIT_SESSION") {
     console.log("[GromitBridge] \u26A1 Session Port Connected.");
@@ -14,8 +16,6 @@ chrome.runtime.onConnect.addListener((port) => {
     });
   }
 });
-var creating = null;
-var activeSessions = 0;
 async function closeOffscreenDocument() {
   if (!creating) {
     try {
