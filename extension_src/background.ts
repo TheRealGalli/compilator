@@ -103,41 +103,33 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
         return true; // Keep channel open
     }
 
-    // --- OLLAMA_FETCH ---
+    // --- OLLAMA_FETCH: Simple fetch proxy ---
     if (request.type === 'OLLAMA_FETCH') {
         const { url, options } = request;
-        console.log(`[GromitBridge] Fetching OLLAMA (Stable Mode): ${url}`);
+
+        console.log('[GromitBridge] Eseguo fetch (Background):', url);
 
         const fetchOptions: any = {
             method: options.method || 'GET',
-            mode: 'cors'
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: options.body,
+            mode: 'cors',
+            credentials: 'omit',
+            referrerPolicy: 'no-referrer'
         };
-
-        if (options.body && fetchOptions.method !== 'GET') {
-            fetchOptions.body = options.body;
-            fetchOptions.headers = { 'Content-Type': 'application/json' };
-        }
 
         fetch(url, fetchOptions)
             .then(async response => {
                 const ok = response.ok;
                 const status = response.status;
-                const text = await response.text().catch(() => '');
-                let data = {};
-                try {
-                    data = text ? JSON.parse(text) : {};
-                } catch (e) {
-                    data = { raw: text };
-                }
+                const data = await response.json().catch(() => ({}));
                 sendResponse({ success: true, ok, status, data });
             })
             .catch(error => {
-                console.error('[GromitBridge] FETCH ERROR:', error);
-                sendResponse({
-                    success: false,
-                    error: error.message || 'Network Error',
-                    status: 0
-                });
+                console.error('[GromitBridge] Errore Fetch:', error);
+                sendResponse({ success: false, error: error.message });
             });
 
         return true;
