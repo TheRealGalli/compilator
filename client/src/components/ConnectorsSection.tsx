@@ -195,7 +195,7 @@ export function ConnectorsSection() {
                                 {ollamaStatus === 'connected' ? (
                                     <>
                                         <Link2 className="w-4 h-4 mr-2" />
-                                        Connetti Ollama
+                                        Connetti account Ollama
                                     </>
                                 ) : (
                                     <>
