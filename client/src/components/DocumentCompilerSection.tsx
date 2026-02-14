@@ -2017,31 +2017,33 @@ export function DocumentCompilerSection({
                 <Info className="w-3.5 h-3.5" />
                 Dettaglio Fonti Non Supportate dal Sistema Pawn
               </div>
-              <div className="grid grid-cols-1 gap-1">
-                {unsupportedSources.map((s, idx) => (
-                  <div key={idx} className="flex flex-col gap-1 text-[10px] text-amber-700 bg-white/50 px-2 py-1.5 rounded border border-amber-100/50">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium truncate max-w-[200px]">{s.name}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="bg-amber-100 px-1.5 py-0.5 rounded text-[9px] font-bold">{s.type}</span>
-                        {s.type === 'Scansione' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 px-2 text-[9px] font-bold border-amber-300 text-amber-800 hover:bg-amber-100"
-                            onClick={() => {
-                              setManualInputScanId(s.id);
-                              setIsManualInputOpen(true);
-                            }}
-                          >
-                            Inserisci manualmente
-                          </Button>
-                        )}
+              <ScrollArea className="max-h-[160px] pr-2">
+                <div className="grid grid-cols-1 gap-1">
+                  {unsupportedSources.map((s, idx) => (
+                    <div key={idx} className="flex flex-col gap-1 text-[10px] text-amber-700 bg-white/50 px-2 py-1.5 rounded border border-amber-100/50">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium truncate max-w-[200px]">{s.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="bg-amber-100 px-1.5 py-0.5 rounded text-[9px] font-bold">{s.type}</span>
+                          {s.type === 'Scansione' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-[9px] font-bold border-amber-300 text-amber-800 hover:bg-amber-100"
+                              onClick={() => {
+                                setManualInputScanId(s.id);
+                                setIsManualInputOpen(true);
+                              }}
+                            >
+                              Inserisci manualmente
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </ScrollArea>
               <p className="text-[9px] text-amber-600 leading-tight italic mt-1">
                 Queste fonti verranno inviate integralmente al server AI poiché il sistema Pawn locale non supporta l&apos;anonimizzazione di immagini, audio o documenti senza testo (scansioni).
               </p>
