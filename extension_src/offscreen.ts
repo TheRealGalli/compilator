@@ -106,7 +106,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse({ success: true, ok, status, data });
             })
             .catch(error => {
-                console.error('[GromitOffscreen] Fetch Fatal Error:', error);
+                // SILENT CONNECTIVITY: Downgrade to debug for network errors
+                if (!error.status || error.status === 0) {
+                    console.debug('[GromitOffscreen] Fetch failed (System Offline):', url);
+                } else {
+                    console.error('[GromitOffscreen] Fetch Fatal Error:', error);
+                }
                 sendResponse({
                     success: false,
                     error: error.message || "Network Error",

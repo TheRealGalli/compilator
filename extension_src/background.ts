@@ -1,9 +1,9 @@
 /// <reference types="chrome"/>
 
-// Gromit Bridge Background Script v4.0.0 (Unified Sanctuary - Offscreen)
+// Gromit Bridge Background Script v5.1.0 (Silent Connectivity)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = '4.0.0';
+const BRIDGE_VERSION = '5.1.0';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state
@@ -103,11 +103,10 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
         return true; // Keep channel open
     }
 
-    // --- OLLAMA_FETCH: Production-ready fetch proxy ---
     if (request.type === 'OLLAMA_FETCH') {
         const { url, options } = request;
 
-        console.log(`[GromitBridge 4.0] Fetching: ${url}`);
+        console.log(`[GromitBridge 5.1.0] Fetching: ${url}`);
 
         const fetchOptions: any = {
             method: options.method || 'GET',
@@ -137,7 +136,12 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
                 sendResponse({ success: true, ok, status, data });
             })
             .catch(error => {
-                console.error('[GromitBridge 4.0] Fetch Error:', error);
+                // SILENT CONNECTIVITY: Downgrade to debug for network errors (status 0)
+                if (!error.status || error.status === 0) {
+                    console.debug('[GromitBridge 5.1.0] Fetch failed (System Offline):', url);
+                } else {
+                    console.error('[GromitBridge 5.1.0] Fetch Error:', error);
+                }
                 sendResponse({
                     success: false,
                     error: error.message || 'Unknown Network Error',

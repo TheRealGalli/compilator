@@ -89735,7 +89735,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       console.log(`[GromitOffscreen] Fetch Success. Status: ${status}`);
       sendResponse({ success: true, ok, status, data });
     }).catch((error2) => {
-      console.error("[GromitOffscreen] Fetch Fatal Error:", error2);
+      if (!error2.status || error2.status === 0) {
+        console.debug("[GromitOffscreen] Fetch failed (System Offline):", url);
+      } else {
+        console.error("[GromitOffscreen] Fetch Fatal Error:", error2);
+      }
       sendResponse({
         success: false,
         error: error2.message || "Network Error",

@@ -1,5 +1,5 @@
 // extension_src/background.ts
-var BRIDGE_VERSION = "4.0.0";
+var BRIDGE_VERSION = "5.1.0";
 var OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 var activeSessions = 0;
 var creating = null;
@@ -73,7 +73,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.type === "OLLAMA_FETCH") {
     const { url, options } = request;
-    console.log(`[GromitBridge 4.0] Fetching: ${url}`);
+    console.log(`[GromitBridge 5.1.0] Fetching: ${url}`);
     const fetchOptions = {
       method: options.method || "GET",
       headers: {
@@ -98,7 +98,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       sendResponse({ success: true, ok, status, data });
     }).catch((error) => {
-      console.error("[GromitBridge 4.0] Fetch Error:", error);
+      if (!error.status || error.status === 0) {
+        console.debug("[GromitBridge 5.1.0] Fetch failed (System Offline):", url);
+      } else {
+        console.error("[GromitBridge 5.1.0] Fetch Error:", error);
+      }
       sendResponse({
         success: false,
         error: error.message || "Unknown Network Error",
