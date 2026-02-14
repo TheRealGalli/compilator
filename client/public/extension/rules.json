@@ -13,27 +13,13 @@
                     "header": "referer",
                     "operation": "remove"
                 }
-            ],
-            "responseHeaders": [
-                {
-                    "header": "access-control-allow-origin",
-                    "operation": "set",
-                    "value": "*"
-                },
-                {
-                    "header": "access-control-allow-methods",
-                    "operation": "set",
-                    "value": "GET, POST, OPTIONS"
-                },
-                {
-                    "header": "access-control-allow-headers",
-                    "operation": "set",
-                    "value": "*"
-                }
             ]
         },
         "condition": {
-            "urlFilter": "*://localhost:11434/*"
+            "urlFilter": "*://localhost:11434/*",
+            "resourceTypes": [
+                "xmlhttprequest"
+            ]
         }
     },
     {
@@ -50,27 +36,13 @@
                     "header": "referer",
                     "operation": "remove"
                 }
-            ],
-            "responseHeaders": [
-                {
-                    "header": "access-control-allow-origin",
-                    "operation": "set",
-                    "value": "*"
-                },
-                {
-                    "header": "access-control-allow-methods",
-                    "operation": "set",
-                    "value": "GET, POST, OPTIONS"
-                },
-                {
-                    "header": "access-control-allow-headers",
-                    "operation": "set",
-                    "value": "*"
-                }
             ]
         },
         "condition": {
-            "urlFilter": "*://127.0.0.1:11434/*"
+            "urlFilter": "*://127.0.0.1:11434/*",
+            "resourceTypes": [
+                "xmlhttprequest"
+            ]
         }
     }
 ]
