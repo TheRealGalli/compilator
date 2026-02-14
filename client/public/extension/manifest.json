@@ -15,7 +15,7 @@
         "offscreen"
     ],
     "content_security_policy": {
-        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.google-analytics.com;"
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; object-src 'self'; connect-src 'self' http://localhost:11434 http://127.0.0.1:11434 https://*.google-analytics.com https://*.google.com;"
     },
     "declarative_net_request": {
         "rule_resources": [
@@ -38,8 +38,10 @@
         }
     ],
     "host_permissions": [
-        "http://localhost:*/*",
-        "http://127.0.0.1:*/*",
+        "http://localhost/11434/*",
+        "http://127.0.0.1/11434/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*",
         "<all_urls>"
     ],
     "web_accessible_resources": [
