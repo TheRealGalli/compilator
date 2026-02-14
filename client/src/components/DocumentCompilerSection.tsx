@@ -651,14 +651,8 @@ export function DocumentCompilerSection({
             if (!text || text.trim().length === 0) return;
             const findings = await extractPIILocal(text);
 
-            const ALLOWED = [
-              'FULL_NAME', 'SURNAME', 'DATE_OF_BIRTH', 'PLACE_OF_BIRTH',
-              'TAX_ID', 'VAT_NUMBER', 'FULL_ADDRESS', 'STREET', 'CITY',
-              'STATE_PROVINCE', 'ZIP_CODE', 'COUNTRY', 'PHONE_NUMBER', 'EMAIL',
-              'DOCUMENT_ID', 'DOCUMENT_TYPE', 'ISSUE_DATE',
-              'EXPIRY_DATE', 'ISSUING_AUTHORITY', 'GENDER',
-              'NATIONALITY', 'OCCUPATION', 'IBAN', 'ORGANIZATION', 'JOB_TITLE', 'MISC'
-            ];
+            // Dynamic Category Strategy: LLM is the source of truth.
+            // We only keep the synonym mapping but allow ANY new category.
 
             for (const f of findings) {
               const rawValue = f.value.trim();
@@ -667,30 +661,28 @@ export function DocumentCompilerSection({
               // 1. Basic validation
               if (!rawValue || rawValue.length < 2) continue;
 
-              // 2. Category normalization
-              if (!ALLOWED.includes(category)) {
-                if (category.includes('NAME') || category.includes('PERSON') || category.includes('NOME')) category = 'FULL_NAME';
-                else if (category.includes('SUR') || category.includes('LAST') || category.includes('COGN')) category = 'SURNAME';
-                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA') || category.includes('CORP')) category = 'ORGANIZATION';
-                else if (category.includes('ADDR') || category.includes('INDIRIZZO')) category = 'FULL_ADDRESS';
-                else if (category.includes('STREET') || category.includes('VIA')) category = 'STREET';
-                else if (category.includes('MAIL')) category = 'EMAIL';
-                else if (category.includes('TEL') || category.includes('PHONE') || category.includes('CELL')) category = 'PHONE_NUMBER';
-                else if (category.includes('BANK') || category.includes('IBAN')) category = 'IBAN';
-                else if (category.includes('CITY') || category.includes('CITTA')) category = 'CITY';
-                else if (category.includes('STATE') || category.includes('PROV')) category = 'STATE_PROVINCE';
-                else if (category.includes('COUNTRY') || category.includes('NATION') || category.includes('NAZION')) category = 'COUNTRY';
-                else if (category.includes('TAX') || category.includes('SOCIAL') || category.includes('FISCAL') || category.includes('CODICE')) category = 'TAX_ID';
-                else if (category.includes('VAT') || category.includes('IVA')) category = 'VAT_NUMBER';
-                else if (category.includes('ZIP') || category.includes('POST') || category.includes('CAP')) category = 'ZIP_CODE';
-                else if (category.includes('BIRTH')) {
-                  if (category.includes('PLACE') || category.includes('LUOGO')) category = 'PLACE_OF_BIRTH';
-                  else category = 'DATE_OF_BIRTH';
-                }
-                else if (category.includes('DOC') || category.includes('NUMBER')) category = 'DOCUMENT_ID';
-                else if (category.includes('ROLE') || category.includes('JOB') || category.includes('RUOLO')) category = 'JOB_TITLE';
-                else category = 'MISC';
+              // Category normalization (synonyms)
+              if (category.includes('NAME') || category.includes('PERSON') || category.includes('NOME')) category = 'FULL_NAME';
+              else if (category.includes('SUR') || category.includes('LAST') || category.includes('COGN')) category = 'SURNAME';
+              else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA') || category.includes('CORP')) category = 'ORGANIZATION';
+              else if (category.includes('ADDR') || category.includes('INDIRIZZO')) category = 'FULL_ADDRESS';
+              else if (category.includes('STREET') || category.includes('VIA')) category = 'STREET';
+              else if (category.includes('MAIL')) category = 'EMAIL';
+              else if (category.includes('TEL') || category.includes('PHONE') || category.includes('CELL')) category = 'PHONE_NUMBER';
+              else if (category.includes('BANK') || category.includes('IBAN')) category = 'IBAN';
+              else if (category.includes('CITY') || category.includes('CITTA')) category = 'CITY';
+              else if (category.includes('STATE') || category.includes('PROV')) category = 'STATE_PROVINCE';
+              else if (category.includes('COUNTRY') || category.includes('NATION') || category.includes('NAZION')) category = 'COUNTRY';
+              else if (category.includes('TAX') || category.includes('SOCIAL') || category.includes('FISCAL') || category.includes('CODICE')) category = 'TAX_ID';
+              else if (category.includes('VAT') || category.includes('IVA')) category = 'VAT_NUMBER';
+              else if (category.includes('ZIP') || category.includes('POST') || category.includes('CAP')) category = 'ZIP_CODE';
+              else if (category.includes('BIRTH')) {
+                if (category.includes('PLACE') || category.includes('LUOGO')) category = 'PLACE_OF_BIRTH';
+                else category = 'DATE_OF_BIRTH';
               }
+              else if (category.includes('DOC') || category.includes('NUMBER')) category = 'DOCUMENT_ID';
+              else if (category.includes('ROLE') || category.includes('JOB') || category.includes('RUOLO')) category = 'JOB_TITLE';
+              // If not a synonym, we KEEP the LLM's category as is.
 
               const value = rawValue;
               let token = "";

@@ -89853,7 +89853,7 @@ async function performNativeOCR(doc) {
     const detector = new window.TextDetector();
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale: 2 });
+      const viewport = page.getViewport({ scale: 3.5 });
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
       if (!context) continue;
@@ -89865,9 +89865,9 @@ async function performNativeOCR(doc) {
       }).promise;
       try {
         const results = await detector.detect(canvas);
-        const pageText = results.map((r) => r.rawValue).join(" ");
+        const pageText = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
         if (pageText.trim()) {
-          fullOcrText += `--- PAGINA ${i} (OCR) ---
+          fullOcrText += `--- PAGINA ${i} (OCR NATIVO) ---
 ${pageText}
 
 `;

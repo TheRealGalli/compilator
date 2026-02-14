@@ -223,25 +223,23 @@ async function getBridgeVersion(retries = 2): Promise<string> {
 function extractJsonFromResponse(text: string): any[] {
     const results: any[] = [];
 
-    // 0. Helper to safely parse and merge
     const tryParse = (str: string) => {
         try {
             const parsed = JSON.parse(str);
             if (Array.isArray(parsed)) results.push(...parsed);
-            else if (typeof parsed === 'object') results.push(parsed);
+            else if (typeof parsed === 'object' && parsed !== null) results.push(parsed);
         } catch (e) {
-            // If strict parse fails, it might be multiple objects/arrays concatenated
-            // e.g. [A][B] or {"a":1}{"b":2}
-            // We use a regex to find all balanced brackets/braces? 
-            // Regex for balanced JSON is hard, so we just log and skip for now
-            // But we can try to rescue the "Unexpected token" case?
-            // Actually, let logic below handle specific patterns.
+            // If strict parse fails, try to see if it's multiple objects/arrays
+            // Or if it's a "messy" JSON
         }
     };
 
     try {
-        // 1. Try direct parse (Best Case)
-        return JSON.parse(text);
+        // 1. Try direct parse
+        const direct = JSON.parse(text);
+        if (Array.isArray(direct)) return direct;
+        if (typeof direct === 'object' && direct !== null) return [direct];
+        return [];
     } catch (e) {
         // 2. Try extracting from markdown code blocks ```json ... ```
         const markdownRegex = /```(?:json)?\s*([\s\S]*?)\s*```/g;
@@ -253,34 +251,24 @@ function extractJsonFromResponse(text: string): any[] {
         }
         if (foundMd && results.length > 0) return results;
 
-        // 3. Balanced Bracket Extractor (Surgical)
-        // Scans the string for top-level [...] arrays.
-        let depth = 0;
-        let start = -1;
+        // 3. Balanced Bracket Extractor
+        let depthArr = 0, depthObj = 0;
+        let startArr = -1, startObj = -1;
 
         for (let i = 0; i < text.length; i++) {
-            if (text[i] === '[') {
-                if (depth === 0) start = i;
-                depth++;
-            } else if (text[i] === ']') {
-                depth--;
-                if (depth === 0 && start !== -1) {
-                    // Found a complete top-level bracket pair
-                    const chunk = text.substring(start, i + 1);
-                    tryParse(chunk);
-                    start = -1;
-                }
-            }
+            if (text[i] === '[') { if (depthArr === 0) startArr = i; depthArr++; }
+            else if (text[i] === ']') { depthArr--; if (depthArr === 0 && startArr !== -1) { tryParse(text.substring(startArr, i + 1)); startArr = -1; } }
+            else if (text[i] === '{') { if (depthObj === 0) startObj = i; depthObj++; }
+            else if (text[i] === '}') { depthObj--; if (depthObj === 0 && startObj !== -1) { tryParse(text.substring(startObj, i + 1)); startObj = -1; } }
         }
 
         if (results.length > 0) return results;
 
-        // 4. Fallback: Try identifying the LARGEST bracket pair if balanced failed (mismatched text)
-        // e.g. "Here is data: [ ... ]"
-        const firstOpen = text.indexOf('[');
-        const lastClose = text.lastIndexOf(']');
-        if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
-            tryParse(text.substring(firstOpen, lastClose + 1));
+        // 4. Final rescue: Largest substring between brackets
+        const firstB = Math.min(text.indexOf('[') === -1 ? Infinity : text.indexOf('['), text.indexOf('{') === -1 ? Infinity : text.indexOf('{'));
+        const lastB = Math.max(text.lastIndexOf(']'), text.lastIndexOf('}'));
+        if (firstB !== Infinity && lastB !== -1 && lastB > firstB) {
+            tryParse(text.substring(firstB, lastB + 1));
         }
 
         return results;
@@ -297,14 +285,29 @@ function extractJsonFromResponse(text: string): any[] {
  */
 function normalizeFindings(input: any): any[] {
     if (!input) return [];
-    if (Array.isArray(input)) return input;
-    if (typeof input === 'object') {
-        // Did it return { "findings": [...] } or { "data": [...] }?
-        if (Array.isArray(input.findings)) return input.findings;
-        if (Array.isArray(input.data)) return input.data;
-        if (Array.isArray(input.result)) return input.result;
-        // Or just a k-v map? Return entries
-        return Object.entries(input).map(([k, v]) => `${k}: ${v}`);
+    if (Array.isArray(input)) {
+        // Could be ["k:v", "k:v"] or [{"value":...}, {...}]
+        return input.flatMap(item => {
+            if (typeof item === 'object' && item !== null) {
+                // If it's a deep object, recurse once to flatten
+                return Object.entries(item).map(([k, v]) => {
+                    if (typeof v === 'string') return `${k}: ${v}`;
+                    return `${k}: ${JSON.stringify(v)}`;
+                });
+            }
+            return item;
+        });
+    }
+    if (typeof input === 'object' && input !== null) {
+        // Did it return { "findings": [...] }?
+        if (Array.isArray(input.findings)) return normalizeFindings(input.findings);
+        if (Array.isArray(input.data)) return normalizeFindings(input.data);
+
+        // Or just a k-v map?
+        return Object.entries(input).map(([k, v]) => {
+            if (typeof v === 'string') return `${k}: ${v}`;
+            return `${k}: ${JSON.stringify(v)}`;
+        });
     }
     return [];
 }
