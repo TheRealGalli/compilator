@@ -69,39 +69,48 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Executed in DOM context (Offscreen), immune to Service Worker termination
     if (request.type === 'OLLAMA_FETCH_OFFSCREEN') {
         const { url, options } = request;
-        console.log(`[GromitOffscreen] Executing fetch for: ${url}`);
+        console.log(`[GromitOffscreen] Fetching: ${url} (${options.method || 'GET'})`);
 
         const fetchOptions: any = {
             method: options.method || 'GET',
             headers: {
-                'Content-Type': 'application/json'
+                ...(options.headers || {})
             },
-            body: options.body,
             mode: 'cors',
-            credentials: 'omit',
-            referrerPolicy: 'no-referrer'
+            credentials: 'omit'
         };
+
+        // Only add body if it's not a GET/HEAD request
+        if (options.body && fetchOptions.method !== 'GET' && fetchOptions.method !== 'HEAD') {
+            fetchOptions.body = options.body;
+            // Ensure Content-Type if not set
+            if (!fetchOptions.headers['Content-Type']) {
+                fetchOptions.headers['Content-Type'] = 'application/json';
+            }
+        }
 
         fetch(url, fetchOptions)
             .then(async response => {
                 const ok = response.ok;
                 const status = response.status;
-                // If it's a 204 No Content, text() might be empty. 
-                // We use text() then try parse to avoid errors on empty bodies.
                 const text = await response.text().catch(() => "");
                 let data = {};
                 try {
                     data = text ? JSON.parse(text) : {};
                 } catch (e) {
-                    // console.warn("Response was not JSON", text);
                     data = { raw: text };
                 }
 
+                console.log(`[GromitOffscreen] Fetch Success. Status: ${status}`);
                 sendResponse({ success: true, ok, status, data });
             })
             .catch(error => {
-                console.error('[GromitOffscreen] Fetch Error:', error);
-                sendResponse({ success: false, error: error.message });
+                console.error('[GromitOffscreen] Fetch Fatal Error:', error);
+                sendResponse({
+                    success: false,
+                    error: error.message || "Network Error",
+                    status: 0 // Distinguish from server errors
+                });
             });
 
         return true;

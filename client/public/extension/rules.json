@@ -13,6 +13,23 @@
                     "header": "referer",
                     "operation": "remove"
                 }
+            ],
+            "responseHeaders": [
+                {
+                    "header": "access-control-allow-origin",
+                    "operation": "set",
+                    "value": "*"
+                },
+                {
+                    "header": "access-control-allow-methods",
+                    "operation": "set",
+                    "value": "GET, POST, OPTIONS"
+                },
+                {
+                    "header": "access-control-allow-headers",
+                    "operation": "set",
+                    "value": "*"
+                }
             ]
         },
         "condition": {
@@ -35,6 +52,23 @@
                 {
                     "header": "referer",
                     "operation": "remove"
+                }
+            ],
+            "responseHeaders": [
+                {
+                    "header": "access-control-allow-origin",
+                    "operation": "set",
+                    "value": "*"
+                },
+                {
+                    "header": "access-control-allow-methods",
+                    "operation": "set",
+                    "value": "GET, POST, OPTIONS"
+                },
+                {
+                    "header": "access-control-allow-headers",
+                    "operation": "set",
+                    "value": "*"
                 }
             ]
         },

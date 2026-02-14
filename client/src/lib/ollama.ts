@@ -75,14 +75,9 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
         if (bridgeResult && bridgeResult.success) {
             return {
                 ok: true,
-                status: 200,
+                status: bridgeResult.status || 200,
                 json: async () => {
-                    // Fix: The bridge might return an object directly or a string
                     const rawData = bridgeResult.data;
-                    // SECURITY: Do not log raw LLM response in production to avoid PII leak
-                    // console.log(`[OllamaLocal] Response JSON received (Length: ${rawData.length})`);
-                    // console.log(`[OllamaLocal] RAW RESPONSE PREVIEW: ${rawData.substring(0, 200)}...`);
-
                     let data = {};
                     if (typeof rawData === 'object' && rawData !== null) {
                         data = rawData;
@@ -98,10 +93,19 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
                 }
             };
         } else {
+            const status = bridgeResult?.status ?? 503;
+            const errorMsg = bridgeResult?.error || 'Bridge connection failed';
+
+            // Log specifically if it's a network error (status 0)
+            if (status === 0) {
+                console.error(`[OllamaLocal] ERRORE DI RETE tramite Bridge: ${errorMsg}`);
+                console.info(`[OllamaLocal] Assicurati che Ollama sia attivo su ${url}`);
+            }
+
             return {
                 ok: false,
-                status: bridgeResult?.status || 503,
-                json: async () => ({ error: bridgeResult?.error || 'Bridge connection failed' })
+                status: status,
+                json: async () => ({ error: errorMsg })
             };
         }
     }
