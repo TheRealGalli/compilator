@@ -209,13 +209,18 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
     if (bodyText.replace(/\s/g, '').length < 50 && doc.numPages > 0) {
         console.log("[GromitOffscreen] Testo insufficiente. Attivazione OCR Tesseract Multipage...");
         try {
-            const { createWorker } = Tesseract;
+            // @ts-ignore
+            Tesseract.setLogging(true);
+            const wPath = chrome.runtime.getURL('worker.min.js');
+            const cPath = chrome.runtime.getURL(''); // Base root for auto-selection of core variants
 
-            const worker = await createWorker('eng', 1, {
-                workerPath: chrome.runtime.getURL('worker.min.js'),
-                corePath: chrome.runtime.getURL('tesseract-core-lstm.js'),
-                workerBlobURL: false, // CRITICAL: Avoids 'importScripts' error by loading worker directly
-                logger: m => console.log(m)
+            console.log(`[GromitOffscreen] OCR Config: workerPath=${wPath}, corePath=${cPath}`);
+
+            const worker = await Tesseract.createWorker('eng', 1, {
+                workerPath: wPath,
+                corePath: cPath,
+                workerBlobURL: false, // Forcing direct load to bypass blob origin restrictions
+                logger: m => console.log("[TESSERACT]", m)
             });
 
             formHeader += "\n[GROMIT VISION] OCR Attivato (Modalità Locale - Scansione).\n";

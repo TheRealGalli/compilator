@@ -91114,13 +91114,16 @@ ${pageText}
   if (bodyText.replace(/\s/g, "").length < 50 && doc.numPages > 0) {
     console.log("[GromitOffscreen] Testo insufficiente. Attivazione OCR Tesseract Multipage...");
     try {
-      const { createWorker } = import_tesseract.default;
-      const worker = await createWorker("eng", 1, {
-        workerPath: chrome.runtime.getURL("worker.min.js"),
-        corePath: chrome.runtime.getURL("tesseract-core-lstm.js"),
+      import_tesseract.default.setLogging(true);
+      const wPath = chrome.runtime.getURL("worker.min.js");
+      const cPath = chrome.runtime.getURL("");
+      console.log(`[GromitOffscreen] OCR Config: workerPath=${wPath}, corePath=${cPath}`);
+      const worker = await import_tesseract.default.createWorker("eng", 1, {
+        workerPath: wPath,
+        corePath: cPath,
         workerBlobURL: false,
-        // CRITICAL: Avoids 'importScripts' error by loading worker directly
-        logger: (m) => console.log(m)
+        // Forcing direct load to bypass blob origin restrictions
+        logger: (m) => console.log("[TESSERACT]", m)
       });
       formHeader += "\n[GROMIT VISION] OCR Attivato (Modalit\xE0 Locale - Scansione).\n";
       const MAX_PAGES_OCR = Math.min(doc.numPages, 5);
