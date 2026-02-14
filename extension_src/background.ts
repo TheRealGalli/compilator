@@ -106,13 +106,11 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
     // --- OLLAMA_FETCH ---
     if (request.type === 'OLLAMA_FETCH') {
         const { url, options } = request;
-        console.log(`[GromitBridge] Fetching OLLAMA: ${url} (Method: ${options.method || 'GET'})`);
+        console.log(`[GromitBridge] Fetching OLLAMA (Stable Mode): ${url}`);
 
-        // Minimal options for maximum compatibility
         const fetchOptions: any = {
             method: options.method || 'GET',
-            mode: 'cors',
-            credentials: 'omit'
+            mode: 'cors'
         };
 
         if (options.body && fetchOptions.method !== 'GET') {
@@ -131,20 +129,15 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
                 } catch (e) {
                     data = { raw: text };
                 }
-                console.log(`[GromitBridge] Fetch Success: ${url} (Status: ${status})`);
                 sendResponse({ success: true, ok, status, data });
             })
             .catch(error => {
-                console.error('[GromitBridge] FETCH FATAL ERROR:', error);
-                // Log properties of the error object
-                const errorInfo = {
-                    name: error.name,
-                    message: error.message,
-                    stack: error.stack,
-                    type: error.type
-                };
-                console.error('[GromitBridge] Error Details:', JSON.stringify(errorInfo));
-                sendResponse({ success: false, error: error.message || 'Unknown Network Error', details: errorInfo });
+                console.error('[GromitBridge] FETCH ERROR:', error);
+                sendResponse({
+                    success: false,
+                    error: error.message || 'Network Error',
+                    status: 0
+                });
             });
 
         return true;
