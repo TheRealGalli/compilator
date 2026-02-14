@@ -1,10 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Loader2, Cpu, LogIn, Link2 } from "lucide-react";
+import { RefreshCw, Loader2, Cpu, LogIn, Link2, Mail, ExternalLink } from "lucide-react";
 import { useGmail } from "@/contexts/GmailContext";
 import { useOllama } from "@/contexts/OllamaContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 
 export const GmailLogo = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
@@ -25,11 +29,52 @@ export const DriveLogo = ({ className }: { className?: string }) => (
 
 export function ConnectorsSection() {
     const { isConnected, isLoading, isFetchingMessages, connect, logout, fetchMessages } = useGmail();
-    const { status: ollamaStatus, checkStatus: checkOllama } = useOllama();
+    const {
+        status: ollamaStatus,
+        checkStatus: checkOllama,
+        accountStatus,
+        accountEmail,
+        connectAccount,
+        disconnectAccount
+    } = useOllama();
+    const { toast } = useToast();
+
+    const [isOllamaModalOpen, setIsOllamaModalOpen] = useState(false);
+    const [ollamaEmail, setOllamaEmail] = useState("");
+    const [isConnecting, setIsConnecting] = useState(false);
 
     useEffect(() => {
         checkOllama();
     }, []);
+
+    const handleConnectOllamaAccount = async () => {
+        if (!ollamaEmail.includes('@')) {
+            toast({
+                title: "Email non valida",
+                description: "Inserisci un indirizzo email valido per procedere.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setIsConnecting(true);
+        try {
+            await connectAccount(ollamaEmail);
+            toast({
+                title: "Account Collegato",
+                description: `L'account Ollama (${ollamaEmail}) è stato connesso con successo.`,
+            });
+            setIsOllamaModalOpen(false);
+        } catch (error) {
+            toast({
+                title: "Errore di connessione",
+                description: "Impossibile collegare l'account in questo momento. Riprova più tardi.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsConnecting(false);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -185,22 +230,29 @@ export function ConnectorsSection() {
                     <CardContent className="pt-4 flex-1 flex flex-col">
                         <p className="text-sm text-muted-foreground mb-6">
                             Motore locale per la protezione della privacy e sanitizzazione "Zero-Data".
+                            {accountStatus === 'connected' && (
+                                <span className="block mt-2 font-medium text-blue-600 flex items-center gap-1.5">
+                                    <Mail className="w-3.5 h-3.5" />
+                                    Account: {accountEmail}
+                                </span>
+                            )}
                         </p>
                         <div className="mt-auto space-y-3">
                             <Button
-                                variant="secondary"
-                                className={`w-full ${ollamaStatus === 'connected' ? 'bg-slate-700 hover:bg-slate-800 text-white' : 'bg-slate-200 text-slate-500 cursor-not-allowed'}`}
-                                disabled={ollamaStatus !== 'connected'}
+                                variant={accountStatus === 'connected' ? "outline" : "secondary"}
+                                className={`w-full ${accountStatus === 'connected' ? '' : (ollamaStatus === 'connected' ? 'bg-slate-700 hover:bg-slate-800 text-white' : 'bg-slate-200 text-slate-500 cursor-not-allowed')}`}
+                                disabled={ollamaStatus !== 'connected' && accountStatus !== 'connected'}
+                                onClick={() => accountStatus === 'connected' ? disconnectAccount() : setIsOllamaModalOpen(true)}
                             >
-                                {ollamaStatus === 'connected' ? (
+                                {accountStatus === 'connected' ? (
                                     <>
-                                        <Link2 className="w-4 h-4 mr-2" />
-                                        Connetti account Ollama
+                                        <ExternalLink className="w-4 h-4 mr-2" />
+                                        Scollega account Ollama
                                     </>
                                 ) : (
                                     <>
-                                        <LogIn className="w-4 h-4 mr-2" />
-                                        Effettua Login a Ollama
+                                        {ollamaStatus === 'connected' ? <Link2 className="w-4 h-4 mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
+                                        {ollamaStatus === 'connected' ? 'Connetti account Ollama' : 'Effettua Login a Ollama'}
                                     </>
                                 )}
                             </Button>
@@ -216,6 +268,40 @@ export function ConnectorsSection() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Dialog open={isOllamaModalOpen} onOpenChange={setIsOllamaModalOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Connetti Account Ollama</DialogTitle>
+                        <DialogDescription>
+                            Inserisci l'email associata al tuo account Ollama Cloud per abilitare i modelli remoti (GTP, SS20).
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="email" className="text-right">
+                                Email
+                            </Label>
+                            <Input
+                                id="email"
+                                placeholder="mario.rossi@esempio.it"
+                                className="col-span-3"
+                                value={ollamaEmail}
+                                onChange={(e) => setOllamaEmail(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsOllamaModalOpen(false)}>
+                            Annulla
+                        </Button>
+                        <Button type="submit" className="bg-slate-900 text-white" onClick={handleConnectOllamaAccount} disabled={isConnecting}>
+                            {isConnecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Link2 className="w-4 h-4 mr-2" />}
+                            Connetti
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

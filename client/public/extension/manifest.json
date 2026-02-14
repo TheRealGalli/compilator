@@ -44,10 +44,6 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "worker.min.js",
-                "tesseract-core*.js",
-                "tesseract-core*.wasm",
-                "tesseract.min.js",
                 "pdf.worker.js",
                 "pdf.worker.min.mjs",
                 "offscreen.html",

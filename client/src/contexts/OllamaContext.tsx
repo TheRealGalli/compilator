@@ -3,16 +3,27 @@ import { testOllamaConnection } from '@/lib/ollama';
 import { useQuery } from '@tanstack/react-query';
 
 type OllamaStatus = 'loading' | 'connected' | 'disconnected';
+type OllamaAccountStatus = 'connected' | 'disconnected';
 
 interface OllamaContextType {
     status: OllamaStatus;
     checkStatus: () => Promise<void>;
+    accountStatus: OllamaAccountStatus;
+    accountEmail?: string;
+    connectAccount: (email: string) => Promise<void>;
+    disconnectAccount: () => void;
 }
 
 const OllamaContext = createContext<OllamaContextType | undefined>(undefined);
 
 export function OllamaProvider({ children }: { children: React.ReactNode }) {
     const [status, setStatus] = useState<OllamaStatus>('loading');
+    const [accountStatus, setAccountStatus] = useState<OllamaAccountStatus>(() => {
+        return (localStorage.getItem('ollama_account_status') as OllamaAccountStatus) || 'disconnected';
+    });
+    const [accountEmail, setAccountEmail] = useState<string | undefined>(() => {
+        return localStorage.getItem('ollama_account_email') || undefined;
+    });
     const isChecking = useRef(false);
 
     // Auth Guard: Only check Ollama if user is logged in
@@ -78,8 +89,33 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
         return () => clearInterval(interval);
     }, [checkStatus]); // NOTA: status NON deve essere qui o causerà un loop infinito
 
+    const connectAccount = useCallback(async (email: string) => {
+        // Simuliamo un delay di connessione
+        await new Promise(r => setTimeout(r, 800));
+        setAccountStatus('connected');
+        setAccountEmail(email);
+        localStorage.setItem('ollama_account_status', 'connected');
+        localStorage.setItem('ollama_account_email', email);
+        console.log(`[OllamaContext] Account connesso: ${email}`);
+    }, []);
+
+    const disconnectAccount = useCallback(() => {
+        setAccountStatus('disconnected');
+        setAccountEmail(undefined);
+        localStorage.removeItem('ollama_account_status');
+        localStorage.removeItem('ollama_account_email');
+        console.log('[OllamaContext] Account disconnesso.');
+    }, []);
+
     return (
-        <OllamaContext.Provider value={{ status, checkStatus }}>
+        <OllamaContext.Provider value={{
+            status,
+            checkStatus,
+            accountStatus,
+            accountEmail,
+            connectAccount,
+            disconnectAccount
+        }}>
             {children}
         </OllamaContext.Provider>
     );

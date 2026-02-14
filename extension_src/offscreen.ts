@@ -1,8 +1,6 @@
 /// <reference types="chrome"/>
 import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFOptionList, PDFRadioGroup } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
-// @ts-ignore
-import Tesseract from 'tesseract.js';
 // import { GlobalWorkerOptions } from 'pdfjs-dist'; // Avoid direct import triggers
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
@@ -217,107 +215,11 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
         console.error("[GromitOffscreen] pdf.js extraction failed:", err);
     }
 
-    // 3. OCR Fallback (Tesseract.js)
+    // 3. OCR Detection (Removed Tesseract)
     // Check clean length. If < 50 chars, we assume it's a scan (or just empty).
     if (bodyText.replace(/\s/g, '').length < 50 && doc.numPages > 0) {
-        console.log("[GromitOffscreen] Testo insufficiente. Attivazione OCR Tesseract Multipage...");
-        try {
-            // @ts-ignore
-            Tesseract.setLogging(true);
-            const wPath = chrome.runtime.getURL('worker.min.js');
-            const cPath = chrome.runtime.getURL('');
-
-            console.log(`[GromitOffscreen] Initializing OCR Scheduler...`);
-            const scheduler = Tesseract.createScheduler();
-
-            const workerOptions = {
-                workerPath: wPath,
-                corePath: cPath,
-                workerBlobURL: false,
-                logger: (m: any) => {
-                    if (m.status === 'recognizing text') {
-                        // console.log(`[TESSERACT] ${m.workerId}: ${Math.round(m.progress * 100)}%`);
-                    } else {
-                        console.log(`[TESSERACT] ${m.status}`);
-                    }
-                }
-            };
-
-            // Sequential creation to avoid RAM spikes on 8GB systems
-            console.log(`[GromitOffscreen] Booting Worker 1...`);
-            const w1 = await Tesseract.createWorker('eng', 1, workerOptions);
-            console.log(`[GromitOffscreen] Worker 1 Ready. Booting Worker 2...`);
-            const w2 = await Tesseract.createWorker('eng', 1, workerOptions);
-            console.log(`[GromitOffscreen] Worker 2 Ready.`);
-
-            scheduler.addWorker(w1);
-            scheduler.addWorker(w2);
-
-            formHeader += "\n[GROMIT VISION] OCR Parallel Engine Attivato.\n";
-
-            // OCR Configuration: Limit to 10 pages for speed/RAM
-            const MAX_PAGES_OCR = Math.min(doc.numPages, 10);
-            let ocrFullText = "";
-            const startTime = Date.now();
-            const jobs: Promise<any>[] = [];
-
-            for (let i = 1; i <= MAX_PAGES_OCR; i++) {
-                const pageNum = i;
-                const page = await doc.getPage(pageNum);
-                const viewport = page.getViewport({ scale: 1.5 });
-                const canvas = document.createElement('canvas');
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
-                const context = canvas.getContext('2d');
-
-                if (context) {
-                    await page.render({ canvasContext: context, viewport }).promise;
-                    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-
-                    if (blob) {
-                        const blobUrl = URL.createObjectURL(blob);
-                        // Add job to scheduler
-                        const job = scheduler.addJob('recognize', blobUrl).then(result => {
-                            URL.revokeObjectURL(blobUrl); // Cleanup memory immediately
-                            return { pageNum, text: result.data.text };
-                        });
-                        jobs.push(job);
-                    }
-                }
-            }
-
-            // Wait for all pages to finish
-            const results = await Promise.all(jobs);
-            results.sort((a, b) => a.pageNum - b.pageNum);
-
-            results.forEach(res => {
-                const pageClean = res.text
-                    .replace(/[\r\n]+/g, ' ')
-                    .replace(/\s+/g, ' ')
-                    .trim();
-                ocrFullText += `--- PAGINA ${res.pageNum} ---\n${pageClean}\n\n`;
-            });
-
-            await scheduler.terminate();
-            const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-            console.log(`[GromitOffscreen] Parallel OCR Complete in ${duration}s. Chars: ${ocrFullText.length}`);
-
-            // Final Cleanup & Truncation (Max 4500 chars for LLM safety)
-            const TRUNCATION_LIMIT = 4500;
-            if (ocrFullText.length > TRUNCATION_LIMIT) {
-                ocrFullText = ocrFullText.substring(0, TRUNCATION_LIMIT) + "\n...[TESTO TRONCATO PER LIMITI MEMORIA]";
-            }
-
-            bodyText = ocrFullText; // Replace the empty bodyText with OCR result
-
-            // SECURITY: Clear intermediate variables
-            ocrFullText = "";
-
-        } catch (ocrErr: any) {
-            console.error("[GromitOffscreen] OCR Failed:", ocrErr);
-            const errDetail = ocrErr.message || (typeof ocrErr === 'string' ? ocrErr : JSON.stringify(ocrErr));
-            formHeader += `\n[ERRORE OCR] ${errDetail}\n`;
-        }
+        console.log("[GromitOffscreen] Testo insufficiente. Rilevata possibile scansione.");
+        bodyText = "[[GROMIT_SCAN_DETECTED]]";
     }
 
     // Combined Result: Header (Forms) + Body (Text/OCR)

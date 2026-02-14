@@ -1,4 +1,4 @@
-import { Asterisk, FileText, ChevronUp, Wand2, Menu, Type, ChevronDown, Printer, Download, X, Check, Copy, Settings2, Sparkles, Zap, BookOpen, Scale, Loader2, Trash2, Plus } from "lucide-react";
+import { Asterisk, FileText, ChevronUp, Wand2, Menu, Type, ChevronDown, Printer, Download, X, Check, Copy, Settings2, Sparkles, Zap, BookOpen, Scale, Loader2, Trash2, Plus, Info } from "lucide-react";
 import { RefineChat } from "./RefineChat";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThreeStars } from "@/components/ui/three-stars"; // Gromit Core Branding
@@ -282,6 +282,7 @@ export function DocumentCompilerSection({
   const [reportVault, setReportVault] = useState<Record<string, string>>({});
   const [reportVaultCounts, setReportVaultCounts] = useState<Record<string, number>>({});
   const [isWaitingForPawnApproval, setIsWaitingForPawnApproval] = useState(false);
+  const [unsupportedSources, setUnsupportedSources] = useState<Array<{ name: string; type: string }>>([]);
   const sourceTextCache = useRef<Array<{ name: string; text: string; originalText?: string }>>([]);
 
   const handleMention = (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => {
@@ -719,16 +720,29 @@ export function DocumentCompilerSection({
             };
 
             // Sequential Extraction (Safe for 8GB RAM)
+            const currentUnsupported: Array<{ name: string; type: string }> = [];
+
             for (const source of Array.from(uniqueFiles.values())) {
-              if (source.type.startsWith('image/')) continue;
+              if (source.type.startsWith('image/') || source.type.startsWith('audio/')) {
+                currentUnsupported.push({ name: source.name, type: source.type.startsWith('image/') ? 'Immagine' : 'Audio' });
+                continue;
+              }
               try {
                 const file = base64ToFile(source.base64, source.name, source.type);
                 const text = await extractTextLocally(file);
-                localExtractedDocs.push({ name: source.name, text, originalText: text });
+
+                if (text === "[[GROMIT_SCAN_DETECTED]]") {
+                  currentUnsupported.push({ name: source.name, type: 'Scansione' });
+                  // We don't add scans to localExtractedDocs as they are not supportable by Pawn for anonymization
+                } else {
+                  localExtractedDocs.push({ name: source.name, text, originalText: text });
+                }
               } catch (e) {
                 console.error(`[DocumentCompiler] Local extraction failed for ${source.name}:`, e);
               }
             }
+
+            setUnsupportedSources(currentUnsupported);
 
             const rawDocs = [
               ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent, originalText: templateContent }] : []),
@@ -1791,11 +1805,19 @@ export function DocumentCompilerSection({
       <Dialog open={isAnonymizationReportOpen} onOpenChange={setIsAnonymizationReportOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="p-2 bg-blue-600 rounded-lg text-white">
-                <FaChessPawn size={20} />
+            <DialogTitle className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2 text-xl">
+                <div className="p-2 bg-blue-600 rounded-lg text-white">
+                  <FaChessPawn size={20} />
+                </div>
+                Analisi Privacy Local (Zero-Data)
               </div>
-              Analisi Privacy Local (Zero-Data)
+              {unsupportedSources.length > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 border border-orange-200 text-orange-700 text-[10px] font-bold uppercase tracking-wider animate-pulse shadow-sm">
+                  <Info className="w-3 h-3" />
+                  Fonti Non Supportate
+                </div>
+              )}
             </DialogTitle>
             <DialogDescription className="text-slate-600">
               Abbiamo individuato i seguenti dati sensibili. Puoi <strong>modificare</strong>, <strong>aggiungere</strong> o <strong>rimuovere</strong> i campi prima della compilazione.
@@ -1900,9 +1922,25 @@ export function DocumentCompilerSection({
             Modifica i token o i valori se necessario. I dati originali non vengono inviati all&apos;IA.
           </p>
 
-          <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-amber-700 text-[10px] leading-tight">
-            <strong>NOTA:</strong> Le immagini, le foto e i file audio non sono attualmente coperte dall&apos;anonimizzazione automatica.
-          </div>
+          {unsupportedSources.length > 0 && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+              <div className="flex items-center gap-2 text-amber-800 text-[11px] font-bold uppercase tracking-tight">
+                <Info className="w-3.5 h-3.5" />
+                Dettaglio Fonti Non Supportate dal Sistema Pawn
+              </div>
+              <div className="grid grid-cols-1 gap-1">
+                {unsupportedSources.map((s, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-[10px] text-amber-700 bg-white/50 px-2 py-1 rounded border border-amber-100/50">
+                    <span className="font-medium truncate max-w-[250px]">{s.name}</span>
+                    <span className="bg-amber-100 px-1.5 py-0.5 rounded text-[9px] font-bold">{s.type}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[9px] text-amber-600 leading-tight italic mt-1">
+                Queste fonti verranno inviate integralmente al server AI poiché il sistema Pawn locale non supporta l&apos;anonimizzazione di immagini, audio o documenti senza testo (scansioni).
+              </p>
+            </div>
+          )}
 
           <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
             <Button
