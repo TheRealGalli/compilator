@@ -89863,7 +89863,7 @@ async function performNativeOCR(doc) {
           const start = performance.now();
           console.log(`[GromitOffscreen] Page ${i}: Loading page object...`);
           const page = await doc.getPage(i);
-          const viewport = page.getViewport({ scale: 1 });
+          const viewport = page.getViewport({ scale: 0.5 });
           console.log(`[GromitOffscreen] Page ${i}: Creating HTMLCanvasElement (${viewport.width}x${viewport.height})...`);
           const canvas = document.createElement("canvas");
           const context = canvas.getContext("2d");
@@ -89873,12 +89873,11 @@ async function performNativeOCR(doc) {
           }
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas...`);
+          document.body.appendChild(canvas);
+          console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas (0.5x scale)...`);
           const renderTask = page.render({
             canvasContext: context,
-            viewport,
-            enableWebGL: false
-            // Disable WebGL for stability in offscreen
+            viewport
           });
           await renderTask.promise;
           const renderEnd = performance.now();
@@ -89888,6 +89887,9 @@ async function performNativeOCR(doc) {
           const detectEnd = performance.now();
           console.log(`[GromitOffscreen] Page ${i} DONE: Detect=${(detectEnd - renderEnd).toFixed(0)}ms`);
           const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+          if (document.body.contains(canvas)) {
+            document.body.removeChild(canvas);
+          }
           canvas.width = 0;
           canvas.height = 0;
           return text.trim() ? `--- PAGINA ${i} (OCR NATIVO) ---

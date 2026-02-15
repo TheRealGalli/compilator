@@ -286,7 +286,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
                     console.log(`[GromitOffscreen] Page ${i}: Loading page object...`);
                     const page = await doc.getPage(i);
-                    const viewport = page.getViewport({ scale: 1.0 });
+                    const viewport = page.getViewport({ scale: 0.5 }); // 0.5x Scale: 75% less memory
 
                     console.log(`[GromitOffscreen] Page ${i}: Creating HTMLCanvasElement (${viewport.width}x${viewport.height})...`);
                     const canvas = document.createElement('canvas');
@@ -299,11 +299,13 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                     canvas.width = viewport.width;
                     canvas.height = viewport.height;
 
-                    console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas...`);
+                    // DOM-SYNC: Temporarily attach to body to force browser priority
+                    document.body.appendChild(canvas);
+
+                    console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas (0.5x scale)...`);
                     const renderTask = page.render({
                         canvasContext: context,
                         viewport: viewport,
-                        enableWebGL: false, // Disable WebGL for stability in offscreen
                     });
 
                     await renderTask.promise;
@@ -321,6 +323,9 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                         .join(' ');
 
                     // Cleanup canvas immediately
+                    if (document.body.contains(canvas)) {
+                        document.body.removeChild(canvas);
+                    }
                     canvas.width = 0;
                     canvas.height = 0;
 
