@@ -276,7 +276,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.1) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.3) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -321,16 +321,38 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                             if (imageSource) {
                                 const imageBitmap = await createImageBitmap(imageSource);
 
-                                // NORMALIZATION (v5.5.2): Draw to OffscreenCanvas to ensure standard RGBA buffer
-                                // This fixes cases where TextDetector returns 0 results from direct PDF.js bitmaps
-                                const canvas = new OffscreenCanvas(img.width, img.height);
+                                // ROBUST NORMALIZATION (v5.5.3):
+                                // 1. Scaling: Cap at 1600px to prevent native OCR context loss
+                                // 2. Background: Fill with white to ensure text contrast (transparency fix)
+                                const MAX_DIM = 1600;
+                                let targetWidth = img.width;
+                                let targetHeight = img.height;
+
+                                if (targetWidth > MAX_DIM) {
+                                    const ratio = MAX_DIM / targetWidth;
+                                    targetWidth = MAX_DIM;
+                                    targetHeight = Math.round(img.height * ratio);
+                                }
+
+                                const canvas = new OffscreenCanvas(targetWidth, targetHeight);
                                 const ctx = canvas.getContext('2d');
                                 if (ctx) {
-                                    ctx.drawImage(imageBitmap, 0, 0);
-                                    console.log(`[GromitOffscreen] Page ${i}: Canvas Normalization SUCCESS (${img.width}x${img.height}). Detecting...`);
+                                    // Layer 1: White background (for transparency cases)
+                                    ctx.fillStyle = '#ffffff';
+                                    ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+                                    // Layer 2: Draw processed image
+                                    ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
+
+                                    console.log(`[GromitOffscreen] Page ${i}: Normalized to ${targetWidth}x${targetHeight}. Detecting...`);
 
                                     const results = await detector.detect(canvas);
                                     console.log(`[GromitOffscreen] Page ${i}: Found ${results.length} text blocks.`);
+
+                                    // Diagnostic: Log first block snippet if available
+                                    if (results.length > 0) {
+                                        console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 30)}..."`);
+                                    }
 
                                     const text = results
                                         .map((r: any) => r.rawValue)
@@ -376,13 +398,26 @@ async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
         const blob = new Blob([arrayBuffer]);
         const imageBitmap = await createImageBitmap(blob);
 
-        // NORMALIZATION (v5.5.2): Ensure standard buffer via OffscreenCanvas
-        const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
+        // ROBUST NORMALIZATION (v5.5.3)
+        const MAX_DIM = 1600;
+        let targetWidth = imageBitmap.width;
+        let targetHeight = imageBitmap.height;
+
+        if (targetWidth > MAX_DIM) {
+            const ratio = MAX_DIM / targetWidth;
+            targetWidth = MAX_DIM;
+            targetHeight = Math.round(imageBitmap.height * ratio);
+        }
+
+        const canvas = new OffscreenCanvas(targetWidth, targetHeight);
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error("Could not create OffscreenCanvas context");
 
-        ctx.drawImage(imageBitmap, 0, 0);
-        console.log(`[GromitOffscreen] Direct Image OCR starting (${imageBitmap.width}x${imageBitmap.height})...`);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, targetWidth, targetHeight);
+        ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
+
+        console.log(`[GromitOffscreen] Direct Image OCR starting (${targetWidth}x${targetHeight})...`);
 
         const results = await detector.detect(canvas);
         console.log(`[GromitOffscreen] Direct Image: Found ${results.length} text blocks.`);
