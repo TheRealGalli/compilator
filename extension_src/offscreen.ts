@@ -273,7 +273,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Fail-Fast OCR (5s/page) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Fail-Fast OCR (10s/page) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -320,7 +320,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
                     return text.trim() ? `--- PAGINA ${i} (OCR NATIVO) ---\n${text}\n\n` : "";
                 })(),
-                new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 5000))
+                new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 10000))
             ]);
 
             fullOcrText += pageTextSnippet;

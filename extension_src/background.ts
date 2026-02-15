@@ -1,9 +1,9 @@
 /// <reference types="chrome"/>
 
-// Gromit Bridge Background Script v5.3.3 (Hardware-Accelerated OCR)
+// Gromit Bridge Background Script v5.3.4 (10s OCR Timeout)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = '5.3.3';
+const BRIDGE_VERSION = '5.3.4';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state

@@ -89854,7 +89854,7 @@ ${pageText}
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Fail-Fast OCR (5s/page) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Fail-Fast OCR (10s/page) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Starting extraction sequence...`);
@@ -89891,7 +89891,7 @@ ${text}
 
 ` : "";
         })(),
-        new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 5e3))
+        new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 1e4))
       ]);
       fullOcrText += pageTextSnippet;
       await new Promise((r) => setTimeout(r, 50));
