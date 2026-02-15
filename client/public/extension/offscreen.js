@@ -89891,38 +89891,75 @@ async function extractPdfText(arrayBuffer) {
   bodyText = "";
   return finalResult;
 }
-async function performNativeOCR(doc) {
+async function detectTextWithTiling(canvas) {
   const detector = new window.TextDetector();
+  const TILE_SIZE = 1024;
+  const OVERLAP = 256;
+  const width = canvas.width;
+  const height = canvas.height;
+  if (width <= TILE_SIZE && height <= TILE_SIZE) {
+    const results = await detector.detect(canvas);
+    return results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+  }
+  console.log(`[GromitOffscreen] Tiling Scan enabled for ${width}x${height} image...`);
+  const allTextBlocks = [];
+  let tileW = 0;
+  let tileH = 0;
+  for (let y = 0; y < height; y += TILE_SIZE - OVERLAP) {
+    tileH = Math.min(TILE_SIZE, height - y);
+    for (let x = 0; x < width; x += TILE_SIZE - OVERLAP) {
+      tileW = Math.min(TILE_SIZE, width - x);
+      const tileCanvas = document.createElement("canvas");
+      tileCanvas.width = tileW;
+      tileCanvas.height = tileH;
+      const tileCtx = tileCanvas.getContext("2d");
+      tileCtx.drawImage(canvas, x, y, tileW, tileH, 0, 0, tileW, tileH);
+      try {
+        const results = await detector.detect(tileCanvas);
+        if (results.length > 0) {
+          const tileText = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+          allTextBlocks.push(tileText);
+        }
+      } catch (e) {
+        console.error("[GromitOffscreen] Tile processing error:", e);
+      }
+      if (x + tileW >= width) break;
+    }
+    if (y + tileH >= height) break;
+  }
+  return allTextBlocks.join(" ");
+}
+async function performNativeOCR(doc) {
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.6) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.0) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
-      console.log(`[GromitOffscreen] Page ${i}: Scanning for images (Deep Look)...`);
+      console.log(`[GromitOffscreen] Page ${i}: Looking for "The Photo" in all levels...`);
       const pageTextSnippet = await Promise.race([
         (async () => {
-          const start = performance.now();
           const page = await doc.getPage(i);
+          const start = performance.now();
           let pageAccText = "";
           try {
             const ops = await page.getOperatorList();
             const imageIds = [];
             let currentCTM = [1, 0, 0, 1, 0, 0];
-            const transformStack = [];
-            for (let j = 0; j < ops.fnArray.length; j++) {
-              const fn = ops.fnArray[j];
-              const args = ops.argsArray[j];
-              if (fn === __webpack_exports__OPS.transform) {
-                currentCTM = args;
-              } else if (fn === __webpack_exports__OPS.save) {
-              } else if (fn === __webpack_exports__OPS.restore) {
-              } else if (fn === __webpack_exports__OPS.paintImageXObject || fn === __webpack_exports__OPS.paintJpegXObject || fn === __webpack_exports__OPS.paintImageMaskXObject) {
-                const id = args[0];
-                imageIds.push({ id, y: currentCTM[5], source: "objs" });
-              } else if (fn === __webpack_exports__OPS.paintInlineImageXObject) {
-                const imgData = args[0];
-                imageIds.push({ data: imgData, y: currentCTM[5], source: "inline" });
+            const scanOperators = (fnArray, argsArray, ctm) => {
+              for (let j = 0; j < fnArray.length; j++) {
+                const fn = fnArray[j];
+                const args = argsArray[j];
+                if (fn === __webpack_exports__OPS.transform) {
+                  ctm = args;
+                } else if (fn === __webpack_exports__OPS.paintImageXObject || fn === __webpack_exports__OPS.paintJpegXObject || fn === __webpack_exports__OPS.paintImageMaskXObject) {
+                  imageIds.push({ id: args[0], y: ctm[5], source: "objs" });
+                } else if (fn === __webpack_exports__OPS.paintInlineImageXObject) {
+                  imageIds.push({ data: args[0], y: ctm[5], source: "inline" });
+                } else if (fn === __webpack_exports__OPS.paintFormXObject) {
+                  imageIds.push({ id: args[0], y: ctm[5], source: "objs" });
+                }
               }
-            }
+            };
+            scanOperators(ops.fnArray, ops.argsArray, currentCTM);
             if (imageIds.length > 0) {
               console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate levels. Searching...`);
               imageIds.sort((a, b) => b.y - a.y);
@@ -89931,23 +89968,24 @@ async function performNativeOCR(doc) {
                   let img = item.data;
                   if (!img && item.id) {
                     img = await new Promise((resolve) => {
-                      if (item.source === "objs") {
-                        page.objs.get(item.id, resolve);
-                      } else {
-                        page.commonObjs.get(item.id, resolve);
-                      }
+                      page.objs.get(item.id, (obj2) => {
+                        if (obj2) resolve(obj2);
+                        else page.commonObjs.get(item.id, resolve);
+                      });
                     });
                   }
                   if (img) {
                     const area = (img.width || 0) * (img.height || 0);
-                    if (area > 2e4) {
-                      console.log(`[GromitOffscreen] Page ${i}: Processing ${item.id || "inline"} (${img.width}x${img.height}, bpc: ${img.bpc || "N/A"}) from ${item.source}`);
+                    if (area > 2e4 || !img.width && img.fnArray) {
+                      console.log(`[GromitOffscreen] Page ${i}: Processing ${item.id || "inline"} (${img.width || "Form"}x${img.height || ""})`);
                       const canvas = document.createElement("canvas");
-                      canvas.width = img.width;
-                      canvas.height = img.height;
+                      const width = img.width || 1e3;
+                      const height = img.height || 1e3;
+                      canvas.width = width;
+                      canvas.height = height;
                       const ctx = canvas.getContext("2d");
                       ctx.fillStyle = "white";
-                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                      ctx.fillRect(0, 0, width, height);
                       if (img.bitmap) {
                         ctx.drawImage(img.bitmap, 0, 0);
                       } else if (img.data) {
@@ -89959,21 +89997,17 @@ async function performNativeOCR(doc) {
                         tempCanvas.getContext("2d").putImageData(imageData, 0, 0);
                         ctx.drawImage(tempCanvas, 0, 0);
                       }
-                      let results = await detector.detect(canvas);
-                      if (results.length === 0) {
+                      let text = await detectTextWithTiling(canvas);
+                      if (!text.trim()) {
                         ctx.globalCompositeOperation = "difference";
                         ctx.fillStyle = "white";
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         ctx.globalCompositeOperation = "source-over";
-                        results = await detector.detect(canvas);
-                        if (results.length > 0) console.log(`[GromitOffscreen] Image ${item.id || "inline"} - Inversion Fallback SUCCESS.`);
+                        text = await detectTextWithTiling(canvas);
                       }
-                      if (results.length > 0) {
-                        const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+                      if (text.trim()) {
                         pageAccText += text + " ";
-                        console.debug(`[GromitOffscreen] Page ${i}: Extracted ${results.length} blocks.`);
-                      } else {
-                        console.log(`[GromitOffscreen] Page ${i}: Image ${item.id || "inline"} - TextDetector returned 0 results.`);
+                        console.debug(`[GromitOffscreen] Page ${i}: Extracted text from level.`);
                       }
                     }
                   }
@@ -90012,12 +90046,17 @@ async function performNativeOCR(doc) {
 }
 async function extractImageText(arrayBuffer) {
   try {
-    const detector = new window.TextDetector();
     const blob = new Blob([arrayBuffer]);
-    console.log(`[GromitOffscreen] Direct Image OCR starting (Size: ${arrayBuffer.byteLength} bytes)...`);
-    const results = await detector.detect(blob);
-    console.log(`[GromitOffscreen] Direct Image: Found ${results.length} text blocks.`);
-    const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0);
+    console.log(`[GromitOffscreen] Direct Image OCR (Tiling) for ${bitmap.width}x${bitmap.height}...`);
+    const text = await detectTextWithTiling(canvas);
     return text.trim() ? text : "[[GROMIT_SCAN_DETECTED]]";
   } catch (err) {
     console.error("[GromitOffscreen] Direct Image OCR failed:", err);

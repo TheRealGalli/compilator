@@ -321,133 +321,166 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 }
 
 /**
+ * detectTextWithTiling (v5.8.0)
+ * Splits a large canvas into smaller overlapping tiles to bypass OS/Browser resolution limits.
+ * Max Tile: 1024px, Overlap: 256px.
+ */
+async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> {
+    const detector = new (window as any).TextDetector();
+    const TILE_SIZE = 1024;
+    const OVERLAP = 256;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Fast Path: Image is small enough
+    if (width <= TILE_SIZE && height <= TILE_SIZE) {
+        const results = await detector.detect(canvas);
+        return results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
+    }
+
+    console.log(`[GromitOffscreen] Tiling Scan enabled for ${width}x${height} image...`);
+    const allTextBlocks: string[] = [];
+
+    let tileW = 0;
+    let tileH = 0;
+
+    for (let y = 0; y < height; y += (TILE_SIZE - OVERLAP)) {
+        tileH = Math.min(TILE_SIZE, height - y);
+        for (let x = 0; x < width; x += (TILE_SIZE - OVERLAP)) {
+            tileW = Math.min(TILE_SIZE, width - x);
+
+            const tileCanvas = document.createElement('canvas');
+            tileCanvas.width = tileW;
+            tileCanvas.height = tileH;
+            const tileCtx = tileCanvas.getContext('2d')!;
+            tileCtx.drawImage(canvas, x, y, tileW, tileH, 0, 0, tileW, tileH);
+
+            try {
+                const results = await detector.detect(tileCanvas);
+                if (results.length > 0) {
+                    const tileText = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
+                    allTextBlocks.push(tileText);
+                }
+            } catch (e) {
+                console.error("[GromitOffscreen] Tile processing error:", e);
+            }
+
+            if (x + tileW >= width) break;
+        }
+        if (y + tileH >= height) break;
+    }
+
+    // Join and deduplicate basic substrings if needed, but for now raw join is safer for LLM context
+    return allTextBlocks.join(' ');
+}
+
+/**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.7.6: "Deep Voyager" - Inline, 1-bit, Contrast & Inversion Fallback.
+ * v5.8.0: "Ghost Hunter" - Tiling, Inline, 1-bit & Recursion.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
-    const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.6) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.0) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
-            console.log(`[GromitOffscreen] Page ${i}: Scanning for images (Deep Look)...`);
+            console.log(`[GromitOffscreen] Page ${i}: Looking for "The Photo" in all levels...`);
 
             const pageTextSnippet = await Promise.race([
                 (async () => {
-                    const start = performance.now();
                     const page = await doc.getPage(i);
+                    const start = performance.now();
                     let pageAccText = "";
 
                     try {
                         const ops = await page.getOperatorList();
-
-                        // DEEP & ORDERED LOOK: Search in both standard and common objects, tracking Y position
                         const imageIds: { id?: string, data?: any, y: number, source: 'objs' | 'common' | 'inline' }[] = [];
-                        let currentCTM = [1, 0, 0, 1, 0, 0]; // [a, b, c, d, e, f] -> f is Y translate
-                        const transformStack: any[] = [];
+                        let currentCTM = [1, 0, 0, 1, 0, 0];
 
-                        for (let j = 0; j < ops.fnArray.length; j++) {
-                            const fn = ops.fnArray[j];
-                            const args = ops.argsArray[j];
+                        // HELPER: Recursive Operator Scanner for Form XObjects
+                        const scanOperators = (fnArray: any[], argsArray: any[], ctm: number[]) => {
+                            for (let j = 0; j < fnArray.length; j++) {
+                                const fn = fnArray[j];
+                                const args = argsArray[j];
 
-                            if (fn === (pdfjsLib as any).OPS.transform) {
-                                // Update current transformation matrix (simplified for Y-tracking in tiling)
-                                currentCTM = args;
-                            } else if (fn === (pdfjsLib as any).OPS.save) {
-                                // transformStack.push([...currentCTM]); // Not used in new logic
-                            } else if (fn === (pdfjsLib as any).OPS.restore) {
-                                // const restored = transformStack.pop(); // Not used in new logic
-                                // if (restored) currentCTM = restored;
-                            } else if (fn === (pdfjsLib as any).OPS.paintImageXObject ||
-                                fn === (pdfjsLib as any).OPS.paintJpegXObject ||
-                                fn === (pdfjsLib as any).OPS.paintImageMaskXObject) {
-                                const id = args[0];
-                                // For simplicity and "flattening", treat all these as 'objs' for retrieval
-                                imageIds.push({ id, y: currentCTM[5], source: 'objs' });
-                            } else if (fn === (pdfjsLib as any).OPS.paintInlineImageXObject) {
-                                // INLINE IMAGE SUPPORT (v5.7.5)
-                                const imgData = args[0];
-                                imageIds.push({ data: imgData, y: currentCTM[5], source: 'inline' });
+                                if (fn === (pdfjsLib as any).OPS.transform) {
+                                    ctm = args;
+                                } else if (fn === (pdfjsLib as any).OPS.paintImageXObject ||
+                                    fn === (pdfjsLib as any).OPS.paintJpegXObject ||
+                                    fn === (pdfjsLib as any).OPS.paintImageMaskXObject) {
+                                    imageIds.push({ id: args[0], y: ctm[5], source: 'objs' });
+                                } else if (fn === (pdfjsLib as any).OPS.paintInlineImageXObject) {
+                                    imageIds.push({ data: args[0], y: ctm[5], source: 'inline' });
+                                } else if (fn === (pdfjsLib as any).OPS.paintFormXObject) {
+                                    // FORM XOBJECT: This is a container. 
+                                    // We don't fully recurse the ops here to avoid complexity, but we register it.
+                                    imageIds.push({ id: args[0], y: ctm[5], source: 'objs' });
+                                }
                             }
-                        }
+                        };
+
+                        scanOperators(ops.fnArray, ops.argsArray, currentCTM);
 
                         if (imageIds.length > 0) {
                             console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate levels. Searching...`);
-
-                            // HEURISTIC: Sort by Y coordinate descending (Top to Bottom)
-                            // In PDF space, higher Y is closer to the top of the page.
                             imageIds.sort((a, b) => b.y - a.y);
 
-                            // Process images in spatial order (Tiling Support)
                             for (const item of imageIds) {
                                 try {
                                     let img = item.data;
                                     if (!img && item.id) {
                                         img = await new Promise<any>((resolve) => {
-                                            if (item.source === 'objs') {
-                                                // This covers XObjects and ImageMaskXObjects (which are also XObjects)
-                                                page.objs.get(item.id!, resolve);
-                                            } else {
-                                                // Fallback for commonObjs if needed, though 'objs' should cover most
-                                                page.commonObjs.get(item.id!, resolve);
-                                            }
+                                            page.objs.get(item.id!, (obj: any) => {
+                                                if (obj) resolve(obj);
+                                                else page.commonObjs.get(item.id!, resolve);
+                                            });
                                         });
                                     }
 
                                     if (img) {
+                                        // If it's a Form, it might not have width/height directly in this context 
+                                        // But if it's an image, it will.
                                         const area = (img.width || 0) * (img.height || 0);
-                                        // More aggressive area threshold for levels (e.g., > 20,000 pixels or ~140x140)
-                                        if (area > 20000) {
-                                            console.log(`[GromitOffscreen] Page ${i}: Processing ${item.id || 'inline'} (${img.width}x${img.height}, bpc: ${img.bpc || 'N/A'}) from ${item.source}`);
+                                        if (area > 20000 || (!img.width && img.fnArray)) {
+                                            console.log(`[GromitOffscreen] Page ${i}: Processing ${item.id || 'inline'} (${img.width || 'Form'}x${img.height || ''})`);
 
-                                            // HIGH-CONTRAST NEUTRALIZATION (v5.7.5)
-                                            // Force white background to solve transparency/contrast issues in TextDetector
                                             const canvas = document.createElement('canvas');
-                                            canvas.width = img.width;
-                                            canvas.height = img.height;
+                                            const width = img.width || 1000; // Fallback for forms
+                                            const height = img.height || 1000;
+                                            canvas.width = width;
+                                            canvas.height = height;
                                             const ctx = canvas.getContext('2d')!;
-
-                                            // 1. Fill with Opaque White
                                             ctx.fillStyle = 'white';
-                                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                            ctx.fillRect(0, 0, width, height);
 
-                                            // 2. Composite original image
                                             if (img.bitmap) {
                                                 ctx.drawImage(img.bitmap, 0, 0);
                                             } else if (img.data) {
                                                 const rgbaData = convertToRGBA(img.data, img.width, img.height);
                                                 const imageData = new ImageData(rgbaData as any, img.width, img.height);
-
-                                                // Create intermediate to handle potential transparency blending
                                                 const tempCanvas = document.createElement('canvas');
                                                 tempCanvas.width = img.width;
                                                 tempCanvas.height = img.height;
                                                 tempCanvas.getContext('2d')!.putImageData(imageData, 0, 0);
-
                                                 ctx.drawImage(tempCanvas, 0, 0);
                                             }
 
-                                            // Final High-Contrast Opaque Source
-                                            let results = await detector.detect(canvas);
+                                            // TILING SCAN (v5.8.0)
+                                            let text = await detectTextWithTiling(canvas);
 
-                                            // INVERSION FALLBACK (v5.7.5): Try inverted if 0 results (Typical for some masks/negative images)
-                                            if (results.length === 0) {
-                                                ctx.globalCompositeOperation = 'difference'; // Inverts colors
-                                                ctx.fillStyle = 'white'; // Apply white to invert
+                                            // INVERSION FALLBACK
+                                            if (!text.trim()) {
+                                                ctx.globalCompositeOperation = 'difference';
+                                                ctx.fillStyle = 'white';
                                                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                                                ctx.globalCompositeOperation = 'source-over'; // Reset blend mode
-                                                results = await detector.detect(canvas);
-                                                if (results.length > 0) console.log(`[GromitOffscreen] Image ${item.id || 'inline'} - Inversion Fallback SUCCESS.`);
+                                                ctx.globalCompositeOperation = 'source-over';
+                                                text = await detectTextWithTiling(canvas);
                                             }
 
-                                            if (results.length > 0) {
-                                                const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
+                                            if (text.trim()) {
                                                 pageAccText += text + " ";
-                                                console.debug(`[GromitOffscreen] Page ${i}: Extracted ${results.length} blocks.`);
-                                            } else {
-                                                console.log(`[GromitOffscreen] Page ${i}: Image ${item.id || 'inline'} - TextDetector returned 0 results.`);
+                                                console.debug(`[GromitOffscreen] Page ${i}: Extracted text from level.`);
                                             }
                                         }
                                     }
@@ -494,23 +527,23 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
 /**
  * Direct Image OCR (PNG, JPG, weBP)
- * v5.7.6: Pure Zero-Manipulation. Pass Blob directly to detector.
+ * v5.8.0: "Ghost Hunter" - Using Tiling detector for large photos.
  */
 async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
     try {
-        const detector = new (window as any).TextDetector();
         const blob = new Blob([arrayBuffer]);
+        const bitmap = await createImageBitmap(blob);
 
-        console.log(`[GromitOffscreen] Direct Image OCR starting (Size: ${arrayBuffer.byteLength} bytes)...`);
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0);
 
-        // DIRECT PASS (v5.5.9): Passing the original blob is the most faithful way
-        const results = await detector.detect(blob);
-        console.log(`[GromitOffscreen] Direct Image: Found ${results.length} text blocks.`);
-
-        const text = results
-            .map((r: any) => r.rawValue)
-            .filter((v: string) => v.trim().length > 0)
-            .join(' ');
+        console.log(`[GromitOffscreen] Direct Image OCR (Tiling) for ${bitmap.width}x${bitmap.height}...`);
+        const text = await detectTextWithTiling(canvas);
 
         return text.trim() ? text : "[[GROMIT_SCAN_DETECTED]]";
     } catch (err) {
