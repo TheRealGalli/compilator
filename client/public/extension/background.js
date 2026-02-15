@@ -1,5 +1,5 @@
 // extension_src/background.ts
-var BRIDGE_VERSION = "5.5.8";
+var BRIDGE_VERSION = "5.7.0";
 var OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 var activeSessions = 0;
 var creating = null;

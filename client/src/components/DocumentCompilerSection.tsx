@@ -788,10 +788,7 @@ export function DocumentCompilerSection({
 
             for (const source of Array.from(uniqueFiles.entries())) {
               const [id, sData] = source;
-              if (sData.type.startsWith('image/') || sData.type.startsWith('audio/')) {
-                currentUnsupported.push({ id, name: sData.name, type: sData.type.startsWith('image/') ? 'Immagine' : 'Audio' });
-                continue;
-              }
+
               try {
                 const file = base64ToFile(sData.base64, sData.name, sData.type);
                 const text = await extractTextLocally(file);

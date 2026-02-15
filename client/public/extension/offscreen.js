@@ -89890,7 +89890,7 @@ async function extractPdfText(arrayBuffer) {
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Deep OCR (v5.6.1) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.0) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Scanning for images (Deep Look)...`);
@@ -89981,6 +89981,10 @@ async function performNativeOCR(doc) {
       fullOcrText += " ";
       continue;
     }
+  }
+  if (fullOcrText.trim().length === 0) {
+    console.warn("[GromitOffscreen] OCR completed but no text was found. Marking as SCAN.");
+    return "[[GROMIT_SCAN_DETECTED]]";
   }
   return fullOcrText.trim();
 }
