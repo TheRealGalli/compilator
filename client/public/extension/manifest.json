@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Gromit Bridge",
-    "version": "5.2.1",
+    "version": "5.3.0",
     "description": "Collega Gromit all'AI locale (Ollama) con supporto di Sanctuary locale per l'estrazione.",
     "icons": {
         "128": "icon.png"
