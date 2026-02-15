@@ -272,50 +272,57 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Fast-Serial OCR for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Fail-Fast OCR (5s/page) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
-            const start = performance.now();
-            const page = await doc.getPage(i);
-            const viewport = page.getViewport({ scale: 1.0 });
+            // HEARTBEAT: Start Page race
+            const pageTextSnippet = await Promise.race([
+                (async () => {
+                    const start = performance.now();
+                    const page = await doc.getPage(i);
+                    const viewport = page.getViewport({ scale: 1.0 });
 
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            if (!context) continue;
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    if (!context) return "";
 
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
 
-            await page.render({
-                canvasContext: context,
-                viewport: viewport
-            }).promise;
-            const renderEnd = performance.now();
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+                    const renderEnd = performance.now();
 
-            const results = await detector.detect(canvas);
-            const detectEnd = performance.now();
+                    const results = await detector.detect(canvas);
+                    const detectEnd = performance.now();
 
-            console.log(`[GromitOffscreen] Page ${i}: Render=${(renderEnd - start).toFixed(0)}ms, Detect=${(detectEnd - renderEnd).toFixed(0)}ms`);
+                    console.log(`[GromitOffscreen] Page ${i} DONE: Render=${(renderEnd - start).toFixed(0)}ms, Detect=${(detectEnd - renderEnd).toFixed(0)}ms`);
 
-            const text = results
-                .map((r: any) => r.rawValue)
-                .filter((v: string) => v.trim().length > 0)
-                .join(' ');
+                    const text = results
+                        .map((r: any) => r.rawValue)
+                        .filter((v: string) => v.trim().length > 0)
+                        .join(' ');
 
-            if (text.trim()) {
-                fullOcrText += `--- PAGINA ${i} (OCR NATIVO) ---\n${text}\n\n`;
-            }
+                    // Cleanup canvas immediately
+                    canvas.width = 0;
+                    canvas.height = 0;
 
-            // Garbage collect canvas immediately
-            canvas.width = 0;
-            canvas.height = 0;
+                    return text.trim() ? `--- PAGINA ${i} (OCR NATIVO) ---\n${text}\n\n` : "";
+                })(),
+                new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 5000))
+            ]);
 
-            // Small delay to prevent GPU/Engine contention
+            fullOcrText += pageTextSnippet;
+
+            // Small delay to prevent Engine contention
             await new Promise(r => setTimeout(r, 50));
 
         } catch (err) {
-            console.warn(`[GromitOffscreen] OCR Page ${i} failed:`, err);
+            console.warn(`[GromitOffscreen] OCR Hard Fail on Page ${i}. Breaking document loop.`, err);
+            break; // FAIL-FAST: Don't try subsequent pages if one hangs or fails
         }
     }
 
