@@ -89968,7 +89968,7 @@ async function performNativeOCR(doc) {
       fullOcrText += pageTextSnippet;
       await new Promise((r) => setTimeout(r, 50));
     } catch (err) {
-      fullOcrText += `[[PAGE_RENDER_FAILED]] `;
+      fullOcrText += " ";
       continue;
     }
   }

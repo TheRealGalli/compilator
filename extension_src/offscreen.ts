@@ -369,7 +369,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
                             try {
                                 const rgbaData = convertToRGBA(bestImage.data, bestImage.width, bestImage.height);
-                                const imageSource = new ImageData(rgbaData, bestImage.width, bestImage.height);
+                                const imageSource = new ImageData(rgbaData as any, bestImage.width, bestImage.height);
                                 const imageBitmap = await createImageBitmap(imageSource);
 
                                 const MAX_DIM = 2500;
@@ -422,7 +422,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
             await new Promise(r => setTimeout(r, 50));
 
         } catch (err) {
-            fullOcrText += `[[PAGE_RENDER_FAILED]] `;
+            fullOcrText += " ";
             continue;
         }
     }
