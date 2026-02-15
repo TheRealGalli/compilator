@@ -322,13 +322,13 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 
 /**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.7.0: Zero-Render Policy. Relying only on direct image extraction.
+ * v5.7.2: Zero-Render Policy. Relying only on direct image extraction.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.0) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.2) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -416,7 +416,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                                     pageAccText += text + " ";
                                                     console.debug(`[GromitOffscreen] Page ${i}: Image ${id} extracted ${results.length} blocks.`);
                                                 } else {
-                                                    console.warn(`[GromitOffscreen] Page ${i}: Image ${id} - TextDetector returned 0 results.`);
+                                                    console.log(`[GromitOffscreen] Page ${i}: Image ${id} - TextDetector returned 0 results.`);
                                                 }
                                             }
                                         }
@@ -454,7 +454,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
     // Final Fallback: If still nothing, return the scan marker
     if (fullOcrText.trim().length === 0) {
-        console.warn("[GromitOffscreen] OCR completed but no text was found. Marking as SCAN.");
+        console.log("[GromitOffscreen] OCR completed but no text was found. Marking as SCAN.");
         return "[[GROMIT_SCAN_DETECTED]]";
     }
 
@@ -463,7 +463,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
 /**
  * Direct Image OCR (PNG, JPG, weBP)
- * v5.7.1: Pure Zero-Manipulation. Pass Blob directly to detector.
+ * v5.7.2: Pure Zero-Manipulation. Pass Blob directly to detector.
  */
 async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
     try {
