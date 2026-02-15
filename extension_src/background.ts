@@ -1,9 +1,9 @@
 /// <reference types="chrome"/>
 
-// Gromit Bridge Background Script v5.3.7 (Render Guardian & UX)
+// Gromit Bridge Background Script v5.3.8 (Render Guardian & Build Fix)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = '5.3.7';
+const BRIDGE_VERSION = '5.3.8';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state
