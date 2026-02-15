@@ -89891,6 +89891,48 @@ async function extractPdfText(arrayBuffer) {
   bodyText = "";
   return finalResult;
 }
+function applyMedianFilter(ctx, width, height) {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const output = new Uint8ClampedArray(data.length);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const vals = [];
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const idx = ((y + ky) * width + (x + kx)) * 4;
+          vals.push(data[idx]);
+        }
+      }
+      vals.sort((a, b) => a - b);
+      const median = vals[4];
+      const dstIdx = (y * width + x) * 4;
+      output[dstIdx] = output[dstIdx + 1] = output[dstIdx + 2] = median;
+      output[dstIdx + 3] = 255;
+    }
+  }
+  ctx.putImageData(new ImageData(output, width, height), 0, 0);
+}
+function applyDilation(ctx, width, height) {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const output = new Uint8ClampedArray(data.length);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      let minVal = 255;
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const idx = ((y + ky) * width + (x + kx)) * 4;
+          if (data[idx] < minVal) minVal = data[idx];
+        }
+      }
+      const dstIdx = (y * width + x) * 4;
+      output[dstIdx] = output[dstIdx + 1] = output[dstIdx + 2] = minVal;
+      output[dstIdx + 3] = 255;
+    }
+  }
+  ctx.putImageData(new ImageData(output, width, height), 0, 0);
+}
 function applySharpen(ctx, width, height) {
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
@@ -89977,12 +90019,12 @@ async function detectTextWithTiling(canvas) {
   const OVERLAP = 256;
   const width = canvas.width;
   const height = canvas.height;
-  const performScan = async (sourceCanvas) => {
+  const performScan = async (sourceCanvas, tileScale = 1) => {
     const sWidth = sourceCanvas.width;
     const sHeight = sourceCanvas.height;
     const bitmap = sourceCanvas instanceof ImageBitmap ? sourceCanvas : await createImageBitmap(sourceCanvas);
     const resultsAcc = [];
-    console.log(`[GromitOffscreen] OCR Scanning buffer ${sWidth}x${sHeight}...`);
+    console.log(`[GromitOffscreen] OCR Scanning buffer ${sWidth}x${sHeight} (TileScale: ${tileScale})...`);
     for (let y = 0; y < sHeight; y += TILE_SIZE - OVERLAP) {
       for (let x = 0; x < sWidth; x += TILE_SIZE - OVERLAP) {
         const tw = Math.min(TILE_SIZE, sWidth - x);
@@ -89990,7 +90032,18 @@ async function detectTextWithTiling(canvas) {
         if (tw <= 0 || th <= 0) break;
         try {
           const tileBitmap = await createImageBitmap(bitmap, x, y, tw, th);
-          const results = await detector.detect(tileBitmap);
+          let detectionTarget = tileBitmap;
+          if (tileScale !== 1) {
+            const tCanvas = document.createElement("canvas");
+            tCanvas.width = tw * tileScale;
+            tCanvas.height = th * tileScale;
+            const tCtx = tCanvas.getContext("2d");
+            tCtx.imageSmoothingEnabled = true;
+            tCtx.imageSmoothingQuality = "high";
+            tCtx.drawImage(tileBitmap, 0, 0, tCanvas.width, tCanvas.height);
+            detectionTarget = tCanvas;
+          }
+          const results = await detector.detect(detectionTarget);
           if (results.length > 0) {
             const tileText = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
             resultsAcc.push(tileText);
@@ -90004,7 +90057,7 @@ async function detectTextWithTiling(canvas) {
     }
     return resultsAcc.join(" ");
   };
-  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.3) for ${width}x${height}...`);
+  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.4) for ${width}x${height}...`);
   let text = await performScan(canvas);
   if (text.trim().length < 50 && (width > 2e3 || height > 2e3)) {
     console.log(`[GromitOffscreen] PASS 2: Trying Downsampling (0.5x)...`);
@@ -90033,11 +90086,27 @@ async function detectTextWithTiling(canvas) {
       text = optText;
     }
   }
+  if (text.trim().length < 50) {
+    console.log(`[GromitOffscreen] PASS 4: Applying Sanctuary Final (Dilation + Median + Upscale Tiling)...`);
+    const finalCanvas = document.createElement("canvas");
+    finalCanvas.width = width;
+    finalCanvas.height = height;
+    const fCtx = finalCanvas.getContext("2d");
+    fCtx.drawImage(canvas, 0, 0);
+    applyMedianFilter(fCtx, width, height);
+    applyDilation(fCtx, width, height);
+    applyAdaptiveThreshold(fCtx, width, height);
+    const finalText = await performScan(finalCanvas, 2);
+    if (finalText.trim().length > text.trim().length) {
+      console.log(`[GromitOffscreen] Sanctuary Final SUCCESS (${finalText.length} chars).`);
+      text = finalText;
+    }
+  }
   return text;
 }
 async function performNativeOCR(doc) {
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.3) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.4) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Looking for "The Photo" in all levels...`);

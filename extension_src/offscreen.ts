@@ -321,6 +321,62 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 }
 
 /**
+ * applyMedianFilter (v5.8.4)
+ * Despeckle filter to remove "salt and pepper" noise from faxes.
+ * Operates on a 3x3 window.
+ */
+function applyMedianFilter(ctx: CanvasRenderingContext2D, width: number, height: number) {
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    const output = new Uint8ClampedArray(data.length);
+
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            const vals = [];
+            for (let ky = -1; ky <= 1; ky++) {
+                for (let kx = -1; kx <= 1; kx++) {
+                    const idx = ((y + ky) * width + (x + kx)) * 4;
+                    vals.push(data[idx]); // Use Red channel as proxy for grayscale
+                }
+            }
+            vals.sort((a, b) => a - b);
+            const median = vals[4];
+            const dstIdx = (y * width + x) * 4;
+            output[dstIdx] = output[dstIdx + 1] = output[dstIdx + 2] = median;
+            output[dstIdx + 3] = 255;
+        }
+    }
+    ctx.putImageData(new ImageData(output, width, height), 0, 0);
+}
+
+/**
+ * applyDilation (v5.8.4)
+ * Morphological Dilation to "fatten" characters and repair broken lines.
+ * Essential for faint fax scans.
+ */
+function applyDilation(ctx: CanvasRenderingContext2D, width: number, height: number) {
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    const output = new Uint8ClampedArray(data.length);
+
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            let minVal = 255; // White
+            for (let ky = -1; ky <= 1; ky++) {
+                for (let kx = -1; kx <= 1; kx++) {
+                    const idx = ((y + ky) * width + (x + kx)) * 4;
+                    if (data[idx] < minVal) minVal = data[idx];
+                }
+            }
+            const dstIdx = (y * width + x) * 4;
+            output[dstIdx] = output[dstIdx + 1] = output[dstIdx + 2] = minVal;
+            output[dstIdx + 3] = 255;
+        }
+    }
+    ctx.putImageData(new ImageData(output, width, height), 0, 0);
+}
+
+/**
  * applySharpen (v5.8.3)
  * Convolution filter to reinforce edges.
  */
@@ -415,11 +471,12 @@ function applyAdaptiveThreshold(ctx: CanvasRenderingContext2D, width: number, he
 }
 
 /**
- * detectTextWithTiling (v5.8.3)
+ * detectTextWithTiling (v5.8.4)
  * Multi-Pass Attack:
  * 1. Native Tiling
  * 2. Downsampling (0.5x)
  * 3. Vision Optimizer (Sharpen + Adaptive Threshold)
+ * 4. Sanctuary Final (Dilation + Median + Upscale Tiling 2x)
  */
 async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> {
     const detector = new (window as any).TextDetector();
@@ -428,13 +485,13 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
     const width = canvas.width;
     const height = canvas.height;
 
-    const performScan = async (sourceCanvas: HTMLCanvasElement | ImageBitmap): Promise<string> => {
+    const performScan = async (sourceCanvas: HTMLCanvasElement | ImageBitmap, tileScale: number = 1.0): Promise<string> => {
         const sWidth = sourceCanvas.width;
         const sHeight = sourceCanvas.height;
         const bitmap = sourceCanvas instanceof ImageBitmap ? sourceCanvas : await createImageBitmap(sourceCanvas);
         const resultsAcc: string[] = [];
 
-        console.log(`[GromitOffscreen] OCR Scanning buffer ${sWidth}x${sHeight}...`);
+        console.log(`[GromitOffscreen] OCR Scanning buffer ${sWidth}x${sHeight} (TileScale: ${tileScale})...`);
 
         for (let y = 0; y < sHeight; y += (TILE_SIZE - OVERLAP)) {
             for (let x = 0; x < sWidth; x += (TILE_SIZE - OVERLAP)) {
@@ -444,7 +501,21 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
 
                 try {
                     const tileBitmap = await createImageBitmap(bitmap, x, y, tw, th);
-                    const results = await detector.detect(tileBitmap);
+
+                    let detectionTarget: ImageBitmap | HTMLCanvasElement = tileBitmap;
+                    if (tileScale !== 1.0) {
+                        const tCanvas = document.createElement('canvas');
+                        tCanvas.width = tw * tileScale;
+                        tCanvas.height = th * tileScale;
+                        const tCtx = tCanvas.getContext('2d')!;
+                        // Bilinear scaling for smoother text shapes
+                        tCtx.imageSmoothingEnabled = true;
+                        tCtx.imageSmoothingQuality = 'high';
+                        tCtx.drawImage(tileBitmap, 0, 0, tCanvas.width, tCanvas.height);
+                        detectionTarget = tCanvas;
+                    }
+
+                    const results = await detector.detect(detectionTarget);
                     if (results.length > 0) {
                         const tileText = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
                         resultsAcc.push(tileText);
@@ -459,7 +530,7 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         return resultsAcc.join(' ');
     };
 
-    console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.3) for ${width}x${height}...`);
+    console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.4) for ${width}x${height}...`);
 
     // PASS 1: Native Resolution
     let text = await performScan(canvas);
@@ -497,17 +568,37 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         }
     }
 
+    // PASS 4: Sanctuary Final Attack (v5.8.4)
+    if (text.trim().length < 50) {
+        console.log(`[GromitOffscreen] PASS 4: Applying Sanctuary Final (Dilation + Median + Upscale Tiling)...`);
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = width;
+        finalCanvas.height = height;
+        const fCtx = finalCanvas.getContext('2d')!;
+        fCtx.drawImage(canvas, 0, 0);
+
+        applyMedianFilter(fCtx, width, height); // Despeckle first
+        applyDilation(fCtx, width, height);     // Then thicken text
+        applyAdaptiveThreshold(fCtx, width, height); // Re-threshold for pure shapes
+
+        const finalText = await performScan(finalCanvas, 2.0); // 2x Upscale individual tiles
+        if (finalText.trim().length > text.trim().length) {
+            console.log(`[GromitOffscreen] Sanctuary Final SUCCESS (${finalText.length} chars).`);
+            text = finalText;
+        }
+    }
+
     return text;
 }
 
 /**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.8.3: "Vision Optimizer" - Bradley Local Thresholding & Sharpening.
+ * v5.8.4: "Sanctuary Final" - Morphological & Tile Upscale.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.3) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.4) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
