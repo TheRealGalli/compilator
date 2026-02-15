@@ -1,5 +1,5 @@
 // extension_src/background.ts
-var BRIDGE_VERSION = "5.5.1";
+var BRIDGE_VERSION = "5.5.2";
 var OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 var activeSessions = 0;
 var creating = null;
@@ -73,7 +73,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.type === "OLLAMA_FETCH") {
     const { url, options } = request;
-    console.log(`[GromitBridge 5.1.0] Fetching: ${url}`);
+    console.log(`[GromitBridge ${BRIDGE_VERSION}] Fetching: ${url}`);
     const fetchOptions = {
       method: options.method || "GET",
       headers: {
@@ -99,9 +99,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true, ok, status, data });
     }).catch((error) => {
       if (!error.status || error.status === 0) {
-        console.debug("[GromitBridge 5.1.0] Fetch failed (System Offline):", url);
+        console.debug(`[GromitBridge ${BRIDGE_VERSION}] Fetch failed (System Offline):`, url);
       } else {
-        console.error("[GromitBridge 5.1.0] Fetch Error:", error);
+        console.error(`[GromitBridge ${BRIDGE_VERSION}] Fetch Error:`, error);
       }
       sendResponse({
         success: false,

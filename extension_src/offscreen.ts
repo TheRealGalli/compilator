@@ -320,17 +320,27 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
                             if (imageSource) {
                                 const imageBitmap = await createImageBitmap(imageSource);
-                                console.log(`[GromitOffscreen] Page ${i}: Smart Extraction SUCCESS (${img.width}x${img.height}). Detecting...`);
-                                const results = await detector.detect(imageBitmap);
 
-                                const text = results
-                                    .map((r: any) => r.rawValue)
-                                    .filter((v: string) => v.trim().length > 0)
-                                    .join(' ');
+                                // NORMALIZATION (v5.5.2): Draw to OffscreenCanvas to ensure standard RGBA buffer
+                                // This fixes cases where TextDetector returns 0 results from direct PDF.js bitmaps
+                                const canvas = new OffscreenCanvas(img.width, img.height);
+                                const ctx = canvas.getContext('2d');
+                                if (ctx) {
+                                    ctx.drawImage(imageBitmap, 0, 0);
+                                    console.log(`[GromitOffscreen] Page ${i}: Canvas Normalization SUCCESS (${img.width}x${img.height}). Detecting...`);
 
-                                const end = performance.now();
-                                console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
-                                return text.trim() ? `--- PAGINA ${i} (OCR SMART) ---\n${text}\n\n` : "";
+                                    const results = await detector.detect(canvas);
+                                    console.log(`[GromitOffscreen] Page ${i}: Found ${results.length} text blocks.`);
+
+                                    const text = results
+                                        .map((r: any) => r.rawValue)
+                                        .filter((v: string) => v.trim().length > 0)
+                                        .join(' ');
+
+                                    const end = performance.now();
+                                    console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
+                                    return text.trim() ? `--- PAGINA ${i} (OCR SMART) ---\n${text}\n\n` : "";
+                                }
                             }
                         }
                     } catch (err) {
@@ -366,8 +376,16 @@ async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
         const blob = new Blob([arrayBuffer]);
         const imageBitmap = await createImageBitmap(blob);
 
+        // NORMALIZATION (v5.5.2): Ensure standard buffer via OffscreenCanvas
+        const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error("Could not create OffscreenCanvas context");
+
+        ctx.drawImage(imageBitmap, 0, 0);
         console.log(`[GromitOffscreen] Direct Image OCR starting (${imageBitmap.width}x${imageBitmap.height})...`);
-        const results = await detector.detect(imageBitmap);
+
+        const results = await detector.detect(canvas);
+        console.log(`[GromitOffscreen] Direct Image: Found ${results.length} text blocks.`);
 
         const text = results
             .map((r: any) => r.rawValue)

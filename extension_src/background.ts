@@ -1,9 +1,9 @@
 /// <reference types="chrome"/>
 
-// Gromit Bridge Background Script v5.5.1 (Multimodal Smart OCR)
+// Gromit Bridge Background Script v5.5.2 (Multimodal Smart OCR)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = '5.5.1';
+const BRIDGE_VERSION = '5.5.2';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state
@@ -106,7 +106,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
     if (request.type === 'OLLAMA_FETCH') {
         const { url, options } = request;
 
-        console.log(`[GromitBridge 5.1.0] Fetching: ${url}`);
+        console.log(`[GromitBridge ${BRIDGE_VERSION}] Fetching: ${url}`);
 
         const fetchOptions: any = {
             method: options.method || 'GET',
@@ -138,9 +138,9 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
             .catch(error => {
                 // SILENT CONNECTIVITY: Downgrade to debug for network errors (status 0)
                 if (!error.status || error.status === 0) {
-                    console.debug('[GromitBridge 5.1.0] Fetch failed (System Offline):', url);
+                    console.debug(`[GromitBridge ${BRIDGE_VERSION}] Fetch failed (System Offline):`, url);
                 } else {
-                    console.error('[GromitBridge 5.1.0] Fetch Error:', error);
+                    console.error(`[GromitBridge ${BRIDGE_VERSION}] Fetch Error:`, error);
                 }
                 sendResponse({
                     success: false,
