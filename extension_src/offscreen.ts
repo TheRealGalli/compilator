@@ -279,62 +279,86 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
         try {
             console.log(`[GromitOffscreen] Page ${i}: Starting extraction sequence...`);
 
-            // HEARTBEAT: Start Page race
+            // SMART IMAGE EXTRACTION (v5.5.0): Try to scrip the raw image directly for scans
             const pageTextSnippet = await Promise.race([
                 (async () => {
                     const start = performance.now();
-
-                    console.log(`[GromitOffscreen] Page ${i}: Loading page object...`);
                     const page = await doc.getPage(i);
-                    const viewport = page.getViewport({ scale: 0.5 }); // 0.5x Scale: 75% less memory
 
-                    console.log(`[GromitOffscreen] Page ${i}: Creating HTMLCanvasElement (${viewport.width}x${viewport.height})...`);
-                    const canvas = document.createElement('canvas');
-                    // DIAGNOSTIC CORE: willReadFrequently forces CPU-backed buffer, avoiding GPU hangs in offscreen
-                    const context = canvas.getContext('2d', { willReadFrequently: true });
-                    if (!context) {
-                        console.error(`[GromitOffscreen] Page ${i}: Failed to get 2D context`);
-                        return "";
+                    try {
+                        console.log(`[GromitOffscreen] Page ${i}: Scanning OperatorList for Smart Image Extraction...`);
+                        const ops = await page.getOperatorList();
+
+                        // Find the first dominant image (XObject)
+                        let imageId = "";
+                        for (let j = 0; j < ops.fnArray.length; j++) {
+                            // Check for paintImageXObject (92) or paintJpegXObject (82)
+                            if (ops.fnArray[j] === (pdfjsLib as any).OPS.paintImageXObject ||
+                                ops.fnArray[j] === (pdfjsLib as any).OPS.paintJpegXObject) {
+                                imageId = ops.argsArray[j][0];
+                                break;
+                            }
+                        }
+
+                        if (imageId) {
+                            console.log(`[GromitOffscreen] Page ${i}: Found ImageXObject (${imageId}). Attempting direct OCR...`);
+                            const img = await new Promise<any>((resolve) => page.objs.get(imageId, resolve));
+
+                            if (img && img.data) {
+                                // Create ImageBitmap directly from raw pixel data
+                                // img.data is usually a Uint8ClampedArray (RGBA)
+                                const imageData = new ImageData(img.data, img.width, img.height);
+                                const imageBitmap = await createImageBitmap(imageData);
+
+                                console.log(`[GromitOffscreen] Page ${i}: Smart Extraction SUCCESS (${img.width}x${img.height}). Detecting...`);
+                                const results = await detector.detect(imageBitmap);
+
+                                const text = results
+                                    .map((r: any) => r.rawValue)
+                                    .filter((v: string) => v.trim().length > 0)
+                                    .join(' ');
+
+                                const end = performance.now();
+                                console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
+                                return text.trim() ? `--- PAGINA ${i} (OCR SMART) ---\n${text}\n\n` : "";
+                            }
+                        }
+                    } catch (extractionErr) {
+                        console.warn(`[GromitOffscreen] Page ${i}: Smart Extraction failed, falling back to Render.`, extractionErr);
                     }
+
+                    // FALLBACK: Existing resilient render logic
+                    console.log(`[GromitOffscreen] Page ${i}: Using Fallback Render strategy...`);
+                    const viewport = page.getViewport({ scale: 0.5 });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d', { willReadFrequently: true });
+
+                    if (!context) return "";
 
                     canvas.width = viewport.width;
                     canvas.height = viewport.height;
-
-                    // DOM-SYNC: Temporarily attach to body to force browser priority
                     document.body.appendChild(canvas);
 
-                    console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas (0.5x scale)...`);
-                    const renderContext = {
-                        canvasContext: context,
-                        viewport: viewport,
-                    } as any;
+                    const renderContext = { canvasContext: context, viewport: viewport } as any;
 
-                    // INTERNAL RENDER GUARDIAN: Race the render promise against a 15s timeout
                     await Promise.race([
                         page.render(renderContext).promise,
                         new Promise((_, reject) => setTimeout(() => reject(new Error("RENDER_HUNG")), 15000))
                     ]);
 
                     const renderEnd = performance.now();
-                    console.log(`[GromitOffscreen] Page ${i}: Render finished in ${(renderEnd - start).toFixed(0)}ms`);
-
-                    console.log(`[GromitOffscreen] Page ${i}: Starting TextDetector.detect()...`);
                     const results = await detector.detect(canvas);
-                    const detectEnd = performance.now();
-                    console.log(`[GromitOffscreen] Page ${i} DONE: Detect=${(detectEnd - renderEnd).toFixed(0)}ms`);
+
+                    if (document.body.contains(canvas)) document.body.removeChild(canvas);
+                    canvas.width = 0; canvas.height = 0;
 
                     const text = results
                         .map((r: any) => r.rawValue)
                         .filter((v: string) => v.trim().length > 0)
                         .join(' ');
 
-                    // Cleanup canvas immediately
-                    if (document.body.contains(canvas)) {
-                        document.body.removeChild(canvas);
-                    }
-                    canvas.width = 0;
-                    canvas.height = 0;
-
+                    const end = performance.now();
+                    console.log(`[GromitOffscreen] Page ${i} DONE (Fallback): ${(end - start).toFixed(0)}ms`);
                     return text.trim() ? `--- PAGINA ${i} (OCR NATIVO) ---\n${text}\n\n` : "";
                 })(),
                 new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 30000))
