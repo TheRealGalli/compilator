@@ -89890,93 +89890,90 @@ async function extractPdfText(arrayBuffer) {
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.8) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Deep OCR (v5.6.1) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
-      console.log(`[GromitOffscreen] Page ${i}: Scanning for Smart Extraction...`);
+      console.log(`[GromitOffscreen] Page ${i}: Scanning for images (Deep Look)...`);
       const pageTextSnippet = await Promise.race([
         (async () => {
           const start = performance.now();
           const page = await doc.getPage(i);
+          let pageAccText = "";
           try {
             const ops = await page.getOperatorList();
             const imageIds = [];
+            let currentCTM = [1, 0, 0, 1, 0, 0];
+            const transformStack = [];
             for (let j = 0; j < ops.fnArray.length; j++) {
-              if (ops.fnArray[j] === __webpack_exports__OPS.paintImageXObject || ops.fnArray[j] === __webpack_exports__OPS.paintJpegXObject) {
-                imageIds.push(ops.argsArray[j][0]);
+              const fn = ops.fnArray[j];
+              const args = ops.argsArray[j];
+              if (fn === __webpack_exports__OPS.transform) {
+                currentCTM = args;
+              } else if (fn === __webpack_exports__OPS.save) {
+                transformStack.push([...currentCTM]);
+              } else if (fn === __webpack_exports__OPS.restore) {
+                const restored = transformStack.pop();
+                if (restored) currentCTM = restored;
+              } else if (fn === __webpack_exports__OPS.paintImageXObject || fn === __webpack_exports__OPS.paintJpegXObject) {
+                const id = args[0];
+                imageIds.push({ id, y: currentCTM[5], source: "objs" });
+              } else if (fn === __webpack_exports__OPS.paintImageMaskXObject) {
+                const id = args[0];
+                imageIds.push({ id, y: currentCTM[5], source: "common" });
               }
             }
-            let bestImage = null;
-            let maxArea = 0;
             if (imageIds.length > 0) {
-              console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} images. Discovering largest...`);
-              for (const id of imageIds) {
+              imageIds.sort((a, b) => b.y - a.y);
+              console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate resources. Sorted Top-Down.`);
+              for (const { id, source, y } of imageIds) {
                 try {
-                  const img = await new Promise((resolve) => page.objs.get(id, resolve));
+                  const img = await new Promise((resolve) => {
+                    if (source === "objs") {
+                      page.objs.get(id, resolve);
+                    } else {
+                      page.commonObjs.get(id, resolve);
+                    }
+                  });
                   if (img) {
                     const area = (img.width || 0) * (img.height || 0);
-                    if (area > maxArea) {
-                      maxArea = area;
-                      bestImage = img;
+                    if (area > 4e4) {
+                      console.log(`[GromitOffscreen] Page ${i}: Image ${id} at Y=${y.toFixed(0)} (${img.width}x${img.height}). Source: ${source}`);
+                      let imageSource = null;
+                      if (img.bitmap) {
+                        imageSource = img.bitmap;
+                      } else if (img.data) {
+                        const rgbaData = convertToRGBA(img.data, img.width, img.height);
+                        imageSource = new ImageData(rgbaData, img.width, img.height);
+                      }
+                      if (imageSource) {
+                        const results = await detector.detect(imageSource);
+                        if (results.length > 0) {
+                          const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+                          pageAccText += text + " ";
+                          console.debug(`[GromitOffscreen] Page ${i}: Image ${id} extracted ${results.length} blocks.`);
+                        }
+                      }
                     }
                   }
                 } catch (e) {
-                  console.debug(`[GromitOffscreen] Page ${i}: Could not resolve image ${id}`);
+                  console.debug(`[GromitOffscreen] Page ${i}: Could not resolve image ${id} from ${source}`);
                 }
               }
             }
-            if (bestImage && maxArea > 1e3) {
-              console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Source: ${bestImage.bitmap ? "Bitmap" : bestImage.data ? "Data" : "Unknown"}`);
-              try {
-                let imageBitmap = null;
-                if (bestImage.bitmap) {
-                  imageBitmap = await createImageBitmap(bestImage.bitmap);
-                } else if (bestImage.bitmapData) {
-                  imageBitmap = await createImageBitmap(bestImage.bitmapData);
-                } else if (bestImage.data) {
-                  const rgbaData = convertToRGBA(bestImage.data, bestImage.width, bestImage.height);
-                  const imageSource = new ImageData(rgbaData, bestImage.width, bestImage.height);
-                  imageBitmap = await createImageBitmap(imageSource);
-                }
-                if (imageBitmap) {
-                  const MAX_DIM = 2500;
-                  let targetWidth = bestImage.width;
-                  let targetHeight = bestImage.height;
-                  if (targetWidth > MAX_DIM) {
-                    const ratio = MAX_DIM / targetWidth;
-                    targetWidth = MAX_DIM;
-                    targetHeight = Math.round(bestImage.height * ratio);
-                  }
-                  const canvas = new OffscreenCanvas(targetWidth, targetHeight);
-                  const ctx = canvas.getContext("2d");
-                  if (ctx) {
-                    ctx.fillStyle = "#ffffff";
-                    ctx.fillRect(0, 0, targetWidth, targetHeight);
-                    ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
-                    console.log(`[GromitOffscreen] Page ${i}: Detecting text...`);
-                    const results = await detector.detect(canvas);
-                    console.log(`[GromitOffscreen] Page ${i} (Smart): Found ${results.length} text blocks.`);
-                    if (results.length > 0) {
-                      console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 40)}..."`);
-                      const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
-                      const end = performance.now();
-                      console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
-                      return text + " ";
-                    }
-                  }
-                }
-              } catch (err) {
-                console.error(`[GromitOffscreen] Page ${i}: OCR Fatal Error:`, err);
-              }
+            if (pageAccText.trim().length > 0) {
+              const end = performance.now();
+              console.log(`[GromitOffscreen] Page ${i} DONE: Extraction success in ${(end - start).toFixed(0)}ms`);
+              return pageAccText;
             }
-            console.log(`[GromitOffscreen] Page ${i}: No text extracted. (Zero-Render Policy)`);
+            console.log(`[GromitOffscreen] Page ${i}: No text extracted from images.`);
             return "";
           } catch (err) {
             console.error(`[GromitOffscreen] Page ${i}: Fatal Lifecycle Error:`, err);
             return "";
           }
         })(),
-        new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 3e4))
+        new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 45e3))
+        // Slight extension for deep look
       ]);
       fullOcrText += pageTextSnippet;
       await new Promise((r) => setTimeout(r, 50));
@@ -89991,23 +89988,8 @@ async function extractImageText(arrayBuffer) {
   try {
     const detector = new window.TextDetector();
     const blob = new Blob([arrayBuffer]);
-    const imageBitmap = await createImageBitmap(blob);
-    const MAX_DIM = 1600;
-    let targetWidth = imageBitmap.width;
-    let targetHeight = imageBitmap.height;
-    if (targetWidth > MAX_DIM) {
-      const ratio = MAX_DIM / targetWidth;
-      targetWidth = MAX_DIM;
-      targetHeight = Math.round(imageBitmap.height * ratio);
-    }
-    const canvas = new OffscreenCanvas(targetWidth, targetHeight);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Could not create OffscreenCanvas context");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, targetWidth, targetHeight);
-    ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
-    console.log(`[GromitOffscreen] Direct Image OCR starting (${targetWidth}x${targetHeight})...`);
-    const results = await detector.detect(canvas);
+    console.log(`[GromitOffscreen] Direct Image OCR starting (Size: ${arrayBuffer.byteLength} bytes)...`);
+    const results = await detector.detect(blob);
     console.log(`[GromitOffscreen] Direct Image: Found ${results.length} text blocks.`);
     const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
     return text.trim() ? text : "[[GROMIT_SCAN_DETECTED]]";

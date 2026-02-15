@@ -328,7 +328,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Deep OCR (v5.6.0) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.6.1) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
