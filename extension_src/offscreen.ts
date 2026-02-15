@@ -207,7 +207,8 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
     // 2. Standard Text Extraction (pdf.js)
     const loadingTask = pdfjsLib.getDocument({
         data: new Uint8Array(arrayBuffer.slice(0)),
-        useSystemFonts: true,
+        useSystemFonts: false,          // SURGICAL: Prevent system font conflicts in offscreen
+        disableFontFace: true,          // SURGICAL: Prevent hanging on font injection
     });
 
     const doc = await loadingTask.promise;
@@ -287,20 +288,17 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                     const page = await doc.getPage(i);
                     const viewport = page.getViewport({ scale: 1.0 });
 
-                    console.log(`[GromitOffscreen] Page ${i}: Creating canvas (${viewport.width}x${viewport.height})...`);
-                    const canvas = document.createElement('canvas');
+                    console.log(`[GromitOffscreen] Page ${i}: Creating OffscreenCanvas (${viewport.width}x${viewport.height})...`);
+                    const canvas = new OffscreenCanvas(viewport.width, viewport.height);
                     const context = canvas.getContext('2d');
                     if (!context) {
                         console.error(`[GromitOffscreen] Page ${i}: Failed to get 2D context`);
                         return "";
                     }
 
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-
                     console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas...`);
                     await page.render({
-                        canvasContext: context,
+                        canvasContext: context as any, // OffscreenCanvas follows same context API
                         viewport: viewport
                     }).promise;
                     const renderEnd = performance.now();
@@ -309,7 +307,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                     console.log(`[GromitOffscreen] Page ${i}: Starting TextDetector.detect()...`);
                     const results = await detector.detect(canvas);
                     const detectEnd = performance.now();
-                    console.log(`[GromitOffscreen] Page ${i}: Detection finished in ${(detectEnd - renderEnd).toFixed(0)}ms`);
+                    console.log(`[GromitOffscreen] Page ${i} DONE: Detect=${(detectEnd - renderEnd).toFixed(0)}ms`);
 
                     const text = results
                         .map((r: any) => r.rawValue)
