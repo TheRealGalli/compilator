@@ -89766,15 +89766,11 @@ function cleanText2(text) {
 function convertToRGBA(data, width, height) {
   const totalPixels = width * height;
   const rgba = new Uint8ClampedArray(totalPixels * 4);
-  if (!data || data.length === 0) {
-    console.warn("[GromitOffscreen] convertToRGBA: Data is null or empty.");
-    return rgba;
-  }
+  if (!data || data.length === 0) return rgba;
   if (data.length === totalPixels * 4) {
     return data instanceof Uint8ClampedArray ? data : new Uint8ClampedArray(data);
   }
   if (data.length === totalPixels * 3) {
-    console.log(`[GromitOffscreen] Converting RGB (${width}x${height}) to RGBA...`);
     for (let i = 0; i < totalPixels; i++) {
       rgba[i * 4] = data[i * 3];
       rgba[i * 4 + 1] = data[i * 3 + 1];
@@ -89784,19 +89780,27 @@ function convertToRGBA(data, width, height) {
     return rgba;
   }
   if (data.length === totalPixels) {
-    console.log(`[GromitOffscreen] Converting Grayscale (${width}x${height}) to RGBA...`);
     for (let i = 0; i < totalPixels; i++) {
-      const val = data[i];
-      rgba[i * 4] = val;
-      rgba[i * 4 + 1] = val;
-      rgba[i * 4 + 2] = val;
+      rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = data[i];
       rgba[i * 4 + 3] = 255;
     }
     return rgba;
   }
-  console.warn(`[GromitOffscreen] Unknown image format (length: ${data.length}, pixels: ${totalPixels}). Attempting raw copy.`);
-  for (let i = 0; i < Math.min(data.length, rgba.length); i++) {
-    rgba[i] = data[i];
+  if (data.length >= Math.floor(totalPixels / 8) && data.length < totalPixels) {
+    console.log(`[GromitOffscreen] Decompressing 1-bit mask (${width}x${height}). Bytes: ${data.length}...`);
+    for (let i = 0; i < totalPixels; i++) {
+      const byte = data[Math.floor(i / 8)];
+      const bit = 7 - i % 8;
+      const val = byte >> bit & 1 ? 0 : 255;
+      rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = val;
+      rgba[i * 4 + 3] = 255;
+    }
+    return rgba;
+  }
+  console.warn(`[GromitOffscreen] Unknown image format (length: ${data.length}, pixels: ${totalPixels}, ratio: ${(data.length / totalPixels).toFixed(2)}).`);
+  for (let i = 0; i < Math.min(data.length, totalPixels); i++) {
+    rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = data[i];
+    rgba[i * 4 + 3] = 255;
   }
   return rgba;
 }
@@ -89910,34 +89914,34 @@ async function performNativeOCR(doc) {
               if (fn === __webpack_exports__OPS.transform) {
                 currentCTM = args;
               } else if (fn === __webpack_exports__OPS.save) {
-                transformStack.push([...currentCTM]);
               } else if (fn === __webpack_exports__OPS.restore) {
-                const restored = transformStack.pop();
-                if (restored) currentCTM = restored;
-              } else if (fn === __webpack_exports__OPS.paintImageXObject || fn === __webpack_exports__OPS.paintJpegXObject) {
+              } else if (fn === __webpack_exports__OPS.paintImageXObject || fn === __webpack_exports__OPS.paintJpegXObject || fn === __webpack_exports__OPS.paintImageMaskXObject) {
                 const id = args[0];
                 imageIds.push({ id, y: currentCTM[5], source: "objs" });
-              } else if (fn === __webpack_exports__OPS.paintImageMaskXObject) {
-                const id = args[0];
-                imageIds.push({ id, y: currentCTM[5], source: "common" });
+              } else if (fn === __webpack_exports__OPS.paintInlineImageXObject) {
+                const imgData = args[0];
+                imageIds.push({ data: imgData, y: currentCTM[5], source: "inline" });
               }
             }
             if (imageIds.length > 0) {
+              console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate levels. Searching...`);
               imageIds.sort((a, b) => b.y - a.y);
-              console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate resources. Sorted Top-Down.`);
-              for (const { id, source, y } of imageIds) {
+              for (const item of imageIds) {
                 try {
-                  const img = await new Promise((resolve) => {
-                    if (source === "objs") {
-                      page.objs.get(id, resolve);
-                    } else {
-                      page.commonObjs.get(id, resolve);
-                    }
-                  });
+                  let img = item.data;
+                  if (!img && item.id) {
+                    img = await new Promise((resolve) => {
+                      if (item.source === "objs") {
+                        page.objs.get(item.id, resolve);
+                      } else {
+                        page.commonObjs.get(item.id, resolve);
+                      }
+                    });
+                  }
                   if (img) {
                     const area = (img.width || 0) * (img.height || 0);
-                    if (area > 4e4) {
-                      console.log(`[GromitOffscreen] Page ${i}: Image ${id} at Y=${y.toFixed(0)} (${img.width}x${img.height}). Source: ${source}`);
+                    if (area > 2e4) {
+                      console.log(`[GromitOffscreen] Page ${i}: Processing ${item.id || "inline"} (${img.width}x${img.height}, bpc: ${img.bpc || "N/A"}) from ${item.source}`);
                       const canvas = document.createElement("canvas");
                       canvas.width = img.width;
                       canvas.height = img.height;
@@ -89955,33 +89959,38 @@ async function performNativeOCR(doc) {
                         tempCanvas.getContext("2d").putImageData(imageData, 0, 0);
                         ctx.drawImage(tempCanvas, 0, 0);
                       }
-                      const imageSource = canvas;
-                      if (imageSource) {
-                        const results = await detector.detect(imageSource);
-                        if (results.length > 0) {
-                          const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
-                          pageAccText += text + " ";
-                          console.debug(`[GromitOffscreen] Page ${i}: Image ${id} extracted ${results.length} blocks.`);
-                        } else {
-                          console.log(`[GromitOffscreen] Page ${i}: Image ${id} - TextDetector returned 0 results.`);
-                        }
+                      let results = await detector.detect(canvas);
+                      if (results.length === 0) {
+                        ctx.globalCompositeOperation = "difference";
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.globalCompositeOperation = "source-over";
+                        results = await detector.detect(canvas);
+                        if (results.length > 0) console.log(`[GromitOffscreen] Image ${item.id || "inline"} - Inversion Fallback SUCCESS.`);
+                      }
+                      if (results.length > 0) {
+                        const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+                        pageAccText += text + " ";
+                        console.debug(`[GromitOffscreen] Page ${i}: Extracted ${results.length} blocks.`);
+                      } else {
+                        console.log(`[GromitOffscreen] Page ${i}: Image ${item.id || "inline"} - TextDetector returned 0 results.`);
                       }
                     }
                   }
                 } catch (e) {
-                  console.debug(`[GromitOffscreen] Page ${i}: Could not resolve image ${id} from ${source}`);
+                  console.debug(`[GromitOffscreen] Page ${i}: Resource error for ${item.id || "inline"} from ${item.source}:`, e);
                 }
               }
             }
             if (pageAccText.trim().length > 0) {
               const end = performance.now();
-              console.log(`[GromitOffscreen] Page ${i} DONE: Extraction success in ${(end - start).toFixed(0)}ms`);
+              console.log(`[GromitOffscreen] Page ${i} SUCCESS in ${(end - start).toFixed(0)}ms`);
               return pageAccText;
             }
-            console.log(`[GromitOffscreen] Page ${i}: No text extracted from images.`);
+            console.log(`[GromitOffscreen] Page ${i}: No text found in any level.`);
             return "";
           } catch (err) {
-            console.error(`[GromitOffscreen] Page ${i}: Fatal Lifecycle Error:`, err);
+            console.error(`[GromitOffscreen] Page ${i} Fatal:`, err);
             return "";
           }
         })(),
@@ -89989,8 +89998,8 @@ async function performNativeOCR(doc) {
         // Slight extension for deep look
       ]);
       fullOcrText += pageTextSnippet;
-      await new Promise((r) => setTimeout(r, 50));
     } catch (err) {
+      console.error(`[GromitOffscreen] Page ${i} skipped due to timeout or error:`, err);
       fullOcrText += " ";
       continue;
     }

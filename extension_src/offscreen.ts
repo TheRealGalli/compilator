@@ -156,46 +156,46 @@ function convertToRGBA(data: Uint8ClampedArray | Uint8Array, width: number, heig
     const totalPixels = width * height;
     const rgba = new Uint8ClampedArray(totalPixels * 4);
 
-    // SAFETY: If data is null or empty, return transparent
-    if (!data || data.length === 0) {
-        console.warn("[GromitOffscreen] convertToRGBA: Data is null or empty.");
-        return rgba;
-    }
+    if (!data || data.length === 0) return rgba;
 
-    // CASE 1: Already RGBA (4 channels)
+    // CASE 1: RGBA (4 channels)
     if (data.length === totalPixels * 4) {
         return data instanceof Uint8ClampedArray ? data : new Uint8ClampedArray(data);
     }
 
     // CASE 2: RGB (3 channels)
     if (data.length === totalPixels * 3) {
-        console.log(`[GromitOffscreen] Converting RGB (${width}x${height}) to RGBA...`);
         for (let i = 0; i < totalPixels; i++) {
-            rgba[i * 4] = data[i * 3];     // R
-            rgba[i * 4 + 1] = data[i * 3 + 1]; // G
-            rgba[i * 4 + 2] = data[i * 3 + 2]; // B
-            rgba[i * 4 + 3] = 255;             // A
+            rgba[i * 4] = data[i * 3]; rgba[i * 4 + 1] = data[i * 3 + 1]; rgba[i * 4 + 2] = data[i * 3 + 2]; rgba[i * 4 + 3] = 255;
         }
         return rgba;
     }
 
     // CASE 3: Grayscale (1 channel)
     if (data.length === totalPixels) {
-        console.log(`[GromitOffscreen] Converting Grayscale (${width}x${height}) to RGBA...`);
         for (let i = 0; i < totalPixels; i++) {
-            const val = data[i];
-            rgba[i * 4] = val; // R
-            rgba[i * 4 + 1] = val; // G
-            rgba[i * 4 + 2] = val; // B
-            rgba[i * 4 + 3] = 255; // A
+            rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = data[i]; rgba[i * 4 + 3] = 255;
         }
         return rgba;
     }
 
-    console.warn(`[GromitOffscreen] Unknown image format (length: ${data.length}, pixels: ${totalPixels}). Attempting raw copy.`);
-    // Fallback: Just copy what we can
-    for (let i = 0; i < Math.min(data.length, rgba.length); i++) {
-        rgba[i] = data[i];
+    // CASE 4: 1-bit (B&W / ImageMask) - 8 pixels per byte
+    if (data.length >= Math.floor(totalPixels / 8) && data.length < totalPixels) {
+        console.log(`[GromitOffscreen] Decompressing 1-bit mask (${width}x${height}). Bytes: ${data.length}...`);
+        for (let i = 0; i < totalPixels; i++) {
+            const byte = data[Math.floor(i / 8)];
+            const bit = 7 - (i % 8);
+            // In PDF ImageMasks: 1 is usually foreground (black), 0 is background (white)
+            const val = ((byte >> bit) & 1) ? 0 : 255;
+            rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = val; rgba[i * 4 + 3] = 255;
+        }
+        return rgba;
+    }
+
+    console.warn(`[GromitOffscreen] Unknown image format (length: ${data.length}, pixels: ${totalPixels}, ratio: ${(data.length / totalPixels).toFixed(2)}).`);
+    // Fallback: Gray copy
+    for (let i = 0; i < Math.min(data.length, totalPixels); i++) {
+        rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = data[i]; rgba[i * 4 + 3] = 255;
     }
     return rgba;
 }
@@ -356,45 +356,53 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                 // Update current transformation matrix (simplified for Y-tracking in tiling)
                                 currentCTM = args;
                             } else if (fn === (pdfjsLib as any).OPS.save) {
-                                transformStack.push([...currentCTM]);
+                                // transformStack.push([...currentCTM]); // Not used in new logic
                             } else if (fn === (pdfjsLib as any).OPS.restore) {
-                                const restored = transformStack.pop();
-                                if (restored) currentCTM = restored;
+                                // const restored = transformStack.pop(); // Not used in new logic
+                                // if (restored) currentCTM = restored;
                             } else if (fn === (pdfjsLib as any).OPS.paintImageXObject ||
-                                fn === (pdfjsLib as any).OPS.paintJpegXObject) {
+                                fn === (pdfjsLib as any).OPS.paintJpegXObject ||
+                                fn === (pdfjsLib as any).OPS.paintImageMaskXObject) {
                                 const id = args[0];
+                                // For simplicity and "flattening", treat all these as 'objs' for retrieval
                                 imageIds.push({ id, y: currentCTM[5], source: 'objs' });
-                            } else if (fn === (pdfjsLib as any).OPS.paintImageMaskXObject) {
-                                const id = args[0];
-                                imageIds.push({ id, y: currentCTM[5], source: 'common' });
+                            } else if (fn === (pdfjsLib as any).OPS.paintInlineImageXObject) {
+                                // INLINE IMAGE SUPPORT (v5.7.5)
+                                const imgData = args[0];
+                                imageIds.push({ data: imgData, y: currentCTM[5], source: 'inline' });
                             }
                         }
 
                         if (imageIds.length > 0) {
+                            console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate levels. Searching...`);
+
                             // HEURISTIC: Sort by Y coordinate descending (Top to Bottom)
                             // In PDF space, higher Y is closer to the top of the page.
                             imageIds.sort((a, b) => b.y - a.y);
 
-                            console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate resources. Sorted Top-Down.`);
-
                             // Process images in spatial order (Tiling Support)
-                            for (const { id, source, y } of imageIds) {
+                            for (const item of imageIds) {
                                 try {
-                                    const img = await new Promise<any>((resolve) => {
-                                        if (source === 'objs') {
-                                            page.objs.get(id, resolve);
-                                        } else {
-                                            page.commonObjs.get(id, resolve);
-                                        }
-                                    });
+                                    let img = item.data;
+                                    if (!img && item.id) {
+                                        img = await new Promise<any>((resolve) => {
+                                            if (item.source === 'objs') {
+                                                // This covers XObjects and ImageMaskXObjects (which are also XObjects)
+                                                page.objs.get(item.id!, resolve);
+                                            } else {
+                                                // Fallback for commonObjs if needed, though 'objs' should cover most
+                                                page.commonObjs.get(item.id!, resolve);
+                                            }
+                                        });
+                                    }
 
                                     if (img) {
                                         const area = (img.width || 0) * (img.height || 0);
-                                        // Capture anything larger than a small icon (e.g., > 40,000 pixels or 200x200)
-                                        if (area > 40000) {
-                                            console.log(`[GromitOffscreen] Page ${i}: Image ${id} at Y=${y.toFixed(0)} (${img.width}x${img.height}). Source: ${source}`);
+                                        // More aggressive area threshold for levels (e.g., > 20,000 pixels or ~140x140)
+                                        if (area > 20000) {
+                                            console.log(`[GromitOffscreen] Page ${i}: Processing ${item.id || 'inline'} (${img.width}x${img.height}, bpc: ${img.bpc || 'N/A'}) from ${item.source}`);
 
-                                            // HIGH-CONTRAST NEUTRALIZATION (v5.7.3)
+                                            // HIGH-CONTRAST NEUTRALIZATION (v5.7.5)
                                             // Force white background to solve transparency/contrast issues in TextDetector
                                             const canvas = document.createElement('canvas');
                                             canvas.width = img.width;
@@ -421,36 +429,44 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                                 ctx.drawImage(tempCanvas, 0, 0);
                                             }
 
-                                            const imageSource = canvas; // Final High-Contrast Opaque Source
+                                            // Final High-Contrast Opaque Source
+                                            let results = await detector.detect(canvas);
 
-                                            if (imageSource) {
-                                                const results = await detector.detect(imageSource);
-                                                if (results.length > 0) {
-                                                    const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
-                                                    pageAccText += text + " ";
-                                                    console.debug(`[GromitOffscreen] Page ${i}: Image ${id} extracted ${results.length} blocks.`);
-                                                } else {
-                                                    console.log(`[GromitOffscreen] Page ${i}: Image ${id} - TextDetector returned 0 results.`);
-                                                }
+                                            // INVERSION FALLBACK (v5.7.5): Try inverted if 0 results (Typical for some masks/negative images)
+                                            if (results.length === 0) {
+                                                ctx.globalCompositeOperation = 'difference'; // Inverts colors
+                                                ctx.fillStyle = 'white'; // Apply white to invert
+                                                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                                ctx.globalCompositeOperation = 'source-over'; // Reset blend mode
+                                                results = await detector.detect(canvas);
+                                                if (results.length > 0) console.log(`[GromitOffscreen] Image ${item.id || 'inline'} - Inversion Fallback SUCCESS.`);
+                                            }
+
+                                            if (results.length > 0) {
+                                                const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
+                                                pageAccText += text + " ";
+                                                console.debug(`[GromitOffscreen] Page ${i}: Extracted ${results.length} blocks.`);
+                                            } else {
+                                                console.log(`[GromitOffscreen] Page ${i}: Image ${item.id || 'inline'} - TextDetector returned 0 results.`);
                                             }
                                         }
                                     }
                                 } catch (e) {
-                                    console.debug(`[GromitOffscreen] Page ${i}: Could not resolve image ${id} from ${source}`);
+                                    console.debug(`[GromitOffscreen] Page ${i}: Resource error for ${item.id || 'inline'} from ${item.source}:`, e);
                                 }
                             }
                         }
 
                         if (pageAccText.trim().length > 0) {
                             const end = performance.now();
-                            console.log(`[GromitOffscreen] Page ${i} DONE: Extraction success in ${(end - start).toFixed(0)}ms`);
+                            console.log(`[GromitOffscreen] Page ${i} SUCCESS in ${(end - start).toFixed(0)}ms`);
                             return pageAccText;
                         }
 
-                        console.log(`[GromitOffscreen] Page ${i}: No text extracted from images.`);
+                        console.log(`[GromitOffscreen] Page ${i}: No text found in any level.`);
                         return "";
                     } catch (err) {
-                        console.error(`[GromitOffscreen] Page ${i}: Fatal Lifecycle Error:`, err);
+                        console.error(`[GromitOffscreen] Page ${i} Fatal:`, err);
                         return "";
                     }
                 })(),
@@ -458,10 +474,11 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
             ]);
 
             fullOcrText += pageTextSnippet;
-            await new Promise(r => setTimeout(r, 50));
+            // await new Promise(r => setTimeout(r, 50)); // Removed for faster processing, if needed can be re-added
 
         } catch (err) {
-            fullOcrText += " ";
+            console.error(`[GromitOffscreen] Page ${i} skipped due to timeout or error:`, err);
+            fullOcrText += " "; // Add a space to separate potential text from other pages
             continue;
         }
     }
@@ -477,7 +494,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
 /**
  * Direct Image OCR (PNG, JPG, weBP)
- * v5.7.3: Pure Zero-Manipulation. Pass Blob directly to detector.
+ * v5.7.5: Pure Zero-Manipulation. Pass Blob directly to detector.
  */
 async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
     try {
