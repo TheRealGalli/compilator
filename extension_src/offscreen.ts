@@ -156,6 +156,12 @@ function convertToRGBA(data: Uint8ClampedArray | Uint8Array, width: number, heig
     const totalPixels = width * height;
     const rgba = new Uint8ClampedArray(totalPixels * 4);
 
+    // SAFETY: If data is null or empty, return transparent
+    if (!data || data.length === 0) {
+        console.warn("[GromitOffscreen] convertToRGBA: Data is null or empty.");
+        return rgba;
+    }
+
     // CASE 1: Already RGBA (4 channels)
     if (data.length === totalPixels * 4) {
         return data instanceof Uint8ClampedArray ? data : new Uint8ClampedArray(data);
@@ -322,7 +328,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.7) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.8) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -365,53 +371,63 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                         }
 
                         if (bestImage && maxArea > 1000) {
-                            console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Converting to RGBA...`);
+                            console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Source: ${bestImage.bitmap ? 'Bitmap' : (bestImage.data ? 'Data' : 'Unknown')}`);
 
                             try {
-                                const rgbaData = convertToRGBA(bestImage.data, bestImage.width, bestImage.height);
-                                const imageSource = new ImageData(rgbaData as any, bestImage.width, bestImage.height);
-                                const imageBitmap = await createImageBitmap(imageSource);
+                                let imageBitmap: ImageBitmap | null = null;
 
-                                const MAX_DIM = 2500;
-                                let targetWidth = bestImage.width;
-                                let targetHeight = bestImage.height;
-
-                                if (targetWidth > MAX_DIM) {
-                                    const ratio = MAX_DIM / targetWidth;
-                                    targetWidth = MAX_DIM;
-                                    targetHeight = Math.round(bestImage.height * ratio);
+                                if (bestImage.bitmap) {
+                                    imageBitmap = await createImageBitmap(bestImage.bitmap);
+                                } else if (bestImage.bitmapData) {
+                                    imageBitmap = await createImageBitmap(bestImage.bitmapData);
+                                } else if (bestImage.data) {
+                                    const rgbaData = convertToRGBA(bestImage.data, bestImage.width, bestImage.height);
+                                    const imageSource = new ImageData(rgbaData as any, bestImage.width, bestImage.height);
+                                    imageBitmap = await createImageBitmap(imageSource);
                                 }
 
-                                const canvas = new OffscreenCanvas(targetWidth, targetHeight);
-                                const ctx = canvas.getContext('2d');
-                                if (ctx) {
-                                    ctx.fillStyle = '#ffffff';
-                                    ctx.fillRect(0, 0, targetWidth, targetHeight);
-                                    ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
+                                if (imageBitmap) {
+                                    const MAX_DIM = 2500;
+                                    let targetWidth = bestImage.width;
+                                    let targetHeight = bestImage.height;
 
-                                    // Detection (v5.5.7): Standard Canvas Detection with valid RGBA
-                                    console.log(`[GromitOffscreen] Page ${i}: Detecting text...`);
-                                    const results = await detector.detect(canvas);
+                                    if (targetWidth > MAX_DIM) {
+                                        const ratio = MAX_DIM / targetWidth;
+                                        targetWidth = MAX_DIM;
+                                        targetHeight = Math.round(bestImage.height * ratio);
+                                    }
 
-                                    console.log(`[GromitOffscreen] Page ${i} (Smart): Found ${results.length} text blocks.`);
+                                    const canvas = new OffscreenCanvas(targetWidth, targetHeight);
+                                    const ctx = canvas.getContext('2d');
+                                    if (ctx) {
+                                        ctx.fillStyle = '#ffffff';
+                                        ctx.fillRect(0, 0, targetWidth, targetHeight);
+                                        ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
 
-                                    if (results.length > 0) {
-                                        console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 40)}..."`);
-                                        const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
-                                        const end = performance.now();
-                                        console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
-                                        return text + " ";
+                                        // SINGLE DETECTION (v5.5.8): Optimized and safe
+                                        console.log(`[GromitOffscreen] Page ${i}: Detecting text...`);
+                                        const results = await detector.detect(canvas);
+
+                                        console.log(`[GromitOffscreen] Page ${i} (Smart): Found ${results.length} text blocks.`);
+
+                                        if (results.length > 0) {
+                                            console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 40)}..."`);
+                                            const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
+                                            const end = performance.now();
+                                            console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
+                                            return text + " ";
+                                        }
                                     }
                                 }
                             } catch (err) {
-                                console.error(`[GromitOffscreen] Page ${i}: Extraction Error during image processing:`, err);
+                                console.error(`[GromitOffscreen] Page ${i}: OCR Fatal Error:`, err);
                             }
                         }
 
-                        console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
+                        console.log(`[GromitOffscreen] Page ${i}: No text extracted. (Zero-Render Policy)`);
                         return "";
                     } catch (err) {
-                        console.error(`[GromitOffscreen] Page ${i}: Fatal Extraction Error:`, err);
+                        console.error(`[GromitOffscreen] Page ${i}: Fatal Lifecycle Error:`, err);
                         return "";
                     }
                 })(),
