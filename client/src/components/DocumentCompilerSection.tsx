@@ -1914,7 +1914,7 @@ export function DocumentCompilerSection({
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto px-6 py-2">
-            <ScrollArea className="max-h-[320px] mt-2 border rounded-xl overflow-hidden shadow-inner bg-slate-50/50">
+            <ScrollArea className="max-h-[400px] mt-2 border rounded-xl overflow-hidden shadow-inner bg-slate-50/50">
               <div className="p-0">
                 <table className="w-full text-sm border-collapse">
                   <thead className="bg-slate-100/80 backdrop-blur sticky top-0 z-10 border-b">
@@ -2018,7 +2018,7 @@ export function DocumentCompilerSection({
                   <Info className="w-3.5 h-3.5" />
                   Dettaglio Fonti Non Supportate dal Sistema Pawn
                 </div>
-                <ScrollArea className="max-h-[120px] pr-2">
+                <ScrollArea className="max-h-[160px] pr-2">
                   <div className="grid grid-cols-1 gap-1">
                     {unsupportedSources.map((s, idx) => (
                       <div key={idx} className="flex flex-col gap-1 text-[10px] text-amber-700 bg-white/50 px-2 py-1.5 rounded border border-amber-100/50">
