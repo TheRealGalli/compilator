@@ -478,7 +478,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                                 ctx.drawImage(tempCanvas, 0, 0);
                                             }
 
-                                            // TILING SCAN (v5.8.0)
+                                            // TILING SCAN (v5.8.1)
                                             let text = await detectTextWithTiling(canvas);
 
                                             // INVERSION FALLBACK
@@ -539,7 +539,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
 /**
  * Direct Image OCR (PNG, JPG, weBP)
- * v5.8.0: "Ghost Hunter" - Using Tiling detector for large photos.
+ * v5.8.1: "Ghost Hunter" - Using Tiling detector for large photos.
  */
 async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
     try {
