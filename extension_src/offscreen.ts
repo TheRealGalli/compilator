@@ -276,7 +276,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.4) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.5) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -363,7 +363,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                         console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
                                         return `--- PAGINA ${i} (OCR SMART) ---\n${text}\n\n`;
                                     }
-                                    console.warn(`[GromitOffscreen] Page ${i}: Largest image yielded zero text. Falling back to internal render.`);
+                                    console.warn(`[GromitOffscreen] Page ${i}: Largest image yielded zero text. (Zero-Render Policy)`);
                                 }
                             }
                         }

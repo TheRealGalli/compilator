@@ -1,9 +1,9 @@
 /// <reference types="chrome"/>
 
-// Gromit Bridge Background Script v5.5.4 (Advanced Robust OCR)
+// Gromit Bridge Background Script v5.5.5 (Zero-Render Policy)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = '5.5.4';
+const BRIDGE_VERSION = '5.5.5';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state

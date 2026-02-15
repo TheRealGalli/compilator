@@ -89856,7 +89856,7 @@ ${pageText}
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.4) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.5) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Scanning for Smart Extraction...`);
@@ -89931,7 +89931,7 @@ ${text}
 
 `;
                   }
-                  console.warn(`[GromitOffscreen] Page ${i}: Largest image yielded zero text. Falling back to internal render.`);
+                  console.warn(`[GromitOffscreen] Page ${i}: Largest image yielded zero text. (Zero-Render Policy)`);
                 }
               }
             }
