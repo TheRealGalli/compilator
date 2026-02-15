@@ -328,85 +328,93 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.9) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.6.0) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
-            console.log(`[GromitOffscreen] Page ${i}: Scanning for Smart Extraction...`);
+            console.log(`[GromitOffscreen] Page ${i}: Scanning for images (Deep Look)...`);
 
             const pageTextSnippet = await Promise.race([
                 (async () => {
                     const start = performance.now();
                     const page = await doc.getPage(i);
+                    let pageAccText = "";
 
                     try {
                         const ops = await page.getOperatorList();
-                        const imageIds: string[] = [];
+
+                        // DEEP LOOK: Search in both standard and common objects
+                        const imageIds: { id: string, source: 'objs' | 'common' }[] = [];
                         for (let j = 0; j < ops.fnArray.length; j++) {
                             if (ops.fnArray[j] === (pdfjsLib as any).OPS.paintImageXObject ||
                                 ops.fnArray[j] === (pdfjsLib as any).OPS.paintJpegXObject) {
-                                imageIds.push(ops.argsArray[j][0]);
+                                const id = ops.argsArray[j][0];
+                                imageIds.push({ id, source: 'objs' });
+                            } else if (ops.fnArray[j] === (pdfjsLib as any).OPS.paintImageMaskXObject) {
+                                // Some scans use masks or common resources
+                                const id = ops.argsArray[j][0];
+                                imageIds.push({ id, source: 'common' });
                             }
                         }
 
-                        let bestImage: any = null;
-                        let maxArea = 0;
-
                         if (imageIds.length > 0) {
-                            console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} images. Discovering largest...`);
-                            for (const id of imageIds) {
+                            console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate resources.`);
+
+                            // Process all significant images (Tiling Support)
+                            for (const { id, source } of imageIds) {
                                 try {
-                                    const img = await new Promise<any>((resolve) => page.objs.get(id, resolve));
+                                    const img = await new Promise<any>((resolve) => {
+                                        if (source === 'objs') {
+                                            page.objs.get(id, resolve);
+                                        } else {
+                                            page.commonObjs.get(id, resolve);
+                                        }
+                                    });
+
                                     if (img) {
                                         const area = (img.width || 0) * (img.height || 0);
-                                        if (area > maxArea) {
-                                            maxArea = area;
-                                            bestImage = img;
+                                        // Capture anything larger than a small icon (e.g., > 40,000 pixels or 200x200)
+                                        if (area > 40000) {
+                                            console.log(`[GromitOffscreen] Page ${i}: Image ${id} (${img.width}x${img.height}). Source: ${img.bitmap ? 'Bitmap' : (img.data ? 'Data' : 'Unknown')}`);
+
+                                            let imageSource: any = null;
+                                            if (img.bitmap) {
+                                                imageSource = img.bitmap;
+                                            } else if (img.data) {
+                                                const rgbaData = convertToRGBA(img.data, img.width, img.height);
+                                                imageSource = new ImageData(rgbaData as any, img.width, img.height);
+                                            }
+
+                                            if (imageSource) {
+                                                const results = await detector.detect(imageSource);
+                                                if (results.length > 0) {
+                                                    const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
+                                                    pageAccText += text + " ";
+                                                    console.debug(`[GromitOffscreen] Page ${i}: Image ${id} extracted ${results.length} blocks.`);
+                                                }
+                                            }
                                         }
                                     }
                                 } catch (e) {
-                                    console.debug(`[GromitOffscreen] Page ${i}: Could not resolve image ${id}`);
+                                    console.debug(`[GromitOffscreen] Page ${i}: Could not resolve image ${id} from ${source}`);
                                 }
                             }
                         }
 
-                        if (bestImage && maxArea > 1000) {
-                            console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Source: ${bestImage.bitmap ? 'Bitmap' : (bestImage.data ? 'Data' : 'Unknown')}`);
-
-                            try {
-                                let imageSource: any = null;
-
-                                if (bestImage.bitmap) {
-                                    imageSource = bestImage.bitmap;
-                                } else if (bestImage.data) {
-                                    const rgbaData = convertToRGBA(bestImage.data, bestImage.width, bestImage.height);
-                                    imageSource = new ImageData(rgbaData as any, bestImage.width, bestImage.height);
-                                }
-
-                                if (imageSource) {
-                                    // ZERO-RENDER POLICY (v5.5.9): Pass original resource directly to detector
-                                    console.log(`[GromitOffscreen] Page ${i}: Detecting text on original resource (${bestImage.width}x${bestImage.height})...`);
-                                    const results = await detector.detect(imageSource);
-
-                                    console.log(`[GromitOffscreen] Page ${i} DONE: Found ${results.length} text blocks in ${(performance.now() - start).toFixed(0)}ms`);
-
-                                    if (results.length > 0) {
-                                        return results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ') + " ";
-                                    }
-                                }
-                            } catch (err) {
-                                console.error(`[GromitOffscreen] Page ${i}: OCR Fatal Error:`, err);
-                            }
+                        if (pageAccText.trim().length > 0) {
+                            const end = performance.now();
+                            console.log(`[GromitOffscreen] Page ${i} DONE: Extraction success in ${(end - start).toFixed(0)}ms`);
+                            return pageAccText;
                         }
 
-                        console.log(`[GromitOffscreen] Page ${i}: No text extracted. (Zero-Render Policy)`);
+                        console.log(`[GromitOffscreen] Page ${i}: No text extracted from images.`);
                         return "";
                     } catch (err) {
                         console.error(`[GromitOffscreen] Page ${i}: Fatal Lifecycle Error:`, err);
                         return "";
                     }
                 })(),
-                new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 30000))
+                new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 45000)) // Slight extension for deep look
             ]);
 
             fullOcrText += pageTextSnippet;
