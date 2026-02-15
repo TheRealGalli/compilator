@@ -321,26 +321,105 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 }
 
 /**
- * applyBinarization (v5.8.2)
- * Forces pixels to be either black or white based on a luminosity threshold.
- * This is the ultimate weapon against fax noise.
+ * applySharpen (v5.8.3)
+ * Convolution filter to reinforce edges.
  */
-function applyBinarization(ctx: CanvasRenderingContext2D, width: number, height: number, threshold: number = 128) {
+function applySharpen(ctx: CanvasRenderingContext2D, width: number, height: number) {
     const imageData = ctx.getImageData(0, 0, width, height);
     const data = imageData.data;
+    const side = 3;
+    const halfSide = Math.floor(side / 2);
+    // Sharpening Kernel
+    const kernel = [
+        0, -1, 0,
+        -1, 5, -1,
+        0, -1, 0
+    ];
+    const output = new Uint8ClampedArray(data.length);
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const dstOff = (y * width + x) * 4;
+            let r = 0, g = 0, b = 0;
+            for (let cy = 0; cy < side; cy++) {
+                for (let cx = 0; cx < side; cx++) {
+                    const scy = Math.min(height - 1, Math.max(0, y + cy - halfSide));
+                    const scx = Math.min(width - 1, Math.max(0, x + cx - halfSide));
+                    const srcOff = (scy * width + scx) * 4;
+                    const wt = kernel[cy * side + cx];
+                    r += data[srcOff] * wt;
+                    g += data[srcOff + 1] * wt;
+                    b += data[srcOff + 2] * wt;
+                }
+            }
+            output[dstOff] = r;
+            output[dstOff + 1] = g;
+            output[dstOff + 2] = b;
+            output[dstOff + 3] = 255;
+        }
+    }
+    ctx.putImageData(new ImageData(output, width, height), 0, 0);
+}
+
+/**
+ * applyAdaptiveThreshold (v5.8.3)
+ * Bradley-Roth local thresholding algorithm.
+ * Best for documents with uneven lighting/shadows.
+ */
+function applyAdaptiveThreshold(ctx: CanvasRenderingContext2D, width: number, height: number) {
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    const s = Math.floor(width / 8); // Neighborhood size
+    const t = 15; // Adjustment constant (%)
+
+    // 1. Convert to grayscale and create integral image
+    const gray = new Uint8ClampedArray(width * height);
     for (let i = 0; i < data.length; i += 4) {
-        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        const val = avg < threshold ? 0 : 255;
-        data[i] = data[i + 1] = data[i + 2] = val;
-        // Alpha stays unchanged (should be 255 anyway)
+        gray[i / 4] = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    }
+
+    const integral = new Uint32Array(width * height);
+    for (let x = 0; x < width; x++) {
+        let sum = 0;
+        for (let y = 0; y < height; y++) {
+            sum += gray[y * width + x];
+            if (x === 0) {
+                integral[y * width + x] = sum;
+            } else {
+                integral[y * width + x] = integral[y * width + (x - 1)] + sum;
+            }
+        }
+    }
+
+    // 2. Perform thresholding
+    const halfS = Math.floor(s / 2);
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const x1 = Math.max(0, x - halfS);
+            const x2 = Math.min(width - 1, x + halfS);
+            const y1 = Math.max(0, y - halfS);
+            const y2 = Math.min(height - 1, y + halfS);
+            const count = (x2 - x1) * (y2 - y1);
+
+            let sum = integral[y2 * width + x2];
+            if (x1 > 0) sum -= integral[y2 * width + (x1 - 1)];
+            if (y1 > 0) sum -= integral[(y1 - 1) * width + x2];
+            if (x1 > 0 && y1 > 0) sum += integral[(y1 - 1) * width + (x1 - 1)];
+
+            const idx = (y * width + x) * 4;
+            const res = (gray[y * width + x] * count) < (sum * (100 - t) / 100) ? 0 : 255;
+            data[idx] = data[idx + 1] = data[idx + 2] = res;
+        }
     }
     ctx.putImageData(imageData, 0, 0);
 }
 
 /**
- * detectTextWithTiling (v5.8.2)
- * Splits a large canvas into smaller overlapping tiles using ImageBitmap.
- * Multi-Pass Attack: 1.0x Normal -> 0.5x Normal -> 1.0x Binarized.
+ * detectTextWithTiling (v5.8.3)
+ * Multi-Pass Attack:
+ * 1. Native Tiling
+ * 2. Downsampling (0.5x)
+ * 3. Vision Optimizer (Sharpen + Adaptive Threshold)
  */
 async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> {
     const detector = new (window as any).TextDetector();
@@ -380,7 +459,7 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         return resultsAcc.join(' ');
     };
 
-    console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.2) for ${width}x${height}...`);
+    console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.3) for ${width}x${height}...`);
 
     // PASS 1: Native Resolution
     let text = await performScan(canvas);
@@ -399,19 +478,22 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         }
     }
 
-    // PASS 3: Binarization Attack (v5.8.2)
+    // PASS 3: Vision Optimizer Attack (v5.8.3)
     if (text.trim().length < 50) {
-        console.log(`[GromitOffscreen] PASS 3: Text still missing. Applying Adaptive Binarization...`);
-        const binCanvas = document.createElement('canvas');
-        binCanvas.width = width;
-        binCanvas.height = height;
-        const bCtx = binCanvas.getContext('2d')!;
-        bCtx.drawImage(canvas, 0, 0);
-        applyBinarization(bCtx, width, height, 180); // Aggressive threshold for fax
-        const binText = await performScan(binCanvas);
-        if (binText.trim().length > text.trim().length) {
-            console.log(`[GromitOffscreen] Binarization SUCCESS (${binText.length} chars).`);
-            text = binText;
+        console.log(`[GromitOffscreen] PASS 3: Applying Vision Optimizer (Bradley & Sharpen)...`);
+        const optimizedCanvas = document.createElement('canvas');
+        optimizedCanvas.width = width;
+        optimizedCanvas.height = height;
+        const oCtx = optimizedCanvas.getContext('2d')!;
+        oCtx.drawImage(canvas, 0, 0);
+
+        applySharpen(oCtx, width, height);
+        applyAdaptiveThreshold(oCtx, width, height);
+
+        const optText = await performScan(optimizedCanvas);
+        if (optText.trim().length > text.trim().length) {
+            console.log(`[GromitOffscreen] Vision Optimizer SUCCESS (${optText.length} chars).`);
+            text = optText;
         }
     }
 
@@ -420,12 +502,12 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
 
 /**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.8.2: "Neural Sync" - Binarization Attack & Multi-Pass Scan.
+ * v5.8.3: "Vision Optimizer" - Bradley Local Thresholding & Sharpening.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.2) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.3) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {

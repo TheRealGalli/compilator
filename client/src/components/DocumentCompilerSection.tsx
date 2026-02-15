@@ -641,7 +641,7 @@ export function DocumentCompilerSection({
         try {
           // --- PHASE 1: SURGICAL EXTRACTION ---
           // Identify all PII findings from all texts to build a MASTER VAULT
-          console.log('[Gromit Frontend] STEP 1: Multimodal Extraction starting (v5.8.2)...');
+          console.log('[Gromit Frontend] STEP 1: Multimodal Extraction starting (v5.8.3)...');
 
           const vaultMap = new Map<string, string>(Object.entries(guardrailVault));
           const vaultCounts = new Map<string, number>();

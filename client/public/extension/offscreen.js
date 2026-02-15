@@ -89891,13 +89891,83 @@ async function extractPdfText(arrayBuffer) {
   bodyText = "";
   return finalResult;
 }
-function applyBinarization(ctx, width, height, threshold = 128) {
+function applySharpen(ctx, width, height) {
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
+  const side = 3;
+  const halfSide = Math.floor(side / 2);
+  const kernel = [
+    0,
+    -1,
+    0,
+    -1,
+    5,
+    -1,
+    0,
+    -1,
+    0
+  ];
+  const output = new Uint8ClampedArray(data.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dstOff = (y * width + x) * 4;
+      let r = 0, g = 0, b = 0;
+      for (let cy2 = 0; cy2 < side; cy2++) {
+        for (let cx2 = 0; cx2 < side; cx2++) {
+          const scy = Math.min(height - 1, Math.max(0, y + cy2 - halfSide));
+          const scx = Math.min(width - 1, Math.max(0, x + cx2 - halfSide));
+          const srcOff = (scy * width + scx) * 4;
+          const wt = kernel[cy2 * side + cx2];
+          r += data[srcOff] * wt;
+          g += data[srcOff + 1] * wt;
+          b += data[srcOff + 2] * wt;
+        }
+      }
+      output[dstOff] = r;
+      output[dstOff + 1] = g;
+      output[dstOff + 2] = b;
+      output[dstOff + 3] = 255;
+    }
+  }
+  ctx.putImageData(new ImageData(output, width, height), 0, 0);
+}
+function applyAdaptiveThreshold(ctx, width, height) {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const s = Math.floor(width / 8);
+  const t = 15;
+  const gray = new Uint8ClampedArray(width * height);
   for (let i = 0; i < data.length; i += 4) {
-    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-    const val = avg < threshold ? 0 : 255;
-    data[i] = data[i + 1] = data[i + 2] = val;
+    gray[i / 4] = (data[i] + data[i + 1] + data[i + 2]) / 3;
+  }
+  const integral = new Uint32Array(width * height);
+  for (let x = 0; x < width; x++) {
+    let sum2 = 0;
+    for (let y = 0; y < height; y++) {
+      sum2 += gray[y * width + x];
+      if (x === 0) {
+        integral[y * width + x] = sum2;
+      } else {
+        integral[y * width + x] = integral[y * width + (x - 1)] + sum2;
+      }
+    }
+  }
+  const halfS = Math.floor(s / 2);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const x1 = Math.max(0, x - halfS);
+      const x2 = Math.min(width - 1, x + halfS);
+      const y1 = Math.max(0, y - halfS);
+      const y2 = Math.min(height - 1, y + halfS);
+      const count = (x2 - x1) * (y2 - y1);
+      let sum2 = integral[y2 * width + x2];
+      if (x1 > 0) sum2 -= integral[y2 * width + (x1 - 1)];
+      if (y1 > 0) sum2 -= integral[(y1 - 1) * width + x2];
+      if (x1 > 0 && y1 > 0) sum2 += integral[(y1 - 1) * width + (x1 - 1)];
+      const idx = (y * width + x) * 4;
+      const res = gray[y * width + x] * count < sum2 * (100 - t) / 100 ? 0 : 255;
+      data[idx] = data[idx + 1] = data[idx + 2] = res;
+    }
   }
   ctx.putImageData(imageData, 0, 0);
 }
@@ -89934,7 +90004,7 @@ async function detectTextWithTiling(canvas) {
     }
     return resultsAcc.join(" ");
   };
-  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.2) for ${width}x${height}...`);
+  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.3) for ${width}x${height}...`);
   let text = await performScan(canvas);
   if (text.trim().length < 50 && (width > 2e3 || height > 2e3)) {
     console.log(`[GromitOffscreen] PASS 2: Trying Downsampling (0.5x)...`);
@@ -89949,24 +90019,25 @@ async function detectTextWithTiling(canvas) {
     }
   }
   if (text.trim().length < 50) {
-    console.log(`[GromitOffscreen] PASS 3: Text still missing. Applying Adaptive Binarization...`);
-    const binCanvas = document.createElement("canvas");
-    binCanvas.width = width;
-    binCanvas.height = height;
-    const bCtx = binCanvas.getContext("2d");
-    bCtx.drawImage(canvas, 0, 0);
-    applyBinarization(bCtx, width, height, 180);
-    const binText = await performScan(binCanvas);
-    if (binText.trim().length > text.trim().length) {
-      console.log(`[GromitOffscreen] Binarization SUCCESS (${binText.length} chars).`);
-      text = binText;
+    console.log(`[GromitOffscreen] PASS 3: Applying Vision Optimizer (Bradley & Sharpen)...`);
+    const optimizedCanvas = document.createElement("canvas");
+    optimizedCanvas.width = width;
+    optimizedCanvas.height = height;
+    const oCtx = optimizedCanvas.getContext("2d");
+    oCtx.drawImage(canvas, 0, 0);
+    applySharpen(oCtx, width, height);
+    applyAdaptiveThreshold(oCtx, width, height);
+    const optText = await performScan(optimizedCanvas);
+    if (optText.trim().length > text.trim().length) {
+      console.log(`[GromitOffscreen] Vision Optimizer SUCCESS (${optText.length} chars).`);
+      text = optText;
     }
   }
   return text;
 }
 async function performNativeOCR(doc) {
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.2) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.3) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Looking for "The Photo" in all levels...`);
