@@ -89856,7 +89856,7 @@ ${pageText}
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.3) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.4) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Scanning for Smart Extraction...`);
@@ -89865,39 +89865,53 @@ async function performNativeOCR(doc) {
           const start = performance.now();
           const page = await doc.getPage(i);
           try {
-            const ops = await page.getOperatorList();
-            let imageId = "";
+            const start2 = performance.now();
+            const page2 = await doc.getPage(i);
+            const ops = await page2.getOperatorList();
+            const imageIds = [];
             for (let j = 0; j < ops.fnArray.length; j++) {
               if (ops.fnArray[j] === __webpack_exports__OPS.paintImageXObject || ops.fnArray[j] === __webpack_exports__OPS.paintJpegXObject) {
-                imageId = ops.argsArray[j][0];
-                break;
+                imageIds.push(ops.argsArray[j][0]);
               }
             }
-            if (imageId) {
-              console.log(`[GromitOffscreen] Page ${i}: Found ImageXObject (${imageId})...`);
-              const img = await new Promise((resolve) => page.objs.get(imageId, resolve));
+            let bestImage = null;
+            let maxArea = 0;
+            if (imageIds.length > 0) {
+              console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} images. Discovering largest...`);
+              for (const id of imageIds) {
+                try {
+                  const img = await new Promise((resolve) => page2.objs.get(id, resolve));
+                  if (img) {
+                    const area = (img.width || 0) * (img.height || 0);
+                    if (area > maxArea) {
+                      maxArea = area;
+                      bestImage = img;
+                    }
+                  }
+                } catch (e) {
+                  console.debug(`[GromitOffscreen] Page ${i}: Could not resolve image ${id}`);
+                }
+              }
+            }
+            if (bestImage && maxArea > 1e3) {
+              console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Processing...`);
               let imageSource = null;
-              if (img && img.data && img.data instanceof Uint8ClampedArray) {
-                console.log(`[GromitOffscreen] Page ${i}: Using Raw Uint8ClampedArray...`);
-                imageSource = new ImageData(img.data, img.width, img.height);
-              } else if (img && img.bitmap) {
-                console.log(`[GromitOffscreen] Page ${i}: Using internal Bitmap...`);
-                imageSource = img.bitmap;
-              } else if (img && img.bitmapData) {
-                console.log(`[GromitOffscreen] Page ${i}: Using internal bitmapData...`);
-                imageSource = img.bitmapData;
-              } else {
-                console.warn(`[GromitOffscreen] Page ${i}: Image found but unsupported format:`, Object.keys(img || {}));
+              if (bestImage.data && bestImage.data instanceof Uint8ClampedArray) {
+                imageSource = new ImageData(bestImage.data, bestImage.width, bestImage.height);
+              } else if (bestImage.bitmap) {
+                imageSource = bestImage.bitmap;
+              } else if (bestImage.bitmapData) {
+                imageSource = bestImage.bitmapData;
               }
               if (imageSource) {
                 const imageBitmap = await createImageBitmap(imageSource);
                 const MAX_DIM = 1600;
-                let targetWidth = img.width;
-                let targetHeight = img.height;
+                let targetWidth = bestImage.width;
+                let targetHeight = bestImage.height;
                 if (targetWidth > MAX_DIM) {
                   const ratio = MAX_DIM / targetWidth;
                   targetWidth = MAX_DIM;
-                  targetHeight = Math.round(img.height * ratio);
+                  targetHeight = Math.round(bestImage.height * ratio);
                 }
                 const canvas = new OffscreenCanvas(targetWidth, targetHeight);
                 const ctx = canvas.getContext("2d");
@@ -89905,24 +89919,47 @@ async function performNativeOCR(doc) {
                   ctx.fillStyle = "#ffffff";
                   ctx.fillRect(0, 0, targetWidth, targetHeight);
                   ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
-                  console.log(`[GromitOffscreen] Page ${i}: Normalized to ${targetWidth}x${targetHeight}. Detecting...`);
                   const results = await detector.detect(canvas);
-                  console.log(`[GromitOffscreen] Page ${i}: Found ${results.length} text blocks.`);
+                  console.log(`[GromitOffscreen] Page ${i} (Smart): Found ${results.length} text blocks.`);
                   if (results.length > 0) {
-                    console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 30)}..."`);
-                  }
-                  const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
-                  const end = performance.now();
-                  console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
-                  return text.trim() ? `--- PAGINA ${i} (OCR SMART) ---
+                    console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 40)}..."`);
+                    const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+                    const end = performance.now();
+                    console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start2).toFixed(0)}ms`);
+                    return `--- PAGINA ${i} (OCR SMART) ---
 ${text}
 
-` : "";
+`;
+                  }
+                  console.warn(`[GromitOffscreen] Page ${i}: Largest image yielded zero text. Falling back to internal render.`);
                 }
               }
             }
+            console.log(`[GromitOffscreen] Page ${i}: Triggering Emergency Render Fallback...`);
+            const viewport = page2.getViewport({ scale: 1.5 });
+            const canvasR = new OffscreenCanvas(viewport.width, viewport.height);
+            const ctxR = canvasR.getContext("2d", { willReadFrequently: true });
+            if (ctxR) {
+              const renderTask = page2.render({ canvasContext: ctxR, viewport });
+              await Promise.race([
+                renderTask.promise,
+                new Promise((_3, reject2) => setTimeout(() => {
+                  renderTask.cancel();
+                  reject2(new Error("RENDER_HUNG"));
+                }, 1e4))
+              ]);
+              const results = await detector.detect(canvasR);
+              console.log(`[GromitOffscreen] Page ${i} (Surgical): Found ${results.length} text blocks.`);
+              const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+              const end = performance.now();
+              console.log(`[GromitOffscreen] Page ${i} DONE (Fallback): ${(end - start2).toFixed(0)}ms`);
+              return text.trim() ? `--- PAGINA ${i} (OCR SURGICAL) ---
+${text}
+
+` : "";
+            }
           } catch (err) {
-            console.error(`[GromitOffscreen] Page ${i}: Smart Extraction Error:`, err);
+            console.error(`[GromitOffscreen] Page ${i}: Extraction Error:`, err);
           }
           console.log(`[GromitOffscreen] Page ${i}: No dominant image found or extraction failed. Returning empty.`);
           return "";

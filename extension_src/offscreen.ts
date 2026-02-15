@@ -276,7 +276,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.3) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.4) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -288,85 +288,108 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                     const page = await doc.getPage(i);
 
                     try {
+                        const start = performance.now();
+                        const page = await doc.getPage(i);
+
+                        // DISCOVERY (v5.5.4): Scan for all images and pick the largest area
                         const ops = await page.getOperatorList();
-                        let imageId = "";
+                        const imageIds: string[] = [];
                         for (let j = 0; j < ops.fnArray.length; j++) {
                             if (ops.fnArray[j] === (pdfjsLib as any).OPS.paintImageXObject ||
                                 ops.fnArray[j] === (pdfjsLib as any).OPS.paintJpegXObject) {
-                                imageId = ops.argsArray[j][0];
-                                break;
+                                imageIds.push(ops.argsArray[j][0]);
                             }
                         }
 
-                        if (imageId) {
-                            console.log(`[GromitOffscreen] Page ${i}: Found ImageXObject (${imageId})...`);
-                            const img = await new Promise<any>((resolve) => page.objs.get(imageId, resolve));
+                        let bestImage: any = null;
+                        let maxArea = 0;
 
-                            // SUPPORT: Various Image formats from PDF.js (v5.5.1)
+                        if (imageIds.length > 0) {
+                            console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} images. Discovering largest...`);
+                            for (const id of imageIds) {
+                                try {
+                                    const img = await new Promise<any>((resolve) => page.objs.get(id, resolve));
+                                    if (img) {
+                                        const area = (img.width || 0) * (img.height || 0);
+                                        if (area > maxArea) {
+                                            maxArea = area;
+                                            bestImage = img;
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.debug(`[GromitOffscreen] Page ${i}: Could not resolve image ${id}`);
+                                }
+                            }
+                        }
+
+                        if (bestImage && maxArea > 1000) {
+                            console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Processing...`);
+
                             let imageSource: any = null;
-
-                            if (img && img.data && img.data instanceof Uint8ClampedArray) {
-                                console.log(`[GromitOffscreen] Page ${i}: Using Raw Uint8ClampedArray...`);
-                                imageSource = new ImageData(img.data, img.width, img.height);
-                            } else if (img && img.bitmap) {
-                                console.log(`[GromitOffscreen] Page ${i}: Using internal Bitmap...`);
-                                imageSource = img.bitmap;
-                            } else if (img && img.bitmapData) {
-                                console.log(`[GromitOffscreen] Page ${i}: Using internal bitmapData...`);
-                                imageSource = img.bitmapData;
-                            } else {
-                                console.warn(`[GromitOffscreen] Page ${i}: Image found but unsupported format:`, Object.keys(img || {}));
+                            if (bestImage.data && bestImage.data instanceof Uint8ClampedArray) {
+                                imageSource = new ImageData(bestImage.data, bestImage.width, bestImage.height);
+                            } else if (bestImage.bitmap) {
+                                imageSource = bestImage.bitmap;
+                            } else if (bestImage.bitmapData) {
+                                imageSource = bestImage.bitmapData;
                             }
 
                             if (imageSource) {
                                 const imageBitmap = await createImageBitmap(imageSource);
-
-                                // ROBUST NORMALIZATION (v5.5.3):
-                                // 1. Scaling: Cap at 1600px to prevent native OCR context loss
-                                // 2. Background: Fill with white to ensure text contrast (transparency fix)
                                 const MAX_DIM = 1600;
-                                let targetWidth = img.width;
-                                let targetHeight = img.height;
+                                let targetWidth = bestImage.width;
+                                let targetHeight = bestImage.height;
 
                                 if (targetWidth > MAX_DIM) {
                                     const ratio = MAX_DIM / targetWidth;
                                     targetWidth = MAX_DIM;
-                                    targetHeight = Math.round(img.height * ratio);
+                                    targetHeight = Math.round(bestImage.height * ratio);
                                 }
 
                                 const canvas = new OffscreenCanvas(targetWidth, targetHeight);
                                 const ctx = canvas.getContext('2d');
                                 if (ctx) {
-                                    // Layer 1: White background (for transparency cases)
                                     ctx.fillStyle = '#ffffff';
                                     ctx.fillRect(0, 0, targetWidth, targetHeight);
-
-                                    // Layer 2: Draw processed image
                                     ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
 
-                                    console.log(`[GromitOffscreen] Page ${i}: Normalized to ${targetWidth}x${targetHeight}. Detecting...`);
-
                                     const results = await detector.detect(canvas);
-                                    console.log(`[GromitOffscreen] Page ${i}: Found ${results.length} text blocks.`);
+                                    console.log(`[GromitOffscreen] Page ${i} (Smart): Found ${results.length} text blocks.`);
 
-                                    // Diagnostic: Log first block snippet if available
                                     if (results.length > 0) {
-                                        console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 30)}..."`);
+                                        console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 40)}..."`);
+                                        const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
+                                        const end = performance.now();
+                                        console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
+                                        return `--- PAGINA ${i} (OCR SMART) ---\n${text}\n\n`;
                                     }
-
-                                    const text = results
-                                        .map((r: any) => r.rawValue)
-                                        .filter((v: string) => v.trim().length > 0)
-                                        .join(' ');
-
-                                    const end = performance.now();
-                                    console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
-                                    return text.trim() ? `--- PAGINA ${i} (OCR SMART) ---\n${text}\n\n` : "";
+                                    console.warn(`[GromitOffscreen] Page ${i}: Largest image yielded zero text. Falling back to internal render.`);
                                 }
                             }
                         }
+
+                        // SURGICAL FALLBACK (v5.5.4): If smart extraction yielded 0 text or no large image found
+                        console.log(`[GromitOffscreen] Page ${i}: Triggering Emergency Render Fallback...`);
+                        const viewport = page.getViewport({ scale: 1.5 });
+                        const canvasR = new OffscreenCanvas(viewport.width, viewport.height);
+                        const ctxR = canvasR.getContext('2d', { willReadFrequently: true });
+                        if (ctxR) {
+                            const renderTask = page.render({ canvasContext: ctxR as any, viewport: viewport });
+                            await Promise.race([
+                                renderTask.promise,
+                                new Promise((_, reject) => setTimeout(() => { renderTask.cancel(); reject(new Error("RENDER_HUNG")); }, 10000))
+                            ]);
+
+                            const results = await detector.detect(canvasR);
+                            console.log(`[GromitOffscreen] Page ${i} (Surgical): Found ${results.length} text blocks.`);
+
+                            const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
+                            const end = performance.now();
+                            console.log(`[GromitOffscreen] Page ${i} DONE (Fallback): ${(end - start).toFixed(0)}ms`);
+                            return text.trim() ? `--- PAGINA ${i} (OCR SURGICAL) ---\n${text}\n\n` : "";
+                        }
                     } catch (err) {
-                        console.error(`[GromitOffscreen] Page ${i}: Smart Extraction Error:`, err);
+                        console.error(`[GromitOffscreen] Page ${i}: Extraction Error:`, err);
                     }
 
                     // v5.5.1: No more render fallback for scans to prevent hangs.
