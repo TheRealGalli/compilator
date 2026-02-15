@@ -89684,6 +89684,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         let text = "";
         if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
           text = await extractPdfText(arrayBuffer);
+        } else if (fileType.startsWith("image/") || fileName.match(/\.(png|jpe?g|webp|bmp)$/i)) {
+          text = await extractImageText(arrayBuffer);
         } else if (fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileName.endsWith(".docx")) {
           text = await extractDocxText(arrayBuffer);
         } else if (fileType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || fileType === "application/vnd.ms-excel" || fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
@@ -89854,16 +89856,15 @@ ${pageText}
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Resilient OCR (30s/page) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.1) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
-      console.log(`[GromitOffscreen] Page ${i}: Starting extraction sequence...`);
+      console.log(`[GromitOffscreen] Page ${i}: Scanning for Smart Extraction...`);
       const pageTextSnippet = await Promise.race([
         (async () => {
           const start = performance.now();
           const page = await doc.getPage(i);
           try {
-            console.log(`[GromitOffscreen] Page ${i}: Scanning OperatorList for Smart Image Extraction...`);
             const ops = await page.getOperatorList();
             let imageId = "";
             for (let j = 0; j < ops.fnArray.length; j++) {
@@ -89873,57 +89874,45 @@ async function performNativeOCR(doc) {
               }
             }
             if (imageId) {
-              console.log(`[GromitOffscreen] Page ${i}: Found ImageXObject (${imageId}). Attempting direct OCR...`);
+              console.log(`[GromitOffscreen] Page ${i}: Found ImageXObject (${imageId})...`);
               const img = await new Promise((resolve) => page.objs.get(imageId, resolve));
-              if (img && img.data) {
-                const imageData = new ImageData(img.data, img.width, img.height);
-                const imageBitmap = await createImageBitmap(imageData);
+              let imageSource = null;
+              if (img && img.data && img.data instanceof Uint8ClampedArray) {
+                console.log(`[GromitOffscreen] Page ${i}: Using Raw Uint8ClampedArray...`);
+                imageSource = new ImageData(img.data, img.width, img.height);
+              } else if (img && img.bitmap) {
+                console.log(`[GromitOffscreen] Page ${i}: Using internal Bitmap...`);
+                imageSource = img.bitmap;
+              } else if (img && img.bitmapData) {
+                console.log(`[GromitOffscreen] Page ${i}: Using internal bitmapData...`);
+                imageSource = img.bitmapData;
+              } else {
+                console.warn(`[GromitOffscreen] Page ${i}: Image found but unsupported format:`, Object.keys(img || {}));
+              }
+              if (imageSource) {
+                const imageBitmap = await createImageBitmap(imageSource);
                 console.log(`[GromitOffscreen] Page ${i}: Smart Extraction SUCCESS (${img.width}x${img.height}). Detecting...`);
-                const results2 = await detector.detect(imageBitmap);
-                const text2 = results2.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
-                const end2 = performance.now();
-                console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end2 - start).toFixed(0)}ms`);
-                return text2.trim() ? `--- PAGINA ${i} (OCR SMART) ---
-${text2}
+                const results = await detector.detect(imageBitmap);
+                const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+                const end = performance.now();
+                console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
+                return text.trim() ? `--- PAGINA ${i} (OCR SMART) ---
+${text}
 
 ` : "";
               }
             }
-          } catch (extractionErr) {
-            console.warn(`[GromitOffscreen] Page ${i}: Smart Extraction failed, falling back to Render.`, extractionErr);
+          } catch (err) {
+            console.error(`[GromitOffscreen] Page ${i}: Smart Extraction Error:`, err);
           }
-          console.log(`[GromitOffscreen] Page ${i}: Using Fallback Render strategy...`);
-          const viewport = page.getViewport({ scale: 0.5 });
-          const canvas = document.createElement("canvas");
-          const context = canvas.getContext("2d", { willReadFrequently: true });
-          if (!context) return "";
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          document.body.appendChild(canvas);
-          const renderContext = { canvasContext: context, viewport };
-          await Promise.race([
-            page.render(renderContext).promise,
-            new Promise((_3, reject2) => setTimeout(() => reject2(new Error("RENDER_HUNG")), 15e3))
-          ]);
-          const renderEnd = performance.now();
-          const results = await detector.detect(canvas);
-          if (document.body.contains(canvas)) document.body.removeChild(canvas);
-          canvas.width = 0;
-          canvas.height = 0;
-          const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
-          const end = performance.now();
-          console.log(`[GromitOffscreen] Page ${i} DONE (Fallback): ${(end - start).toFixed(0)}ms`);
-          return text.trim() ? `--- PAGINA ${i} (OCR NATIVO) ---
-${text}
-
-` : "";
+          console.log(`[GromitOffscreen] Page ${i}: No dominant image found or extraction failed. Returning empty.`);
+          return "";
         })(),
         new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 3e4))
       ]);
       fullOcrText += pageTextSnippet;
       await new Promise((r) => setTimeout(r, 50));
     } catch (err) {
-      console.warn(`[GromitOffscreen] Page ${i} FAILED (${err instanceof Error ? err.message : "Unknown"}). Skipping to next page.`, err);
       fullOcrText += `--- PAGINA ${i} (ERRORE ESTRAZIONE) ---
 [[PAGE_RENDER_FAILED]]
 
@@ -89932,6 +89921,23 @@ ${text}
     }
   }
   return fullOcrText.trim();
+}
+async function extractImageText(arrayBuffer) {
+  try {
+    const detector = new window.TextDetector();
+    const blob = new Blob([arrayBuffer]);
+    const imageBitmap = await createImageBitmap(blob);
+    console.log(`[GromitOffscreen] Direct Image OCR starting (${imageBitmap.width}x${imageBitmap.height})...`);
+    const results = await detector.detect(imageBitmap);
+    const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
+    return text.trim() ? `--- IMMAGINE (OCR) ---
+${text}
+
+` : "[[GROMIT_SCAN_DETECTED]]";
+  } catch (err) {
+    console.error("[GromitOffscreen] Direct Image OCR failed:", err);
+    return "[[GROMIT_SCAN_DETECTED]]";
+  }
 }
 async function extractDocxText(arrayBuffer) {
   const result2 = await import_mammoth.default.extractRawText({ arrayBuffer });
