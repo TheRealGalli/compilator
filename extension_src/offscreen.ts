@@ -321,9 +321,9 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 }
 
 /**
- * detectTextWithTiling (v5.8.0)
- * Splits a large canvas into smaller overlapping tiles to bypass OS/Browser resolution limits.
- * Max Tile: 1024px, Overlap: 256px.
+ * detectTextWithTiling (v5.8.1)
+ * Splits a large canvas into smaller overlapping tiles using ImageBitmap.
+ * Includes a Downsampling Pass (0.5x) if full-res tiling fails.
  */
 async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> {
     const detector = new (window as any).TextDetector();
@@ -332,56 +332,68 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
     const width = canvas.width;
     const height = canvas.height;
 
-    // Fast Path: Image is small enough
-    if (width <= TILE_SIZE && height <= TILE_SIZE) {
-        const results = await detector.detect(canvas);
-        return results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
-    }
+    const performScan = async (sourceCanvas: HTMLCanvasElement | ImageBitmap): Promise<string> => {
+        const sWidth = sourceCanvas.width;
+        const sHeight = sourceCanvas.height;
+        const bitmap = sourceCanvas instanceof ImageBitmap ? sourceCanvas : await createImageBitmap(sourceCanvas);
+        const resultsAcc: string[] = [];
 
-    console.log(`[GromitOffscreen] Tiling Scan enabled for ${width}x${height} image...`);
-    const allTextBlocks: string[] = [];
+        console.log(`[GromitOffscreen] OCR Scanning buffer ${sWidth}x${sHeight}...`);
 
-    let tileW = 0;
-    let tileH = 0;
+        for (let y = 0; y < sHeight; y += (TILE_SIZE - OVERLAP)) {
+            for (let x = 0; x < sWidth; x += (TILE_SIZE - OVERLAP)) {
+                const tw = Math.min(TILE_SIZE, sWidth - x);
+                const th = Math.min(TILE_SIZE, sHeight - y);
+                if (tw <= 0 || th <= 0) break;
 
-    for (let y = 0; y < height; y += (TILE_SIZE - OVERLAP)) {
-        tileH = Math.min(TILE_SIZE, height - y);
-        for (let x = 0; x < width; x += (TILE_SIZE - OVERLAP)) {
-            tileW = Math.min(TILE_SIZE, width - x);
-
-            const tileCanvas = document.createElement('canvas');
-            tileCanvas.width = tileW;
-            tileCanvas.height = tileH;
-            const tileCtx = tileCanvas.getContext('2d')!;
-            tileCtx.drawImage(canvas, x, y, tileW, tileH, 0, 0, tileW, tileH);
-
-            try {
-                const results = await detector.detect(tileCanvas);
-                if (results.length > 0) {
-                    const tileText = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
-                    allTextBlocks.push(tileText);
+                try {
+                    const tileBitmap = await createImageBitmap(bitmap, x, y, tw, th);
+                    const results = await detector.detect(tileBitmap);
+                    if (results.length > 0) {
+                        const tileText = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
+                        resultsAcc.push(tileText);
+                    }
+                } catch (e) {
+                    console.debug("[GromitOffscreen] Tile skip:", e);
                 }
-            } catch (e) {
-                console.error("[GromitOffscreen] Tile processing error:", e);
+                if (x + tw >= sWidth) break;
             }
-
-            if (x + tileW >= width) break;
+            if (y + Math.min(TILE_SIZE, sHeight - y) >= sHeight) break;
         }
-        if (y + tileH >= height) break;
+        return resultsAcc.join(' ');
+    };
+
+    console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.1) for ${width}x${height}...`);
+
+    // PASS 1: Native (Original) Resolution Tiling
+    let text = await performScan(canvas);
+
+    // PASS 2: Downsampling Fallback (v5.8.1)
+    if (text.trim().length < 50 && (width > 2000 || height > 2000)) {
+        console.log(`[GromitOffscreen] PASS 2: Huge image detected. Trying Downsampling (0.5x)...`);
+        const scaledCanvas = document.createElement('canvas');
+        scaledCanvas.width = width * 0.5;
+        scaledCanvas.height = height * 0.5;
+        const sCtx = scaledCanvas.getContext('2d')!;
+        sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+        const scaledText = await performScan(scaledCanvas);
+        if (scaledText.trim().length > text.trim().length) {
+            console.log(`[GromitOffscreen] Downsampling successful (${scaledText.length} vs ${text.length} chars).`);
+            text = scaledText;
+        }
     }
 
-    // Join and deduplicate basic substrings if needed, but for now raw join is safer for LLM context
-    return allTextBlocks.join(' ');
+    return text;
 }
 
 /**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.8.0: "Ghost Hunter" - Tiling, Inline, 1-bit & Recursion.
+ * v5.8.1: "Ghost Hunter" - Scaling Fallback & ImageBitmap Tiling.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.0) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.1) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
