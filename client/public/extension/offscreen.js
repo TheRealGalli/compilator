@@ -89891,6 +89891,16 @@ async function extractPdfText(arrayBuffer) {
   bodyText = "";
   return finalResult;
 }
+function applyBinarization(ctx, width, height, threshold = 128) {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    const val = avg < threshold ? 0 : 255;
+    data[i] = data[i + 1] = data[i + 2] = val;
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
 async function detectTextWithTiling(canvas) {
   const detector = new window.TextDetector();
   const TILE_SIZE = 1024;
@@ -89924,10 +89934,10 @@ async function detectTextWithTiling(canvas) {
     }
     return resultsAcc.join(" ");
   };
-  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.1) for ${width}x${height}...`);
+  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.2) for ${width}x${height}...`);
   let text = await performScan(canvas);
   if (text.trim().length < 50 && (width > 2e3 || height > 2e3)) {
-    console.log(`[GromitOffscreen] PASS 2: Huge image detected. Trying Downsampling (0.5x)...`);
+    console.log(`[GromitOffscreen] PASS 2: Trying Downsampling (0.5x)...`);
     const scaledCanvas = document.createElement("canvas");
     scaledCanvas.width = width * 0.5;
     scaledCanvas.height = height * 0.5;
@@ -89935,15 +89945,28 @@ async function detectTextWithTiling(canvas) {
     sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
     const scaledText = await performScan(scaledCanvas);
     if (scaledText.trim().length > text.trim().length) {
-      console.log(`[GromitOffscreen] Downsampling successful (${scaledText.length} vs ${text.length} chars).`);
       text = scaledText;
+    }
+  }
+  if (text.trim().length < 50) {
+    console.log(`[GromitOffscreen] PASS 3: Text still missing. Applying Adaptive Binarization...`);
+    const binCanvas = document.createElement("canvas");
+    binCanvas.width = width;
+    binCanvas.height = height;
+    const bCtx = binCanvas.getContext("2d");
+    bCtx.drawImage(canvas, 0, 0);
+    applyBinarization(bCtx, width, height, 180);
+    const binText = await performScan(binCanvas);
+    if (binText.trim().length > text.trim().length) {
+      console.log(`[GromitOffscreen] Binarization SUCCESS (${binText.length} chars).`);
+      text = binText;
     }
   }
   return text;
 }
 async function performNativeOCR(doc) {
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.1) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.2) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Looking for "The Photo" in all levels...`);

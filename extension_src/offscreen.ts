@@ -321,9 +321,26 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 }
 
 /**
- * detectTextWithTiling (v5.8.1)
+ * applyBinarization (v5.8.2)
+ * Forces pixels to be either black or white based on a luminosity threshold.
+ * This is the ultimate weapon against fax noise.
+ */
+function applyBinarization(ctx: CanvasRenderingContext2D, width: number, height: number, threshold: number = 128) {
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const val = avg < threshold ? 0 : 255;
+        data[i] = data[i + 1] = data[i + 2] = val;
+        // Alpha stays unchanged (should be 255 anyway)
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
+/**
+ * detectTextWithTiling (v5.8.2)
  * Splits a large canvas into smaller overlapping tiles using ImageBitmap.
- * Includes a Downsampling Pass (0.5x) if full-res tiling fails.
+ * Multi-Pass Attack: 1.0x Normal -> 0.5x Normal -> 1.0x Binarized.
  */
 async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> {
     const detector = new (window as any).TextDetector();
@@ -363,14 +380,14 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         return resultsAcc.join(' ');
     };
 
-    console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.1) for ${width}x${height}...`);
+    console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.2) for ${width}x${height}...`);
 
-    // PASS 1: Native (Original) Resolution Tiling
+    // PASS 1: Native Resolution
     let text = await performScan(canvas);
 
-    // PASS 2: Downsampling Fallback (v5.8.1)
+    // PASS 2: Downsampling Fallback (v5.8.1 legacy)
     if (text.trim().length < 50 && (width > 2000 || height > 2000)) {
-        console.log(`[GromitOffscreen] PASS 2: Huge image detected. Trying Downsampling (0.5x)...`);
+        console.log(`[GromitOffscreen] PASS 2: Trying Downsampling (0.5x)...`);
         const scaledCanvas = document.createElement('canvas');
         scaledCanvas.width = width * 0.5;
         scaledCanvas.height = height * 0.5;
@@ -378,8 +395,23 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
         const scaledText = await performScan(scaledCanvas);
         if (scaledText.trim().length > text.trim().length) {
-            console.log(`[GromitOffscreen] Downsampling successful (${scaledText.length} vs ${text.length} chars).`);
             text = scaledText;
+        }
+    }
+
+    // PASS 3: Binarization Attack (v5.8.2)
+    if (text.trim().length < 50) {
+        console.log(`[GromitOffscreen] PASS 3: Text still missing. Applying Adaptive Binarization...`);
+        const binCanvas = document.createElement('canvas');
+        binCanvas.width = width;
+        binCanvas.height = height;
+        const bCtx = binCanvas.getContext('2d')!;
+        bCtx.drawImage(canvas, 0, 0);
+        applyBinarization(bCtx, width, height, 180); // Aggressive threshold for fax
+        const binText = await performScan(binCanvas);
+        if (binText.trim().length > text.trim().length) {
+            console.log(`[GromitOffscreen] Binarization SUCCESS (${binText.length} chars).`);
+            text = binText;
         }
     }
 
@@ -388,12 +420,12 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
 
 /**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.8.1: "Ghost Hunter" - Scaling Fallback & ImageBitmap Tiling.
+ * v5.8.2: "Neural Sync" - Binarization Attack & Multi-Pass Scan.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.1) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.2) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {

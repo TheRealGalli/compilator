@@ -1,9 +1,9 @@
 /// <reference types="chrome"/>
 
-// Gromit Bridge Background Script v5.8.1 (Ghost Hunter - Downsample & Hybrid)
+// Gromit Bridge Background Script v5.8.2 (Neural Sync - Binarization & Adaptive Threshold)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = '5.8.1';
+const BRIDGE_VERSION = '5.8.2';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state
