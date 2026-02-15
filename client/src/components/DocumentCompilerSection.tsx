@@ -2006,7 +2006,7 @@ export function DocumentCompilerSection({
                   </tbody>
                 </table>
               </div>
-            </ScrollArea>
+            </div>
 
             <p className="text-[10px] text-muted-foreground px-1 mt-2 leading-relaxed">
               Modifica i token o i valori se necessario. I dati originali non vengono inviati all&apos;IA.
