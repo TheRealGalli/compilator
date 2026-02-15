@@ -89854,7 +89854,7 @@ ${pageText}
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Fail-Fast OCR (30s/page) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Resilient OCR (30s/page) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Starting extraction sequence...`);
@@ -89866,7 +89866,7 @@ async function performNativeOCR(doc) {
           const viewport = page.getViewport({ scale: 0.5 });
           console.log(`[GromitOffscreen] Page ${i}: Creating HTMLCanvasElement (${viewport.width}x${viewport.height})...`);
           const canvas = document.createElement("canvas");
-          const context = canvas.getContext("2d");
+          const context = canvas.getContext("2d", { willReadFrequently: true });
           if (!context) {
             console.error(`[GromitOffscreen] Page ${i}: Failed to get 2D context`);
             return "";
@@ -89905,8 +89905,12 @@ ${text}
       fullOcrText += pageTextSnippet;
       await new Promise((r) => setTimeout(r, 50));
     } catch (err) {
-      console.warn(`[GromitOffscreen] OCR Hard Fail on Page ${i}. Breaking document loop.`, err);
-      break;
+      console.warn(`[GromitOffscreen] Page ${i} FAILED (${err instanceof Error ? err.message : "Unknown"}). Skipping to next page.`, err);
+      fullOcrText += `--- PAGINA ${i} (ERRORE ESTRAZIONE) ---
+[[PAGE_RENDER_FAILED]]
+
+`;
+      continue;
     }
   }
   return fullOcrText.trim();

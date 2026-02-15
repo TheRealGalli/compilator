@@ -6,8 +6,8 @@ import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 
 // Configure PDF Worker
-// In offscreen document, we can use the bundled worker file
 pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.js');
+// (pdfjsLib as any).verbosity = 1; // Removed: Immutable export in namespace
 
 const EXTENSION_ID = chrome.runtime.id;
 let extractionLock: Promise<void> | null = null;
@@ -273,7 +273,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Fail-Fast OCR (30s/page) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Resilient OCR (30s/page) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -290,7 +290,8 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
                     console.log(`[GromitOffscreen] Page ${i}: Creating HTMLCanvasElement (${viewport.width}x${viewport.height})...`);
                     const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
+                    // DIAGNOSTIC CORE: willReadFrequently forces CPU-backed buffer, avoiding GPU hangs in offscreen
+                    const context = canvas.getContext('2d', { willReadFrequently: true });
                     if (!context) {
                         console.error(`[GromitOffscreen] Page ${i}: Failed to get 2D context`);
                         return "";
@@ -345,8 +346,9 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
             await new Promise(r => setTimeout(r, 50));
 
         } catch (err) {
-            console.warn(`[GromitOffscreen] OCR Hard Fail on Page ${i}. Breaking document loop.`, err);
-            break; // FAIL-FAST: Don't try subsequent pages if one hangs or fails
+            console.warn(`[GromitOffscreen] Page ${i} FAILED (${err instanceof Error ? err.message : 'Unknown'}). Skipping to next page.`, err);
+            fullOcrText += `--- PAGINA ${i} (ERRORE ESTRAZIONE) ---\n[[PAGE_RENDER_FAILED]]\n\n`;
+            continue; // RESILIENT: Don't kill the whole document for one page
         }
     }
 

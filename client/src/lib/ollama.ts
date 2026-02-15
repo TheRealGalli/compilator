@@ -97,7 +97,7 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
             const errorMsg = bridgeResult?.error || 'Bridge connection failed';
 
             // Log specifically if it's a network error
-            console.warn(`[OllamaLocal 5.3.8] Bridge Error for ${url}: ${errorMsg} (Status: ${status})`);
+            console.warn(`[OllamaLocal 5.4.0] Bridge Error for ${url}: ${errorMsg} (Status: ${status})`);
 
             if (status === 0 || errorMsg.includes('Failed to fetch') || errorMsg.includes('Extension context invalidated')) {
                 console.info(`[OllamaLocal] 💡 Suggerimento: Verifica che Ollama sia attivo (ollama list) e che l'URL sia corretto.`);
