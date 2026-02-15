@@ -328,7 +328,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.8) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.9) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -374,49 +374,24 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                             console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Source: ${bestImage.bitmap ? 'Bitmap' : (bestImage.data ? 'Data' : 'Unknown')}`);
 
                             try {
-                                let imageBitmap: ImageBitmap | null = null;
+                                let imageSource: any = null;
 
                                 if (bestImage.bitmap) {
-                                    imageBitmap = await createImageBitmap(bestImage.bitmap);
-                                } else if (bestImage.bitmapData) {
-                                    imageBitmap = await createImageBitmap(bestImage.bitmapData);
+                                    imageSource = bestImage.bitmap;
                                 } else if (bestImage.data) {
                                     const rgbaData = convertToRGBA(bestImage.data, bestImage.width, bestImage.height);
-                                    const imageSource = new ImageData(rgbaData as any, bestImage.width, bestImage.height);
-                                    imageBitmap = await createImageBitmap(imageSource);
+                                    imageSource = new ImageData(rgbaData as any, bestImage.width, bestImage.height);
                                 }
 
-                                if (imageBitmap) {
-                                    const MAX_DIM = 2500;
-                                    let targetWidth = bestImage.width;
-                                    let targetHeight = bestImage.height;
+                                if (imageSource) {
+                                    // ZERO-RENDER POLICY (v5.5.9): Pass original resource directly to detector
+                                    console.log(`[GromitOffscreen] Page ${i}: Detecting text on original resource (${bestImage.width}x${bestImage.height})...`);
+                                    const results = await detector.detect(imageSource);
 
-                                    if (targetWidth > MAX_DIM) {
-                                        const ratio = MAX_DIM / targetWidth;
-                                        targetWidth = MAX_DIM;
-                                        targetHeight = Math.round(bestImage.height * ratio);
-                                    }
+                                    console.log(`[GromitOffscreen] Page ${i} DONE: Found ${results.length} text blocks in ${(performance.now() - start).toFixed(0)}ms`);
 
-                                    const canvas = new OffscreenCanvas(targetWidth, targetHeight);
-                                    const ctx = canvas.getContext('2d');
-                                    if (ctx) {
-                                        ctx.fillStyle = '#ffffff';
-                                        ctx.fillRect(0, 0, targetWidth, targetHeight);
-                                        ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
-
-                                        // SINGLE DETECTION (v5.5.8): Optimized and safe
-                                        console.log(`[GromitOffscreen] Page ${i}: Detecting text...`);
-                                        const results = await detector.detect(canvas);
-
-                                        console.log(`[GromitOffscreen] Page ${i} (Smart): Found ${results.length} text blocks.`);
-
-                                        if (results.length > 0) {
-                                            console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 40)}..."`);
-                                            const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
-                                            const end = performance.now();
-                                            console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
-                                            return text + " ";
-                                        }
+                                    if (results.length > 0) {
+                                        return results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ') + " ";
                                     }
                                 }
                             } catch (err) {
@@ -448,36 +423,17 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
 /**
  * Direct Image OCR (PNG, JPG, weBP)
- * v5.5.1: New Multimodal Path
+ * v5.5.9: Pure Zero-Manipulation. Pass Blob directly to detector.
  */
 async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
     try {
         const detector = new (window as any).TextDetector();
         const blob = new Blob([arrayBuffer]);
-        const imageBitmap = await createImageBitmap(blob);
 
-        // ROBUST NORMALIZATION (v5.5.3)
-        const MAX_DIM = 1600;
-        let targetWidth = imageBitmap.width;
-        let targetHeight = imageBitmap.height;
+        console.log(`[GromitOffscreen] Direct Image OCR starting (Size: ${arrayBuffer.byteLength} bytes)...`);
 
-        if (targetWidth > MAX_DIM) {
-            const ratio = MAX_DIM / targetWidth;
-            targetWidth = MAX_DIM;
-            targetHeight = Math.round(imageBitmap.height * ratio);
-        }
-
-        const canvas = new OffscreenCanvas(targetWidth, targetHeight);
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error("Could not create OffscreenCanvas context");
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, targetWidth, targetHeight);
-        ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
-
-        console.log(`[GromitOffscreen] Direct Image OCR starting (${targetWidth}x${targetHeight})...`);
-
-        const results = await detector.detect(canvas);
+        // DIRECT PASS (v5.5.9): Passing the original blob is the most faithful way
+        const results = await detector.detect(blob);
         console.log(`[GromitOffscreen] Direct Image: Found ${results.length} text blocks.`);
 
         const text = results
