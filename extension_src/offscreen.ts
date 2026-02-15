@@ -343,25 +343,42 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                     try {
                         const ops = await page.getOperatorList();
 
-                        // DEEP LOOK: Search in both standard and common objects
-                        const imageIds: { id: string, source: 'objs' | 'common' }[] = [];
+                        // DEEP & ORDERED LOOK: Search in both standard and common objects, tracking Y position
+                        const imageIds: { id: string, y: number, source: 'objs' | 'common' }[] = [];
+                        let currentCTM = [1, 0, 0, 1, 0, 0]; // [a, b, c, d, e, f] -> f is Y translate
+                        const transformStack: any[] = [];
+
                         for (let j = 0; j < ops.fnArray.length; j++) {
-                            if (ops.fnArray[j] === (pdfjsLib as any).OPS.paintImageXObject ||
-                                ops.fnArray[j] === (pdfjsLib as any).OPS.paintJpegXObject) {
-                                const id = ops.argsArray[j][0];
-                                imageIds.push({ id, source: 'objs' });
-                            } else if (ops.fnArray[j] === (pdfjsLib as any).OPS.paintImageMaskXObject) {
-                                // Some scans use masks or common resources
-                                const id = ops.argsArray[j][0];
-                                imageIds.push({ id, source: 'common' });
+                            const fn = ops.fnArray[j];
+                            const args = ops.argsArray[j];
+
+                            if (fn === (pdfjsLib as any).OPS.transform) {
+                                // Update current transformation matrix (simplified for Y-tracking in tiling)
+                                currentCTM = args;
+                            } else if (fn === (pdfjsLib as any).OPS.save) {
+                                transformStack.push([...currentCTM]);
+                            } else if (fn === (pdfjsLib as any).OPS.restore) {
+                                const restored = transformStack.pop();
+                                if (restored) currentCTM = restored;
+                            } else if (fn === (pdfjsLib as any).OPS.paintImageXObject ||
+                                fn === (pdfjsLib as any).OPS.paintJpegXObject) {
+                                const id = args[0];
+                                imageIds.push({ id, y: currentCTM[5], source: 'objs' });
+                            } else if (fn === (pdfjsLib as any).OPS.paintImageMaskXObject) {
+                                const id = args[0];
+                                imageIds.push({ id, y: currentCTM[5], source: 'common' });
                             }
                         }
 
                         if (imageIds.length > 0) {
-                            console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate resources.`);
+                            // HEURISTIC: Sort by Y coordinate descending (Top to Bottom)
+                            // In PDF space, higher Y is closer to the top of the page.
+                            imageIds.sort((a, b) => b.y - a.y);
 
-                            // Process all significant images (Tiling Support)
-                            for (const { id, source } of imageIds) {
+                            console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate resources. Sorted Top-Down.`);
+
+                            // Process images in spatial order (Tiling Support)
+                            for (const { id, source, y } of imageIds) {
                                 try {
                                     const img = await new Promise<any>((resolve) => {
                                         if (source === 'objs') {
@@ -375,7 +392,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                         const area = (img.width || 0) * (img.height || 0);
                                         // Capture anything larger than a small icon (e.g., > 40,000 pixels or 200x200)
                                         if (area > 40000) {
-                                            console.log(`[GromitOffscreen] Page ${i}: Image ${id} (${img.width}x${img.height}). Source: ${img.bitmap ? 'Bitmap' : (img.data ? 'Data' : 'Unknown')}`);
+                                            console.log(`[GromitOffscreen] Page ${i}: Image ${id} at Y=${y.toFixed(0)} (${img.width}x${img.height}). Source: ${source}`);
 
                                             let imageSource: any = null;
                                             if (img.bitmap) {
