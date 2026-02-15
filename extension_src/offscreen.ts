@@ -270,7 +270,7 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 
 /**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.5.1: High-Performance Pure Image Path (No rendering fallback)
+ * v5.5.5: Zero-Render Policy. Relying only on direct image extraction.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
     const detector = new (window as any).TextDetector();
@@ -288,10 +288,6 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                     const page = await doc.getPage(i);
 
                     try {
-                        const start = performance.now();
-                        const page = await doc.getPage(i);
-
-                        // DISCOVERY (v5.5.4): Scan for all images and pick the largest area
                         const ops = await page.getOperatorList();
                         const imageIds: string[] = [];
                         for (let j = 0; j < ops.fnArray.length; j++) {
@@ -368,33 +364,13 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                             }
                         }
 
-                        // SURGICAL FALLBACK (v5.5.4): If smart extraction yielded 0 text or no large image found
-                        console.log(`[GromitOffscreen] Page ${i}: Triggering Emergency Render Fallback...`);
-                        const viewport = page.getViewport({ scale: 1.5 });
-                        const canvasR = new OffscreenCanvas(viewport.width, viewport.height);
-                        const ctxR = canvasR.getContext('2d', { willReadFrequently: true });
-                        if (ctxR) {
-                            const renderTask = page.render({ canvasContext: ctxR as any, viewport: viewport });
-                            await Promise.race([
-                                renderTask.promise,
-                                new Promise((_, reject) => setTimeout(() => { renderTask.cancel(); reject(new Error("RENDER_HUNG")); }, 10000))
-                            ]);
-
-                            const results = await detector.detect(canvasR);
-                            console.log(`[GromitOffscreen] Page ${i} (Surgical): Found ${results.length} text blocks.`);
-
-                            const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
-                            const end = performance.now();
-                            console.log(`[GromitOffscreen] Page ${i} DONE (Fallback): ${(end - start).toFixed(0)}ms`);
-                            return text.trim() ? `--- PAGINA ${i} (OCR SURGICAL) ---\n${text}\n\n` : "";
-                        }
+                        // v5.5.5: Zero-Render Policy. No fallback to page.render() to prevent hangs.
+                        console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
+                        return "";
                     } catch (err) {
                         console.error(`[GromitOffscreen] Page ${i}: Extraction Error:`, err);
+                        return "";
                     }
-
-                    // v5.5.1: No more render fallback for scans to prevent hangs.
-                    console.log(`[GromitOffscreen] Page ${i}: No dominant image found or extraction failed. Returning empty.`);
-                    return "";
                 })(),
                 new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 30000))
             ]);

@@ -89865,9 +89865,7 @@ async function performNativeOCR(doc) {
           const start = performance.now();
           const page = await doc.getPage(i);
           try {
-            const start2 = performance.now();
-            const page2 = await doc.getPage(i);
-            const ops = await page2.getOperatorList();
+            const ops = await page.getOperatorList();
             const imageIds = [];
             for (let j = 0; j < ops.fnArray.length; j++) {
               if (ops.fnArray[j] === __webpack_exports__OPS.paintImageXObject || ops.fnArray[j] === __webpack_exports__OPS.paintJpegXObject) {
@@ -89880,7 +89878,7 @@ async function performNativeOCR(doc) {
               console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} images. Discovering largest...`);
               for (const id of imageIds) {
                 try {
-                  const img = await new Promise((resolve) => page2.objs.get(id, resolve));
+                  const img = await new Promise((resolve) => page.objs.get(id, resolve));
                   if (img) {
                     const area = (img.width || 0) * (img.height || 0);
                     if (area > maxArea) {
@@ -89925,7 +89923,7 @@ async function performNativeOCR(doc) {
                     console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 40)}..."`);
                     const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
                     const end = performance.now();
-                    console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start2).toFixed(0)}ms`);
+                    console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
                     return `--- PAGINA ${i} (OCR SMART) ---
 ${text}
 
@@ -89935,34 +89933,12 @@ ${text}
                 }
               }
             }
-            console.log(`[GromitOffscreen] Page ${i}: Triggering Emergency Render Fallback...`);
-            const viewport = page2.getViewport({ scale: 1.5 });
-            const canvasR = new OffscreenCanvas(viewport.width, viewport.height);
-            const ctxR = canvasR.getContext("2d", { willReadFrequently: true });
-            if (ctxR) {
-              const renderTask = page2.render({ canvasContext: ctxR, viewport });
-              await Promise.race([
-                renderTask.promise,
-                new Promise((_3, reject2) => setTimeout(() => {
-                  renderTask.cancel();
-                  reject2(new Error("RENDER_HUNG"));
-                }, 1e4))
-              ]);
-              const results = await detector.detect(canvasR);
-              console.log(`[GromitOffscreen] Page ${i} (Surgical): Found ${results.length} text blocks.`);
-              const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
-              const end = performance.now();
-              console.log(`[GromitOffscreen] Page ${i} DONE (Fallback): ${(end - start2).toFixed(0)}ms`);
-              return text.trim() ? `--- PAGINA ${i} (OCR SURGICAL) ---
-${text}
-
-` : "";
-            }
+            console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
+            return "";
           } catch (err) {
             console.error(`[GromitOffscreen] Page ${i}: Extraction Error:`, err);
+            return "";
           }
-          console.log(`[GromitOffscreen] Page ${i}: No dominant image found or extraction failed. Returning empty.`);
-          return "";
         })(),
         new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 3e4))
       ]);
