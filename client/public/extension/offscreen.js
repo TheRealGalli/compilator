@@ -89854,24 +89854,33 @@ async function performNativeOCR(doc) {
   console.log(`[GromitOffscreen] Starting Fail-Fast OCR (5s/page) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
+      console.log(`[GromitOffscreen] Page ${i}: Starting extraction sequence...`);
       const pageTextSnippet = await Promise.race([
         (async () => {
           const start = performance.now();
+          console.log(`[GromitOffscreen] Page ${i}: Loading page object...`);
           const page = await doc.getPage(i);
           const viewport = page.getViewport({ scale: 1 });
+          console.log(`[GromitOffscreen] Page ${i}: Creating canvas (${viewport.width}x${viewport.height})...`);
           const canvas = document.createElement("canvas");
           const context = canvas.getContext("2d");
-          if (!context) return "";
+          if (!context) {
+            console.error(`[GromitOffscreen] Page ${i}: Failed to get 2D context`);
+            return "";
+          }
           canvas.height = viewport.height;
           canvas.width = viewport.width;
+          console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas...`);
           await page.render({
             canvasContext: context,
             viewport
           }).promise;
           const renderEnd = performance.now();
+          console.log(`[GromitOffscreen] Page ${i}: Render finished in ${(renderEnd - start).toFixed(0)}ms`);
+          console.log(`[GromitOffscreen] Page ${i}: Starting TextDetector.detect()...`);
           const results = await detector.detect(canvas);
           const detectEnd = performance.now();
-          console.log(`[GromitOffscreen] Page ${i} DONE: Render=${(renderEnd - start).toFixed(0)}ms, Detect=${(detectEnd - renderEnd).toFixed(0)}ms`);
+          console.log(`[GromitOffscreen] Page ${i}: Detection finished in ${(detectEnd - renderEnd).toFixed(0)}ms`);
           const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
           canvas.width = 0;
           canvas.height = 0;
