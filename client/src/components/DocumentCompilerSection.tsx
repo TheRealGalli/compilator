@@ -641,7 +641,7 @@ export function DocumentCompilerSection({
         try {
           // --- PHASE 1: SURGICAL EXTRACTION ---
           // Identify all PII findings from all texts to build a MASTER VAULT
-          console.log('[Gromit Frontend] STEP 1: Surgical Extraction starting (v5.3.6)...');
+          console.log('[Gromit Frontend] STEP 1: Surgical Extraction starting (v5.3.7)...');
 
           const vaultMap = new Map<string, string>(Object.entries(guardrailVault));
           const vaultCounts = new Map<string, number>();
@@ -1913,8 +1913,8 @@ export function DocumentCompilerSection({
             </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto px-6 py-2">
-            <ScrollArea className="max-h-[400px] mt-2 border rounded-xl overflow-hidden shadow-inner bg-slate-50/50">
+          <div className="flex-1 px-6 py-2">
+            <div className="max-h-[400px] overflow-y-auto mt-2 border rounded-xl shadow-inner bg-slate-50/50">
               <div className="p-0">
                 <table className="w-full text-sm border-collapse">
                   <thead className="bg-slate-100/80 backdrop-blur sticky top-0 z-10 border-b">
@@ -2018,7 +2018,7 @@ export function DocumentCompilerSection({
                   <Info className="w-3.5 h-3.5" />
                   Dettaglio Fonti Non Supportate dal Sistema Pawn
                 </div>
-                <ScrollArea className="max-h-[160px] pr-2">
+                <div className="max-h-[160px] overflow-y-auto pr-2">
                   <div className="grid grid-cols-1 gap-1">
                     {unsupportedSources.map((s, idx) => (
                       <div key={idx} className="flex flex-col gap-1 text-[10px] text-amber-700 bg-white/50 px-2 py-1.5 rounded border border-amber-100/50">
@@ -2044,7 +2044,7 @@ export function DocumentCompilerSection({
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
+                </div>
                 <p className="text-[9px] text-amber-600 leading-tight italic mt-1">
                   Queste fonti verranno inviate integralmente al server AI poiché il sistema Pawn locale non supporta l&apos;anonimizzazione di immagini, audio o documenti senza testo (scansioni).
                 </p>

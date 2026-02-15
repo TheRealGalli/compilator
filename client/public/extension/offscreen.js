@@ -89854,7 +89854,7 @@ ${pageText}
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Fail-Fast OCR (10s/page) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Fail-Fast OCR (30s/page) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Starting extraction sequence...`);
@@ -89875,11 +89875,14 @@ async function performNativeOCR(doc) {
           canvas.height = viewport.height;
           document.body.appendChild(canvas);
           console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas (0.5x scale)...`);
-          const renderTask = page.render({
+          const renderContext = {
             canvasContext: context,
             viewport
-          });
-          await renderTask.promise;
+          };
+          await Promise.race([
+            page.render(renderContext).promise,
+            new Promise((_3, reject2) => setTimeout(() => reject2(new Error("RENDER_HUNG")), 15e3))
+          ]);
           const renderEnd = performance.now();
           console.log(`[GromitOffscreen] Page ${i}: Render finished in ${(renderEnd - start).toFixed(0)}ms`);
           console.log(`[GromitOffscreen] Page ${i}: Starting TextDetector.detect()...`);
@@ -89897,7 +89900,7 @@ ${text}
 
 ` : "";
         })(),
-        new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 1e4))
+        new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 3e4))
       ]);
       fullOcrText += pageTextSnippet;
       await new Promise((r) => setTimeout(r, 50));

@@ -273,7 +273,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Fail-Fast OCR (10s/page) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Fail-Fast OCR (30s/page) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -303,12 +303,17 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                     document.body.appendChild(canvas);
 
                     console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas (0.5x scale)...`);
-                    const renderTask = page.render({
+                    const renderContext = {
                         canvasContext: context,
                         viewport: viewport,
-                    });
+                    } as any;
 
-                    await renderTask.promise;
+                    // INTERNAL RENDER GUARDIAN: Race the render promise against a 15s timeout
+                    await Promise.race([
+                        page.render(renderContext).promise,
+                        new Promise((_, reject) => setTimeout(() => reject(new Error("RENDER_HUNG")), 15000))
+                    ]);
+
                     const renderEnd = performance.now();
                     console.log(`[GromitOffscreen] Page ${i}: Render finished in ${(renderEnd - start).toFixed(0)}ms`);
 
@@ -331,7 +336,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
                     return text.trim() ? `--- PAGINA ${i} (OCR NATIVO) ---\n${text}\n\n` : "";
                 })(),
-                new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 10000))
+                new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 30000))
             ]);
 
             fullOcrText += pageTextSnippet;
