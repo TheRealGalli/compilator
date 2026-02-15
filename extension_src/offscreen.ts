@@ -399,7 +399,14 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                                 imageSource = img.bitmap;
                                             } else if (img.data) {
                                                 const rgbaData = convertToRGBA(img.data, img.width, img.height);
-                                                imageSource = new ImageData(rgbaData as any, img.width, img.height);
+                                                // Optimized compatibility: Draw to canvas first
+                                                const canvas = document.createElement('canvas');
+                                                canvas.width = img.width;
+                                                canvas.height = img.height;
+                                                const ctx = canvas.getContext('2d')!;
+                                                const imageData = new ImageData(rgbaData as any, img.width, img.height);
+                                                ctx.putImageData(imageData, 0, 0);
+                                                imageSource = canvas; // TextDetector often prefers Canvas/Bitmap over raw ImageData
                                             }
 
                                             if (imageSource) {
@@ -408,6 +415,8 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                                     const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
                                                     pageAccText += text + " ";
                                                     console.debug(`[GromitOffscreen] Page ${i}: Image ${id} extracted ${results.length} blocks.`);
+                                                } else {
+                                                    console.warn(`[GromitOffscreen] Page ${i}: Image ${id} - TextDetector returned 0 results.`);
                                                 }
                                             }
                                         }
@@ -454,7 +463,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
 /**
  * Direct Image OCR (PNG, JPG, weBP)
- * v5.7.0: Pure Zero-Manipulation. Pass Blob directly to detector.
+ * v5.7.1: Pure Zero-Manipulation. Pass Blob directly to detector.
  */
 async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
     try {

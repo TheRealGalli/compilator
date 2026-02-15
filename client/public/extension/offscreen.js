@@ -89943,7 +89943,13 @@ async function performNativeOCR(doc) {
                         imageSource = img.bitmap;
                       } else if (img.data) {
                         const rgbaData = convertToRGBA(img.data, img.width, img.height);
-                        imageSource = new ImageData(rgbaData, img.width, img.height);
+                        const canvas = document.createElement("canvas");
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext("2d");
+                        const imageData = new ImageData(rgbaData, img.width, img.height);
+                        ctx.putImageData(imageData, 0, 0);
+                        imageSource = canvas;
                       }
                       if (imageSource) {
                         const results = await detector.detect(imageSource);
@@ -89951,6 +89957,8 @@ async function performNativeOCR(doc) {
                           const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
                           pageAccText += text + " ";
                           console.debug(`[GromitOffscreen] Page ${i}: Image ${id} extracted ${results.length} blocks.`);
+                        } else {
+                          console.warn(`[GromitOffscreen] Page ${i}: Image ${id} - TextDetector returned 0 results.`);
                         }
                       }
                     }
