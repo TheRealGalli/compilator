@@ -89890,7 +89890,7 @@ async function extractPdfText(arrayBuffer) {
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.2) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.3) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Scanning for images (Deep Look)...`);
@@ -89938,19 +89938,24 @@ async function performNativeOCR(doc) {
                     const area = (img.width || 0) * (img.height || 0);
                     if (area > 4e4) {
                       console.log(`[GromitOffscreen] Page ${i}: Image ${id} at Y=${y.toFixed(0)} (${img.width}x${img.height}). Source: ${source}`);
-                      let imageSource = null;
+                      const canvas = document.createElement("canvas");
+                      canvas.width = img.width;
+                      canvas.height = img.height;
+                      const ctx = canvas.getContext("2d");
+                      ctx.fillStyle = "white";
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
                       if (img.bitmap) {
-                        imageSource = img.bitmap;
+                        ctx.drawImage(img.bitmap, 0, 0);
                       } else if (img.data) {
                         const rgbaData = convertToRGBA(img.data, img.width, img.height);
-                        const canvas = document.createElement("canvas");
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext("2d");
                         const imageData = new ImageData(rgbaData, img.width, img.height);
-                        ctx.putImageData(imageData, 0, 0);
-                        imageSource = canvas;
+                        const tempCanvas = document.createElement("canvas");
+                        tempCanvas.width = img.width;
+                        tempCanvas.height = img.height;
+                        tempCanvas.getContext("2d").putImageData(imageData, 0, 0);
+                        ctx.drawImage(tempCanvas, 0, 0);
                       }
+                      const imageSource = canvas;
                       if (imageSource) {
                         const results = await detector.detect(imageSource);
                         if (results.length > 0) {

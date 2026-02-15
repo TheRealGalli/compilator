@@ -322,13 +322,13 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 
 /**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.7.2: Zero-Render Policy. Relying only on direct image extraction.
+ * v5.7.3: Zero-Render Policy. Forced White Background for Contrast.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.2) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.3) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -394,20 +394,34 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                         if (area > 40000) {
                                             console.log(`[GromitOffscreen] Page ${i}: Image ${id} at Y=${y.toFixed(0)} (${img.width}x${img.height}). Source: ${source}`);
 
-                                            let imageSource: any = null;
+                                            // HIGH-CONTRAST NEUTRALIZATION (v5.7.3)
+                                            // Force white background to solve transparency/contrast issues in TextDetector
+                                            const canvas = document.createElement('canvas');
+                                            canvas.width = img.width;
+                                            canvas.height = img.height;
+                                            const ctx = canvas.getContext('2d')!;
+
+                                            // 1. Fill with Opaque White
+                                            ctx.fillStyle = 'white';
+                                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                                            // 2. Composite original image
                                             if (img.bitmap) {
-                                                imageSource = img.bitmap;
+                                                ctx.drawImage(img.bitmap, 0, 0);
                                             } else if (img.data) {
                                                 const rgbaData = convertToRGBA(img.data, img.width, img.height);
-                                                // Optimized compatibility: Draw to canvas first
-                                                const canvas = document.createElement('canvas');
-                                                canvas.width = img.width;
-                                                canvas.height = img.height;
-                                                const ctx = canvas.getContext('2d')!;
                                                 const imageData = new ImageData(rgbaData as any, img.width, img.height);
-                                                ctx.putImageData(imageData, 0, 0);
-                                                imageSource = canvas; // TextDetector often prefers Canvas/Bitmap over raw ImageData
+
+                                                // Create intermediate to handle potential transparency blending
+                                                const tempCanvas = document.createElement('canvas');
+                                                tempCanvas.width = img.width;
+                                                tempCanvas.height = img.height;
+                                                tempCanvas.getContext('2d')!.putImageData(imageData, 0, 0);
+
+                                                ctx.drawImage(tempCanvas, 0, 0);
                                             }
+
+                                            const imageSource = canvas; // Final High-Contrast Opaque Source
 
                                             if (imageSource) {
                                                 const results = await detector.detect(imageSource);
@@ -463,7 +477,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
 /**
  * Direct Image OCR (PNG, JPG, weBP)
- * v5.7.2: Pure Zero-Manipulation. Pass Blob directly to detector.
+ * v5.7.3: Pure Zero-Manipulation. Pass Blob directly to detector.
  */
 async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
     try {
