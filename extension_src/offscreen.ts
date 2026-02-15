@@ -322,13 +322,13 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 
 /**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.7.3: Zero-Render Policy. Forced White Background for Contrast.
+ * v5.7.6: "Deep Voyager" - Inline, 1-bit, Contrast & Inversion Fallback.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.3) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.6) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -494,7 +494,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
 /**
  * Direct Image OCR (PNG, JPG, weBP)
- * v5.7.5: Pure Zero-Manipulation. Pass Blob directly to detector.
+ * v5.7.6: Pure Zero-Manipulation. Pass Blob directly to detector.
  */
 async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
     try {

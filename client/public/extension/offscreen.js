@@ -89894,7 +89894,7 @@ async function extractPdfText(arrayBuffer) {
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.3) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Deep OCR (v5.7.6) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Scanning for images (Deep Look)...`);
