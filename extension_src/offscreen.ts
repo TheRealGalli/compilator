@@ -344,7 +344,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                         const ops = await page.getOperatorList();
 
                         // DEEP & ORDERED LOOK: Search in both standard and common objects, tracking Y position
-                        const imageIds: { id: string, y: number, source: 'objs' | 'common' }[] = [];
+                        const imageIds: { id?: string, data?: any, y: number, source: 'objs' | 'common' | 'inline' }[] = [];
                         let currentCTM = [1, 0, 0, 1, 0, 0]; // [a, b, c, d, e, f] -> f is Y translate
                         const transformStack: any[] = [];
 
