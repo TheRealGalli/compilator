@@ -89763,6 +89763,39 @@ function base64ToArrayBuffer(base64) {
 function cleanText2(text) {
   return text.replace(/\r\n/g, "\n").replace(/\u00A0/g, " ").replace(/[ \t]+/g, " ").replace(/\n\s+\n/g, "\n\n").replace(/\n{3,}/g, "\n\n").trim();
 }
+function convertToRGBA(data, width, height) {
+  const totalPixels = width * height;
+  const rgba = new Uint8ClampedArray(totalPixels * 4);
+  if (data.length === totalPixels * 4) {
+    return data instanceof Uint8ClampedArray ? data : new Uint8ClampedArray(data);
+  }
+  if (data.length === totalPixels * 3) {
+    console.log(`[GromitOffscreen] Converting RGB (${width}x${height}) to RGBA...`);
+    for (let i = 0; i < totalPixels; i++) {
+      rgba[i * 4] = data[i * 3];
+      rgba[i * 4 + 1] = data[i * 3 + 1];
+      rgba[i * 4 + 2] = data[i * 3 + 2];
+      rgba[i * 4 + 3] = 255;
+    }
+    return rgba;
+  }
+  if (data.length === totalPixels) {
+    console.log(`[GromitOffscreen] Converting Grayscale (${width}x${height}) to RGBA...`);
+    for (let i = 0; i < totalPixels; i++) {
+      const val = data[i];
+      rgba[i * 4] = val;
+      rgba[i * 4 + 1] = val;
+      rgba[i * 4 + 2] = val;
+      rgba[i * 4 + 3] = 255;
+    }
+    return rgba;
+  }
+  console.warn(`[GromitOffscreen] Unknown image format (length: ${data.length}, pixels: ${totalPixels}). Attempting raw copy.`);
+  for (let i = 0; i < Math.min(data.length, rgba.length); i++) {
+    rgba[i] = data[i];
+  }
+  return rgba;
+}
 async function extractPdfText(arrayBuffer) {
   let formHeader = "";
   try {
@@ -89853,7 +89886,7 @@ async function extractPdfText(arrayBuffer) {
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.6) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.7) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Scanning for Smart Extraction...`);
@@ -89889,18 +89922,12 @@ async function performNativeOCR(doc) {
               }
             }
             if (bestImage && maxArea > 1e3) {
-              console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Processing...`);
-              let imageSource = null;
-              if (bestImage.data && bestImage.data instanceof Uint8ClampedArray) {
-                imageSource = new ImageData(bestImage.data, bestImage.width, bestImage.height);
-              } else if (bestImage.bitmap) {
-                imageSource = bestImage.bitmap;
-              } else if (bestImage.bitmapData) {
-                imageSource = bestImage.bitmapData;
-              }
-              if (imageSource) {
+              console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Converting to RGBA...`);
+              try {
+                const rgbaData = convertToRGBA(bestImage.data, bestImage.width, bestImage.height);
+                const imageSource = new ImageData(rgbaData, bestImage.width, bestImage.height);
                 const imageBitmap = await createImageBitmap(imageSource);
-                const MAX_DIM = 1600;
+                const MAX_DIM = 2500;
                 let targetWidth = bestImage.width;
                 let targetHeight = bestImage.height;
                 if (targetWidth > MAX_DIM) {
@@ -89914,18 +89941,8 @@ async function performNativeOCR(doc) {
                   ctx.fillStyle = "#ffffff";
                   ctx.fillRect(0, 0, targetWidth, targetHeight);
                   ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
-                  const sample2 = ctx.getImageData(0, 0, 10, 10).data;
-                  console.log(`[GromitOffscreen] Page ${i} Canvas Pixel Sample (Top-Left):`, Array.from(sample2.slice(0, 12)));
-                  console.log(`[GromitOffscreen] Page ${i}: Detecting from Canvas...`);
-                  let results = await detector.detect(canvas);
-                  if (results.length === 0) {
-                    console.warn(`[GromitOffscreen] Page ${i}: Canvas detection failed. Trying direct Bitmap detection...`);
-                    const resultsB = await detector.detect(imageBitmap);
-                    if (resultsB.length > 0) {
-                      console.log(`[GromitOffscreen] Page ${i}: Bitmap detection SUCCESS! Using bitmap results.`);
-                      results = resultsB;
-                    }
-                  }
+                  console.log(`[GromitOffscreen] Page ${i}: Detecting text...`);
+                  const results = await detector.detect(canvas);
                   console.log(`[GromitOffscreen] Page ${i} (Smart): Found ${results.length} text blocks.`);
                   if (results.length > 0) {
                     console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 40)}..."`);
@@ -89934,15 +89951,17 @@ async function performNativeOCR(doc) {
                     console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
                     return text + " ";
                   }
-                  console.warn(`[GromitOffscreen] Page ${i}: Largest image yielded zero text. (Zero-Render Policy)`);
                 }
+              } catch (err) {
+                console.error(`[GromitOffscreen] Page ${i}: Extraction Error during image processing:`, err);
               }
             }
+            console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
+            return "";
           } catch (err) {
-            console.error(`[GromitOffscreen] Page ${i}: Extraction Error during image processing:`, err);
+            console.error(`[GromitOffscreen] Page ${i}: Fatal Extraction Error:`, err);
+            return "";
           }
-          console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
-          return "";
         })(),
         new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 3e4))
       ]);

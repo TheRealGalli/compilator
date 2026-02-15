@@ -148,6 +148,52 @@ function cleanText(text: string): string {
         .trim();
 }
 
+/**
+ * Robust OCR Helper (v5.5.7): Guarantees RGBA data for TextDetector.
+ * PDF.js images are often RGB (3) or Gray (1), but ImageData needs RGBA (4).
+ */
+function convertToRGBA(data: Uint8ClampedArray | Uint8Array, width: number, height: number): Uint8ClampedArray {
+    const totalPixels = width * height;
+    const rgba = new Uint8ClampedArray(totalPixels * 4);
+
+    // CASE 1: Already RGBA (4 channels)
+    if (data.length === totalPixels * 4) {
+        return data instanceof Uint8ClampedArray ? data : new Uint8ClampedArray(data);
+    }
+
+    // CASE 2: RGB (3 channels)
+    if (data.length === totalPixels * 3) {
+        console.log(`[GromitOffscreen] Converting RGB (${width}x${height}) to RGBA...`);
+        for (let i = 0; i < totalPixels; i++) {
+            rgba[i * 4] = data[i * 3];     // R
+            rgba[i * 4 + 1] = data[i * 3 + 1]; // G
+            rgba[i * 4 + 2] = data[i * 3 + 2]; // B
+            rgba[i * 4 + 3] = 255;             // A
+        }
+        return rgba;
+    }
+
+    // CASE 3: Grayscale (1 channel)
+    if (data.length === totalPixels) {
+        console.log(`[GromitOffscreen] Converting Grayscale (${width}x${height}) to RGBA...`);
+        for (let i = 0; i < totalPixels; i++) {
+            const val = data[i];
+            rgba[i * 4] = val; // R
+            rgba[i * 4 + 1] = val; // G
+            rgba[i * 4 + 2] = val; // B
+            rgba[i * 4 + 3] = 255; // A
+        }
+        return rgba;
+    }
+
+    console.warn(`[GromitOffscreen] Unknown image format (length: ${data.length}, pixels: ${totalPixels}). Attempting raw copy.`);
+    // Fallback: Just copy what we can
+    for (let i = 0; i < Math.min(data.length, rgba.length); i++) {
+        rgba[i] = data[i];
+    }
+    return rgba;
+}
+
 // --- EXTRACTORS ---
 
 async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
@@ -276,7 +322,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.6) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.7) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -319,20 +365,14 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                         }
 
                         if (bestImage && maxArea > 1000) {
-                            console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Processing...`);
+                            console.log(`[GromitOffscreen] Page ${i}: Largest image found (${bestImage.width}x${bestImage.height}). Converting to RGBA...`);
 
-                            let imageSource: any = null;
-                            if (bestImage.data && bestImage.data instanceof Uint8ClampedArray) {
-                                imageSource = new ImageData(bestImage.data, bestImage.width, bestImage.height);
-                            } else if (bestImage.bitmap) {
-                                imageSource = bestImage.bitmap;
-                            } else if (bestImage.bitmapData) {
-                                imageSource = bestImage.bitmapData;
-                            }
-
-                            if (imageSource) {
+                            try {
+                                const rgbaData = convertToRGBA(bestImage.data, bestImage.width, bestImage.height);
+                                const imageSource = new ImageData(rgbaData, bestImage.width, bestImage.height);
                                 const imageBitmap = await createImageBitmap(imageSource);
-                                const MAX_DIM = 1600;
+
+                                const MAX_DIM = 2500;
                                 let targetWidth = bestImage.width;
                                 let targetHeight = bestImage.height;
 
@@ -349,23 +389,9 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                     ctx.fillRect(0, 0, targetWidth, targetHeight);
                                     ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
 
-                                    // DEBUG: Log canvas health
-                                    const sample = ctx.getImageData(0, 0, 10, 10).data;
-                                    console.log(`[GromitOffscreen] Page ${i} Canvas Pixel Sample (Top-Left):`, Array.from(sample.slice(0, 12)));
-
-                                    // Detection 1: From Canvas (Standard)
-                                    console.log(`[GromitOffscreen] Page ${i}: Detecting from Canvas...`);
-                                    let results = await detector.detect(canvas);
-
-                                    // Detection 2: Direct from Bitmap (Safety check)
-                                    if (results.length === 0) {
-                                        console.warn(`[GromitOffscreen] Page ${i}: Canvas detection failed. Trying direct Bitmap detection...`);
-                                        const resultsB = await detector.detect(imageBitmap);
-                                        if (resultsB.length > 0) {
-                                            console.log(`[GromitOffscreen] Page ${i}: Bitmap detection SUCCESS! Using bitmap results.`);
-                                            results = resultsB;
-                                        }
-                                    }
+                                    // Detection (v5.5.7): Standard Canvas Detection with valid RGBA
+                                    console.log(`[GromitOffscreen] Page ${i}: Detecting text...`);
+                                    const results = await detector.detect(canvas);
 
                                     console.log(`[GromitOffscreen] Page ${i} (Smart): Found ${results.length} text blocks.`);
 
@@ -374,20 +400,20 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                         const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
                                         const end = performance.now();
                                         console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
-                                        // RETURN: Raw text only (Single-Line Policy)
                                         return text + " ";
                                     }
-                                    console.warn(`[GromitOffscreen] Page ${i}: Largest image yielded zero text. (Zero-Render Policy)`);
                                 }
+                            } catch (err) {
+                                console.error(`[GromitOffscreen] Page ${i}: Extraction Error during image processing:`, err);
                             }
                         }
-                    } catch (err) {
-                        console.error(`[GromitOffscreen] Page ${i}: Extraction Error during image processing:`, err);
-                    }
 
-                    // v5.5.6: Zero-Render Policy. No headers.
-                    console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
-                    return "";
+                        console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
+                        return "";
+                    } catch (err) {
+                        console.error(`[GromitOffscreen] Page ${i}: Fatal Extraction Error:`, err);
+                        return "";
+                    }
                 })(),
                 new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 30000))
             ]);
@@ -397,7 +423,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
 
         } catch (err) {
             fullOcrText += `[[PAGE_RENDER_FAILED]] `;
-            continue; // RESILIENT: Don't kill the whole document for one page
+            continue;
         }
     }
 

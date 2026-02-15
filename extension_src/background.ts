@@ -1,9 +1,9 @@
 /// <reference types="chrome"/>
 
-// Gromit Bridge Background Script v5.5.6 (OCR Debug & Single-Line)
+// Gromit Bridge Background Script v5.5.7 (Reliable OCR & Single-Line)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = '5.5.6';
+const BRIDGE_VERSION = '5.5.7';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state
