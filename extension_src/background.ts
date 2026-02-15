@@ -1,9 +1,9 @@
 /// <reference types="chrome"/>
 
-// Gromit Bridge Background Script v5.3.4 (10s OCR Timeout)
+// Gromit Bridge Background Script v5.3.5 (ESM Worker & Canvas Revert)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = '5.3.4';
+const BRIDGE_VERSION = '5.3.5';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state

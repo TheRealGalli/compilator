@@ -89864,19 +89864,23 @@ async function performNativeOCR(doc) {
           console.log(`[GromitOffscreen] Page ${i}: Loading page object...`);
           const page = await doc.getPage(i);
           const viewport = page.getViewport({ scale: 1 });
-          console.log(`[GromitOffscreen] Page ${i}: Creating OffscreenCanvas (${viewport.width}x${viewport.height})...`);
-          const canvas = new OffscreenCanvas(viewport.width, viewport.height);
+          console.log(`[GromitOffscreen] Page ${i}: Creating HTMLCanvasElement (${viewport.width}x${viewport.height})...`);
+          const canvas = document.createElement("canvas");
           const context = canvas.getContext("2d");
           if (!context) {
             console.error(`[GromitOffscreen] Page ${i}: Failed to get 2D context`);
             return "";
           }
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
           console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas...`);
-          await page.render({
+          const renderTask = page.render({
             canvasContext: context,
-            // OffscreenCanvas follows same context API
-            viewport
-          }).promise;
+            viewport,
+            enableWebGL: false
+            // Disable WebGL for stability in offscreen
+          });
+          await renderTask.promise;
           const renderEnd = performance.now();
           console.log(`[GromitOffscreen] Page ${i}: Render finished in ${(renderEnd - start).toFixed(0)}ms`);
           console.log(`[GromitOffscreen] Page ${i}: Starting TextDetector.detect()...`);

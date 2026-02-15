@@ -288,19 +288,25 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                     const page = await doc.getPage(i);
                     const viewport = page.getViewport({ scale: 1.0 });
 
-                    console.log(`[GromitOffscreen] Page ${i}: Creating OffscreenCanvas (${viewport.width}x${viewport.height})...`);
-                    const canvas = new OffscreenCanvas(viewport.width, viewport.height);
+                    console.log(`[GromitOffscreen] Page ${i}: Creating HTMLCanvasElement (${viewport.width}x${viewport.height})...`);
+                    const canvas = document.createElement('canvas');
                     const context = canvas.getContext('2d');
                     if (!context) {
                         console.error(`[GromitOffscreen] Page ${i}: Failed to get 2D context`);
                         return "";
                     }
 
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+
                     console.log(`[GromitOffscreen] Page ${i}: Rendering to canvas...`);
-                    await page.render({
-                        canvasContext: context as any, // OffscreenCanvas follows same context API
-                        viewport: viewport
-                    }).promise;
+                    const renderTask = page.render({
+                        canvasContext: context,
+                        viewport: viewport,
+                        enableWebGL: false, // Disable WebGL for stability in offscreen
+                    });
+
+                    await renderTask.promise;
                     const renderEnd = performance.now();
                     console.log(`[GromitOffscreen] Page ${i}: Render finished in ${(renderEnd - start).toFixed(0)}ms`);
 

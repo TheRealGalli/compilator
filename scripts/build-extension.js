@@ -44,8 +44,7 @@ async function build() {
         entryPoints: {
             'pdf.worker': 'node_modules/pdfjs-dist/build/pdf.worker.mjs'
         },
-        format: 'iife',
-        // Ensure global name doesn't conflict
+        format: 'esm', // Use ESM for the worker
     });
 
 
