@@ -227,7 +227,7 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 
             // Only add to bodyText if there is actual content
             if (pageText.trim().length > 10) {
-                bodyText += `--- PAGINA ${i} ---\n${pageText}\n\n`;
+                bodyText += pageText + " ";
             }
         }
     } catch (err) {
@@ -276,7 +276,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
     const detector = new (window as any).TextDetector();
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.5) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.6) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -349,7 +349,24 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                     ctx.fillRect(0, 0, targetWidth, targetHeight);
                                     ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
 
-                                    const results = await detector.detect(canvas);
+                                    // DEBUG: Log canvas health
+                                    const sample = ctx.getImageData(0, 0, 10, 10).data;
+                                    console.log(`[GromitOffscreen] Page ${i} Canvas Pixel Sample (Top-Left):`, Array.from(sample.slice(0, 12)));
+
+                                    // Detection 1: From Canvas (Standard)
+                                    console.log(`[GromitOffscreen] Page ${i}: Detecting from Canvas...`);
+                                    let results = await detector.detect(canvas);
+
+                                    // Detection 2: Direct from Bitmap (Safety check)
+                                    if (results.length === 0) {
+                                        console.warn(`[GromitOffscreen] Page ${i}: Canvas detection failed. Trying direct Bitmap detection...`);
+                                        const resultsB = await detector.detect(imageBitmap);
+                                        if (resultsB.length > 0) {
+                                            console.log(`[GromitOffscreen] Page ${i}: Bitmap detection SUCCESS! Using bitmap results.`);
+                                            results = resultsB;
+                                        }
+                                    }
+
                                     console.log(`[GromitOffscreen] Page ${i} (Smart): Found ${results.length} text blocks.`);
 
                                     if (results.length > 0) {
@@ -357,20 +374,20 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                                         const text = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
                                         const end = performance.now();
                                         console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
-                                        return `--- PAGINA ${i} (OCR SMART) ---\n${text}\n\n`;
+                                        // RETURN: Raw text only (Single-Line Policy)
+                                        return text + " ";
                                     }
                                     console.warn(`[GromitOffscreen] Page ${i}: Largest image yielded zero text. (Zero-Render Policy)`);
                                 }
                             }
                         }
-
-                        // v5.5.5: Zero-Render Policy. No fallback to page.render() to prevent hangs.
-                        console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
-                        return "";
                     } catch (err) {
-                        console.error(`[GromitOffscreen] Page ${i}: Extraction Error:`, err);
-                        return "";
+                        console.error(`[GromitOffscreen] Page ${i}: Extraction Error during image processing:`, err);
                     }
+
+                    // v5.5.6: Zero-Render Policy. No headers.
+                    console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
+                    return "";
                 })(),
                 new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 30000))
             ]);
@@ -379,7 +396,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
             await new Promise(r => setTimeout(r, 50));
 
         } catch (err) {
-            fullOcrText += `--- PAGINA ${i} (ERRORE ESTRAZIONE) ---\n[[PAGE_RENDER_FAILED]]\n\n`;
+            fullOcrText += `[[PAGE_RENDER_FAILED]] `;
             continue; // RESILIENT: Don't kill the whole document for one page
         }
     }
@@ -426,7 +443,7 @@ async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
             .filter((v: string) => v.trim().length > 0)
             .join(' ');
 
-        return text.trim() ? `--- IMMAGINE (OCR) ---\n${text}\n\n` : "[[GROMIT_SCAN_DETECTED]]";
+        return text.trim() ? text : "[[GROMIT_SCAN_DETECTED]]";
     } catch (err) {
         console.error("[GromitOffscreen] Direct Image OCR failed:", err);
         return "[[GROMIT_SCAN_DETECTED]]";

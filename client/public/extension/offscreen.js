@@ -89820,10 +89820,7 @@ async function extractPdfText(arrayBuffer) {
       const content = await page.getTextContent();
       const pageText = content.items.map((item) => item.str).join(" ");
       if (pageText.trim().length > 10) {
-        bodyText += `--- PAGINA ${i} ---
-${pageText}
-
-`;
+        bodyText += pageText + " ";
       }
     }
   } catch (err) {
@@ -89856,7 +89853,7 @@ ${pageText}
 async function performNativeOCR(doc) {
   const detector = new window.TextDetector();
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.5) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Multimodal OCR (v5.5.6) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Scanning for Smart Extraction...`);
@@ -89917,38 +89914,42 @@ async function performNativeOCR(doc) {
                   ctx.fillStyle = "#ffffff";
                   ctx.fillRect(0, 0, targetWidth, targetHeight);
                   ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
-                  const results = await detector.detect(canvas);
+                  const sample2 = ctx.getImageData(0, 0, 10, 10).data;
+                  console.log(`[GromitOffscreen] Page ${i} Canvas Pixel Sample (Top-Left):`, Array.from(sample2.slice(0, 12)));
+                  console.log(`[GromitOffscreen] Page ${i}: Detecting from Canvas...`);
+                  let results = await detector.detect(canvas);
+                  if (results.length === 0) {
+                    console.warn(`[GromitOffscreen] Page ${i}: Canvas detection failed. Trying direct Bitmap detection...`);
+                    const resultsB = await detector.detect(imageBitmap);
+                    if (resultsB.length > 0) {
+                      console.log(`[GromitOffscreen] Page ${i}: Bitmap detection SUCCESS! Using bitmap results.`);
+                      results = resultsB;
+                    }
+                  }
                   console.log(`[GromitOffscreen] Page ${i} (Smart): Found ${results.length} text blocks.`);
                   if (results.length > 0) {
                     console.debug(`[GromitOffscreen] Page ${i} Sample: "${results[0].rawValue.substring(0, 40)}..."`);
                     const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
                     const end = performance.now();
                     console.log(`[GromitOffscreen] Page ${i} DONE (Smart): ${(end - start).toFixed(0)}ms`);
-                    return `--- PAGINA ${i} (OCR SMART) ---
-${text}
-
-`;
+                    return text + " ";
                   }
                   console.warn(`[GromitOffscreen] Page ${i}: Largest image yielded zero text. (Zero-Render Policy)`);
                 }
               }
             }
-            console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
-            return "";
           } catch (err) {
-            console.error(`[GromitOffscreen] Page ${i}: Extraction Error:`, err);
-            return "";
+            console.error(`[GromitOffscreen] Page ${i}: Extraction Error during image processing:`, err);
           }
+          console.log(`[GromitOffscreen] Page ${i}: No text found via direct extraction. Returning empty.`);
+          return "";
         })(),
         new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 3e4))
       ]);
       fullOcrText += pageTextSnippet;
       await new Promise((r) => setTimeout(r, 50));
     } catch (err) {
-      fullOcrText += `--- PAGINA ${i} (ERRORE ESTRAZIONE) ---
-[[PAGE_RENDER_FAILED]]
-
-`;
+      fullOcrText += `[[PAGE_RENDER_FAILED]] `;
       continue;
     }
   }
@@ -89977,10 +89978,7 @@ async function extractImageText(arrayBuffer) {
     const results = await detector.detect(canvas);
     console.log(`[GromitOffscreen] Direct Image: Found ${results.length} text blocks.`);
     const text = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
-    return text.trim() ? `--- IMMAGINE (OCR) ---
-${text}
-
-` : "[[GROMIT_SCAN_DETECTED]]";
+    return text.trim() ? text : "[[GROMIT_SCAN_DETECTED]]";
   } catch (err) {
     console.error("[GromitOffscreen] Direct Image OCR failed:", err);
     return "[[GROMIT_SCAN_DETECTED]]";
