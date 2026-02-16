@@ -89763,47 +89763,6 @@ function base64ToArrayBuffer(base64) {
 function cleanText2(text) {
   return text.replace(/\r\n/g, "\n").replace(/\u00A0/g, " ").replace(/[ \t]+/g, " ").replace(/\n\s+\n/g, "\n\n").replace(/\n{3,}/g, "\n\n").trim();
 }
-function convertToRGBA(data, width, height) {
-  const totalPixels = width * height;
-  const rgba = new Uint8ClampedArray(totalPixels * 4);
-  if (!data || data.length === 0) return rgba;
-  if (data.length === totalPixels * 4) {
-    return data instanceof Uint8ClampedArray ? data : new Uint8ClampedArray(data);
-  }
-  if (data.length === totalPixels * 3) {
-    for (let i = 0; i < totalPixels; i++) {
-      rgba[i * 4] = data[i * 3];
-      rgba[i * 4 + 1] = data[i * 3 + 1];
-      rgba[i * 4 + 2] = data[i * 3 + 2];
-      rgba[i * 4 + 3] = 255;
-    }
-    return rgba;
-  }
-  if (data.length === totalPixels) {
-    for (let i = 0; i < totalPixels; i++) {
-      rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = data[i];
-      rgba[i * 4 + 3] = 255;
-    }
-    return rgba;
-  }
-  if (data.length >= Math.floor(totalPixels / 8) && data.length < totalPixels) {
-    console.log(`[GromitOffscreen] Decompressing 1-bit mask (${width}x${height}). Bytes: ${data.length}...`);
-    for (let i = 0; i < totalPixels; i++) {
-      const byte = data[Math.floor(i / 8)];
-      const bit = 7 - i % 8;
-      const val = byte >> bit & 1 ? 0 : 255;
-      rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = val;
-      rgba[i * 4 + 3] = 255;
-    }
-    return rgba;
-  }
-  console.warn(`[GromitOffscreen] Unknown image format (length: ${data.length}, pixels: ${totalPixels}, ratio: ${(data.length / totalPixels).toFixed(2)}).`);
-  for (let i = 0; i < Math.min(data.length, totalPixels); i++) {
-    rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = data[i];
-    rgba[i * 4 + 3] = 255;
-  }
-  return rgba;
-}
 async function extractPdfText(arrayBuffer) {
   let formHeader = "";
   try {
@@ -90106,109 +90065,51 @@ async function detectTextWithTiling(canvas) {
 }
 async function performNativeOCR(doc) {
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.5) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Preview-Style OCR (v5.8.6) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
-      console.log(`[GromitOffscreen] Page ${i}: Looking for "The Photo" in all levels...`);
+      console.log(`[GromitOffscreen] Page ${i}: Rendering full page snapshot (300 DPI)...`);
       const pageTextSnippet = await Promise.race([
         (async () => {
           const page = await doc.getPage(i);
           const start = performance.now();
-          let pageAccText = "";
-          try {
-            const ops = await page.getOperatorList();
-            const imageIds = [];
-            let currentCTM = [1, 0, 0, 1, 0, 0];
-            const scanOperators = (fnArray, argsArray, ctm) => {
-              for (let j = 0; j < fnArray.length; j++) {
-                const fn = fnArray[j];
-                const args = argsArray[j];
-                if (fn === __webpack_exports__OPS.transform) {
-                  ctm = args;
-                } else if (fn === __webpack_exports__OPS.paintImageXObject || fn === __webpack_exports__OPS.paintJpegXObject || fn === __webpack_exports__OPS.paintImageMaskXObject) {
-                  imageIds.push({ id: args[0], y: ctm[5], source: "objs" });
-                } else if (fn === __webpack_exports__OPS.paintInlineImageXObject) {
-                  imageIds.push({ data: args[0], y: ctm[5], source: "inline" });
-                } else if (fn === __webpack_exports__OPS.paintFormXObject) {
-                  imageIds.push({ id: args[0], y: ctm[5], source: "objs" });
-                }
-              }
-            };
-            scanOperators(ops.fnArray, ops.argsArray, currentCTM);
-            if (imageIds.length > 0) {
-              console.log(`[GromitOffscreen] Page ${i}: Found ${imageIds.length} candidate levels. Searching...`);
-              imageIds.sort((a, b) => b.y - a.y);
-              for (const item of imageIds) {
-                try {
-                  let img = item.data;
-                  if (!img && item.id) {
-                    img = await new Promise((resolve) => {
-                      page.objs.get(item.id, (obj2) => {
-                        if (obj2) resolve(obj2);
-                        else page.commonObjs.get(item.id, resolve);
-                      });
-                    });
-                  }
-                  if (img) {
-                    const area = (img.width || 0) * (img.height || 0);
-                    if (area > 2e4 || !img.width && img.fnArray) {
-                      console.log(`[GromitOffscreen] Page ${i}: Processing ${item.id || "inline"} (${img.width || "Form"}x${img.height || ""})`);
-                      const canvas = document.createElement("canvas");
-                      const width = img.width || 1e3;
-                      const height = img.height || 1e3;
-                      canvas.width = width;
-                      canvas.height = height;
-                      const ctx = canvas.getContext("2d");
-                      ctx.fillStyle = "white";
-                      ctx.fillRect(0, 0, width, height);
-                      if (img.bitmap) {
-                        ctx.drawImage(img.bitmap, 0, 0);
-                      } else if (img.data) {
-                        const rgbaData = convertToRGBA(img.data, img.width, img.height);
-                        const imageData = new ImageData(rgbaData, img.width, img.height);
-                        const tempCanvas = document.createElement("canvas");
-                        tempCanvas.width = img.width;
-                        tempCanvas.height = img.height;
-                        tempCanvas.getContext("2d").putImageData(imageData, 0, 0);
-                        ctx.drawImage(tempCanvas, 0, 0);
-                      }
-                      let text = await detectTextWithTiling(canvas);
-                      if (!text.trim()) {
-                        ctx.globalCompositeOperation = "difference";
-                        ctx.fillStyle = "white";
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.globalCompositeOperation = "source-over";
-                        text = await detectTextWithTiling(canvas);
-                      }
-                      if (text.trim()) {
-                        pageAccText += text + " ";
-                        console.debug(`[GromitOffscreen] Page ${i}: Extracted text from level.`);
-                      }
-                    }
-                  }
-                } catch (e) {
-                  console.debug(`[GromitOffscreen] Page ${i}: Resource error for ${item.id || "inline"} from ${item.source}:`, e);
-                }
-              }
-            }
-            if (pageAccText.trim().length > 0) {
-              const end = performance.now();
-              console.log(`[GromitOffscreen] Page ${i} SUCCESS in ${(end - start).toFixed(0)}ms`);
-              return pageAccText;
-            }
-            console.log(`[GromitOffscreen] Page ${i}: No text found in any level.`);
-            return "";
-          } catch (err) {
-            console.error(`[GromitOffscreen] Page ${i} Fatal:`, err);
+          const viewport = page.getViewport({ scale: 2.5 });
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          ctx.fillStyle = "white";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          const renderContext = {
+            canvasContext: ctx,
+            viewport,
+            enableWebGL: false
+          };
+          await page.render(renderContext).promise;
+          console.log(`[GromitOffscreen] Page ${i}: Rendered at ${canvas.width}x${canvas.height}. Starting Multi-Pass OCR...`);
+          let text = await detectTextWithTiling(canvas);
+          if (!text.trim()) {
+            console.log(`[GromitOffscreen] Page ${i}: No text found on normal render. Trying Inversion...`);
+            ctx.globalCompositeOperation = "difference";
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalCompositeOperation = "source-over";
+            text = await detectTextWithTiling(canvas);
+          }
+          const end = performance.now();
+          if (text.trim()) {
+            console.log(`[GromitOffscreen] Page ${i} SUCCESS in ${(end - start).toFixed(0)}ms (${text.length} chars)`);
+            return text + " ";
+          } else {
+            console.log(`[GromitOffscreen] Page ${i}: No text found after full rendering.`);
             return "";
           }
         })(),
-        new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 45e3))
-        // Slight extension for deep look
+        new Promise((_3, reject2) => setTimeout(() => reject2(new Error("OCR_PAGE_TIMEOUT")), 6e4))
       ]);
       fullOcrText += pageTextSnippet;
     } catch (err) {
-      console.error(`[GromitOffscreen] Page ${i} skipped due to timeout or error:`, err);
+      console.error(`[GromitOffscreen] Page ${i} skipped:`, err);
       fullOcrText += " ";
       continue;
     }
