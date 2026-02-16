@@ -3,7 +3,7 @@
 // Gromit Bridge Background Script v5.8.6 (Shield & Opt)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = "v5.8.10";
+const BRIDGE_VERSION = "v5.8.11";
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state
@@ -149,6 +149,27 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
                 });
             });
 
+        return true;
+    }
+
+    if (request.type === 'NATIVE_OCR') {
+        const { fileBase64, fileName } = request;
+        console.log(`[GromitBridge] 🚀 Calling Swift Native OCR for ${fileName}...`);
+
+        chrome.runtime.sendNativeMessage(
+            'com.gromit.ocr',
+            { base64: fileBase64, fileName: fileName },
+            (response) => {
+                if (chrome.runtime.lastError) {
+                    const errMsg = chrome.runtime.lastError.message;
+                    console.error('[GromitBridge] Native Message Error:', errMsg);
+                    sendResponse({ success: false, error: errMsg });
+                } else {
+                    console.log(`[GromitBridge] Native OCR Success (${response.text?.length || 0} chars)`);
+                    sendResponse(response);
+                }
+            }
+        );
         return true;
     }
 

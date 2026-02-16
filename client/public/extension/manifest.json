@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Gromit Bridge",
-    "version": "5.8.10",
+    "version": "5.8.11",
     "description": "Collega Gromit all'AI locale (Ollama) con supporto di Sanctuary locale per l'estrazione.",
     "icons": {
         "128": "icon.png"
@@ -13,7 +13,8 @@
     "permissions": [
         "declarativeNetRequest",
         "declarativeNetRequestFeedback",
-        "offscreen"
+        "offscreen",
+        "nativeMessaging"
     ],
     "content_security_policy": {
         "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.google-analytics.com;"

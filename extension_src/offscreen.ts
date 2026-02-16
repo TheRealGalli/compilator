@@ -32,10 +32,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 let text = "";
 
                 if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
-                    text = await extractPdfText(arrayBuffer);
+                    text = await extractPdfText(arrayBuffer, fileName, fileBase64);
                 } else if (fileType.startsWith('image/') || fileName.match(/\.(png|jpe?g|webp|bmp)$/i)) {
-                    // NEW (v5.5.1): Direct OCR for images
-                    text = await extractImageText(arrayBuffer);
+                    // NEW (v5.8.11): Swift Native OCR for high-quality images
+                    text = await extractImageText(arrayBuffer, fileName, fileBase64);
                 } else if (
                     fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
                     fileName.endsWith('.docx')
@@ -202,7 +202,7 @@ function convertToRGBA(data: Uint8ClampedArray | Uint8Array, width: number, heig
 
 // --- EXTRACTORS ---
 
-async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
+async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBase64: string): Promise<string> {
     // 1. AcroForm Extraction (Form-First Strategy)
     let formHeader = "";
     try {
@@ -287,11 +287,28 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
         console.error("[GromitOffscreen] pdf.js extraction failed:", err);
     }
 
-    // 3. OCR Detection (Native TextDetector)
+    // 3. OCR Detection (Native Bridge / Browser Fallback)
     // Check clean length. If < 50 chars, we assume it's a scan (or just empty).
     if (bodyText.replace(/\s/g, '').length < 50 && doc.numPages > 0) {
-        console.log("[GromitOffscreen] Testo insufficiente. Tentativo OCR Nativo (Shape Detection API)...");
+        console.log("[GromitOffscreen] Testo insufficiente. Tentativo OCR Nativo (Swift Bridge)...");
 
+        try {
+            const nativeResponse = await chrome.runtime.sendMessage({
+                type: 'NATIVE_OCR',
+                fileBase64: fileBase64,
+                fileName: fileName
+            });
+
+            if (nativeResponse && nativeResponse.success && nativeResponse.text?.trim()) {
+                console.log("[GromitOffscreen] Native OCR Success.");
+                bodyText = nativeResponse.text;
+                return (formHeader + bodyText).trim();
+            }
+        } catch (err) {
+            console.warn("[GromitOffscreen] Native bridge failure, falling back to browser TextDetector:", err);
+        }
+
+        // --- BROWSER FALLBACK (Original logic) ---
         // Check if TextDetector is available
         if (typeof (window as any).TextDetector !== 'undefined') {
             try {
@@ -448,8 +465,20 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
  * Direct Image OCR (PNG, JPG, weBP)
  * v5.8.1: "Ghost Hunter" - Using Tiling detector for large photos.
  */
-async function extractImageText(arrayBuffer: ArrayBuffer): Promise<string> {
+async function extractImageText(arrayBuffer: ArrayBuffer, fileName: string, fileBase64: string): Promise<string> {
     try {
+        console.log(`[GromitOffscreen] Image OCR: Starting Swift Native Bridge for ${fileName}...`);
+        const nativeResponse = await chrome.runtime.sendMessage({
+            type: 'NATIVE_OCR',
+            fileBase64: fileBase64,
+            fileName: fileName
+        });
+
+        if (nativeResponse && nativeResponse.success && nativeResponse.text?.trim()) {
+            return nativeResponse.text.trim();
+        }
+
+        // Fallback to browser (Ghost Hunter)
         const blob = new Blob([arrayBuffer]);
         const bitmap = await createImageBitmap(blob);
 

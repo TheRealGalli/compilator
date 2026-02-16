@@ -1,0 +1,9 @@
+{
+    "name": "com.gromit.ocr",
+    "description": "Gromit Bridge Native OCR Assistant",
+    "path": "/Users/carlogalli/Desktop/Gromit/Gromit DIE/native_src/GromitOCR",
+    "type": "stdio",
+    "allowed_origins": [
+        "chrome-extension://ADD_YOUR_EXTENSION_ID_HERE/"
+    ]
+}
