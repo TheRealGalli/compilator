@@ -148,58 +148,6 @@ function cleanText(text: string): string {
         .trim();
 }
 
-/**
- * Robust OCR Helper (v5.5.7): Guarantees RGBA data for TextDetector.
- * PDF.js images are often RGB (3) or Gray (1), but ImageData needs RGBA (4).
- */
-function convertToRGBA(data: Uint8ClampedArray | Uint8Array, width: number, height: number): Uint8ClampedArray {
-    const totalPixels = width * height;
-    const rgba = new Uint8ClampedArray(totalPixels * 4);
-
-    if (!data || data.length === 0) return rgba;
-
-    // CASE 1: RGBA (4 channels)
-    if (data.length === totalPixels * 4) {
-        return data instanceof Uint8ClampedArray ? data : new Uint8ClampedArray(data);
-    }
-
-    // CASE 2: RGB (3 channels)
-    if (data.length === totalPixels * 3) {
-        for (let i = 0; i < totalPixels; i++) {
-            rgba[i * 4] = data[i * 3]; rgba[i * 4 + 1] = data[i * 3 + 1]; rgba[i * 4 + 2] = data[i * 3 + 2]; rgba[i * 4 + 3] = 255;
-        }
-        return rgba;
-    }
-
-    // CASE 3: Grayscale (1 channel)
-    if (data.length === totalPixels) {
-        for (let i = 0; i < totalPixels; i++) {
-            rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = data[i]; rgba[i * 4 + 3] = 255;
-        }
-        return rgba;
-    }
-
-    // CASE 4: 1-bit (B&W / ImageMask) - 8 pixels per byte
-    if (data.length >= Math.floor(totalPixels / 8) && data.length < totalPixels) {
-        console.log(`[GromitOffscreen] Decompressing 1-bit mask (${width}x${height}). Bytes: ${data.length}...`);
-        for (let i = 0; i < totalPixels; i++) {
-            const byte = data[Math.floor(i / 8)];
-            const bit = 7 - (i % 8);
-            // In PDF ImageMasks: 1 is usually foreground (black), 0 is background (white)
-            const val = ((byte >> bit) & 1) ? 0 : 255;
-            rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = val; rgba[i * 4 + 3] = 255;
-        }
-        return rgba;
-    }
-
-    console.warn(`[GromitOffscreen] Unknown image format (length: ${data.length}, pixels: ${totalPixels}, ratio: ${(data.length / totalPixels).toFixed(2)}).`);
-    // Fallback: Gray copy
-    for (let i = 0; i < Math.min(data.length, totalPixels); i++) {
-        rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = data[i]; rgba[i * 4 + 3] = 255;
-    }
-    return rgba;
-}
-
 // --- EXTRACTORS ---
 
 async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBase64: string): Promise<string> {
@@ -287,10 +235,10 @@ async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBa
         console.error("[GromitOffscreen] pdf.js extraction failed:", err);
     }
 
-    // 3. OCR Detection (Native Bridge / Browser Fallback)
+    // 3. OCR Detection (EXCLUSIVELY Native Bridge v5.8.12)
     // Check clean length. If < 50 chars, we assume it's a scan (or just empty).
     if (bodyText.replace(/\s/g, '').length < 50 && doc.numPages > 0) {
-        console.log("[GromitOffscreen] Testo insufficiente. Tentativo OCR Nativo (Swift Bridge)...");
+        console.log("[GromitOffscreen] Testo insufficiente. Richiesta Swift Native OCR Bridge...");
 
         try {
             const nativeResponse = await chrome.runtime.sendMessage({
@@ -304,26 +252,12 @@ async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBa
                 bodyText = nativeResponse.text;
                 return (formHeader + bodyText).trim();
             }
-        } catch (err) {
-            console.warn("[GromitOffscreen] Native bridge failure, falling back to browser TextDetector:", err);
-        }
 
-        // --- BROWSER FALLBACK (Original logic) ---
-        // Check if TextDetector is available
-        if (typeof (window as any).TextDetector !== 'undefined') {
-            try {
-                const ocrResult = await performNativeOCR(doc);
-                if (ocrResult && ocrResult.trim().length > 10) {
-                    bodyText = ocrResult;
-                } else {
-                    bodyText = "[[GROMIT_SCAN_DETECTED]]";
-                }
-            } catch (err) {
-                console.debug("[GromitOffscreen] Native OCR silent fallback (Empty/Scan):", err);
-                bodyText = "[[GROMIT_SCAN_DETECTED]]";
-            }
-        } else {
-            console.log("[GromitOffscreen] TextDetector non disponibile. Usa fallback manuale.");
+            // If native fails or is empty, we don't have a fallback anymore
+            console.warn("[GromitOffscreen] Native OCR returned no results.");
+            bodyText = "[[GROMIT_SCAN_DETECTED]]";
+        } catch (err) {
+            console.error("[GromitOffscreen] Native bridge fatal failure:", err);
             bodyText = "[[GROMIT_SCAN_DETECTED]]";
         }
     }
@@ -339,135 +273,12 @@ async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBa
 }
 
 /**
- * detectTextWithTiling (v5.8.10) - "Snapshot Universale"
- * Smart Tiling: tries Full-Page scan first, falls back to Tiling if low text found.
- */
-async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> {
-    const detector = new (window as any).TextDetector();
-    const TILE_SIZE = 1200; // Increased tile size
-    const OVERLAP = 200;
-    const width = canvas.width;
-    const height = canvas.height;
-
-    // 1. FAST PASS: TRY FULL IMAGE FIRST (The "Instant Screenshot" way)
-    try {
-        console.log(`[GromitOffscreen] Universal Snapshot Scannning (${width}x${height})...`);
-        const fullResults = await detector.detect(canvas);
-        if (fullResults.length > 5) { // If we got a decent amount of blocks, we win
-            const fullText = fullResults.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
-            if (fullText.trim().length > 50) {
-                console.log(`[GromitOffscreen] Snapshot Scan SUCCESS (${fullText.length} chars).`);
-                return fullText;
-            }
-        }
-    } catch (e) {
-        console.warn("[GromitOffscreen] Snapshot scan failed, falling back to Tiling:", e);
-    }
-
-    // 2. FALLBACK: TILING (For very high-res or complex documents)
-    const bitmap = await createImageBitmap(canvas);
-    const resultsAcc: string[] = [];
-    console.log(`[GromitOffscreen] Complex Scan: Falling back to Tiling...`);
-
-    for (let y = 0; y < height; y += (TILE_SIZE - OVERLAP)) {
-        for (let x = 0; x < width; x += (TILE_SIZE - OVERLAP)) {
-            const tw = Math.min(TILE_SIZE, width - x);
-            const th = Math.min(TILE_SIZE, height - y);
-            if (tw <= 0 || th <= 0) break;
-
-            try {
-                const tileBitmap = await createImageBitmap(bitmap, x, y, tw, th);
-                const results = await detector.detect(tileBitmap);
-                if (results.length > 0) {
-                    const tileText = results.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
-                    resultsAcc.push(tileText);
-                }
-            } catch (e) {
-                console.debug("[GromitOffscreen] Tile skip:", e);
-            }
-            if (x + tw >= width) break;
-        }
-        if (y + Math.min(TILE_SIZE, height - y) >= height) break;
-    }
-    return resultsAcc.join(' ');
-}
-
-/**
- * Native OCR using the Shape Detection API (TextDetector)
- * v5.8.10: "Snapshot Universale" - Treats everything as a fast image, supports XFA.
- */
-async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
-    let fullOcrText = "";
-
-    console.log(`[GromitOffscreen] Starting Universal Snapshot (v5.8.10) for ${doc.numPages} pages...`);
-
-    for (let i = 1; i <= doc.numPages; i++) {
-        try {
-            const pageTextSnippet = await Promise.race([
-                (async () => {
-                    const page = await doc.getPage(i);
-                    const start = performance.now();
-
-                    // Scale 1.2x (Approx 86 DPI)
-                    // Universal Snapshot Resolution: very fast, high compatibility
-                    const viewport = page.getViewport({ scale: 1.2 });
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true })!;
-                    canvas.width = viewport.width;
-                    canvas.height = viewport.height;
-
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                    console.log(`[GromitOffscreen] Page ${i}: Capturing Universal Snapshot...`);
-
-                    const renderContext = {
-                        canvasContext: ctx,
-                        viewport: viewport,
-                        annotationMode: 1 // Attempt to include forms data in rendering
-                    };
-
-                    await page.render(renderContext).promise;
-
-                    // OCR ON SNAPSHOT
-                    let text = await detectTextWithTiling(canvas);
-
-                    const end = performance.now();
-                    if (text.trim()) {
-                        console.log(`[GromitOffscreen] Page ${i} DONE in ${(end - start).toFixed(0)}ms (${text.length} chars)`);
-                        return text + " ";
-                    } else {
-                        console.log(`[GromitOffscreen] Page ${i}: Empty snapshot.`);
-                        return "";
-                    }
-                })(),
-                new Promise<string>((_, reject) => setTimeout(() => reject(new Error("OCR_PAGE_TIMEOUT")), 30000))
-            ]);
-
-            fullOcrText += pageTextSnippet;
-
-        } catch (err) {
-            console.error(`[GromitOffscreen] Page ${i} failed/timeout:`, err);
-            fullOcrText += " ";
-            continue;
-        }
-    }
-
-    if (fullOcrText.trim().length === 0) {
-        console.log("[GromitOffscreen] OCR completed but no text was found. Marking as SCAN.");
-        return "[[GROMIT_SCAN_DETECTED]]";
-    }
-
-    return fullOcrText.trim();
-}
-
-/**
  * Direct Image OCR (PNG, JPG, weBP)
- * v5.8.1: "Ghost Hunter" - Using Tiling detector for large photos.
+ * EXCLUSIVELY Swift Native Bridge (v5.8.12)
  */
 async function extractImageText(arrayBuffer: ArrayBuffer, fileName: string, fileBase64: string): Promise<string> {
     try {
-        console.log(`[GromitOffscreen] Image OCR: Starting Swift Native Bridge for ${fileName}...`);
+        console.log(`[GromitOffscreen] Image OCR: Calling Swift Native Bridge for ${fileName}...`);
         const nativeResponse = await chrome.runtime.sendMessage({
             type: 'NATIVE_OCR',
             fileBase64: fileBase64,
@@ -478,22 +289,7 @@ async function extractImageText(arrayBuffer: ArrayBuffer, fileName: string, file
             return nativeResponse.text.trim();
         }
 
-        // Fallback to browser (Ghost Hunter)
-        const blob = new Blob([arrayBuffer]);
-        const bitmap = await createImageBitmap(blob);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(bitmap, 0, 0);
-
-        console.log(`[GromitOffscreen] Direct Image OCR (Tiling) for ${bitmap.width}x${bitmap.height}...`);
-        const text = await detectTextWithTiling(canvas);
-
-        return text.trim() ? text : "[[GROMIT_SCAN_DETECTED]]";
+        return "[[GROMIT_SCAN_DETECTED]]";
     } catch (err) {
         console.error("[GromitOffscreen] Direct Image OCR failed:", err);
         return "[[GROMIT_SCAN_DETECTED]]";
