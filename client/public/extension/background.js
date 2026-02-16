@@ -112,7 +112,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
-export {
-  BRIDGE_VERSION
-};
 //# sourceMappingURL=background.js.map
