@@ -90057,7 +90057,7 @@ async function detectTextWithTiling(canvas) {
     }
     return resultsAcc.join(" ");
   };
-  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.4) for ${width}x${height}...`);
+  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.6) for ${width}x${height}...`);
   let text = await performScan(canvas);
   if (text.trim().length < 50 && (width > 2e3 || height > 2e3)) {
     console.log(`[GromitOffscreen] PASS 2: Trying Downsampling (0.5x)...`);
@@ -90100,20 +90100,6 @@ async function detectTextWithTiling(canvas) {
     if (finalText.trim().length > text.trim().length) {
       console.log(`[GromitOffscreen] Sanctuary Final SUCCESS (${finalText.length} chars).`);
       text = finalText;
-    }
-  }
-  if (text.trim().length < 50) {
-    console.log(`[GromitOffscreen] PASS 5: Trying Pure Grayscale + Upscale (Preserving Anti-Aliasing)...`);
-    const grayCanvas = document.createElement("canvas");
-    grayCanvas.width = width;
-    grayCanvas.height = height;
-    const gCtx = grayCanvas.getContext("2d", { willReadFrequently: true });
-    gCtx.filter = "grayscale(100%) contrast(150%) brightness(110%)";
-    gCtx.drawImage(canvas, 0, 0);
-    const grayText = await performScan(grayCanvas, 2.5);
-    if (grayText.trim().length > text.trim().length) {
-      console.log(`[GromitOffscreen] Grayscale High-Res SUCCESS (${grayText.length} chars).`);
-      text = grayText;
     }
   }
   return text;

@@ -530,7 +530,7 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         return resultsAcc.join(' ');
     };
 
-    console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.4) for ${width}x${height}...`);
+    console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.6) for ${width}x${height}...`);
 
     // PASS 1: Native Resolution
     let text = await performScan(canvas);
@@ -585,23 +585,6 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         if (finalText.trim().length > text.trim().length) {
             console.log(`[GromitOffscreen] Sanctuary Final SUCCESS (${finalText.length} chars).`);
             text = finalText;
-        }
-    }
-
-    // PASS 5: Grayscale High-Res (v5.8.5)
-    if (text.trim().length < 50) {
-        console.log(`[GromitOffscreen] PASS 5: Trying Pure Grayscale + Upscale (Preserving Anti-Aliasing)...`);
-        const grayCanvas = document.createElement('canvas');
-        grayCanvas.width = width;
-        grayCanvas.height = height;
-        const gCtx = grayCanvas.getContext('2d', { willReadFrequently: true })!;
-        gCtx.filter = 'grayscale(100%) contrast(150%) brightness(110%)';
-        gCtx.drawImage(canvas, 0, 0);
-
-        const grayText = await performScan(grayCanvas, 2.5); // Higher scale
-        if (grayText.trim().length > text.trim().length) {
-            console.log(`[GromitOffscreen] Grayscale High-Res SUCCESS (${grayText.length} chars).`);
-            text = grayText;
         }
     }
 
