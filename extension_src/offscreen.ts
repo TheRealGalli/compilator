@@ -241,11 +241,15 @@ async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBa
         console.log("[GromitOffscreen] Testo insufficiente. Richiesta Swift Native OCR Bridge...");
 
         try {
-            const nativeResponse = await chrome.runtime.sendMessage({
-                type: 'NATIVE_OCR',
-                fileBase64: fileBase64,
-                fileName: fileName
-            });
+            // v5.8.13: Added 20s safety timeout for complex documents
+            const nativeResponse = await Promise.race([
+                chrome.runtime.sendMessage({
+                    type: 'NATIVE_OCR',
+                    fileBase64: fileBase64,
+                    fileName: fileName
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("NATIVE_OCR_TIMEOUT")), 20000))
+            ]);
 
             if (nativeResponse && nativeResponse.success && nativeResponse.text?.trim()) {
                 console.log("[GromitOffscreen] Native OCR Success.");
@@ -253,11 +257,10 @@ async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBa
                 return (formHeader + bodyText).trim();
             }
 
-            // If native fails or is empty, we don't have a fallback anymore
-            console.warn("[GromitOffscreen] Native OCR returned no results.");
+            console.warn("[GromitOffscreen] Native OCR returned no results or failed.");
             bodyText = "[[GROMIT_SCAN_DETECTED]]";
         } catch (err) {
-            console.error("[GromitOffscreen] Native bridge fatal failure:", err);
+            console.warn("[GromitOffscreen] Native OCR skipped (Bridge unavailable or Timeout):", err);
             bodyText = "[[GROMIT_SCAN_DETECTED]]";
         }
     }
@@ -279,11 +282,14 @@ async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBa
 async function extractImageText(arrayBuffer: ArrayBuffer, fileName: string, fileBase64: string): Promise<string> {
     try {
         console.log(`[GromitOffscreen] Image OCR: Calling Swift Native Bridge for ${fileName}...`);
-        const nativeResponse = await chrome.runtime.sendMessage({
-            type: 'NATIVE_OCR',
-            fileBase64: fileBase64,
-            fileName: fileName
-        });
+        const nativeResponse = await Promise.race([
+            chrome.runtime.sendMessage({
+                type: 'NATIVE_OCR',
+                fileBase64: fileBase64,
+                fileName: fileName
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("NATIVE_OCR_TIMEOUT")), 20000))
+        ]);
 
         if (nativeResponse && nativeResponse.success && nativeResponse.text?.trim()) {
             return nativeResponse.text.trim();

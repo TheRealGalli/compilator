@@ -3,7 +3,7 @@
 // Gromit Bridge Background Script v5.8.6 (Shield & Opt)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = "v5.8.12";
+const BRIDGE_VERSION = "v5.8.13";
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state
@@ -162,7 +162,8 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
             (response) => {
                 if (chrome.runtime.lastError) {
                     const errMsg = chrome.runtime.lastError.message;
-                    console.error('[GromitBridge] Native Message Error:', errMsg);
+                    // v5.8.13: Use debug instead of error for missing hosts (expected on Windows/Linux)
+                    console.debug('[GromitBridge] Native Message skipped:', errMsg);
                     sendResponse({ success: false, error: errMsg });
                 } else {
                     console.log(`[GromitBridge] Native OCR Success (${response.text?.length || 0} chars)`);

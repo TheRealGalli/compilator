@@ -134,7 +134,3 @@ func main() {
 
 // Run Main
 main()
-
-// Wait, I used UIGraphicsImageRenderer and UIColor which are iOS. 
-// For macOS (which the user is on), I need AppKit (NSImage, NSColor, etc.)
-// Let's rewrite the rendering block for macOS.
