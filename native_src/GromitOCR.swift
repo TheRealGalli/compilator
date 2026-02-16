@@ -92,7 +92,13 @@ class GromitBridgeApp: NSObject, NSApplicationDelegate {
         // 2. Setup Menu Bar
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
-            button.title = "👁️" 
+            if let imageURL = Bundle.main.url(forResource: "menu_bar_icon", withExtension: "png"),
+               let image = NSImage(contentsOf: imageURL) {
+                image.isTemplate = true // Ensures icon color adapts to light/dark mode
+                button.image = image
+            } else {
+                button.title = "👁️" 
+            }
             button.toolTip = "Gromit OCR Bridge"
         }
         

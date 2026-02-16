@@ -16,6 +16,15 @@ mkdir -p "$RESOURCES_DIR"
 echo "Compiling $APP_NAME..."
 xcrun -sdk macosx swiftc "$SRC_FILE" -o "$MACOS_DIR/GromitOCR" -O
 
+# Copy Resources
+echo "Adding icons and resources..."
+if [ -f "native_src/AppIcon.icns" ]; then
+    cp "native_src/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+fi
+if [ -f "native_src/menu_bar_icon.png" ]; then
+    cp "native_src/menu_bar_icon.png" "$RESOURCES_DIR/menu_bar_icon.png"
+fi
+
 # Create Info.plist
 cat > "$CONTENTS_DIR/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
