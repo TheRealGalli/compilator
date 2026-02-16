@@ -35,6 +35,26 @@ cp -R "$APP_PATH" "$MOUNT_POINT/"
 echo "Creating Applications link..."
 ln -s /Applications "$MOUNT_POINT/Applications"
 
+# Script to set the icon positions and window size (Basic version using applescript via shell)
+echo "Setting DMG appearance..."
+osascript <<EOF
+tell application "Finder"
+    tell disk "$VOLUME_NAME"
+        open
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set the bounds of container window to {400, 100, 1424, 868} -- 1024x768 wide
+        set viewOptions to the icon view options of container window
+        set icon size of viewOptions to 160
+        set arrangement of viewOptions to not arranged
+        set position of item "$APP_NAME.app" of container window to {250, 384}
+        set position of item "Applications" of container window to {774, 384}
+        close
+    end tell
+end tell
+EOF
+
 # Unmount the image
 echo "Unmounting..."
 hdiutil detach "$MOUNT_POINT"

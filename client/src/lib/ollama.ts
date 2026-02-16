@@ -410,12 +410,30 @@ ${llmText}
                 .replace(/`/g, '')                 // Remove inline code backticks
                 .trim();
 
+            // HEURISTIC: The model sometimes prefixes everything with "TOKEN: " or "PII: "
+            // Also handle "TOKEN: FULL_NAME: John Doe"
+            cleanLine = cleanLine.replace(/^(TOKEN|PII|Label|Data)\s*[:=]\s*/i, '').trim();
+
             // Matches: "NAME: Mario Rossi", "P.IVA: 123"
+            // Support for hierarchical keys like "PII: FULL_NAME: Value"
             const match = cleanLine.match(/^\s*([A-Za-z0-9_ \-\.\'àèìòùÀÈÌÒÙ]+)\s*[:=]\s*(.+)\s*$/);
             if (!match) return null;
 
-            const key = match[1].trim().toUpperCase();
+            let key = match[1].trim().toUpperCase();
             let val = match[2].trim();
+
+            // If the value itself has another colon, it might be "CATEGORY: VALUE"
+            // e.g. "FULL_NAME: Mario" -> key="FULL_NAME", val="Mario"
+            // Some models do "PII: NAME: Mario" -> key="PII", val="NAME: Mario"
+            // We want to extract the deepest key if the first key is generic. 
+            const GENERIC_KEYS = ['TOKEN', 'PII', 'DATA', 'VALUE', 'INFO', 'FINDING', 'ITEM'];
+            if (GENERIC_KEYS.includes(key) && val.includes(':')) {
+                const subMatch = val.match(/^\s*([A-Za-z0-9_ \-\.\']+)\s*[:=]\s*(.+)\s*$/);
+                if (subMatch) {
+                    key = subMatch[1].trim().toUpperCase();
+                    val = subMatch[2].trim();
+                }
+            }
 
             // Remove potential trailing quotes/comma from value if regex missed them
             val = val.replace(/",?$/, '').replace(/',?$/, '');
