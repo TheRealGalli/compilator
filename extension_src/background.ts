@@ -3,7 +3,7 @@
 // Gromit Bridge Background Script v5.8.6 (Shield & Opt)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = "v5.8.8";
+const BRIDGE_VERSION = "v5.8.9";
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state
