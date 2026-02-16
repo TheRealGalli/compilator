@@ -507,7 +507,7 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
                         const tCanvas = document.createElement('canvas');
                         tCanvas.width = tw * tileScale;
                         tCanvas.height = th * tileScale;
-                        const tCtx = tCanvas.getContext('2d')!;
+                        const tCtx = tCanvas.getContext('2d', { willReadFrequently: true })!;
                         // Bilinear scaling for smoother text shapes
                         tCtx.imageSmoothingEnabled = true;
                         tCtx.imageSmoothingQuality = 'high';
@@ -541,7 +541,7 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         const scaledCanvas = document.createElement('canvas');
         scaledCanvas.width = width * 0.5;
         scaledCanvas.height = height * 0.5;
-        const sCtx = scaledCanvas.getContext('2d')!;
+        const sCtx = scaledCanvas.getContext('2d', { willReadFrequently: true })!;
         sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
         const scaledText = await performScan(scaledCanvas);
         if (scaledText.trim().length > text.trim().length) {
@@ -555,7 +555,7 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         const optimizedCanvas = document.createElement('canvas');
         optimizedCanvas.width = width;
         optimizedCanvas.height = height;
-        const oCtx = optimizedCanvas.getContext('2d')!;
+        const oCtx = optimizedCanvas.getContext('2d', { willReadFrequently: true })!;
         oCtx.drawImage(canvas, 0, 0);
 
         applySharpen(oCtx, width, height);
@@ -574,7 +574,7 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         const finalCanvas = document.createElement('canvas');
         finalCanvas.width = width;
         finalCanvas.height = height;
-        const fCtx = finalCanvas.getContext('2d')!;
+        const fCtx = finalCanvas.getContext('2d', { willReadFrequently: true })!;
         fCtx.drawImage(canvas, 0, 0);
 
         applyMedianFilter(fCtx, width, height); // Despeckle first
@@ -588,17 +588,34 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
         }
     }
 
+    // PASS 5: Grayscale High-Res (v5.8.5)
+    if (text.trim().length < 50) {
+        console.log(`[GromitOffscreen] PASS 5: Trying Pure Grayscale + Upscale (Preserving Anti-Aliasing)...`);
+        const grayCanvas = document.createElement('canvas');
+        grayCanvas.width = width;
+        grayCanvas.height = height;
+        const gCtx = grayCanvas.getContext('2d', { willReadFrequently: true })!;
+        gCtx.filter = 'grayscale(100%) contrast(150%) brightness(110%)';
+        gCtx.drawImage(canvas, 0, 0);
+
+        const grayText = await performScan(grayCanvas, 2.5); // Higher scale
+        if (grayText.trim().length > text.trim().length) {
+            console.log(`[GromitOffscreen] Grayscale High-Res SUCCESS (${grayText.length} chars).`);
+            text = grayText;
+        }
+    }
+
     return text;
 }
 
 /**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.8.4: "Sanctuary Final" - Morphological & Tile Upscale.
+ * v5.8.5: "Shield & Opt" - Morphological, Tile Upscale & Grayscale.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.4) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.5) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {

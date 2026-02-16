@@ -90037,7 +90037,7 @@ async function detectTextWithTiling(canvas) {
             const tCanvas = document.createElement("canvas");
             tCanvas.width = tw * tileScale;
             tCanvas.height = th * tileScale;
-            const tCtx = tCanvas.getContext("2d");
+            const tCtx = tCanvas.getContext("2d", { willReadFrequently: true });
             tCtx.imageSmoothingEnabled = true;
             tCtx.imageSmoothingQuality = "high";
             tCtx.drawImage(tileBitmap, 0, 0, tCanvas.width, tCanvas.height);
@@ -90064,7 +90064,7 @@ async function detectTextWithTiling(canvas) {
     const scaledCanvas = document.createElement("canvas");
     scaledCanvas.width = width * 0.5;
     scaledCanvas.height = height * 0.5;
-    const sCtx = scaledCanvas.getContext("2d");
+    const sCtx = scaledCanvas.getContext("2d", { willReadFrequently: true });
     sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
     const scaledText = await performScan(scaledCanvas);
     if (scaledText.trim().length > text.trim().length) {
@@ -90076,7 +90076,7 @@ async function detectTextWithTiling(canvas) {
     const optimizedCanvas = document.createElement("canvas");
     optimizedCanvas.width = width;
     optimizedCanvas.height = height;
-    const oCtx = optimizedCanvas.getContext("2d");
+    const oCtx = optimizedCanvas.getContext("2d", { willReadFrequently: true });
     oCtx.drawImage(canvas, 0, 0);
     applySharpen(oCtx, width, height);
     applyAdaptiveThreshold(oCtx, width, height);
@@ -90091,7 +90091,7 @@ async function detectTextWithTiling(canvas) {
     const finalCanvas = document.createElement("canvas");
     finalCanvas.width = width;
     finalCanvas.height = height;
-    const fCtx = finalCanvas.getContext("2d");
+    const fCtx = finalCanvas.getContext("2d", { willReadFrequently: true });
     fCtx.drawImage(canvas, 0, 0);
     applyMedianFilter(fCtx, width, height);
     applyDilation(fCtx, width, height);
@@ -90102,11 +90102,25 @@ async function detectTextWithTiling(canvas) {
       text = finalText;
     }
   }
+  if (text.trim().length < 50) {
+    console.log(`[GromitOffscreen] PASS 5: Trying Pure Grayscale + Upscale (Preserving Anti-Aliasing)...`);
+    const grayCanvas = document.createElement("canvas");
+    grayCanvas.width = width;
+    grayCanvas.height = height;
+    const gCtx = grayCanvas.getContext("2d", { willReadFrequently: true });
+    gCtx.filter = "grayscale(100%) contrast(150%) brightness(110%)";
+    gCtx.drawImage(canvas, 0, 0);
+    const grayText = await performScan(grayCanvas, 2.5);
+    if (grayText.trim().length > text.trim().length) {
+      console.log(`[GromitOffscreen] Grayscale High-Res SUCCESS (${grayText.length} chars).`);
+      text = grayText;
+    }
+  }
   return text;
 }
 async function performNativeOCR(doc) {
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.4) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Deep OCR (v5.8.5) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Looking for "The Photo" in all levels...`);

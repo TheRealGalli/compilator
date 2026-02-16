@@ -1,9 +1,9 @@
 /// <reference types="chrome"/>
 
-// Gromit Bridge Background Script v5.8.4 (Sanctuary Final - Morphological & Tile Upscale)
+// Gromit Bridge Background Script v5.8.5 (Shield & Opt)
 // Supports: OLLAMA_FETCH, EXTRACT_AND_ANALYZE (Proxied), GET_VERSION
 
-const BRIDGE_VERSION = '5.8.4';
+const BRIDGE_VERSION = '5.8.5';
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 
 // Global state
