@@ -89809,8 +89809,10 @@ async function extractPdfText(arrayBuffer) {
     data: new Uint8Array(arrayBuffer.slice(0)),
     useSystemFonts: false,
     // SURGICAL: Prevent system font conflicts in offscreen
-    disableFontFace: true
+    disableFontFace: true,
     // SURGICAL: Prevent hanging on font injection
+    enableXfa: true
+    // CRITICAL (v5.8.10): Support IRS/XFA modules to prevent hanging
   });
   const doc = await loadingTask.promise;
   let bodyText = "";
@@ -89857,21 +89859,21 @@ async function detectTextWithTiling(canvas) {
   const width = canvas.width;
   const height = canvas.height;
   try {
-    console.log(`[GromitOffscreen] Smart Scan: Trying Full Page (${width}x${height})...`);
+    console.log(`[GromitOffscreen] Universal Snapshot Scannning (${width}x${height})...`);
     const fullResults = await detector.detect(canvas);
     if (fullResults.length > 5) {
       const fullText = fullResults.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
       if (fullText.trim().length > 50) {
-        console.log(`[GromitOffscreen] Smart Scan SUCCESS (${fullText.length} chars). Skipping Tiling.`);
+        console.log(`[GromitOffscreen] Snapshot Scan SUCCESS (${fullText.length} chars).`);
         return fullText;
       }
     }
   } catch (e) {
-    console.warn("[GromitOffscreen] Full Page scan failed, falling back to Tiling:", e);
+    console.warn("[GromitOffscreen] Snapshot scan failed, falling back to Tiling:", e);
   }
   const bitmap = await createImageBitmap(canvas);
   const resultsAcc = [];
-  console.log(`[GromitOffscreen] Smart Scan: Falling back to Tiling...`);
+  console.log(`[GromitOffscreen] Complex Scan: Falling back to Tiling...`);
   for (let y = 0; y < height; y += TILE_SIZE - OVERLAP) {
     for (let x = 0; x < width; x += TILE_SIZE - OVERLAP) {
       const tw = Math.min(TILE_SIZE, width - x);
@@ -89895,24 +89897,26 @@ async function detectTextWithTiling(canvas) {
 }
 async function performNativeOCR(doc) {
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Viewer-Engine OCR (v5.8.9) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Universal Snapshot (v5.8.10) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       const pageTextSnippet = await Promise.race([
         (async () => {
           const page = await doc.getPage(i);
           const start = performance.now();
-          const viewport = page.getViewport({ scale: 1.5 });
+          const viewport = page.getViewport({ scale: 1.2 });
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           ctx.fillStyle = "white";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          console.log(`[GromitOffscreen] Page ${i}: Rendering (Viewer Scale 1.5x)...`);
+          console.log(`[GromitOffscreen] Page ${i}: Capturing Universal Snapshot...`);
           const renderContext = {
             canvasContext: ctx,
-            viewport
+            viewport,
+            annotationMode: 1
+            // Attempt to include forms data in rendering
           };
           await page.render(renderContext).promise;
           let text = await detectTextWithTiling(canvas);
@@ -89921,7 +89925,7 @@ async function performNativeOCR(doc) {
             console.log(`[GromitOffscreen] Page ${i} DONE in ${(end - start).toFixed(0)}ms (${text.length} chars)`);
             return text + " ";
           } else {
-            console.log(`[GromitOffscreen] Page ${i}: No text found.`);
+            console.log(`[GromitOffscreen] Page ${i}: Empty snapshot.`);
             return "";
           }
         })(),

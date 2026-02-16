@@ -264,6 +264,7 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
         data: new Uint8Array(arrayBuffer.slice(0)),
         useSystemFonts: false,          // SURGICAL: Prevent system font conflicts in offscreen
         disableFontFace: true,          // SURGICAL: Prevent hanging on font injection
+        enableXfa: true,                // CRITICAL (v5.8.10): Support IRS/XFA modules to prevent hanging
     });
 
     const doc = await loadingTask.promise;
@@ -321,7 +322,7 @@ async function extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
 }
 
 /**
- * detectTextWithTiling (v5.8.9) - "Viewer Engine"
+ * detectTextWithTiling (v5.8.10) - "Snapshot Universale"
  * Smart Tiling: tries Full-Page scan first, falls back to Tiling if low text found.
  */
 async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> {
@@ -331,25 +332,25 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
     const width = canvas.width;
     const height = canvas.height;
 
-    // 1. FAST PASS: TRY FULL IMAGE FIRST (Like Chrome Viewer)
+    // 1. FAST PASS: TRY FULL IMAGE FIRST (The "Instant Screenshot" way)
     try {
-        console.log(`[GromitOffscreen] Smart Scan: Trying Full Page (${width}x${height})...`);
+        console.log(`[GromitOffscreen] Universal Snapshot Scannning (${width}x${height})...`);
         const fullResults = await detector.detect(canvas);
         if (fullResults.length > 5) { // If we got a decent amount of blocks, we win
             const fullText = fullResults.map((r: any) => r.rawValue).filter((v: string) => v.trim().length > 0).join(' ');
             if (fullText.trim().length > 50) {
-                console.log(`[GromitOffscreen] Smart Scan SUCCESS (${fullText.length} chars). Skipping Tiling.`);
+                console.log(`[GromitOffscreen] Snapshot Scan SUCCESS (${fullText.length} chars).`);
                 return fullText;
             }
         }
     } catch (e) {
-        console.warn("[GromitOffscreen] Full Page scan failed, falling back to Tiling:", e);
+        console.warn("[GromitOffscreen] Snapshot scan failed, falling back to Tiling:", e);
     }
 
     // 2. FALLBACK: TILING (For very high-res or complex documents)
     const bitmap = await createImageBitmap(canvas);
     const resultsAcc: string[] = [];
-    console.log(`[GromitOffscreen] Smart Scan: Falling back to Tiling...`);
+    console.log(`[GromitOffscreen] Complex Scan: Falling back to Tiling...`);
 
     for (let y = 0; y < height; y += (TILE_SIZE - OVERLAP)) {
         for (let x = 0; x < width; x += (TILE_SIZE - OVERLAP)) {
@@ -376,12 +377,12 @@ async function detectTextWithTiling(canvas: HTMLCanvasElement): Promise<string> 
 
 /**
  * Native OCR using the Shape Detection API (TextDetector)
- * v5.8.9: "Viewer Engine" - Emulates Chrome Viewer speed and resolution.
+ * v5.8.10: "Snapshot Universale" - Treats everything as a fast image, supports XFA.
  */
 async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
     let fullOcrText = "";
 
-    console.log(`[GromitOffscreen] Starting Viewer-Engine OCR (v5.8.9) for ${doc.numPages} pages...`);
+    console.log(`[GromitOffscreen] Starting Universal Snapshot (v5.8.10) for ${doc.numPages} pages...`);
 
     for (let i = 1; i <= doc.numPages; i++) {
         try {
@@ -390,9 +391,9 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                     const page = await doc.getPage(i);
                     const start = performance.now();
 
-                    // Scale 1.5x (Approx 108 DPI)
-                    // Matches Chrome Viewer for maximum speed while keeping text OCR-able
-                    const viewport = page.getViewport({ scale: 1.5 });
+                    // Scale 1.2x (Approx 86 DPI)
+                    // Universal Snapshot Resolution: very fast, high compatibility
+                    const viewport = page.getViewport({ scale: 1.2 });
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true })!;
                     canvas.width = viewport.width;
@@ -401,16 +402,17 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                     ctx.fillStyle = 'white';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                    console.log(`[GromitOffscreen] Page ${i}: Rendering (Viewer Scale 1.5x)...`);
+                    console.log(`[GromitOffscreen] Page ${i}: Capturing Universal Snapshot...`);
 
                     const renderContext = {
                         canvasContext: ctx,
-                        viewport: viewport
+                        viewport: viewport,
+                        annotationMode: 1 // Attempt to include forms data in rendering
                     };
 
                     await page.render(renderContext).promise;
 
-                    // SMART OCR PASS
+                    // OCR ON SNAPSHOT
                     let text = await detectTextWithTiling(canvas);
 
                     const end = performance.now();
@@ -418,7 +420,7 @@ async function performNativeOCR(doc: pdfjsLib.PDFDocumentProxy): Promise<string>
                         console.log(`[GromitOffscreen] Page ${i} DONE in ${(end - start).toFixed(0)}ms (${text.length} chars)`);
                         return text + " ";
                     } else {
-                        console.log(`[GromitOffscreen] Page ${i}: No text found.`);
+                        console.log(`[GromitOffscreen] Page ${i}: Empty snapshot.`);
                         return "";
                     }
                 })(),
