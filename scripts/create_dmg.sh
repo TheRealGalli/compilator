@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Configuration
+APP_NAME="Gromit Bridge"
+DMG_NAME="GromitBridgeInstaller"
+APP_PATH="dist_app/$APP_NAME.app"
+DMG_PATH="dist_app/$DMG_NAME.dmg"
+VOLUME_NAME="Gromit Bridge Installer"
+
+# Cleanup
+rm -f "$DMG_PATH"
+
+echo "Creating DMG for $APP_NAME..."
+
+# Create a temporary disk image
+hdiutil create -size 50m -fs HFS+ -volname "$VOLUME_NAME" -ov "$DMG_PATH"-tmp.dmg
+
+# Mount the temporary image
+MOUNT_POINT=$(hdiutil attach "$DMG_PATH"-tmp.dmg | grep /Volumes/ | awk '{print $3}')
+
+# Copy the app to the volume
+cp -R "$APP_PATH" "$MOUNT_POINT/"
+
+# Create a symbolic link to Applications
+ln -s /Applications "$MOUNT_POINT/Applications"
+
+# Unmount the image
+hdiutil detach "$MOUNT_POINT"
+
+# Convert to a compressed read-only image
+hdiutil convert "$DMG_PATH"-tmp.dmg -format UDZO -o "$DMG_PATH"
+
+# Cleanup temporary image
+rm "$DMG_PATH"-tmp.dmg
+
+echo "DMG created at $DMG_PATH"

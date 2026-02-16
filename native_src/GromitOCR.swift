@@ -3,16 +3,9 @@ import Vision
 import PDFKit
 import AppKit
 
-/**
- * GromitOCR Native Assistant v1.0.0
- * Uses Apple Vision and PDFKit for high-accuracy OCR.
- * Supports: Native Messaging (Chrome)
- * OS: macOS (AppKit)
- */
-
+// MARK: - Native Messaging Protocol
 struct OCRRequest: Codable {
     let base64: String
-    let fileName: String?
 }
 
 struct OCRResponse: Codable {
@@ -21,34 +14,25 @@ struct OCRResponse: Codable {
     let error: String?
 }
 
-// --- HELPER: NATIVE MESSAGING PROTOCOL ---
 func readMessage() -> Data? {
-    var length: UInt32 = 0
-    let readCount = fread(&length, 1, 4, stdin)
-    if readCount < 4 { return nil }
-    
-    let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(length))
-    defer { buffer.deallocate() }
-    
-    let bytesRead = fread(buffer, 1, Int(length), stdin)
-    if bytesRead < Int(length) { return nil }
-    
-    return Data(bytes: buffer, count: Int(length))
+    let stdin = FileHandle.standardInput
+    let lengthData = stdin.readData(ofLength: 4)
+    guard lengthData.count == 4 else { return nil }
+    let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self) }
+    return stdin.readData(ofLength: Int(length))
 }
 
 func sendMessage(text: String, success: Bool, error: String? = nil) {
     let response = OCRResponse(text: text, success: success, error: error)
-    if let jsonData = try? JSONEncoder().encode(response) {
-        var length = UInt32(jsonData.count)
-        fwrite(&length, 1, 4, stdout)
-        jsonData.withUnsafeBytes { ptr in
-            _ = fwrite(ptr.baseAddress, 1, jsonData.count, stdout)
-        }
-        fflush(stdout)
-    }
+    guard let jsonData = try? JSONEncoder().encode(response) else { return }
+    let length = UInt32(jsonData.count)
+    var lengthBuffer = length
+    let lengthData = Data(bytes: &lengthBuffer, count: 4)
+    FileHandle.standardOutput.write(lengthData)
+    FileHandle.standardOutput.write(jsonData)
 }
 
-// --- OCR CORE ---
+// MARK: - OCR Engine
 func performOCR(on image: CGImage) -> String {
     let requestHandler = VNImageRequestHandler(cgImage: image, options: [:])
     let request = VNRecognizeTextRequest()
@@ -59,78 +43,112 @@ func performOCR(on image: CGImage) -> String {
     do {
         try requestHandler.perform([request])
         guard let observations = request.results else { return "" }
-        
-        let recognizedStrings = observations.compactMap { observation in
-            observation.topCandidates(1).first?.string
-        }
-        return recognizedStrings.joined(separator: " ")
+        let recognizedStrings = observations.compactMap { $0.topCandidates(1).first?.string }
+        return recognizedStrings.joined(separator: "\n")
     } catch {
         return ""
     }
 }
 
-// --- MAIN LOOP ---
-func main() {
-    guard let messageData = readMessage() else { return }
+// MARK: - Self-Registration (Zero-Config)
+func registerHost() {
+    let fileManager = FileManager.default
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    let hostsPath = home.appendingPathComponent("Library/Application Support/Google/Chrome/NativeMessagingHosts")
+    let manifestURL = hostsPath.appendingPathComponent("com.gromit.ocr.json")
+    
+    // Get current binary path
+    let binaryPath = Bundle.main.executablePath ?? CommandLine.arguments[0]
+    
+    let manifest: [String: Any] = [
+        "name": "com.gromit.ocr",
+        "description": "Gromit Native OCR Bridge",
+        "path": binaryPath,
+        "type": "stdio",
+        "allowed_origins": [
+            "chrome-extension://legiinepkdobifjhlolpojdgcioolacj/"
+        ]
+    ]
     
     do {
-        let request = try JSONDecoder().decode(OCRRequest.self, from: messageData)
-        guard let data = Data(base64Encoded: request.base64) else {
-            sendMessage(text: "", success: false, error: "Invalid Base64")
-            return
-        }
-        
-        var fullText = ""
-        
-        // Try PDF first
-        if let pdfDoc = PDFDocument(data: data) {
-            for i in 0..<pdfDoc.pageCount {
-                guard let page = pdfDoc.page(at: i) else { continue }
-                
-                // Get page bounds
-                let mediaBox = page.bounds(for: .mediaBox)
-                let scale: CGFloat = 3.0 // 216 DPI if original was 72
-                let width = Int(mediaBox.width * scale)
-                let height = Int(mediaBox.height * scale)
-                
-                // Create Bitmap Context
-                guard let context = CGContext(data: nil,
-                                              width: width,
-                                              height: height,
-                                              bitsPerComponent: 8,
-                                              bytesPerRow: 0,
-                                              space: CGColorSpaceCreateDeviceRGB(),
-                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { continue }
-                
-                // Fill White Background
-                context.setFillColor(NSColor.white.cgColor)
-                context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-                
-                // Scale and Draw
-                context.scaleBy(x: scale, y: scale)
-                page.draw(with: .mediaBox, to: context)
-                
-                if let cgImage = context.makeImage() {
-                    let pageText = performOCR(on: cgImage)
-                    fullText += pageText + "\n"
-                }
-            }
-        } else {
-            // Try as direct image
-            if let image = NSImage(data: data), let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                fullText = performOCR(on: cgImage)
-            } else {
-                 sendMessage(text: "", success: false, error: "Unsupported file format or corrupt data")
-                 return
-            }
-        }
-        
-        sendMessage(text: fullText.trimmingCharacters(in: .whitespacesAndNewlines), success: true)
-        
+        try fileManager.createDirectory(at: hostsPath, withIntermediateDirectories: true)
+        let data = try JSONSerialization.data(withJSONObject: manifest, options: .prettyPrinted)
+        try data.write(to: manifestURL)
+        // Note: print on stdout might break Native Messaging if not careful, 
+        // but this only runs once at startup if launched as App.
     } catch {
-        sendMessage(text: "", success: false, error: "Processing Error: \(error.localizedDescription)")
+        // Fallback or log
     }
 }
 
-// Run Main
-main()
+// MARK: - App logic
+class GromitBridgeApp: NSObject, NSApplicationDelegate {
+    var statusItem: NSStatusItem?
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // 1. Register Host
+        registerHost()
+        
+        // 2. Setup Menu Bar
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let button = statusItem?.button {
+            button.title = "👁️" 
+            button.toolTip = "Gromit OCR Bridge"
+        }
+        
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "Gromit Bridge: Attivo", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Esci", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        statusItem?.menu = menu
+        
+        // 3. Start Native Messaging Loop in background
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.runNativeMessagingLoop()
+        }
+    }
+    
+    func runNativeMessagingLoop() {
+        while let messageData = readMessage() {
+            autoreleasepool {
+                do {
+                    let request = try JSONDecoder().decode(OCRRequest.self, from: messageData)
+                    guard let data = Data(base64Encoded: request.base64) else {
+                        sendMessage(text: "", success: false, error: "Invalid Base64")
+                        return
+                    }
+                    
+                    var fullText = ""
+                    if let pdfDoc = PDFDocument(data: data) {
+                        for i in 0..<pdfDoc.pageCount {
+                            if let page = pdfDoc.page(at: i) {
+                                let rect = page.bounds(for: .mediaBox)
+                                // High res thumbnail for OCR
+                                let pageImage = page.thumbnail(of: rect.size, for: .mediaBox)
+                                if let cgImage = pageImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                                    fullText += performOCR(on: cgImage) + "\n"
+                                }
+                            }
+                        }
+                    } else if let image = NSImage(data: data), let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                        fullText = performOCR(on: cgImage)
+                    } else {
+                        sendMessage(text: "", success: false, error: "Format not supported")
+                        return
+                    }
+                    
+                    sendMessage(text: fullText.trimmingCharacters(in: .whitespacesAndNewlines), success: true)
+                } catch {
+                    sendMessage(text: "", success: false, error: "Processing Error: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Main Bootstrap
+let app = NSApplication.shared
+let delegate = GromitBridgeApp()
+app.delegate = delegate
+app.setActivationPolicy(.accessory) 
+app.run()
