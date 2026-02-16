@@ -89861,7 +89861,7 @@ async function detectTextWithTiling(canvas) {
     const sHeight = sourceCanvas.height;
     const bitmap = sourceCanvas instanceof ImageBitmap ? sourceCanvas : await createImageBitmap(sourceCanvas);
     const resultsAcc = [];
-    console.log(`[GromitOffscreen] OCR Scanning buffer ${sWidth}x${sHeight} (TileScale: ${tileScale})...`);
+    console.log(`[GromitOffscreen] OCR Tiling Loop Starting for ${sWidth}x${sHeight}...`);
     for (let y = 0; y < sHeight; y += TILE_SIZE - OVERLAP) {
       for (let x = 0; x < sWidth; x += TILE_SIZE - OVERLAP) {
         const tw = Math.min(TILE_SIZE, sWidth - x);
@@ -89883,36 +89883,35 @@ async function detectTextWithTiling(canvas) {
     }
     return resultsAcc.join(" ");
   };
-  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.7) for ${width}x${height}...`);
+  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.8) for ${width}x${height}...`);
   return await performScan(canvas);
 }
 async function performNativeOCR(doc) {
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Ultra-Light OCR (v5.8.7) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Instant-Snapshot OCR (v5.8.8) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
-      console.log(`[GromitOffscreen] Page ${i}: Rendering full page snapshot (300 DPI)...`);
       const pageTextSnippet = await Promise.race([
         (async () => {
           const page = await doc.getPage(i);
           const start = performance.now();
-          const viewport = page.getViewport({ scale: 2.5 });
+          const viewport = page.getViewport({ scale: 2 });
           const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           ctx.fillStyle = "white";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
+          console.log(`[GromitOffscreen] Page ${i}: Rendering Snapshot (${canvas.width}x${canvas.height})...`);
           const renderContext = {
             canvasContext: ctx,
-            viewport,
-            enableWebGL: false
+            viewport
           };
           await page.render(renderContext).promise;
-          console.log(`[GromitOffscreen] Page ${i}: Rendered at ${canvas.width}x${canvas.height}. Starting Multi-Pass OCR...`);
+          console.log(`[GromitOffscreen] Page ${i}: Snapshot Ready. Starting Tiling Scan...`);
           let text = await detectTextWithTiling(canvas);
           if (!text.trim()) {
-            console.log(`[GromitOffscreen] Page ${i}: No text found on normal render. Trying Inversion...`);
+            console.log(`[GromitOffscreen] Page ${i}: No text found. Trying Inversion...`);
             ctx.globalCompositeOperation = "difference";
             ctx.fillStyle = "white";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -89924,7 +89923,7 @@ async function performNativeOCR(doc) {
             console.log(`[GromitOffscreen] Page ${i} SUCCESS in ${(end - start).toFixed(0)}ms (${text.length} chars)`);
             return text + " ";
           } else {
-            console.log(`[GromitOffscreen] Page ${i}: No text found after full rendering.`);
+            console.log(`[GromitOffscreen] Page ${i}: No text found.`);
             return "";
           }
         })(),
@@ -89932,7 +89931,7 @@ async function performNativeOCR(doc) {
       ]);
       fullOcrText += pageTextSnippet;
     } catch (err) {
-      console.error(`[GromitOffscreen] Page ${i} skipped:`, err);
+      console.error(`[GromitOffscreen] Page ${i} failed or timed out:`, err);
       fullOcrText += " ";
       continue;
     }
