@@ -89850,128 +89850,6 @@ async function extractPdfText(arrayBuffer) {
   bodyText = "";
   return finalResult;
 }
-function applyMedianFilter(ctx, width, height) {
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  const output = new Uint8ClampedArray(data.length);
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const vals = [];
-      for (let ky = -1; ky <= 1; ky++) {
-        for (let kx = -1; kx <= 1; kx++) {
-          const idx = ((y + ky) * width + (x + kx)) * 4;
-          vals.push(data[idx]);
-        }
-      }
-      vals.sort((a, b) => a - b);
-      const median = vals[4];
-      const dstIdx = (y * width + x) * 4;
-      output[dstIdx] = output[dstIdx + 1] = output[dstIdx + 2] = median;
-      output[dstIdx + 3] = 255;
-    }
-  }
-  ctx.putImageData(new ImageData(output, width, height), 0, 0);
-}
-function applyDilation(ctx, width, height) {
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  const output = new Uint8ClampedArray(data.length);
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      let minVal = 255;
-      for (let ky = -1; ky <= 1; ky++) {
-        for (let kx = -1; kx <= 1; kx++) {
-          const idx = ((y + ky) * width + (x + kx)) * 4;
-          if (data[idx] < minVal) minVal = data[idx];
-        }
-      }
-      const dstIdx = (y * width + x) * 4;
-      output[dstIdx] = output[dstIdx + 1] = output[dstIdx + 2] = minVal;
-      output[dstIdx + 3] = 255;
-    }
-  }
-  ctx.putImageData(new ImageData(output, width, height), 0, 0);
-}
-function applySharpen(ctx, width, height) {
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  const side = 3;
-  const halfSide = Math.floor(side / 2);
-  const kernel = [
-    0,
-    -1,
-    0,
-    -1,
-    5,
-    -1,
-    0,
-    -1,
-    0
-  ];
-  const output = new Uint8ClampedArray(data.length);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const dstOff = (y * width + x) * 4;
-      let r = 0, g = 0, b = 0;
-      for (let cy2 = 0; cy2 < side; cy2++) {
-        for (let cx2 = 0; cx2 < side; cx2++) {
-          const scy = Math.min(height - 1, Math.max(0, y + cy2 - halfSide));
-          const scx = Math.min(width - 1, Math.max(0, x + cx2 - halfSide));
-          const srcOff = (scy * width + scx) * 4;
-          const wt = kernel[cy2 * side + cx2];
-          r += data[srcOff] * wt;
-          g += data[srcOff + 1] * wt;
-          b += data[srcOff + 2] * wt;
-        }
-      }
-      output[dstOff] = r;
-      output[dstOff + 1] = g;
-      output[dstOff + 2] = b;
-      output[dstOff + 3] = 255;
-    }
-  }
-  ctx.putImageData(new ImageData(output, width, height), 0, 0);
-}
-function applyAdaptiveThreshold(ctx, width, height) {
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  const s = Math.floor(width / 8);
-  const t = 15;
-  const gray = new Uint8ClampedArray(width * height);
-  for (let i = 0; i < data.length; i += 4) {
-    gray[i / 4] = (data[i] + data[i + 1] + data[i + 2]) / 3;
-  }
-  const integral = new Uint32Array(width * height);
-  for (let x = 0; x < width; x++) {
-    let sum2 = 0;
-    for (let y = 0; y < height; y++) {
-      sum2 += gray[y * width + x];
-      if (x === 0) {
-        integral[y * width + x] = sum2;
-      } else {
-        integral[y * width + x] = integral[y * width + (x - 1)] + sum2;
-      }
-    }
-  }
-  const halfS = Math.floor(s / 2);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const x1 = Math.max(0, x - halfS);
-      const x2 = Math.min(width - 1, x + halfS);
-      const y1 = Math.max(0, y - halfS);
-      const y2 = Math.min(height - 1, y + halfS);
-      const count = (x2 - x1) * (y2 - y1);
-      let sum2 = integral[y2 * width + x2];
-      if (x1 > 0) sum2 -= integral[y2 * width + (x1 - 1)];
-      if (y1 > 0) sum2 -= integral[(y1 - 1) * width + x2];
-      if (x1 > 0 && y1 > 0) sum2 += integral[(y1 - 1) * width + (x1 - 1)];
-      const idx = (y * width + x) * 4;
-      const res = gray[y * width + x] * count < sum2 * (100 - t) / 100 ? 0 : 255;
-      data[idx] = data[idx + 1] = data[idx + 2] = res;
-    }
-  }
-  ctx.putImageData(imageData, 0, 0);
-}
 async function detectTextWithTiling(canvas) {
   const detector = new window.TextDetector();
   const TILE_SIZE = 1024;
@@ -89991,18 +89869,7 @@ async function detectTextWithTiling(canvas) {
         if (tw <= 0 || th <= 0) break;
         try {
           const tileBitmap = await createImageBitmap(bitmap, x, y, tw, th);
-          let detectionTarget = tileBitmap;
-          if (tileScale !== 1) {
-            const tCanvas = document.createElement("canvas");
-            tCanvas.width = tw * tileScale;
-            tCanvas.height = th * tileScale;
-            const tCtx = tCanvas.getContext("2d", { willReadFrequently: true });
-            tCtx.imageSmoothingEnabled = true;
-            tCtx.imageSmoothingQuality = "high";
-            tCtx.drawImage(tileBitmap, 0, 0, tCanvas.width, tCanvas.height);
-            detectionTarget = tCanvas;
-          }
-          const results = await detector.detect(detectionTarget);
+          const results = await detector.detect(tileBitmap);
           if (results.length > 0) {
             const tileText = results.map((r) => r.rawValue).filter((v) => v.trim().length > 0).join(" ");
             resultsAcc.push(tileText);
@@ -90016,56 +89883,12 @@ async function detectTextWithTiling(canvas) {
     }
     return resultsAcc.join(" ");
   };
-  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.6) for ${width}x${height}...`);
-  let text = await performScan(canvas);
-  if (text.trim().length < 50 && (width > 2e3 || height > 2e3)) {
-    console.log(`[GromitOffscreen] PASS 2: Trying Downsampling (0.5x)...`);
-    const scaledCanvas = document.createElement("canvas");
-    scaledCanvas.width = width * 0.5;
-    scaledCanvas.height = height * 0.5;
-    const sCtx = scaledCanvas.getContext("2d", { willReadFrequently: true });
-    sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
-    const scaledText = await performScan(scaledCanvas);
-    if (scaledText.trim().length > text.trim().length) {
-      text = scaledText;
-    }
-  }
-  if (text.trim().length < 50) {
-    console.log(`[GromitOffscreen] PASS 3: Applying Vision Optimizer (Bradley & Sharpen)...`);
-    const optimizedCanvas = document.createElement("canvas");
-    optimizedCanvas.width = width;
-    optimizedCanvas.height = height;
-    const oCtx = optimizedCanvas.getContext("2d", { willReadFrequently: true });
-    oCtx.drawImage(canvas, 0, 0);
-    applySharpen(oCtx, width, height);
-    applyAdaptiveThreshold(oCtx, width, height);
-    const optText = await performScan(optimizedCanvas);
-    if (optText.trim().length > text.trim().length) {
-      console.log(`[GromitOffscreen] Vision Optimizer SUCCESS (${optText.length} chars).`);
-      text = optText;
-    }
-  }
-  if (text.trim().length < 50) {
-    console.log(`[GromitOffscreen] PASS 4: Applying Sanctuary Final (Dilation + Median + Upscale Tiling)...`);
-    const finalCanvas = document.createElement("canvas");
-    finalCanvas.width = width;
-    finalCanvas.height = height;
-    const fCtx = finalCanvas.getContext("2d", { willReadFrequently: true });
-    fCtx.drawImage(canvas, 0, 0);
-    applyMedianFilter(fCtx, width, height);
-    applyDilation(fCtx, width, height);
-    applyAdaptiveThreshold(fCtx, width, height);
-    const finalText = await performScan(finalCanvas, 2);
-    if (finalText.trim().length > text.trim().length) {
-      console.log(`[GromitOffscreen] Sanctuary Final SUCCESS (${finalText.length} chars).`);
-      text = finalText;
-    }
-  }
-  return text;
+  console.log(`[GromitOffscreen] Tiling Scan starting (v5.8.7) for ${width}x${height}...`);
+  return await performScan(canvas);
 }
 async function performNativeOCR(doc) {
   let fullOcrText = "";
-  console.log(`[GromitOffscreen] Starting Preview-Style OCR (v5.8.6) for ${doc.numPages} pages...`);
+  console.log(`[GromitOffscreen] Starting Ultra-Light OCR (v5.8.7) for ${doc.numPages} pages...`);
   for (let i = 1; i <= doc.numPages; i++) {
     try {
       console.log(`[GromitOffscreen] Page ${i}: Rendering full page snapshot (300 DPI)...`);
