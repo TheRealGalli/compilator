@@ -352,22 +352,23 @@ export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
         console.log(`[OllamaLocal] Text truncated for LLM: ${text.length} -> ${MAX_LLM_CHARS} chars (regex ran on full text)`);
     }
 
-    // ULTRA-CONCISE PROMPT (User's Proven Prompt)
-    // We use the exact phrasing that worked in chat.
-    const prompt = `find PERSONAL data in the text and do a token for pseuddonimiz it , return only the list of DATA as a tokenized format.
+    // ULTRA-CONCISE PROMPT (Improved for Small Models)
+    // We use a strictly formatted list with Italian examples to guide the model better.
+    const prompt = `find PERSONAL data in the text and do a token for pseuddonimiz it.
 IMPORTANT RULES:
 1. You have a strict limit of 1024 tokens. BE CONCISE.
-2. Return ONLY a list in this format: "TOKEN: VALUE".
-3. If you find a value but don't know the category, use "General_PII".
+2. Return ONLY a list in this format: "CATEGORY: VALUE".
+3. If you find a value but don't know the category, use "gen_pii".
 4. Do NOT include descriptions, explanations, or markdown formatting like **bold**.
-5. IF NO PII IS FOUND, RETURN AN EMPTY LIST. DO NOT INVENT DATA.
+5. Do NOT output the examples provided below.
+6. IF NO PII IS FOUND, RETURN AN EMPTY LIST.
 
 EXAMPLE INPUT:
-"John Doe was born in New York on 01/01/1980."
+"Mario Rossi nato a Roma il 01/01/1980."
 
 EXAMPLE OUTPUT:
-FULL_NAME: John Doe
-PLACE_OF_BIRTH: New York
+FULL_NAME: Mario Rossi
+PLACE_OF_BIRTH: Roma
 DATE_OF_BIRTH: 01/01/1980
 
 Text:

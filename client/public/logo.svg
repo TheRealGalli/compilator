@@ -1,5 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M12 6v12"/>
-  <path d="M17.196 9L6.804 15"/>
-  <path d="M6.804 9l10.392 6"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <g transform="translate(51.2, 51.2) scale(0.9)">
+      <!-- Background Squircle with Shadow -->
+      <!-- We duplicate the path to apply shadow to the bottom one, or just apply filter to the shape.
+           If we apply filter to the shape with white fill, the shadow will appear behind it. 
+           (feDropShadow draws the source alpha + shadow, so it works perfectly on a filled shape). -->
+      <path d="M512 1024C864 1024 1024 864 1024 512C1024 160 864 0 512 0C160 0 0 160 0 512C0 864 160 1024 512 1024Z" fill="white" filter="url(#shadow)"/>
+      
+      <!-- Asterisk - Centered and Padded -->
+      <g transform="translate(512, 512) scale(24)"> 
+          <g transform="translate(-12, -12)">
+            <path d="M12 2v20" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 2v20" transform="rotate(60 12 12)" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 2v20" transform="rotate(120 12 12)" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+      </g>
+  </g>
 </svg>

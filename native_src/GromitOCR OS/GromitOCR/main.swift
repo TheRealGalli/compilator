@@ -108,9 +108,34 @@ class GromitBridgeApp: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Esci", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem?.menu = menu
         
-        // 3. Start Native Messaging Loop in background
+        // 3. Launch Ollama if needed
+        launchOllama()
+
+        // 4. Start Native Messaging Loop in background
         DispatchQueue.global(qos: .userInitiated).async {
             self.runNativeMessagingLoop()
+        }
+    }
+
+    func launchOllama() {
+        let ollamaAppUrl = URL(fileURLWithPath: "/Applications/Ollama.app")
+        let workspace = NSWorkspace.shared
+        
+        // Check if already running
+        let isRunning = workspace.runningApplications.contains { app in
+            app.bundleURL == ollamaAppUrl || app.localizedName == "Ollama"
+        }
+        
+        if !isRunning {
+            if #available(macOS 10.15, *) {
+                let config = NSWorkspace.OpenConfiguration()
+                config.activates = false // Don't steal focus
+                config.hides = true      // Launch hidden (menu bar only)
+                workspace.openApplication(at: ollamaAppUrl, configuration: config) { _, _ in }
+            } else {
+                // Fallback for older macOS
+                _ = try? workspace.launchApplication(at: ollamaAppUrl, options: [.withoutActivation, .andHide], configuration: [:])
+            }
         }
     }
     
