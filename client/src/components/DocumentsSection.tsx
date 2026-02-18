@@ -1,13 +1,21 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2, Send, Cpu } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2, Send, Cpu, Check, ChevronDown, Download, Cloud } from "lucide-react";
 import { FaChessKing } from "react-icons/fa6";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
@@ -21,6 +29,7 @@ import { it } from "date-fns/locale";
 import { useGoogleDrive, DriveCategory } from "@/contexts/GoogleDriveContext";
 import { useQuery } from "@tanstack/react-query";
 import { LoginOverlay } from "./LoginOverlay";
+import { AVAILABLE_MODELS } from "@/lib/ollama";
 
 
 export function DocumentsSection() {
@@ -49,7 +58,7 @@ export function DocumentsSection() {
     navigateToFolder, goToParentFolder, resetNavigation,
     isConnected: isConnectedDrive
   } = useGoogleDrive();
-  const { status: ollamaStatus } = useOllama();
+  const { status: ollamaStatus, selectedModel, setModel, installedModels, accountStatus } = useOllama();
   const [localSearch, setLocalSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
@@ -710,14 +719,70 @@ export function DocumentsSection() {
                 </Button>
               )}
               {ollamaStatus === 'connected' && (
-                <Button
-                  variant="outline"
-                  className="gap-2 border-slate-50 hover:bg-slate-50 hover:text-slate-600 transition-all hover:border-slate-200 shadow-sm cursor-default"
-                  disabled={!isAuthenticated}
-                >
-                  <Cpu className="w-4 h-4" />
-                  Ollama
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="gap-2 border-slate-50 hover:bg-slate-50 hover:text-slate-600 transition-all hover:border-slate-200 shadow-sm"
+                      disabled={!isAuthenticated}
+                    >
+                      <Cpu className="w-4 h-4" />
+                      {selectedModel ? selectedModel.replace('gemma3:', 'Gemma ').replace('gpt-oss:', 'GPT-OSS ').replace('-cloud', '') : 'Ollama'}
+                      <ChevronDown className="w-3 h-3 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Modelli Locali</DropdownMenuLabel>
+                    {AVAILABLE_MODELS.local.map(model => {
+                      const isInstalled = installedModels.some(im => im === model.id || im.startsWith(model.id));
+                      return (
+                        <DropdownMenuItem
+                          key={model.id}
+                          disabled={!isInstalled}
+                          onClick={() => setModel(model.id)}
+                          className="justify-between cursor-pointer"
+                        >
+                          <span>{model.label}</span>
+                          {isInstalled ? (
+                            selectedModel === model.id ? <Check className="w-4 h-4" /> : null
+                          ) : (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <span className="text-[10px] text-muted-foreground flex items-center gap-1 opacity-70">
+                                    <Download className="w-3 h-3" /> {model.size}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Esegui: ollama pull {model.id}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="flex items-center gap-2">
+                      Modelli Cloud
+                      {accountStatus !== 'connected' && <span className="text-[10px] text-muted-foreground font-normal">(Login richiesto)</span>}
+                    </DropdownMenuLabel>
+                    {AVAILABLE_MODELS.cloud.map(model => (
+                      <DropdownMenuItem
+                        key={model.id}
+                        disabled={accountStatus !== 'connected'}
+                        onClick={() => setModel(model.id)}
+                        className="justify-between cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Cloud className="w-3 h-3 text-blue-500" />
+                          {model.label}
+                        </span>
+                        {selectedModel === model.id && <Check className="w-4 h-4" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </div>

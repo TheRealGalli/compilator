@@ -254,7 +254,7 @@ export function DocumentCompilerSection({
     resetSession
   } = useCompiler();
 
-  const { status: ollamaStatus } = useOllama();
+  const { status: ollamaStatus, selectedModel } = useOllama();
 
   const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof templates | "">("");
   const [isCompiledView, setIsCompiledView] = useState(false);
@@ -499,7 +499,7 @@ export function DocumentCompilerSection({
     if (!text || text.trim() === "") return { anonymized: text, newVault: currentVault };
 
     try {
-      const findings = await extractPIILocal(text);
+      const findings = await extractPIILocal(text, selectedModel);
       const vaultMap = new Map<string, string>(Object.entries(currentVault));
 
       for (const finding of findings) {
@@ -543,7 +543,7 @@ export function DocumentCompilerSection({
     setIsCompiling(true); // Show loader if needed
     try {
       console.log(`[DocumentCompiler] Processing manual input for scan ${manualInputScanId}...`);
-      const findings = await extractPIILocal(manualInputText);
+      const findings = await extractPIILocal(manualInputText, selectedModel);
 
       const newVault = { ...reportVault };
       const newCounts = { ...reportVaultCounts };
@@ -649,7 +649,7 @@ export function DocumentCompilerSection({
           // Helper to extract findings and update vaultMap
           const extractAndVault = async (text: string, vMap: Map<string, string>, vCounts: Map<string, number>) => {
             if (!text || text.trim().length === 0) return;
-            const findings = await extractPIILocal(text);
+            const findings = await extractPIILocal(text, selectedModel);
 
             // Dynamic Category Strategy: LLM is the source of truth.
             // We only keep the synonym mapping but allow ANY new category.
@@ -833,7 +833,7 @@ export function DocumentCompilerSection({
               console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
               console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
 
-              const findings = await extractPIILocal(doc.text);
+              const findings = await extractPIILocal(doc.text, selectedModel);
 
               console.log(`[DocumentCompiler] <- '${doc.name}' finito: ${findings.length} elementi trovati.`);
               return { name: doc.name, findings };

@@ -10,7 +10,20 @@ export interface PIIFinding {
 }
 
 let currentBaseUrl = 'http://localhost:11434';
-const OLLAMA_MODEL = 'gemma3:1b';
+export const DEFAULT_OLLAMA_MODEL = 'gemma3:1b';
+
+export const AVAILABLE_MODELS = {
+    local: [
+        { id: 'gemma3:1b', label: 'Gemma 3 (1B)', size: '1.5GB' },
+        { id: 'gemma3:4b', label: 'Gemma 3 (4B)', size: '3.0GB' },
+        { id: 'gemma3:12b', label: 'Gemma 3 (12B)', size: '8.0GB' },
+        { id: 'gemma3:27b', label: 'Gemma 3 (27B)', size: '18GB' },
+    ],
+    cloud: [
+        { id: 'gpt-oss:20b-cloud', label: 'GPT-OSS (20B)', provider: 'Cloud' },
+        { id: 'gpt-oss:120b-cloud', label: 'GPT-OSS (120B)', provider: 'Cloud' },
+    ]
+};
 
 // Removed CHUNK_SIZE as we are now doing Full Text
 // const CHUNK_SIZE = 32000;
@@ -145,19 +158,19 @@ export async function testOllamaConnection(): Promise<boolean> {
 
             // Controllo per gemma3:1b
             const hasModel = models.some((name: string) =>
-                name === OLLAMA_MODEL ||
-                name.startsWith(`${OLLAMA_MODEL}:`) ||
+                name === DEFAULT_OLLAMA_MODEL ||
+                name.startsWith(`${DEFAULT_OLLAMA_MODEL}:`) ||
                 name === 'gemma3:latest' ||
                 (name.includes('gemma3') && name.includes('1b'))
             );
 
             if (hasModel) {
-                // console.log(`[OllamaLocal] PRONTO! Modello ${OLLAMA_MODEL} trovato su ${url}.`);
+                // console.log(`[OllamaLocal] PRONTO! Modello ${DEFAULT_OLLAMA_MODEL} trovato su ${url}.`);
                 currentBaseUrl = url;
                 return true;
             } else {
-                console.warn(`[OllamaLocal] Ollama attivo su ${url}, ma il modello '${OLLAMA_MODEL}' non trovato.`);
-                console.info(`[OllamaLocal] SOLUZIONE: Esegui 'ollama pull ${OLLAMA_MODEL}'`);
+                console.warn(`[OllamaLocal] Ollama attivo su ${url}, ma il modello '${DEFAULT_OLLAMA_MODEL}' non trovato.`);
+                console.info(`[OllamaLocal] SOLUZIONE: Esegui 'ollama pull ${DEFAULT_OLLAMA_MODEL}'`);
             }
         } catch (err) {
             lastError = err;
@@ -174,6 +187,30 @@ export async function testOllamaConnection(): Promise<boolean> {
     }
 
     return false;
+}
+
+/**
+ * Recupera la lista dei modelli installati localmente su Ollama.
+ */
+export async function getRunningModels(): Promise<string[]> {
+    const urls = [
+        'http://localhost:11434',
+        'http://127.0.0.1:11434'
+    ];
+
+    for (const url of urls) {
+        try {
+            const response = await smartFetch(`${url}/api/tags`, { method: 'GET' });
+            if (response.ok) {
+                const data = await response.json();
+                currentBaseUrl = url; // Update base url if successful
+                return (data.models || []).map((m: any) => m.name);
+            }
+        } catch (e) {
+            // ignore
+        }
+    }
+    return [];
 }
 
 /**
@@ -316,7 +353,7 @@ function normalizeFindings(input: any): any[] {
 // Note: The actual prompt is now generated dynamically inside extractPIILocal
 
 
-export async function extractPIILocal(text: string): Promise<PIIFinding[]> {
+export async function extractPIILocal(text: string, modelId: string = DEFAULT_OLLAMA_MODEL): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
     // console.log(`[OllamaLocal] Starting Hybrid PII Extraction on ${text.length} chars...`);
@@ -379,7 +416,7 @@ ${llmText}
 
     try {
         const payload = {
-            model: OLLAMA_MODEL,
+            model: modelId,
             messages: [{ role: 'user', content: prompt }],
             stream: false,
             // format: 'json', // REMOVE JSON FORMAT ENFORCEMENT - Let it speak naturally

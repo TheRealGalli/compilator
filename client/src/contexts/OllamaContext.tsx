@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { testOllamaConnection } from '@/lib/ollama';
+import { testOllamaConnection, getRunningModels, DEFAULT_OLLAMA_MODEL } from '@/lib/ollama';
 import { useQuery } from '@tanstack/react-query';
 
 type OllamaStatus = 'loading' | 'connected' | 'disconnected';
@@ -13,6 +13,10 @@ interface OllamaContextType {
     accountToken?: string;
     connectAccount: (email: string, token: string) => Promise<void>;
     disconnectAccount: () => void;
+    expectedModel?: string; // Modello che ci aspettiamo sia il default
+    selectedModel: string;
+    setModel: (model: string) => void;
+    installedModels: string[];
 }
 
 const OllamaContext = createContext<OllamaContextType | undefined>(undefined);
@@ -28,6 +32,10 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
     const [accountToken, setAccountToken] = useState<string | undefined>(() => {
         return localStorage.getItem('ollama_account_token') || undefined;
     });
+    const [selectedModel, setSelectedModel] = useState<string>(() => {
+        return localStorage.getItem('ollama_selected_model') || DEFAULT_OLLAMA_MODEL;
+    });
+    const [installedModels, setInstalledModels] = useState<string[]>([]);
     const isChecking = useRef(false);
 
     // Auth Guard: Only check Ollama if user is logged in
@@ -55,9 +63,13 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
             if (isDirectReachable) {
                 console.log('[OllamaContext] Connessione locale OK.');
                 setStatus('connected');
+                // Fetch models dynamically
+                const models = await getRunningModels();
+                setInstalledModels(models);
             } else {
                 console.log('[OllamaContext] Connessione locale FALLITA.');
                 setStatus('disconnected');
+                setInstalledModels([]);
             }
         } catch (error) {
             console.error('[OllamaContext] Errore critico:', error);
@@ -111,8 +123,12 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
         setAccountToken(undefined);
         localStorage.removeItem('ollama_account_status');
         localStorage.removeItem('ollama_account_email');
-        localStorage.removeItem('ollama_account_token');
         console.log('[OllamaContext] Account disconnesso.');
+    }, []);
+
+    const setModel = useCallback((model: string) => {
+        setSelectedModel(model);
+        localStorage.setItem('ollama_selected_model', model);
     }, []);
 
     return (
@@ -123,7 +139,10 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
             accountEmail,
             accountToken,
             connectAccount,
-            disconnectAccount
+            disconnectAccount,
+            selectedModel,
+            setModel,
+            installedModels
         }}>
             {children}
         </OllamaContext.Provider>
