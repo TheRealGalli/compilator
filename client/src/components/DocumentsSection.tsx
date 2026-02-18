@@ -694,7 +694,7 @@ export function DocumentsSection() {
                   Gmail
                 </Button>
               )}
-              {isConnectedDrive && (
+              {isConnected && (
                 <Button
                   variant="outline"
                   className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
