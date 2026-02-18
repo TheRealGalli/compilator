@@ -247,30 +247,42 @@ export function RefineChat({
         setIsLoading(true);
 
         try {
-            // PRIVACY: Anonymize user instruction locally before sending
-            console.log(`[RefineChat] Anonymizing instruction: "${userMsg.text}" with model ${selectedModel}...`);
-            const { anonymized: anonymizedInstruction, newVault: updatedVault } = await anonymizeWithOllamaLocal(
-                userMsg.text,
-                guardrailVault,
-                selectedModel
-            );
+            // CHECK IF PAWN (PRIVACY) IS ACTIVE
+            const isPawnActive = compileContext.activeGuardrails?.includes('pawn');
+            console.log(`[RefineChat] Pawn Guardrail is ${isPawnActive ? 'ACTIVE' : 'INACTIVE'}`);
 
-            // Update local vault immediately
-            setGuardrailVault(updatedVault);
+            let finalUserInstruction = userMsg.text;
+            let finalCurrentContent = currentContent;
+            let finalNotes = compileContext.notes;
+            let updatedVault = guardrailVault;
 
-            // PRIVACY CRITICAL: Anonymize the DOCUMENT CONTENT and NOTES using the updated vault.
-            // This ensures the server never sees raw PII in the context or the document.
-            const anonymizedContent = performMechanicalGlobalSweep(currentContent, updatedVault);
-            const anonymizedNotes = compileContext.notes ? performMechanicalGlobalSweep(compileContext.notes, updatedVault) : compileContext.notes;
+            if (isPawnActive) {
+                // PRIVACY: Anonymize user instruction locally before sending
+                console.log(`[RefineChat] Anonymizing instruction: "${userMsg.text}" with model ${selectedModel}...`);
+                const result = await anonymizeWithOllamaLocal(
+                    userMsg.text,
+                    guardrailVault,
+                    selectedModel
+                );
+                finalUserInstruction = result.anonymized;
+                updatedVault = result.newVault;
+
+                // Update local vault immediately
+                setGuardrailVault(updatedVault);
+
+                // PRIVACY CRITICAL: Anonymize the DOCUMENT CONTENT and NOTES using the updated vault.
+                finalCurrentContent = performMechanicalGlobalSweep(currentContent, updatedVault);
+                finalNotes = compileContext.notes ? performMechanicalGlobalSweep(compileContext.notes, updatedVault) : compileContext.notes;
+            }
 
             const response = await apiRequest('POST', '/api/refine', {
                 compileContext: {
                     ...compileContext,
-                    notes: anonymizedNotes // Send anonymized notes
+                    notes: finalNotes // Send potentially anonymized notes
                 },
-                currentContent: anonymizedContent, // Send anonymized content
+                currentContent: finalCurrentContent, // Send potentially anonymized content
 
-                userInstruction: anonymizedInstruction, // SEND ANONYMIZED
+                userInstruction: finalUserInstruction,
                 mentions: mentions.map(m => ({ source: m.source, text: m.text, label: m.label })),
                 mentionRegistry: mentionRegistry.map(m => ({ source: m.source, text: m.text, label: m.label })),
                 chatHistory: messages.map(m => ({ role: m.role, text: m.text })),
@@ -285,7 +297,12 @@ export function RefineChat({
 
             // PRIVACY: De-anonymize the explanation received from AI
             const rawExplanation = data.explanation || "Ecco la bozza modificata. Controlla e conferma.";
-            const deanonymizedExplanation = performMechanicalReverseSweep(rawExplanation, data.guardrailVault || updatedVault);
+            let deanonymizedExplanation = rawExplanation;
+
+            // Only de-anonymize if Pawn was active (otherwise server returned clear text)
+            if (isPawnActive) {
+                deanonymizedExplanation = performMechanicalReverseSweep(rawExplanation, data.guardrailVault || updatedVault);
+            }
 
             const aiMsg: ChatMessage = {
                 id: (Date.now() + 1).toString(),
@@ -302,7 +319,9 @@ export function RefineChat({
             setMessages(prev => [...prev, aiMsg]);
 
             if (data.newContent) {
-                onPreview(data.newContent);
+                // If Pawn was active, the server returned tokens. We need to de-anonymize locally before previewing.
+                const contentToShow = isPawnActive ? performMechanicalReverseSweep(data.newContent, data.guardrailVault || updatedVault) : data.newContent;
+                onPreview(contentToShow);
             }
 
         } catch (error) {
