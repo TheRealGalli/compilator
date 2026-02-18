@@ -382,13 +382,18 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
     // 2. LLM SWEEPER (Full Text Discovery)
     // Regex runs on FULL text above, but LLM has a context window limit (num_ctx: 4096 ≈ 3k tokens).
     // We truncate text for the LLM only to avoid 120s timeouts on large documents.
-    const MAX_LLM_CHARS = 4500;
+    // DYNAMIC LIMITS based on Model Capacity
+    const isSmallModel = modelId.includes('1b');
+    // User requested: 16k chars for 1b, 32k tokens (~128k chars) for others
+    const MAX_LLM_CHARS = isSmallModel ? 16000 : 128000;
+    const CONTEXT_WINDOW = isSmallModel ? 8192 : 32768;
+
     const llmText = text.length > MAX_LLM_CHARS
         ? text.substring(0, MAX_LLM_CHARS) + '\n[...]'
         : text;
 
     if (text.length > MAX_LLM_CHARS) {
-        console.log(`[OllamaLocal] Text truncated for LLM: ${text.length} -> ${MAX_LLM_CHARS} chars (regex ran on full text)`);
+        console.log(`[OllamaLocal] Text truncated for LLM: ${text.length} -> ${MAX_LLM_CHARS} chars (Model: ${modelId})`);
     }
 
     // ULTRA-CONCISE PROMPT (Improved for Small Models)
@@ -424,7 +429,7 @@ ${llmText}
             // format: 'json', // REMOVE JSON FORMAT ENFORCEMENT - Let it speak naturally
             options: {
                 temperature: 0.15, // Slightly bumped to avoid repetitive loops
-                num_ctx: 4096, // Context window
+                num_ctx: CONTEXT_WINDOW, // Context window
                 num_predict: 1024, // CAP OUTPUT to ~750 words to prevent infinite loops (Critical for 120s timeout)
                 top_k: 20,
                 top_p: 0.9

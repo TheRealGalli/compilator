@@ -264,7 +264,7 @@ ${text} [/INST]`;
                 const parsed = JSON.parse(rawResponse);
                 findings = parsed.findings || [];
             } catch (e) {
-                console.error("[AiService] FAILED to parse Ollama JSON:", rawResponse);
+                console.error("[AiService] FAILED to parse Ollama JSON.");
                 // Simple regex fallback if JSON parsing fails
                 const regex = /"value":\s*"([^"]+)",\s*"category":\s*"([^"]+)"/g;
                 let match;

@@ -1842,7 +1842,7 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
         const urls = notes.match(urlRegex);
         if (urls && urls.length > 0) {
           hasManualUrls = true;
-          console.log(`[DEBUG Compile] Found URLs in notes: ${urls.join(', ')}`);
+          // console.log(`[DEBUG Compile] Found URLs in notes: ${urls.join(', ')}`);
           for (const url of urls) {
             const content = await fetchUrlContent(url);
             if (content) {
@@ -2057,21 +2057,13 @@ ISTRUZIONI OUTPUT:
         console.log(`[GUARDIAN] Refine Vault size: ${vault.size}`);
       }
 
-      // Sanitize instruction and current content if Pawn is active
-      const processedInstruction = isPawnActive ? await aiService.anonymizeWithDLP(userInstruction, vault) : userInstruction;
-      const processedContent = isPawnActive ? await aiService.anonymizeWithDLP(currentContent, vault) : currentContent;
-      const processedNotes = isPawnActive ? await aiService.anonymizeWithDLP(notes, vault) : notes;
-
-      // Sanitize mentions and chat history as well
-      const processedChatHistory = isPawnActive ? await Promise.all((chatHistory || []).map(async (m: any) => ({
-        ...m,
-        text: await aiService.anonymizeWithDLP(m.text, vault)
-      }))) : chatHistory;
-
-      const processedMentions = isPawnActive ? await Promise.all((mentions || []).map(async (m: any) => ({
-        ...m,
-        text: await aiService.anonymizeWithDLP(m.text, vault)
-      }))) : mentions;
+      // Refine/Chat Privacy: 
+      // We TRUST the client to have anonymized 'userInstruction'.
+      const processedInstruction = userInstruction;
+      const processedContent = currentContent;
+      const processedNotes = notes;
+      const processedChatHistory = chatHistory;
+      const processedMentions = mentions;
 
       const systemPrompt = buildSystemPrompt({
         dateTimeIT,
@@ -2084,7 +2076,7 @@ ISTRUZIONI OUTPUT:
         multimodalFiles,
         fetchedCompilerContext,
         hasExternalSources,
-        isPawnActive // Pass the flag to the system prompt builder
+        isPawnActive
       });
 
       // Format mentions for the AI using the new label system (#C1, #T1) and position offsets
@@ -2161,7 +2153,7 @@ ISTRUZIONI OPERATIVE:
         const cleanJson = jsonMatch ? jsonMatch[0] : jsonResponse;
         parsed = JSON.parse(cleanJson);
       } catch (e) {
-        console.error("Failed to parse JSON from AI. Raw response:", jsonResponse);
+        console.error("Failed to parse JSON from AI.");
         // Fallback: if it's not JSON, treat the whole thing as an explanation
         parsed = {
           newContent: null,
@@ -2171,10 +2163,8 @@ ISTRUZIONI OPERATIVE:
 
       // De-sanitize response if Pawn was active
       let finalParsed = parsed;
-      if (isPawnActive) {
-        if (finalParsed.newContent) finalParsed.newContent = desanitizeText(finalParsed.newContent, vault);
-        if (finalParsed.explanation) finalParsed.explanation = desanitizeText(finalParsed.explanation, vault);
-      }
+      // ZERO-DATA: DO NOT De-sanitize on server. Return tokens to client.
+      // The client holds the Vault and will restore real values.
 
       res.json({
         success: true,

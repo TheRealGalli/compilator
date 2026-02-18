@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MentionButton } from './MentionButton';
 import { useCompiler } from '@/contexts/CompilerContext';
+import { anonymizeWithOllamaLocal, performMechanicalReverseSweep } from '@/lib/privacy';
 
 interface ChatMessage {
     id: string;
@@ -33,6 +34,7 @@ interface RefineChatProps {
     pendingMention?: { text: string; id: string; start?: number; end?: number } | null;
     onMentionConsumed?: () => void;
     onMentionCreated?: (text: string, source: 'copilot' | 'template' | 'anteprema', start?: number, end?: number) => void;
+    selectedModel?: string;
 }
 
 interface MentionContext {
@@ -56,7 +58,8 @@ export function RefineChat({
     minimal = false,
     pendingMention,
     onMentionConsumed,
-    onMentionCreated
+    onMentionCreated,
+    selectedModel = "gemma2:9b" // Default fallback
 }: RefineChatProps) {
     const {
         messages, setMessages,
@@ -244,15 +247,32 @@ export function RefineChat({
         setIsLoading(true);
 
         try {
+            // PRIVACY: Anonymize user instruction locally before sending
+            console.log(`[RefineChat] Anonymizing instruction: "${userMsg.text}" with model ${selectedModel}...`);
+            const { anonymized: anonymizedInstruction, newVault: updatedVault } = await anonymizeWithOllamaLocal(
+                userMsg.text,
+                guardrailVault,
+                selectedModel
+            );
+
+            // Update local vault immediately
+            setGuardrailVault(updatedVault);
+
             const response = await apiRequest('POST', '/api/refine', {
                 compileContext,
-                currentContent,
-                userInstruction: userMsg.text,
+                currentContent, // This is already the "compiled" version which might have tokens? No, compileContext has the original?
+                // Actually currentContent in Refine is usually the DE-anonymized view if we are showing it to user?
+                // Wait, if we are in "Pawn" mode, the content in the editor IS the one with tokens or not?
+                // In DocumentCompiler, "compiledContent" is the result of the compilation.
+                // If Pawn is active, compiledContent HAS tokens.
+                // So we just send it as is.
+
+                userInstruction: anonymizedInstruction, // SEND ANONYMIZED
                 mentions: mentions.map(m => ({ source: m.source, text: m.text, label: m.label })),
                 mentionRegistry: mentionRegistry.map(m => ({ source: m.source, text: m.text, label: m.label })),
                 chatHistory: messages.map(m => ({ role: m.role, text: m.text })),
                 webResearch: compileContext.webResearch,
-                guardrailVault: guardrailVault // Use current session vault
+                guardrailVault: updatedVault // Send updated vault
             });
 
             const data = await response.json();
@@ -260,10 +280,14 @@ export function RefineChat({
             // Success might be true even if JSON parsing failed but fallback was used
             if (!data.success) throw new Error(data.error);
 
+            // PRIVACY: De-anonymize the explanation received from AI
+            const rawExplanation = data.explanation || "Ecco la bozza modificata. Controlla e conferma.";
+            const deanonymizedExplanation = performMechanicalReverseSweep(rawExplanation, data.guardrailVault || updatedVault);
+
             const aiMsg: ChatMessage = {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
-                text: data.explanation || "Ecco la bozza modificata. Controlla e conferma.",
+                text: deanonymizedExplanation,
                 timestamp: new Date(),
                 groundingMetadata: data.groundingMetadata
             };
