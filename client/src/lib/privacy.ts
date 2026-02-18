@@ -17,10 +17,19 @@ export const performMechanicalGlobalSweep = (text: string, vault: Record<string,
 
         const chars = value.split('');
         const escapedChars = chars.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-        // Allow spaces, slashes, dots, dashes between characters
+
+        // Allow spaces, slashes, dots, dashes between characters to handle "spaced out" variations
         const separator = '[\\s\\/\\.\\-]*';
-        // Use Word Boundaries \\b to ensure we match the exact word/value and not a substring
-        const robustPattern = '\\b' + escapedChars.join(separator) + '\\b';
+        const mainPattern = escapedChars.join(separator);
+
+        // SMART BOUNDARIES:
+        // Only apply \b if the value starts/ends with a word character.
+        // E.g. "+39..." starts with +, so \b would fail if preceded by space (non-word).
+        // "Mario" starts with M, so \b is good.
+        const startBoundary = /^\w/.test(value) ? '\\b' : '';
+        const endBoundary = /\w$/.test(value) ? '\\b' : '';
+
+        const robustPattern = startBoundary + mainPattern + endBoundary;
 
         // CRITICAL: Use 'gi' for Case-Insensitive Global replacement
         const regex = new RegExp(robustPattern, 'gi');
