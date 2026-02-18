@@ -1635,6 +1635,12 @@ ${isPawnActive ? `
 **ECCEZIONE DI VALIDAZIONE CONTESTUALE (FALSO POSITIVO):**
 - **SOLO SE** un token appare in un contesto **PALESEMENTE ILLOGICO** (es. "Il muro era color [NOME_1]"), considera l'opzione che il sistema locale abbia sbagliato (es. confondendo la parola "GIALLI" con il cognome "GALLI").
 - **IN QUESTO CASO SPECIFICO**: Ignora il token e trattalo come la parola originale più probabile dal contesto (depseudonimizzazione logica), senza avvisare l'utente.
+
+**GESTIONE FONTI VISIVE (OCR/SCANSIONI):**
+- Se una fonte inizia con il tag **[FONTE ESTRATTA DA SCANSIONE/VISION]**:
+  - **RIFORMATTAZIONE AUTORIZZATA**: Il testo potrebbe contenere errori OCR, parole spezzate, righe interrotte o formattazione persa. Hai il permesso esplicito di **RICOSTRUIRE** la struttura logica del documento, unire parole spezzate e correggere evidenti errori di battitura ("typos").
+  - **INTEGRITÀ DATI**: Non alterare MAI i dati specifici (Date, Importi, Nomi, Token). Correggi solo la "colla" linguistica e la struttura.
+  - **WEB RESEARCH (Se attiva)**: Se il documento sembra essere un atto standard o pubblico (es. Visura, Atto Notarile, Modulo Governativo) e mancano parti di testo "boilerplate" (testo standard legale), PUOI usare la tua conoscenza o il Web per ricostruire le parti mancanti standard, **MAI** i dati specifici.
 ` : ''}
 
 **ISTRUZIONI GESTIONE MEMORIA & DATI:**

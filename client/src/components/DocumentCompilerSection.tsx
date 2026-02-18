@@ -963,11 +963,15 @@ export function DocumentCompilerSection({
           if (cached && (cached.originalText || cached.text)) {
             const anonymizedText = await getAnonymizedText(s);
             console.log(`[Pawn] Converting '${s.name}' (${s.type}) to Text-Only Payload for Privacy.`);
+
+            // PREPEND OCR/VISION TAG ensures server knows this is reconstructed text
+            const taggedText = `[FONTE ESTRATTA DA SCANSIONE/VISION]\n${anonymizedText}`;
+
             finalSources.push({
               name: s.name,
               type: 'text/plain', // Force type to text/plain
-              base64: toBase64(anonymizedText),
-              anonymizedText: anonymizedText,
+              base64: toBase64(taggedText),
+              anonymizedText: taggedText,
               originalType: s.type
             });
           } else {
