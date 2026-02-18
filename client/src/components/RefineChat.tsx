@@ -11,7 +11,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MentionButton } from './MentionButton';
 import { useCompiler } from '@/contexts/CompilerContext';
-import { anonymizeWithOllamaLocal, performMechanicalReverseSweep } from '@/lib/privacy';
+import { anonymizeWithOllamaLocal, performMechanicalReverseSweep, performMechanicalGlobalSweep } from '@/lib/privacy';
 
 interface ChatMessage {
     id: string;
@@ -258,14 +258,17 @@ export function RefineChat({
             // Update local vault immediately
             setGuardrailVault(updatedVault);
 
+            // PRIVACY CRITICAL: Anonymize the DOCUMENT CONTENT and NOTES using the updated vault.
+            // This ensures the server never sees raw PII in the context or the document.
+            const anonymizedContent = performMechanicalGlobalSweep(currentContent, updatedVault);
+            const anonymizedNotes = compileContext.notes ? performMechanicalGlobalSweep(compileContext.notes, updatedVault) : compileContext.notes;
+
             const response = await apiRequest('POST', '/api/refine', {
-                compileContext,
-                currentContent, // This is already the "compiled" version which might have tokens? No, compileContext has the original?
-                // Actually currentContent in Refine is usually the DE-anonymized view if we are showing it to user?
-                // Wait, if we are in "Pawn" mode, the content in the editor IS the one with tokens or not?
-                // In DocumentCompiler, "compiledContent" is the result of the compilation.
-                // If Pawn is active, compiledContent HAS tokens.
-                // So we just send it as is.
+                compileContext: {
+                    ...compileContext,
+                    notes: anonymizedNotes // Send anonymized notes
+                },
+                currentContent: anonymizedContent, // Send anonymized content
 
                 userInstruction: anonymizedInstruction, // SEND ANONYMIZED
                 mentions: mentions.map(m => ({ source: m.source, text: m.text, label: m.label })),
