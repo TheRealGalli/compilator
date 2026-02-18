@@ -101,8 +101,10 @@ export async function extractTextLocally(file: File): Promise<string> {
     const fileName = file.name.toLowerCase();
 
     // Fallback for plain text files (can be done locally without libs)
+    // NOTE: We EXCLUDE .rtf from here because we want the Bridge to convert it to clean text, 
+    // otherwise readAsText() returns raw RTF markup (e.g. {\rtf1...}) which confuses the LLM.
     if (
-        file.type.startsWith('text/') ||
+        (file.type.startsWith('text/') && !fileName.endsWith('.rtf')) ||
         fileName.endsWith('.txt') ||
         fileName.endsWith('.md') ||
         fileName.endsWith('.csv') ||

@@ -45,7 +45,8 @@ export class AiService {
                 mimeType === 'application/rtf' ||
                 mimeType === 'application/json' ||
                 mimeType === 'application/xml' ||
-                mimeType === 'text/xml';
+                mimeType === 'text/xml' ||
+                mimeType === 'application/vnd.oasis.opendocument.text';
 
             const isDOCX = mimeType.includes('wordprocessingml') || mimeType.includes('msword');
 
