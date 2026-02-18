@@ -1,7 +1,7 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2, Send } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2, Send, Cpu } from "lucide-react";
 import { FaChessKing } from "react-icons/fa6";
 import {
   Popover,
@@ -12,6 +12,7 @@ import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSources } from "@/contexts/SourcesContext";
 import { useGmail } from "@/contexts/GmailContext";
+import { useOllama } from "@/contexts/OllamaContext";
 import { GmailLogo, DriveLogo } from "./ConnectorsSection";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -48,6 +49,7 @@ export function DocumentsSection() {
     navigateToFolder, goToParentFolder, resetNavigation,
     isConnected: isConnectedDrive
   } = useGoogleDrive();
+  const { status: ollamaStatus } = useOllama();
   const [localSearch, setLocalSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
@@ -670,7 +672,7 @@ export function DocumentsSection() {
           disabled={isUploading || !isAuthenticated}
         />
 
-        {(isConnected) && (
+        {(isConnected || isConnectedDrive || ollamaStatus === 'connected') && (
           <div className="flex flex-col gap-4 relative">
             <div className="flex items-center gap-4">
               <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
@@ -692,7 +694,7 @@ export function DocumentsSection() {
                   Gmail
                 </Button>
               )}
-              {isConnected && (
+              {isConnectedDrive && (
                 <Button
                   variant="outline"
                   className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
@@ -705,6 +707,16 @@ export function DocumentsSection() {
                 >
                   <DriveLogo className="w-4 h-4" />
                   Google Drive
+                </Button>
+              )}
+              {ollamaStatus === 'connected' && (
+                <Button
+                  variant="outline"
+                  className="gap-2 border-slate-50 hover:bg-slate-50 hover:text-slate-600 transition-all hover:border-slate-200 shadow-sm cursor-default"
+                  disabled={!isAuthenticated}
+                >
+                  <Cpu className="w-4 h-4" />
+                  Ollama
                 </Button>
               )}
             </div>
