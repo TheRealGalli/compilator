@@ -485,9 +485,14 @@ export function DocumentCompilerSection({
       // Update source text cache so it's used for the final server call
       const scanSource = unsupportedSources.find(s => s.id === manualInputScanId);
       if (scanSource) {
+        console.log(`[Pawn] Caching manual text for scan '${scanSource.name}' to enable Zero-Data override.`);
         sourceTextCache.current = [
           ...sourceTextCache.current,
-          { name: scanSource.name, text: manualInputText, originalText: manualInputText }
+          {
+            name: scanSource.name,
+            text: manualInputText,
+            originalText: manualInputText
+          }
         ];
       }
 
@@ -947,22 +952,28 @@ export function DocumentCompilerSection({
           }
         };
 
+
         // Construct Sources Payload
         for (const s of selectedSources) {
           const cached = sourceTextCache.current.find(d => d.name === s.name);
-          // If we have manual text in cache (or it was a text doc), use it
+
+          // ZERO-DATA ENFORCEMENT for Visual Sources (Images/Scans)
+          // If we have extracted text (either automatic OCR or Manual Input), we send ONLY that text.
+          // We DO NOT send the original image/pdf base64.
           if (cached && (cached.originalText || cached.text)) {
             const anonymizedText = await getAnonymizedText(s);
+            console.log(`[Pawn] Converting '${s.name}' (${s.type}) to Text-Only Payload for Privacy.`);
             finalSources.push({
               name: s.name,
-              type: 'text/plain',
+              type: 'text/plain', // Force type to text/plain
               base64: toBase64(anonymizedText),
               anonymizedText: anonymizedText,
               originalType: s.type
             });
           } else {
-            // It's an unsupported source (Image, Audio, or unhandled Scan)
-            // Send original base64 as specified in the warning alert
+            // It's an unsupported source (Image, Audio, or unhandled Scan) WITHOUT text.
+            // This will trigger the warning in the UI, and if user proceeds, it sends original.
+            console.warn(`[Pawn] Source '${s.name}' has no extracted text. Sending original base64.`);
             finalSources.push({
               name: s.name,
               type: s.type,
@@ -976,6 +987,7 @@ export function DocumentCompilerSection({
           const cached = sourceTextCache.current.find(d => d.name === masterSource.name);
           if (cached && (cached.originalText || cached.text)) {
             const anonymizedMaster = await getAnonymizedText(masterSource);
+            console.log(`[Pawn] Converting Master '${masterSource.name}' to Text-Only Payload.`);
             finalMasterSource = {
               name: masterSource.name,
               type: 'text/plain',
@@ -984,7 +996,7 @@ export function DocumentCompilerSection({
               originalType: masterSource.type
             };
           } else {
-            // Unsupported Master (Image, Audio, or unhandled Scan)
+            // Unsupported Master
             finalMasterSource = {
               name: masterSource.name,
               type: masterSource.type,
