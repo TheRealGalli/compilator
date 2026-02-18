@@ -18,6 +18,8 @@ export const AVAILABLE_MODELS = {
         { id: 'gemma3:4b', label: 'Gemma 3 (4B)', size: '3.0GB' },
         { id: 'gemma3:12b', label: 'Gemma 3 (12B)', size: '8.0GB' },
         { id: 'gemma3:27b', label: 'Gemma 3 (27B)', size: '18GB' },
+        { id: 'gpt-oss:20b', label: 'GPT-OSS (20B)', size: '14GB' },
+        { id: 'gpt-oss:120b', label: 'GPT-OSS (120B)', size: '75GB' },
     ],
     cloud: [
         { id: 'gpt-oss:20b-cloud', label: 'GPT-OSS (20B)', provider: 'Cloud' },

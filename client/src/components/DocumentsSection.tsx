@@ -731,7 +731,7 @@ export function DocumentsSection() {
                       <ChevronDown className="w-3 h-3 opacity-50" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="end" side="top" className="w-56">
                     <DropdownMenuLabel>Modelli Locali</DropdownMenuLabel>
                     {AVAILABLE_MODELS.local.map(model => {
                       const isInstalled = installedModels.some(im => im === model.id || im.startsWith(model.id));
