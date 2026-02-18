@@ -734,7 +734,8 @@ export function DocumentsSection() {
                   <DropdownMenuContent align="end" side="top" className="w-56">
                     <DropdownMenuLabel>Modelli Locali</DropdownMenuLabel>
                     {AVAILABLE_MODELS.local.map(model => {
-                      const isInstalled = installedModels.some(im => im === model.id || im.startsWith(model.id));
+                      // Fix: Precise matching to avoid "gpt-oss:20b-cloud" matching "gpt-oss:20b"
+                      const isInstalled = installedModels.some(im => im === model.id || im === `${model.id}:latest`);
                       return (
                         <DropdownMenuItem
                           key={model.id}
