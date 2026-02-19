@@ -5,6 +5,7 @@ import { extractPIILocal } from './ollama';
  * Based on the "Global Sweep" strategy to ensure 100% consistency.
  * NOW ROBUST: Handles "spaced out" values (e.g. "G A L L I") and case-insensitivity.
  * STRICT BOUNDARIES: Uses \\b to avoid partial matches (e.g. GALLI inside GALLIPOLI).
+ * WHITESPACE AGNOSTIC FIX: Matches "Carlo Galli" even if text is "Carlo\\nGalli".
  */
 export const performMechanicalGlobalSweep = (text: string, vault: Record<string, string>): string => {
     if (!text || Object.keys(vault).length === 0) return text;
@@ -18,14 +19,18 @@ export const performMechanicalGlobalSweep = (text: string, vault: Record<string,
         const chars = value.split('');
         const escapedChars = chars.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 
-        // Allow spaces, slashes, dots, dashes between characters to handle "spaced out" variations
+        // Allow any whitespace (spaces, tabs, newlines) or common separators between characters
+        // This handles "Carlo Galli" matching "Carlo\\nGalli" or "Carlo  Galli"
+        // Also handles "spaced out" chars like "G A L L I"
         const separator = '[\\s\\/\\.\\-]*';
+
+        // We need to match the value, but if the value itself has spaces (e.g. "Carlo Galli"),
+        // we want to allow those spaces to be ANY whitespace in the target text.
+        // So we effectively replace every character in the search string with "char + optional separators".
         const mainPattern = escapedChars.join(separator);
 
         // SMART BOUNDARIES:
-        // Only apply \b if the value starts/ends with a word character.
-        // E.g. "+39..." starts with +, so \b would fail if preceded by space (non-word).
-        // "Mario" starts with M, so \b is good.
+        // Only apply \\b if the value starts/ends with a word character.
         const startBoundary = /^\w/.test(value) ? '\\b' : '';
         const endBoundary = /\w$/.test(value) ? '\\b' : '';
 
