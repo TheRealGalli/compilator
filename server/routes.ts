@@ -1626,7 +1626,7 @@ Devi compilare il template sottostante utilizzando le informazioni fornite nei d
 ${isPawnActive ? `
 **⚠️ PROTOCOLLO PAWN ATTIVO (PRIVACY ZERO-DATA) - ISTRUZIONE CRITICA:**
 1. I documenti forniti sono stati **PSEUDONIMIZZATI** localmente.
-2. Troverai token come **[NOME_1]**, **[DATA_1]**, **[PIVA_1]**, **[IBAN_1]** ecc.
+2. Troverai token come [NOME_1], [DATA_1], [PIVA_1], [IBAN_1] ecc.
 3. **QUESTI NON SONO DATI MANCANTI**. Rappresentano dati REALI e VALIDI che l'utente possiede.
 4. **NON** provare a "indovinare" o riempire questi token.
 5. **TRATTALI COME VALORI DEFINITIVI**. Inseriscili nel documento finale ESATTAMENTE come li trovi.
@@ -1638,9 +1638,10 @@ ${isPawnActive ? `
 
 **GESTIONE FONTI VISIVE (OCR/SCANSIONI):**
 - Se una fonte inizia con il tag **[FONTE ESTRATTA DA SCANSIONE/VISION]**:
-  - **RIFORMATTAZIONE AUTORIZZATA**: Il testo potrebbe contenere errori OCR, parole spezzate, righe interrotte o formattazione persa. Hai il permesso esplicito di **RICOSTRUIRE** la struttura logica del documento, unire parole spezzate e correggere evidenti errori di battitura ("typos").
-  - **INTEGRITÀ DATI**: Non alterare MAI i dati specifici (Date, Importi, Nomi, Token). Correggi solo la "colla" linguistica e la struttura.
-  - **WEB RESEARCH (Se attiva)**: Se il documento sembra essere un atto standard o pubblico (es. Visura, Atto Notarile, Modulo Governativo) e mancano parti di testo "boilerplate" (testo standard legale), PUOI usare la tua conoscenza o il Web per ricostruire le parti mancanti standard, **MAI** i dati specifici.
+  - **RIFORMATTAZIONE AGGRESSIVA**: Il testo è stato estratto via OCR e sarà frammentato. Hai il dovere di **RICOSTRUIRE FLUIDITÀ**. Unisci righe spezzate, correggi la punteggiatura e sistema la struttura dei paragrafi.
+  - **INTEGRITÀ DATI**: Puoi modificare tutto il testo di contorno per renderlo leggibile, ma **NON TOCCARE** i token (es. [NOME_1]) o i dati specifici (Date, Cifre).
+  - **NO MARKDOWN SUI TOKEN**: Non mettere mai i token in **grassetto** o *corsivo*. Scrivili esattamente come sono (es. [NOME_1], non **[NOME_1]**).
+  - **WEB RESEARCH (Se attiva)**: Usa il web per ricostruire boilerplate legali mancanti.
 ` : ''}
 
 **ISTRUZIONI GESTIONE MEMORIA & DATI:**

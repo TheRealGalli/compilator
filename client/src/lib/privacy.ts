@@ -45,17 +45,34 @@ export const performMechanicalGlobalSweep = (text: string, vault: Record<string,
 
 /**
  * Restores original values from tokens.
+ * NOW ROBUST: Handles Markdown bolding (**[TOKEN]**) and loose spacing ([ TOKEN ]).
  */
 export const performMechanicalReverseSweep = (text: string, vault: Record<string, string>): string => {
     if (!text || Object.keys(vault).length === 0) return text;
     let result = text;
-    // Replaces tokens [CAT_X] with their values
-    for (const [token, value] of Object.entries(vault)) {
-        // Escape token for regex (they contain brackets [NAME_1])
-        // We modify the regex to be lenient with spaces: \[ ?NAME_1 ?\]
-        const coreToken = token.replace(/^\[|\]$/g, ''); // Extract 'NAME_1' from '[NAME_1]'
-        // Regex: \[ \s* NAME_1 \s* \]
-        const regex = new RegExp(`\\[\\s*${coreToken}\\s*\\]`, 'g');
+
+    // Sort vault by token length descending to avoid partial replacements if any overlap exists
+    const sortedTokens = Object.entries(vault).sort((a, b) => b[0].length - a[0].length);
+
+    for (const [token, value] of sortedTokens) {
+        // Core token: 'NAME_1' from '[NAME_1]'
+        const coreToken = token.replace(/^\[|\]$/g, '');
+
+        // Regex Construction:
+        // 1. Optional Markdown bolding: (\*\*|__)?
+        // 2. Opening Bracket with optional space: \[\s*
+        // 3. Core Token (exact match): coreToken
+        // 4. Closing Bracket with optional space: \s*\]
+        // 5. Evaluation of Markdown closing: \1 (backreference if supported) or just optional closing
+
+        // Simplified Robust Regex: 
+        // Matches: [NAME_1], **[NAME_1]**, [ NAME_1 ], ** [ NAME_1 ] **
+
+        // Escape special chars in coreToken just in case
+        const safeCore = coreToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        const regex = new RegExp(`(\\*\\*|__)?\\s*\\[\\s*${safeCore}\\s*\\]\\s*(\\*\\*|__)?`, 'g');
+
         result = result.replace(regex, value);
     }
     return result;
