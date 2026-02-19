@@ -1639,9 +1639,13 @@ ${isPawnActive ? `
 **GESTIONE FONTI VISIVE (OCR/SCANSIONI):**
 - Se una fonte inizia con il tag **[FONTE ESTRATTA DA SCANSIONE/VISION]**:
   - **RIFORMATTAZIONE AGGRESSIVA**: Il testo è stato estratto via OCR e sarà frammentato. Hai il dovere di **RICOSTRUIRE FLUIDITÀ**. Unisci righe spezzate, correggi la punteggiatura e sistema la struttura dei paragrafi.
-  - **INTEGRITÀ DATI**: Puoi modificare tutto il testo di contorno per renderlo leggibile, ma **NON TOCCARE** i token (es. [NOME_1]) o i dati specifici (Date, Cifre).
-  - **NO MARKDOWN SUI TOKEN**: Non mettere mai i token in **grassetto** o *corsivo*. Scrivili esattamente come sono (es. [NOME_1], non **[NOME_1]**).
-  - **WEB RESEARCH (Se attiva)**: Usa il web per ricostruire boilerplate legali mancanti.
+   - **INTEGRITÀ DATI (SACRA)**: **NON TOCCARE** i token (es. [NOME_1]) o i dati specifici (Date, Cifre). Questi sono **INTOCCABILI**.
+   - **BEST EFFORT RICOSTRUZIONE**: Se il testo di contorno è illegibile o frammentato, **RICOSTRUISCILO** basandoti sulla logica del documento.
+        - Esempio: "Il sott...crtto...dichiara" -> "Il sottoscritto dichiara".
+        - Esempio: "D...ta ..i nas..t.." -> "Data di nascita".
+   - **TI È VIETATO** scrivere "[TESTO ILLEGGIBILE]" a meno che non sia impossibile decifrare nemmeno il contesto generale. Preferisci una ricostruzione logica verosimile (per il testo boilerplate) piuttosto che lasciare buchi.
+   - **NO MARKDOWN SUI TOKEN**: Non mettere mai i token in **grassetto** o *corsivo*. Scrivili esattamente come sono (es. [NOME_1], non **[NOME_1]**).
+   - **WEB RESEARCH (Se attiva)**: Usa il web per ricostruire boilerplate legali mancanti.
 ` : ''}
 
 **ISTRUZIONI GESTIONE MEMORIA & DATI:**
@@ -2103,6 +2107,22 @@ Hai già compilato una prima bozza del documento. Ora l'utente vuole discuterne 
 
 NOTE IMPORTANTI DAL MODELLO (Rispettale sempre):
 ${compileContext.notes || 'Nessuna nota specifica.'}
+
+${isPawnActive ? `
+**⚠️ PROTOCOLLO PAWN ATTIVO (PRIVACY ZERO-DATA) - ISTRUZIONE CRITICA:**
+1. I documenti forniti sono stati **PSEUDONIMIZZATI** localmente.
+2. Troverai token come [NOME_1], [DATA_1], [PIVA_1], [IBAN_1] ecc.
+3. **QUESTI NON SONO DATI MANCANTI**. Rappresentano dati REALI e VALIDI.
+4. **NON** provare a "indovinare" o riempire questi token.
+5. **TRATTALI COME VALORI DEFINITIVI**. Inseriscili nel documento finale ESATTAMENTE come li trovi.
+6. **NO MARKDOWN SUI TOKEN**: Non mettere mai i token in **grassetto** o *corsivo*. Scrivili esattamente come sono (es. [NOME_1], non **[NOME_1]**).
+
+**GESTIONE FONTI VISIVE (OCR/SCANSIONI):**
+- Se una fonte inizia con il tag **[FONTE ESTRATTA DA SCANSIONE/VISION]**:
+  - **BEST EFFORT RICOSTRUZIONE**: Se il testo è illegibile o frammentato, **RICOSTRUISCILO** basandoti sulla logica.
+  - **INTEGRITÀ DATI**: Non toccare i token [NOME_1].
+  - **TI È VIETATO** scrivere "[TESTO ILLEGGIBILE]" a meno che non sia impossibile decifrare nemmeno il contesto.
+` : ''}
 
 DOC ATTUALE:
 """

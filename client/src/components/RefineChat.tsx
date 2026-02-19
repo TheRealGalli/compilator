@@ -101,7 +101,10 @@ export function RefineChat({
             const aiMsg: ChatMessage = {
                 id: 'init-analysis',
                 role: 'ai',
-                text: data.explanation || "Analisi completata. Pronti per le tue modifiche.",
+                // DE-ANONYMIZE INITIAL ANALYSIS (Reverse Sweep)
+                text: (compileContext.activeGuardrails?.includes('pawn') && data.explanation)
+                    ? performMechanicalReverseSweep(data.explanation, guardrailVault)
+                    : (data.explanation || "Analisi completata. Pronti per le tue modifiche."),
                 timestamp: new Date(),
                 groundingMetadata: data.groundingMetadata
             };
@@ -304,13 +307,15 @@ export function RefineChat({
                 deanonymizedExplanation = performMechanicalReverseSweep(rawExplanation, data.guardrailVault || updatedVault);
             }
 
+            // Add de-anonymized AI message to chat history
             const aiMsg: ChatMessage = {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
-                text: deanonymizedExplanation,
+                text: deanonymizedExplanation, // Show real values (Reverse Swept)
                 timestamp: new Date(),
                 groundingMetadata: data.groundingMetadata
             };
+
 
             if (data.guardrailVault) {
                 setGuardrailVault(data.guardrailVault);
