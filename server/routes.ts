@@ -2759,6 +2759,16 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
       // Calculate max response length - using tokens as per user request
       const maxTokens = 50000;
 
+      // Process Mentions
+      let mentionsContext = "";
+      if (req.body.mentions && Array.isArray(req.body.mentions) && req.body.mentions.length > 0) {
+        mentionsContext = "\n### 🎯 FOCUS ATTUALE (MENZIONI UTENTE):\nL'utente ha selezionato esplicitamente le seguenti parti di testo. La tua risposta deve fare riferimento PRIORITARIO ad esse:\n";
+        req.body.mentions.forEach((m: any) => {
+          mentionsContext += `- MENZIONE #${m.label}: "${m.text}"\n`;
+        });
+        mentionsContext += "\n";
+      }
+
       const isAuthenticated = !!req.user;
       const userToolMode = req.body.toolMode || 'allegati';
 
@@ -2818,6 +2828,7 @@ Alla fine di ogni risposta, aggiungi SEMPRE un titolo estremamente breve (max 5 
 Hai accesso ai seguenti documenti. È TASSATIVO considerarli TUTTI, inclusi quelli di testo/Word (DOCX):
 ${sources.filter((s: any) => !s.isMemory).map((s: any) => `- ${s.name} (${s.type})`).join('\n')}
 ${filesContext}
+${mentionsContext}
 
 **TABELLE E FORMATTAZIONE (CALIBRAZIONE NOTION):**
 1. **Sintassi GFM Rigorosa (NOTION COMPLIANT)**: Ogni tabella DEVE avere una riga di separazione valida \`|---|---|\`.

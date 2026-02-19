@@ -9,6 +9,8 @@ export interface PIIFinding {
     label?: string;
 }
 
+import { PII_SCHEMA_DEFINITIONS } from './pii-schema';
+
 let currentBaseUrl = 'http://localhost:11434';
 export const DEFAULT_OLLAMA_MODEL = 'gemma3:1b';
 
@@ -398,22 +400,18 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
 
     // ULTRA-CONCISE PROMPT (Improved for Small Models)
     // We use a strictly formatted list with Italian examples to guide the model better.
-    const prompt = `find PERSONAL data in the text and do a token for pseuddonimiz it.
+    // We use a strictly formatted list with Italian examples to guide the model better.
+    const prompt = `find PERSONAL data in the text and do a token for pseudonymization.
 IMPORTANT RULES:
 1. You have a strict limit of 1024 tokens. BE CONCISE.
 2. Return ONLY a list in this format: "CATEGORY: VALUE".
-3. If you find a value but don't know the category, use "gen_pii".
-4. Do NOT include descriptions, explanations, or markdown formatting like **bold**.
-5. Do NOT output the examples provided below.
-6. IF NO PII IS FOUND, RETURN AN EMPTY LIST.
+3. Use the categories defined in the SCHEMA below.
+4. If you find a value that is clearly PERSONAL DATA but does not fit any schema category, use "GENERIC_PII".
+5. Do NOT include descriptions, explanations, or markdown formatting like **bold**.
+6. Do NOT output the examples provided in the schema.
+7. IF NO PII IS FOUND, RETURN AN EMPTY LIST.
 
-EXAMPLE INPUT:
-"Mario Rossi nato a Roma il 01/01/1980."
-
-EXAMPLE OUTPUT:
-FULL_NAME: Mario Rossi
-PLACE_OF_BIRTH: Roma
-DATE_OF_BIRTH: 01/01/1980
+${PII_SCHEMA_DEFINITIONS}
 
 Text:
 ${llmText}
@@ -440,7 +438,7 @@ ${llmText}
         let findings: any[] = [];
         let rawResponse = data.message?.content || "";
 
-        console.log("[OllamaLocal] RAW RESPONSE PREVIEW:", rawResponse.substring(0, 500) + "..."); // DEBUG: Inspect model output
+        // console.log("[OllamaLocal] RAW RESPONSE PREVIEW:", rawResponse.substring(0, 500) + "..."); // DEBUG: Inspect model output
 
         // Helper to parse a single line "KEY: VALUE"
         const parseLine = (line: string): { value: string, type: string, label: string } | null => {

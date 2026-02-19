@@ -156,9 +156,9 @@ function createApp() {
       const duration = Date.now() - start;
       if (path.startsWith("/api")) {
         let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-        if (capturedJsonResponse) {
-          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-        }
+        // if (capturedJsonResponse) {
+        //   logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        // }
 
         if (logLine.length > 2000) {
           logLine = logLine.slice(0, 1999) + "…";

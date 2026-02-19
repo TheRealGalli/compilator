@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, Bot, Globe, Mic, Square, Asterisk, HardDrive, Paperclip, Play } from "lucide-react";
+import { Send, Bot, Globe, Mic, Square, Asterisk, HardDrive, Paperclip, Play, X } from "lucide-react";
+import { MentionButton } from "./MentionButton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,8 +22,16 @@ import { DriveLogo } from "./ConnectorsSection";
 
 // { id, role, content, timestamp, sources, audioUrl, groundingMetadata, searchEntryPoint, shortTitle }
 
+
 interface ChatInterfaceProps {
   modelProvider?: 'openai' | 'gemini';
+}
+
+interface Mention {
+  id: string;
+  text: string;
+  label: string;
+  source: 'chat' | 'selection';
 }
 
 export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) {
@@ -34,6 +43,11 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [toolMode, setToolMode] = useState<'allegati' | 'run'>('allegati');
   const { toast } = useToast();
   const { selectedSources, masterSource } = useSources();
+
+  // Mention State
+  const [mentions, setMentions] = useState<Mention[]>([]);
+  const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { data: user } = useQuery({ queryKey: ['/api/user'] });
   const isAuthenticated = !!user;
@@ -216,8 +230,52 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       }
     };
 
+
     extractFields();
   }, [masterSource?.id]);
+
+  // Handle Selection for Mentions
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (sel && sel.toString().trim().length > 0 && containerRef.current && containerRef.current.contains(sel.anchorNode)) {
+        const range = sel.getRangeAt(0);
+        const rects = range.getClientRects();
+        if (rects.length > 0) {
+          const firstRect = rects[0];
+          setSelection({
+            text: sel.toString().trim(),
+            x: firstRect.right,
+            y: firstRect.top - 10
+          });
+        }
+      } else {
+        setSelection(null);
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
+
+  const handleMentionClick = () => {
+    if (selection) {
+      const newMention: Mention = {
+        id: Date.now().toString(),
+        text: selection.text,
+        label: `C${mentions.length + 1}`, // Copilot mention style
+        source: 'selection'
+      };
+      setMentions([...mentions, newMention]);
+      setSelection(null);
+      window.getSelection()?.removeAllRanges();
+    }
+  };
+
+  const removeMention = (id: string) => {
+    setMentions(mentions.filter(m => m.id !== id));
+  };
+
 
   const fetchSuggestedQuestions = async (currentMessages: Message[]) => {
     try {
@@ -256,9 +314,11 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
+
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
+    setMentions([]); // Clear mentions
     setSuggestedPrompts([]);
     setIsLoading(true);
 
@@ -288,7 +348,8 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
           type: masterSource.type,
           base64: masterSource.base64
         } : null,
-        extractedFields: extractedFields.length > 0 ? extractedFields : undefined
+        extractedFields: extractedFields.length > 0 ? extractedFields : undefined,
+        mentions: mentions // Send mentions to backend
       });
 
       const data = await response.json();
@@ -361,29 +422,60 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const { userIdentity } = useGoogleDrive();
 
   return (
-    <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1 p-6">
-        <div className="space-y-6 max-w-3xl mx-auto">
-          {messages.map((message) => (
-            <ChatMessage key={message.id} {...message} userInitial={userIdentity?.initial} />
-          ))}
-          {(isLoading || isGreetingLoading) && (
-            <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
-                <Asterisk
-                  className="w-6 h-6 text-blue-600 animate-spin"
-                  strokeWidth={3}
-                />
-              </div>
-              <div className="bg-muted rounded-lg">
-                <TypingIndicator />
-              </div>
-            </div>
-          )}
+    <div className="flex flex-col h-full relative">
+      {/* Mention Button Overlay */}
+      {selection && (
+        <div
+          style={{
+            position: 'fixed',
+            left: selection.x,
+            top: selection.y,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 50
+          }}
+        >
+          <MentionButton onClick={handleMentionClick} />
         </div>
-      </ScrollArea>
+      )}
+
+      <div className="flex-1 overflow-hidden flex flex-col relative" ref={containerRef}>
+        <ScrollArea className="flex-1 p-6">
+          <div className="space-y-6 max-w-3xl mx-auto">
+            {messages.map((message) => (
+              <ChatMessage key={message.id} {...message} userInitial={userIdentity?.initial} />
+            ))}
+            {(isLoading || isGreetingLoading) && (
+              <div className="flex gap-3 justify-start">
+                <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                  <Asterisk
+                    className="w-6 h-6 text-blue-600 animate-spin"
+                    strokeWidth={3}
+                  />
+                </div>
+                <div className="bg-muted rounded-lg">
+                  <TypingIndicator />
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
 
       <div className="border-t bg-background p-4">
+        {/* Mentions Chips */}
+        {mentions.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2 px-2">
+            {mentions.map(m => (
+              <div key={m.id} className="flex items-center gap-1 bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded-full border border-indigo-200">
+                <span className="font-bold">#{m.label}</span>
+                <span className="max-w-[150px] truncate">"{m.text}"</span>
+                <button onClick={() => removeMention(m.id)} className="hover:text-indigo-900 ml-1">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="max-w-3xl mx-auto">
           <AnimatePresence mode="wait">
             {suggestedPrompts.length > 0 && (

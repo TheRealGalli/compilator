@@ -16,11 +16,14 @@ export const performMechanicalGlobalSweep = (text: string, vault: Record<string,
     for (const [token, value] of sortedValues) {
         if (!value || value.length < 2) continue;
 
-        const chars = value.split('');
+        // STRIP ALL WHITESPACE from the value to match characters regardless of spacing in the source
+        // e.g. "Carlo Galli" -> "CarloGalli" (chars) -> C[\s...]*a[\s...]*r...
+        const cleanValue = value.replace(/\s+/g, '');
+        const chars = cleanValue.split('');
         const escapedChars = chars.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 
         // Allow any whitespace (spaces, tabs, newlines) or common separators between characters
-        // This handles "Carlo Galli" matching "Carlo\\nGalli" or "Carlo  Galli"
+        // This handles "Carlo Galli" matching "Carlo\nGalli" or "Carlo  Galli"
         // Also handles "spaced out" chars like "G A L L I"
         const separator = '[\\s\\/\\.\\-]*';
 
