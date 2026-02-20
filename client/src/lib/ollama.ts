@@ -436,7 +436,16 @@ ${llmText}
 
         const data = await _extractWithRetry(payload, 2);
         let findings: any[] = [];
-        let rawResponse = data.message?.content || "";
+
+        // DEBUG: Inspect actual response structure (different models/APIs return different formats)
+        console.log("[OllamaLocal] Response keys:", Object.keys(data));
+
+        // Try multiple extraction paths for compatibility
+        let rawResponse = data.message?.content  // Ollama native format
+            || data.choices?.[0]?.message?.content  // OpenAI-compatible format
+            || data.response  // Ollama generate format
+            || (typeof data.raw === 'string' ? data.raw : '')  // Bridge fallback
+            || "";
 
         console.log("[OllamaLocal] RAW RESPONSE PREVIEW:", rawResponse.substring(0, 500) + "..."); // DEBUG: Inspect model output
 
