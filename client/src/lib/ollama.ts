@@ -431,7 +431,8 @@ ${llmText}
                 num_predict: 1024, // CAP OUTPUT to ~750 words to prevent infinite loops (Critical for 120s timeout)
                 top_k: 20,
                 top_p: 0.9
-            }
+            },
+            think: false // Disable reasoning/thinking mode — we need direct output, not chain-of-thought
         };
 
         const data = await _extractWithRetry(payload, 2);
@@ -443,6 +444,7 @@ ${llmText}
 
         // Try multiple extraction paths for compatibility
         let rawResponse = data.message?.content  // Ollama native format
+            || data.message?.thinking  // Reasoning model fallback (thinking field has the actual work)
             || data.choices?.[0]?.message?.content  // OpenAI-compatible format
             || data.response  // Ollama generate format
             || (typeof data.raw === 'string' ? data.raw : '')  // Bridge fallback
