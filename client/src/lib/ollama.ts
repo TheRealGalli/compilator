@@ -438,7 +438,8 @@ ${llmText}
         let findings: any[] = [];
 
         // DEBUG: Inspect actual response structure (different models/APIs return different formats)
-        console.log("[OllamaLocal] Response keys:", Object.keys(data));
+        console.log("[OllamaLocal] Response keys:", JSON.stringify(Object.keys(data)));
+        console.log("[OllamaLocal] Response DATA (first 500):", JSON.stringify(data).substring(0, 500));
 
         // Try multiple extraction paths for compatibility
         let rawResponse = data.message?.content  // Ollama native format
