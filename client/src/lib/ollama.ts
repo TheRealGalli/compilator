@@ -438,7 +438,7 @@ ${llmText}
         let findings: any[] = [];
         let rawResponse = data.message?.content || "";
 
-        // console.log("[OllamaLocal] RAW RESPONSE PREVIEW:", rawResponse.substring(0, 500) + "..."); // DEBUG: Inspect model output
+        console.log("[OllamaLocal] RAW RESPONSE PREVIEW:", rawResponse.substring(0, 500) + "..."); // DEBUG: Inspect model output
 
         // Helper to parse a single line "KEY: VALUE"
         const parseLine = (line: string): { value: string, type: string, label: string } | null => {
@@ -451,6 +451,7 @@ ${llmText}
                 .replace(/^\d+[\.\)]\s+/, '')      // Remove numbered list markers (1. 2) etc.)
                 .replace(/^"|",?$/g, '').replace(/^'|',?$/g, '')  // Remove surrounding quotes
                 .replace(/`/g, '')                 // Remove inline code backticks
+                .replace(/[\[\]]/g, '')            // Remove square brackets (schema tokens like [NOME_PERSONA] -> NOME_PERSONA)
                 .trim();
 
             // HEURISTIC: The model sometimes prefixes everything with "TOKEN: " or "PII: "
@@ -497,17 +498,23 @@ ${llmText}
             const fillerCount = descWords.filter(w => FILLER_WORDS.has(w)).length;
             if (descWords.length >= 4 && fillerCount / descWords.length > 0.4) return null;
 
-            // Map generic keys to our CATEGORIES
+            // Map generic keys to our CATEGORIES (Supports both English and Italian schema tokens)
             let type = 'UNKNOWN';
-            if (key.includes('NAME') || key.includes('NOME') || key.includes('TITOLARE') || key.includes('SOGGETTO') || key.includes('COGNOME') || key.includes('SURNAME')) type = 'NAME';
-            else if (key.includes('ADDRESS') || key.includes('INDIRIZZO') || key.includes('RESIDENZA') || key.includes('DOMICILIO') || key.includes('LUOGO') || key.includes('COMUNE') || key.includes('PROV') || key.includes('CITY') || key.includes('LOCATION')) type = 'ADDRESS';
-            else if (key.includes('DATE') || key.includes('DATA') || key.includes('INIZIO') || key.includes('FINE')) type = 'DATE';
-            else if (key.includes('IVA') || key.includes('VAT') || key.includes('PIVA')) type = 'VAT_NUMBER';
-            else if (key.includes('FISCAL') || key.includes('CODE') || key.includes('CF') || key.includes('TAX') || key.includes('CODICE')) type = 'TAX_ID';
-            else if (key.includes('MAIL') || key.includes('EMAIL')) type = 'EMAIL_ADDRESS';
+            if (key.includes('NAME') || key.includes('NOME') || key.includes('PERSONA') || key.includes('TITOLARE') || key.includes('SOGGETTO') || key.includes('COGNOME') || key.includes('SURNAME')) type = 'NAME';
+            else if (key.includes('ADDRESS') || key.includes('INDIRIZZO') || key.includes('RESIDENZA') || key.includes('DOMICILIO') || key.includes('LUOGO') || key.includes('COMUNE') || key.includes('PROV') || key.includes('CITY') || key.includes('LOCATION') || key.includes('NASCITA') && !key.includes('DATA')) type = 'ADDRESS';
+            else if (key.includes('DATE') || key.includes('DATA') || key.includes('INIZIO') || key.includes('FINE') || key.includes('NASCITA') && !key.includes('LUOGO')) type = 'DATE';
+            else if (key.includes('IVA') || key.includes('VAT') || key.includes('PIVA') || key.includes('P.IVA') || key.includes('N_P')) type = 'VAT_NUMBER';
+            else if (key.includes('FISCAL') || key.includes('C_FISCALE') || key.includes('CODE') || key.includes('CF') || key.includes('TAX') || key.includes('CODICE')) type = 'TAX_ID';
+            else if (key.includes('MAIL') || key.includes('EMAIL') || key.includes('CONTATTO')) type = 'EMAIL_ADDRESS';
             else if (key.includes('PHONE') || key.includes('TEL') || key.includes('CELL')) type = 'PHONE_NUMBER';
             else if (key.includes('ORGANIZATION') || key.includes('COMPANY') || key.includes('DITTA') || key.includes('SOCIETA') || key.includes('BUSINESS') || key.includes('DENOMINAZIONE')) type = 'ORGANIZATION';
-            else if (key.includes('IBAN') || key.includes('BANK') || key.includes('CONTO')) type = 'IBAN';
+            else if (key.includes('IBAN') || key.includes('BANK') || key.includes('CONTO') || key.includes('FINANZIAR')) type = 'IBAN';
+            else if (key.includes('DOCUMENTO') || key.includes('DOCUMENT')) type = 'DOCUMENT_NUMBER';
+            else if (key.includes('RUOLO') || key.includes('PROFESSION')) type = 'PROFESSIONAL_ROLE';
+            else if (key.includes('SALUTE') || key.includes('HEALTH') || key.includes('BIOMETRIC') || key.includes('GENETIC')) type = 'SENSITIVE_DATA';
+            else if (key.includes('SESSO') || key.includes('GENDER') || key.includes('ORIENTAMENTO') || key.includes('RELIGIOS') || key.includes('POLITIC') || key.includes('SINDACAL')) type = 'SENSITIVE_DATA';
+            else if (key.includes('NAZIONAL')) type = 'NATIONALITY';
+            else if (key.includes('COMPORTAMENT')) type = 'BEHAVIORAL_DATA';
             else type = 'GENERIC_PII';
 
             // NORMALIZED LABEL
