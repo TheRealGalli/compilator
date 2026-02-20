@@ -428,23 +428,25 @@ ${llmText}
             options: {
                 temperature: 0.15, // Slightly bumped to avoid repetitive loops
                 num_ctx: CONTEXT_WINDOW, // Context window
-                num_predict: 1024, // CAP OUTPUT to ~750 words to prevent infinite loops (Critical for 120s timeout)
+                num_predict: 2048, // CAP content output only (thinking tokens are NOT counted per Ollama API spec)
                 top_k: 20,
                 top_p: 0.9
-            },
-            think: false // Disable reasoning/thinking mode — we need direct output, not chain-of-thought
+            }
         };
 
         const data = await _extractWithRetry(payload, 2);
         let findings: any[] = [];
 
-        // DEBUG: Inspect actual response structure (different models/APIs return different formats)
+        // DEBUG: Inspect actual response structure
         console.log("[OllamaLocal] Response keys:", JSON.stringify(Object.keys(data)));
-        console.log("[OllamaLocal] Response DATA (first 500):", JSON.stringify(data).substring(0, 500));
 
-        // Try multiple extraction paths for compatibility
+        // Log if model used reasoning (thinking is ignored for PII extraction — we only parse content)
+        if (data.message?.thinking) {
+            console.log(`[OllamaLocal] Model used reasoning (${data.message.thinking.length} chars thinking). Ignoring thinking, using content only.`);
+        }
+
+        // ONLY use the real response content — never the thinking/reasoning field
         let rawResponse = data.message?.content  // Ollama native format
-            || data.message?.thinking  // Reasoning model fallback (thinking field has the actual work)
             || data.choices?.[0]?.message?.content  // OpenAI-compatible format
             || data.response  // Ollama generate format
             || (typeof data.raw === 'string' ? data.raw : '')  // Bridge fallback
@@ -569,26 +571,8 @@ ${llmText}
             }
         }
 
-        // STRATEGY 3: Extract [CATEGORY]: "VALUE" patterns from prose/thinking text
-        // Reasoning models embed structured data inside chain-of-thought prose
-        if (findings.length === 0 && rawResponse.length > 0) {
-            console.log("[OllamaLocal] Line-by-Line empty. Trying Pattern Extraction from prose...");
-            // Match: [CATEGORY]: "VALUE" or [CATEGORY]: VALUE (up to end of line/sentence)
-            const patternRegex = /\[([A-Z_]+)\]\s*:\s*(?:"([^"]+)"|'([^']+)'|([^\n,.\]]{2,50}))/gi;
-            let match;
-            while ((match = patternRegex.exec(rawResponse)) !== null) {
-                const key = match[1].toUpperCase();
-                const val = (match[2] || match[3] || match[4] || '').trim();
-                if (!val || val.length < 2) continue;
-                // Reuse the type mapping from parseLine
-                const fakeLine = `${key}: ${val}`;
-                const parsed = parseLine(fakeLine);
-                if (parsed) findings.push(parsed);
-            }
-            if (findings.length > 0) {
-                console.log(`[OllamaLocal] Pattern extraction found ${findings.length} items from prose.`);
-            }
-        }
+        // NOTE: Strategy 3 (prose extraction from thinking) removed.
+        // Reasoning models should produce structured output in content, not thinking.
 
         if (!Array.isArray(findings)) findings = [];
 
