@@ -234,28 +234,41 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     extractFields();
   }, [masterSource?.id]);
 
-  // Handle Selection for Mentions
+  // Handle Selection for Mentions (mouseup-based for stable positioning)
   useEffect(() => {
-    const handleSelectionChange = () => {
-      const sel = window.getSelection();
-      if (sel && sel.toString().trim().length > 0 && containerRef.current && containerRef.current.contains(sel.anchorNode)) {
-        const range = sel.getRangeAt(0);
-        const rects = range.getClientRects();
-        if (rects.length > 0) {
-          const firstRect = rects[0];
-          setSelection({
-            text: sel.toString().trim(),
-            x: firstRect.right,
-            y: firstRect.top - 10
-          });
+    const handleMouseUp = () => {
+      // Small delay to let the selection stabilize
+      setTimeout(() => {
+        const sel = window.getSelection();
+        if (sel && sel.toString().trim().length > 0 && containerRef.current && containerRef.current.contains(sel.anchorNode)) {
+          const range = sel.getRangeAt(0);
+          const rects = range.getClientRects();
+          if (rects.length > 0) {
+            // Use LAST rect to position at end of selection
+            const lastRect = rects[rects.length - 1];
+            setSelection({
+              text: sel.toString().trim(),
+              x: lastRect.right + 8,
+              y: lastRect.top + lastRect.height / 2
+            });
+          }
         }
-      } else {
-        setSelection(null);
-      }
+      }, 10);
     };
 
-    document.addEventListener('selectionchange', handleSelectionChange);
-    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+    const handleMouseDown = (e: MouseEvent) => {
+      // Clear selection when clicking anywhere EXCEPT on the mention button
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-mention-button]')) return;
+      setSelection(null);
+    };
+
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousedown', handleMouseDown);
+    };
   }, []);
 
   const handleMentionClick = () => {
@@ -263,10 +276,12 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       const newMention: Mention = {
         id: Date.now().toString(),
         text: selection.text,
-        label: `C${mentions.length + 1}`, // Copilot mention style
+        label: `C${mentions.length + 1}`,
         source: 'selection'
       };
-      setMentions([...mentions, newMention]);
+      setMentions(prev => [...prev, newMention]);
+      // Inject tag into prompt input
+      setInput(prev => (prev ? prev + ' ' : '') + `#${newMention.label} `);
       setSelection(null);
       window.getSelection()?.removeAllRanges();
     }
@@ -423,15 +438,16 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Mention Button Overlay */}
+      {/* Mention Button Overlay — fixed to end of selection */}
       {selection && (
         <div
           style={{
             position: 'fixed',
             left: selection.x,
             top: selection.y,
-            transform: 'translate(-50%, -100%)',
-            zIndex: 50
+            transform: 'translateY(-50%)',
+            zIndex: 9999,
+            pointerEvents: 'auto'
           }}
         >
           <MentionButton onClick={handleMentionClick} />
@@ -462,20 +478,6 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       </div>
 
       <div className="border-t bg-background p-4">
-        {/* Mentions Chips */}
-        {mentions.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2 px-2">
-            {mentions.map(m => (
-              <div key={m.id} className="flex items-center gap-1 bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded-full border border-indigo-200">
-                <span className="font-bold">#{m.label}</span>
-                <span className="max-w-[150px] truncate">"{m.text}"</span>
-                <button onClick={() => removeMention(m.id)} className="hover:text-indigo-900 ml-1">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
         <div className="max-w-3xl mx-auto">
           <AnimatePresence mode="wait">
             {suggestedPrompts.length > 0 && (
@@ -658,15 +660,31 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
             </div>
 
             <div className="flex gap-2">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder={!isAuthenticated ? "Fai una domanda.." : webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? (isPaused ? "Registrazione in pausa..." : "Registrazione in corso...") : isTranscribing ? "Trascrizione audio..." : "Fai una domanda sui tuoi documenti..."}
-                className="resize-none min-h-[60px]"
-                data-testid="input-chat"
-                disabled={isRecording || isTranscribing}
-              />
+              <div className="flex-1 flex flex-col border rounded-md bg-background focus-within:ring-2 focus-within:ring-ring">
+                {/* Mention chips inline above textarea */}
+                {mentions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 px-3 pt-2">
+                    {mentions.map(m => (
+                      <span key={m.id} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-800 text-[11px] px-2 py-0.5 rounded-full border border-indigo-200 max-w-[200px]">
+                        <span className="font-bold">#{m.label}</span>
+                        <span className="truncate">"{m.text}"</span>
+                        <button onClick={() => removeMention(m.id)} className="hover:text-indigo-900 ml-0.5 flex-shrink-0">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <Textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={!isAuthenticated ? "Fai una domanda.." : webResearch ? "Fai una domanda (con ricerca web)..." : isRecording ? (isPaused ? "Registrazione in pausa..." : "Registrazione in corso...") : isTranscribing ? "Trascrizione audio..." : "Fai una domanda sui tuoi documenti..."}
+                  className="resize-none min-h-[50px] border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  data-testid="input-chat"
+                  disabled={isRecording || isTranscribing}
+                />
+              </div>
               <Button
                 size="icon"
                 onClick={() => handleSend()}
