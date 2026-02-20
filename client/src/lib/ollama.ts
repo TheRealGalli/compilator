@@ -567,7 +567,30 @@ ${llmText}
                 const parsed = parseLine(line);
                 if (parsed) findings.push(parsed);
             }
-        } if (!Array.isArray(findings)) findings = [];
+        }
+
+        // STRATEGY 3: Extract [CATEGORY]: "VALUE" patterns from prose/thinking text
+        // Reasoning models embed structured data inside chain-of-thought prose
+        if (findings.length === 0 && rawResponse.length > 0) {
+            console.log("[OllamaLocal] Line-by-Line empty. Trying Pattern Extraction from prose...");
+            // Match: [CATEGORY]: "VALUE" or [CATEGORY]: VALUE (up to end of line/sentence)
+            const patternRegex = /\[([A-Z_]+)\]\s*:\s*(?:"([^"]+)"|'([^']+)'|([^\n,.\]]{2,50}))/gi;
+            let match;
+            while ((match = patternRegex.exec(rawResponse)) !== null) {
+                const key = match[1].toUpperCase();
+                const val = (match[2] || match[3] || match[4] || '').trim();
+                if (!val || val.length < 2) continue;
+                // Reuse the type mapping from parseLine
+                const fakeLine = `${key}: ${val}`;
+                const parsed = parseLine(fakeLine);
+                if (parsed) findings.push(parsed);
+            }
+            if (findings.length > 0) {
+                console.log(`[OllamaLocal] Pattern extraction found ${findings.length} items from prose.`);
+            }
+        }
+
+        if (!Array.isArray(findings)) findings = [];
 
         // SANITY FILTER: Remove placeholder hallucinations (John Doe, etc.)
         const isPlaceholder = (val: string) => {
