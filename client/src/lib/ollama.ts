@@ -440,10 +440,11 @@ ${llmText}
         // DEBUG: Inspect actual response structure
         console.log("[OllamaLocal] Response keys:", JSON.stringify(Object.keys(data)));
 
-        // Log if model used reasoning (thinking is ignored for PII extraction — we only parse content)
+        // Log if model used reasoning — show the FULL thinking to debug why content is empty
         if (data.message?.thinking) {
-            console.log(`[OllamaLocal] Model used reasoning (${data.message.thinking.length} chars thinking). Ignoring thinking, using content only.`);
+            console.log(`[OllamaLocal] THINKING (${data.message.thinking.length} chars):\n${data.message.thinking}`);
         }
+        console.log(`[OllamaLocal] CONTENT field: type=${typeof data.message?.content}, length=${(data.message?.content || '').length}, value=`, JSON.stringify(data.message?.content));
 
         // ONLY use the real response content — never the thinking/reasoning field
         let rawResponse = data.message?.content  // Ollama native format
