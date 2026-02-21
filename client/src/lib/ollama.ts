@@ -520,9 +520,13 @@ ${llmText}
             const commaWords = val.split(',').map(s => s.trim().toUpperCase());
             if (commaWords.length >= 3 && commaWords.filter(w => KNOWN_CATS.includes(w)).length >= 3) return null;
 
-            // SANITY: Address can't be PHONE — reject PHONE if value looks like a street address
-            const ADDRESS_INDICATORS = /\b(ST |AVE |BLVD |RD |DR |LN |WAY |STE |SUITE |VIA |PIAZZA |CORSO |VIALE |N° |\d{5})\b/i;
-            if ((key.includes('PHONE') || key.includes('TEL') || key.includes('CELL')) && ADDRESS_INDICATORS.test(val)) return null;
+            // SANITY: PHONE values must be only digits (10 digits, or +XX 12 digits)
+            // Valid: "3985729897", "+393985729897", "+39 3985729897", "1-800-829-4933"
+            // Invalid: "7901 4TH ST N STE 300" (contains letters = not a phone)
+            if (key.includes('PHONE') || key.includes('TEL') || key.includes('CELL') || key.includes('CONTATTO')) {
+                const digitsOnly = val.replace(/[\s\-\+\(\)\.]/g, '');
+                if (/[a-zA-Z]/.test(digitsOnly)) return null; // Contains letters → not a phone
+            }
 
             // QUALITY FILTER: Reject values that are descriptions, not actual data.
             // Real PII: "Carlo Galli", "36-5157311", "VIA CAMPANA 45"
