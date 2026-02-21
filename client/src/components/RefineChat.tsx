@@ -172,27 +172,23 @@ export function RefineChat({
     const [isMouseDown, setIsMouseDown] = useState(false);
     useEffect(() => {
         const handleMouseDown = () => setIsMouseDown(true);
-        const handleMouseUp = () => {
+        const handleMouseUp = (e: MouseEvent) => {
             setIsMouseDown(false);
             // Small delay to allow range to stabilize
             setTimeout(() => {
                 const sel = window.getSelection();
                 if (sel && sel.toString().trim().length > 0 && containerRef.current) {
-                    const range = sel.getRangeAt(0);
-                    const rects = range.getClientRects();
-                    if (rects.length === 0) return;
-
-                    const firstLineRect = rects[0];
-
                     if (containerRef.current.contains(sel.anchorNode)) {
+                        // Use mouse coordinates for stable positioning
+                        // Clamp X so button never goes off-screen (min 160px from left for button width)
+                        const clampedX = Math.max(160, Math.min(e.clientX + 12, window.innerWidth - 20));
                         setSelection({
                             text: sel.toString().trim(),
-                            x: firstLineRect.right,
-                            y: firstLineRect.top - 8
+                            x: clampedX,
+                            y: e.clientY
                         });
                     }
                 } else if (!isMouseDown) {
-                    // Only clear if mouse is truly up and no selection
                     setSelection(null);
                 }
             }, 50);
@@ -218,14 +214,35 @@ export function RefineChat({
         }
 
         if (selection) {
+            // Compute character offset of this selection within the document
+            // to disambiguate duplicate text (e.g., "000856" appearing multiple times)
+            let charStart: number | undefined;
+            let charEnd: number | undefined;
+            let surroundingContext = '';
+
+            if (currentContent) {
+                const idx = currentContent.indexOf(selection.text);
+                if (idx !== -1) {
+                    charStart = idx;
+                    charEnd = idx + selection.text.length;
+
+                    // Extract surrounding context (30 chars before + after) for disambiguation
+                    const ctxStart = Math.max(0, idx - 30);
+                    const ctxEnd = Math.min(currentContent.length, idx + selection.text.length + 30);
+                    surroundingContext = currentContent.substring(ctxStart, ctxEnd);
+                }
+            }
+
             const newMention: MentionContext = {
                 id: `mention-${Date.now()}`,
                 text: selection.text,
-                label: `Selection-${Date.now().toString().slice(-4)}`, // Fallback label
-                source: isReviewing ? 'anteprema' : 'copilot'
+                label: `Selection-${Date.now().toString().slice(-4)}`,
+                source: isReviewing ? 'anteprema' : 'copilot',
+                start: charStart,
+                end: charEnd
             };
-            onMentionCreated?.(selection.text, isReviewing ? 'anteprema' : 'copilot');
-            setMentionRegistry(prev => [...prev, newMention]); // Add to registry
+            onMentionCreated?.(selection.text, isReviewing ? 'anteprema' : 'copilot', charStart, charEnd);
+            setMentionRegistry(prev => [...prev, newMention]);
             setSelection(null);
         }
     };
@@ -286,8 +303,8 @@ export function RefineChat({
                 currentContent: finalCurrentContent, // Send potentially anonymized content
 
                 userInstruction: finalUserInstruction,
-                mentions: mentions.map(m => ({ source: m.source, text: m.text, label: m.label })),
-                mentionRegistry: mentionRegistry.map(m => ({ source: m.source, text: m.text, label: m.label })),
+                mentions: mentions.map(m => ({ source: m.source, text: m.text, label: m.label, start: m.start, end: m.end })),
+                mentionRegistry: mentionRegistry.map(m => ({ source: m.source, text: m.text, label: m.label, start: m.start, end: m.end })),
                 chatHistory: messages.map(m => ({ role: m.role, text: m.text })),
                 webResearch: compileContext.webResearch,
                 guardrailVault: updatedVault // Send updated vault
@@ -481,9 +498,9 @@ export function RefineChat({
                     <div
                         className="fixed z-[9999]"
                         style={{
-                            left: selection?.x,
-                            top: selection?.y,
-                            transform: 'translate(-100%, -100%)'
+                            left: selection.x,
+                            top: selection.y,
+                            transform: 'translateY(-50%)'
                         }}
                     >
                         <MentionButton onClick={handleMentionClick} />
@@ -715,7 +732,7 @@ export function RefineChat({
                     style={{
                         left: selection.x,
                         top: selection.y,
-                        transform: 'translate(-100%, -100%)'
+                        transform: 'translateY(-50%)'
                     }}
                 >
                     <MentionButton onClick={handleMentionClick} />

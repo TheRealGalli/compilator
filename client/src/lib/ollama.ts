@@ -440,7 +440,7 @@ ${llmText}
             options: {
                 temperature: 0.15, // Slightly bumped to avoid repetitive loops
                 num_ctx: CONTEXT_WINDOW, // Context window
-                num_predict: 2048, // CAP content output only (thinking tokens are NOT counted per Ollama API spec)
+                num_predict: isSmallModel ? 2048 : 8192, // Large budget for reasoning models (cloud relay counts thinking+content together)
                 top_k: 20,
                 top_p: 0.9
             }
@@ -452,20 +452,26 @@ ${llmText}
         // DEBUG: Inspect actual response structure
         console.log("[OllamaLocal] Response keys:", JSON.stringify(Object.keys(data)));
 
-        // Log if model used reasoning — show the FULL thinking to debug why content is empty
+        // Log reasoning if present (truncated)
         if (data.message?.thinking) {
-            console.log(`[OllamaLocal] THINKING (${data.message.thinking.length} chars):\n${data.message.thinking}`);
+            console.log(`[OllamaLocal] THINKING (${data.message.thinking.length} chars): ${data.message.thinking.substring(0, 200)}...`);
         }
-        console.log(`[OllamaLocal] CONTENT field: type=${typeof data.message?.content}, length=${(data.message?.content || '').length}, value=`, JSON.stringify(data.message?.content));
 
-        // ONLY use the real response content — never the thinking/reasoning field
+        // PRIORITY: Use real content field
         let rawResponse = data.message?.content  // Ollama native format
             || data.choices?.[0]?.message?.content  // OpenAI-compatible format
             || data.response  // Ollama generate format
             || (typeof data.raw === 'string' ? data.raw : '')  // Bridge fallback
             || "";
 
-        console.log("[OllamaLocal] RAW RESPONSE PREVIEW:", rawResponse.substring(0, 500) + "..."); // DEBUG: Inspect model output
+        // SAFETY NET: If content is empty but thinking has data, extract from thinking
+        // This handles cloud relays that count thinking+content together against num_predict
+        if (!rawResponse && data.message?.thinking) {
+            console.warn(`[OllamaLocal] Content empty but thinking has ${data.message.thinking.length} chars. Falling back to thinking extraction.`);
+            rawResponse = data.message.thinking;
+        }
+
+        console.log(`[OllamaLocal] RAW RESPONSE (${rawResponse.length} chars): ${rawResponse.substring(0, 300)}...`);
 
         // Helper to parse a single line "KEY: VALUE"
         const parseLine = (line: string): { value: string, type: string, label: string } | null => {

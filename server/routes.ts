@@ -2093,7 +2093,17 @@ ISTRUZIONI OUTPUT:
       // Format mentions for the AI using the new label system (#C1, #T1) and position offsets
       const formattedMentions = (processedMentions || []).map((m: any) => {
         const positionInfo = (m.start !== undefined && m.end !== undefined) ? ` [pos: ${m.start}-${m.end}]` : '';
-        return `- ATTIVA: MENZIONE ${m.label || m.source}${positionInfo}: "${m.text}"`;
+
+        // Extract surrounding context from the document for disambiguation
+        let contextInfo = '';
+        if (m.start !== undefined && m.end !== undefined && processedContent) {
+          const ctxStart = Math.max(0, m.start - 40);
+          const ctxEnd = Math.min(processedContent.length, m.end + 40);
+          const surrounding = processedContent.substring(ctxStart, ctxEnd);
+          contextInfo = `\n  CONTESTO: "...${surrounding}..."`;
+        }
+
+        return `- ATTIVA: MENZIONE ${m.label || m.source}${positionInfo}: "${m.text}"${contextInfo}`;
       }).join('\n');
 
       // Format session-wide mention registry
