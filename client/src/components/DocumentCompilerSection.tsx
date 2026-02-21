@@ -37,7 +37,7 @@ import { Slider } from "@/components/ui/slider";
 import { getApiUrl } from "@/lib/api-config";
 import { apiRequest } from "@/lib/queryClient";
 import { extractTextLocally } from "@/lib/local-extractor";
-import { extractPIILocal } from "@/lib/ollama";
+import { extractPIILocal, unifyPIIFindings, DEFAULT_OLLAMA_MODEL, AVAILABLE_MODELS } from '../lib/ollama';
 import { useOllama } from "@/contexts/OllamaContext";
 import { performMechanicalGlobalSweep, performMechanicalReverseSweep, anonymizeWithOllamaLocal } from "@/lib/privacy";
 
@@ -757,7 +757,7 @@ export function DocumentCompilerSection({
           const totalTime = (Date.now() - startTime) / 1000;
           // console.log(`[DocumentCompiler] Estrazione completata in ${totalTime.toFixed(1)}s (${(totalTime / allDocs.length).toFixed(1)}s per doc).`);
 
-          // 3. Sequential Vault Registration (Safe Deduplication)
+          // 3. Robust Vault Registration (Pawn Style)
           const ALLOWED = [
             'NOME', 'COGNOME', 'DATA_NASCITA', 'LUOGO_NASCITA', 'CODICE_FISCALE',
             'PARTITA_IVA', 'EIN_USA', 'INDIRIZZO', 'TELEFONO', 'EMAIL', 'URL',
@@ -765,25 +765,27 @@ export function DocumentCompilerSection({
             'DATI_SENSIBILI', 'DATI_COMPORTAMENTALI', 'INDIRIZZO_IP', 'ALTRO'
           ];
 
+          const uniqueFoundValues = new Set<string>();
+
           for (const res of flatResults) {
-            console.log(`[DocumentCompiler] Registering PII from: ${res.name} (${res.findings.length} findings)`);
+            console.log(`[DocumentCompiler] Processing PII findings from: ${res.name} (${res.findings.length} findings)`);
 
             for (const f of res.findings) {
               const rawValue = f.value.trim();
-
-              // 1. Determine Category: Prefer dynamic Label, otherwise standard Category
-              let category = f.label ? f.label : f.category.toUpperCase().replace(/[^A-Z_]/g, '_');
-
               if (!rawValue || rawValue.length < 2) continue;
-              // Grounding Check: Ignore values that look like prompt artifacts or codes
+
+              // Grounding Check
               if (rawValue.includes('[') || rawValue.includes(']') || rawValue.includes('<')) continue;
               if (rawValue.toLowerCase() === 'null' || rawValue.toLowerCase() === 'undefined') continue;
 
-              // 2. Category normalization (English-First) - ONLY if no custom label provided
+              // 1. Determine Category
+              let category = f.label ? f.label : f.category.toUpperCase().replace(/[^A-Z_]/g, '_');
+
+              // 2. Category normalization (English-First)
               if (!f.label && !ALLOWED.includes(category)) {
                 if (category.includes('NAME') || category.includes('PERSON') || category.includes('NOME')) category = 'NOME';
                 else if (category.includes('SUR') || category.includes('LAST') || category.includes('COGN')) category = 'COGNOME';
-                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA') || category.includes('CORP')) return; // Drop organization
+                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA') || category.includes('CORP')) continue; // Reject organization
                 else if (category.includes('ADDR') || category.includes('INDIRIZZO') || category.includes('STREET') || category.includes('VIA') || category.includes('CITY') || category.includes('CITTA') || category.includes('PROV') || category.includes('ZIP') || category.includes('CAP')) category = 'INDIRIZZO';
                 else if (category.includes('MAIL')) category = 'EMAIL';
                 else if (category.includes('TEL') || category.includes('PHONE') || category.includes('CELL')) category = 'TELEFONO';
@@ -799,10 +801,15 @@ export function DocumentCompilerSection({
                 else category = 'ALTRO';
               }
 
+              // Register in set for unification later
+              if (category !== 'ALTRO' && !category.includes('GENERIC_PII')) {
+                uniqueFoundValues.add(rawValue);
+              }
+
               let token = "";
               const normalizedValue = rawValue.toLowerCase();
 
-              // Deduplication
+              // Deduplication (Case-Insensitive)
               for (const [existingToken, existingValue] of vaultMap.entries()) {
                 if (existingValue.toLowerCase() === normalizedValue) {
                   token = existingToken;
@@ -825,9 +832,48 @@ export function DocumentCompilerSection({
 
                 token = `[${category}_${nextIndex}]`;
                 vaultMap.set(token, rawValue);
-                console.log(`[DocumentCompiler] Vault registered: ${token} (Redacted Value)`);
+                console.log(`[DocumentCompiler] Registered: ${token} -> ${rawValue}`);
               }
               vaultCounts.set(token, (vaultCounts.get(token) || 0) + 1);
+            }
+          }
+
+          // 4. Intelligent Unification (Post-Processing Refinement)
+          // This groups variations of the same PII (e.g. addresses, names)
+          let finalValueToTokenMap: Record<string, string> = {};
+
+          try {
+            console.log(`[DocumentCompiler] STEP 3: Unifying ${uniqueFoundValues.size} variations...`);
+            const unificationMap = await unifyPIIFindings(Array.from(uniqueFoundValues), selectedModel);
+            console.log(`[DocumentCompiler] STEP 3 COMPLETE: LLM returned ${Object.keys(unificationMap).length} mappings.`);
+
+            // Group existing tokens by their canonical values
+            const canonicalToToken = new Map<string, string>();
+            const processedValues = new Set<string>();
+
+            // Re-build vault and mapping based on canonical results
+            for (const [token, originalValue] of Array.from(vaultMap.entries())) {
+              const canonical = unificationMap[originalValue] || originalValue;
+              const normalizedCanonical = canonical.toLowerCase();
+
+              if (!canonicalToToken.has(normalizedCanonical)) {
+                // Keep the first token assigned to this canonical group
+                canonicalToToken.set(normalizedCanonical, token);
+                // Update vault with the most canonical name if it exists
+                vaultMap.set(token, canonical);
+              }
+
+              const targetToken = canonicalToToken.get(normalizedCanonical)!;
+              finalValueToTokenMap[originalValue] = targetToken;
+              finalValueToTokenMap[canonical] = targetToken;
+
+              // If merged, we might want to update counts (optional for now)
+            }
+          } catch (uErr) {
+            console.error("[DocumentCompiler] Unification Refinement failed, using identity mapping:", uErr);
+            // Fallback: simple token mapping
+            for (const [token, value] of Array.from(vaultMap.entries())) {
+              finalValueToTokenMap[value] = token;
             }
           }
 
@@ -840,7 +886,7 @@ export function DocumentCompilerSection({
 
           // Apply anonymity to ALL documents locally
           const anonymizedDocs = allDocs.map(doc => {
-            const anonymizedText = performMechanicalGlobalSweep(doc.text, masterVault);
+            const anonymizedText = performMechanicalGlobalSweep(doc.text, finalValueToTokenMap);
             return {
               ...doc,
               text: anonymizedText,

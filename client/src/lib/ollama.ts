@@ -726,3 +726,80 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promi
     }
     throw new Error('Retries exhausted');
 }
+
+/**
+ * Uses LLM to unify similar PII values (fuzzy deduplication).
+ * Returns a mapping: { "Original Value": "Canonical Value" }
+ */
+export async function unifyPIIFindings(
+    values: string[],
+    modelId: string = DEFAULT_OLLAMA_MODEL
+): Promise<Record<string, string>> {
+    if (!values || values.length <= 1) {
+        const result: Record<string, string> = {};
+        values.forEach(v => result[v] = v);
+        return result;
+    }
+
+    const prompt = `Unify the following personal data strings. Group variations of the same entity (e.g. same address with different formatting, same name).
+RULES:
+1. Return ONLY a JSON object: {"variation": "canonical_value"}.
+2. The "canonical_value" must be the most complete version from the list.
+3. If a value is unique, map it to itself.
+4. No explanations, no markdown, no other text.
+
+Data list:
+${values.join('\n')}
+`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    try {
+        const messages = [{ role: 'user', content: prompt }];
+        const response = await smartFetch(`${currentBaseUrl}/api/chat`, {
+            method: 'POST',
+            signal: controller.signal,
+            body: JSON.stringify({
+                model: modelId,
+                messages,
+                stream: false,
+                format: 'json',
+                options: {
+                    temperature: 0.1,
+                    num_predict: 2048
+                }
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.message?.content) {
+            console.log(`[OllamaLocal] RAW UNIFIER RESPONSE: ${result.message.content}`);
+            try {
+                // Remove potential markdown blocks
+                const rawContent = result.message.content.replace(/```json|```/g, '').trim();
+                const mapping = JSON.parse(rawContent);
+                console.log(`[OllamaLocal] PII Unifier: Mapped ${Object.keys(mapping).length} variations.`);
+                return mapping;
+            } catch (pErr) {
+                console.warn("[OllamaLocal] Unification JSON parse failed, returning identity map.");
+                const identity: Record<string, string> = {};
+                values.forEach(v => identity[v] = v);
+                return identity;
+            }
+        }
+    } catch (err: any) {
+        if (err.name === 'AbortError') {
+            console.warn("[OllamaLocal] PII Unification TIMEOUT (20s) - returning identity map.");
+        } else {
+            console.error("[OllamaLocal] PII Unification failed:", err);
+        }
+    } finally {
+        clearTimeout(timeoutId);
+    }
+
+    const fallback: Record<string, string> = {};
+    values.forEach(v => fallback[v] = v);
+    return fallback;
+}
