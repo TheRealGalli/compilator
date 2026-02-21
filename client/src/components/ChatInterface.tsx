@@ -236,22 +236,17 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
   // Handle Selection for Mentions (mouseup-based for stable positioning)
   useEffect(() => {
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: MouseEvent) => {
       // Small delay to let the selection stabilize
       setTimeout(() => {
         const sel = window.getSelection();
         if (sel && sel.toString().trim().length > 0 && containerRef.current && containerRef.current.contains(sel.anchorNode)) {
-          const range = sel.getRangeAt(0);
-          const rects = range.getClientRects();
-          if (rects.length > 0) {
-            // Use LAST rect to position at end of selection
-            const lastRect = rects[rects.length - 1];
-            setSelection({
-              text: sel.toString().trim(),
-              x: lastRect.right + 8,
-              y: lastRect.top + lastRect.height / 2
-            });
-          }
+          // Use MOUSE COORDINATES directly — always stable, always where user expects
+          setSelection({
+            text: sel.toString().trim(),
+            x: e.clientX + 12,
+            y: e.clientY
+          });
         }
       }, 10);
     };

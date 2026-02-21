@@ -513,6 +513,17 @@ ${llmText}
             if (val.length < 2) return null;
             if (key.includes("EXPLANATION") || key.includes("NOTE")) return null;
 
+            // ANTI-ECHO FILTER: Reject when model echoes back category names from the prompt
+            // e.g. "CATEGORY: NAME, ADDRESS, DATE, PHONE, EMAIL, TAX_ID, DOCUMENT, ORGANIZATION"
+            if (key === 'CATEGORY' || key === 'CATEGORIES' || key === 'FORMAT' || key === 'SCHEMA') return null;
+            const KNOWN_CATS = ['NAME', 'ADDRESS', 'DATE', 'PHONE', 'EMAIL', 'TAX_ID', 'DOCUMENT', 'ORGANIZATION', 'CONTACT', 'NOME', 'INDIRIZZO', 'CONTATTO'];
+            const commaWords = val.split(',').map(s => s.trim().toUpperCase());
+            if (commaWords.length >= 3 && commaWords.filter(w => KNOWN_CATS.includes(w)).length >= 3) return null;
+
+            // SANITY: Address can't be PHONE — reject PHONE if value looks like a street address
+            const ADDRESS_INDICATORS = /\b(ST |AVE |BLVD |RD |DR |LN |WAY |STE |SUITE |VIA |PIAZZA |CORSO |VIALE |N° |\d{5})\b/i;
+            if ((key.includes('PHONE') || key.includes('TEL') || key.includes('CELL')) && ADDRESS_INDICATORS.test(val)) return null;
+
             // QUALITY FILTER: Reject values that are descriptions, not actual data.
             // Real PII: "Carlo Galli", "36-5157311", "VIA CAMPANA 45"
             // Garbage:  "The country where the corporation is incorporated"
@@ -586,6 +597,15 @@ ${llmText}
 
         // NOTE: Strategy 3 (prose extraction from thinking) removed.
         // Reasoning models should produce structured output in content, not thinking.
+
+        // DEDUP: If same value appears with different labels, keep the first one
+        const seenValues = new Set<string>();
+        findings = findings.filter(f => {
+            const key = f.value.toLowerCase().trim();
+            if (seenValues.has(key)) return false;
+            seenValues.add(key);
+            return true;
+        });
 
         if (!Array.isArray(findings)) findings = [];
 
