@@ -57,11 +57,9 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
         isChecking.current = true;
 
         try {
-            console.log('[OllamaContext] Verifica connessione locale...');
             const isDirectReachable = await testOllamaConnection();
 
             if (isDirectReachable) {
-                console.log('[OllamaContext] Connessione locale OK.');
                 setStatus('connected');
                 // Fetch models dynamically
                 const models = await getRunningModels();

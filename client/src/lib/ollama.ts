@@ -87,7 +87,7 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
     }
 
     if (bridgeActive) {
-        console.log(`[OllamaLocal] Using GROMIT BRIDGE for ${url}`);
+        console.debug(`[OllamaLocal] Using GROMIT BRIDGE for ${url}`);
         const bridgeResult = await fetchViaBridge(url, options);
         if (bridgeResult && bridgeResult.success) {
             return {
