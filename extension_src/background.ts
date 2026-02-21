@@ -108,6 +108,13 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
 
         console.log(`[GromitBridge ${BRIDGE_VERSION}] Fetching: ${url}`);
 
+        // Abort fetch after 120s to match frontend timeout and prevent stale requests
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => {
+            controller.abort();
+            console.warn(`[GromitBridge ${BRIDGE_VERSION}] Fetch ABORTED after 120s: ${url}`);
+        }, 120000);
+
         const fetchOptions: any = {
             method: options.method || 'GET',
             headers: {
@@ -115,7 +122,8 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
             },
             mode: 'cors',
             credentials: 'omit',
-            referrerPolicy: 'no-referrer'
+            referrerPolicy: 'no-referrer',
+            signal: controller.signal
         };
 
         if (options.body && options.method !== 'GET') {
@@ -124,6 +132,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
 
         fetch(url, fetchOptions)
             .then(async response => {
+                clearTimeout(fetchTimeout);
                 const ok = response.ok;
                 const status = response.status;
                 const text = await response.text().catch(() => '');
@@ -136,17 +145,18 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
                 sendResponse({ success: true, ok, status, data });
             })
             .catch(error => {
+                clearTimeout(fetchTimeout);
                 // SILENT CONNECTIVITY: Downgrade to debug for network errors (status 0)
-                if (!error.status || error.status === 0) {
+                if (error.name === 'AbortError') {
+                    console.warn(`[GromitBridge ${BRIDGE_VERSION}] Fetch timed out for: ${url}`);
+                    sendResponse({ success: false, error: 'TIMEOUT (120s)', status: 408 });
+                } else if (!error.status || error.status === 0) {
                     console.debug(`[GromitBridge ${BRIDGE_VERSION}] Fetch failed (System Offline):`, url);
+                    sendResponse({ success: false, error: error.message || 'Unknown Network Error', status: 0 });
                 } else {
                     console.error(`[GromitBridge ${BRIDGE_VERSION}] Fetch Error:`, error);
+                    sendResponse({ success: false, error: error.message || 'Unknown Network Error', status: 0 });
                 }
-                sendResponse({
-                    success: false,
-                    error: error.message || 'Unknown Network Error',
-                    status: 0
-                });
             });
 
         return true;

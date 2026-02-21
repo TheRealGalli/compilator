@@ -443,12 +443,10 @@ ${llmText}
         const options: any = {
             temperature: 0.15,
             num_ctx: CONTEXT_WINDOW,
+            num_predict: isOSSModel ? 4096 : 1024, // OSS: budget for thinking+content, others: content only
             top_k: 20,
             top_p: 0.9
         };
-        if (!isOSSModel) {
-            options.num_predict = 1024; // Cap output for non-reasoning models
-        }
 
         const payload: any = {
             model: modelId,
