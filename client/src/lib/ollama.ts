@@ -440,17 +440,21 @@ ${llmText}
     try {
         const messages = [{ role: 'user', content: prompt }];
 
+        const options: any = {
+            temperature: 0.15,
+            num_ctx: CONTEXT_WINDOW,
+            top_k: 20,
+            top_p: 0.9
+        };
+        if (!isOSSModel) {
+            options.num_predict = 1024; // Cap output for non-reasoning models
+        }
+
         const payload: any = {
             model: modelId,
             messages,
             stream: false,
-            options: {
-                temperature: 0.15,
-                num_ctx: CONTEXT_WINDOW,
-                num_predict: isOSSModel ? 4048 : 1024, // OSS needs budget for thinking + content
-                top_k: 20,
-                top_p: 0.9
-            }
+            options
         };
 
         // Only disable thinking for non-reasoning models
