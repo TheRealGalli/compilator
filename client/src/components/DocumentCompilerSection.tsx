@@ -37,7 +37,7 @@ import { Slider } from "@/components/ui/slider";
 import { getApiUrl } from "@/lib/api-config";
 import { apiRequest } from "@/lib/queryClient";
 import { extractTextLocally } from "@/lib/local-extractor";
-import { extractPIILocal, unifyPIIFindings, DEFAULT_OLLAMA_MODEL, AVAILABLE_MODELS } from '../lib/ollama';
+import { extractPIILocal, unifyPIIFindings, isNoisyPII, DEFAULT_OLLAMA_MODEL, AVAILABLE_MODELS } from '../lib/ollama';
 import { useOllama } from "@/contexts/OllamaContext";
 import { performMechanicalGlobalSweep, performMechanicalReverseSweep, anonymizeWithOllamaLocal } from "@/lib/privacy";
 
@@ -777,6 +777,7 @@ export function DocumentCompilerSection({
               // Grounding Check
               if (rawValue.includes('[') || rawValue.includes(']') || rawValue.includes('<')) continue;
               if (rawValue.toLowerCase() === 'null' || rawValue.toLowerCase() === 'undefined') continue;
+              if (isNoisyPII(rawValue)) continue;
 
               // 1. Determine Category
               let category = f.label ? f.label : f.category.toUpperCase().replace(/[^A-Z_]/g, '_');

@@ -14,6 +14,34 @@ import { PII_SCHEMA_DEFINITIONS } from './pii-schema';
 let currentBaseUrl = 'http://localhost:11434';
 export const DEFAULT_OLLAMA_MODEL = 'gemma3:1b';
 
+/**
+ * Filtra valori che non sono vero PII ma rumore tecnico o semantico.
+ */
+export function isNoisyPII(value: string): boolean {
+    if (!value) return true;
+    const v = value.trim().toLowerCase();
+
+    // 1. Technical/Schema noise
+    const technicalNoise = [
+        'cast', 'schema', 'undefined', 'null', 'n/a', 'none', 'no data', 'no info',
+        'unknown', 'generic', 'pii', 'token', 'value', 'type', 'id', 'uuid',
+        'hidden', 'error', 'failed', 'empty', 'missing'
+    ];
+    if (technicalNoise.some(noise => v === noise || v.startsWith(noise + ':'))) return true;
+
+    // 2. Fragment IDs or hex strings (e.g. "cast-281923")
+    if (/^[a-zA-Z]+-[0-9]+$/.test(v)) return true; // match "prefix-number"
+    if (/^[0-9a-f]{8,}$/i.test(v)) return true;    // long hex strings
+
+    // 3. Short garbage
+    if (v.length < 2) return true;
+
+    // 4. Common descriptive text (if LLM hallucinates descriptions as values)
+    if (v.split(' ').length > 10) return true; // Way too long to be a standard PII value
+
+    return false;
+}
+
 export const AVAILABLE_MODELS = {
     local: [
         { id: 'gemma3:1b', label: 'Gemma 3 (1B)', size: '1.5GB' },
@@ -667,7 +695,7 @@ ${llmText}
             const placeholders = ['john doe', 'jane doe', 'mario rossi', 'new york', '01/01/1980', '123 main st', 'san francisco'];
             return placeholders.some(p => v === p || v.includes(p) && v.length < p.length + 5);
         };
-        findings = findings.filter(f => !isPlaceholder(f.value));
+        findings = findings.filter(f => !isPlaceholder(f.value) && !isNoisyPII(f.value));
 
         if (findings.length === 0) {
             console.warn("[OllamaLocal] LLM returned 0 findings (after parsing).");
@@ -768,6 +796,15 @@ export async function unifyPIIFindings(
         return result;
     }
 
+    // Filter out obvious noise before sending to LLM
+    const filteredValues = values.filter(v => !isNoisyPII(v));
+    if (filteredValues.length === 0) {
+        console.warn("[OllamaLocal] No valid PII values to unify after filtering noise.");
+        const identity: Record<string, string> = {};
+        values.forEach(v => identity[v] = v);
+        return identity;
+    }
+
     const prompt = `Unify the following personal data strings. Group variations of the same entity (e.g. same address with different formatting, same name).
 RULES:
 1. Return ONLY a JSON object: {"variation": "canonical_value"}.
@@ -776,7 +813,7 @@ RULES:
 4. No explanations, no markdown, no other text.
 
 Data list:
-${values.join('\n')}
+${filteredValues.join('\n')}
 `;
 
     const controller = new AbortController();
