@@ -759,12 +759,10 @@ export function DocumentCompilerSection({
 
           // 3. Sequential Vault Registration (Safe Deduplication)
           const ALLOWED = [
-            'FULL_NAME', 'SURNAME', 'DATE_OF_BIRTH', 'PLACE_OF_BIRTH',
-            'TAX_ID', 'VAT_NUMBER', 'FULL_ADDRESS', 'STREET', 'CITY',
-            'STATE_PROVINCE', 'ZIP_CODE', 'COUNTRY', 'PHONE_NUMBER', 'EMAIL',
-            'DOCUMENT_ID', 'DOCUMENT_TYPE', 'ISSUE_DATE',
-            'EXPIRY_DATE', 'ISSUING_AUTHORITY', 'GENDER',
-            'NATIONALITY', 'OCCUPATION', 'IBAN', 'ORGANIZATION', 'JOB_TITLE', 'MISC'
+            'NOME', 'COGNOME', 'DATA_NASCITA', 'LUOGO_NASCITA', 'CODICE_FISCALE',
+            'PARTITA_IVA', 'EIN_USA', 'INDIRIZZO', 'TELEFONO', 'EMAIL', 'URL',
+            'IBAN', 'DOCUMENTO', 'SESSO', 'NAZIONALITA', 'RUOLO', 'DATI_FINANZIARI',
+            'DATI_SENSIBILI', 'DATI_COMPORTAMENTALI', 'INDIRIZZO_IP', 'ALTRO'
           ];
 
           for (const res of flatResults) {
@@ -783,27 +781,22 @@ export function DocumentCompilerSection({
 
               // 2. Category normalization (English-First) - ONLY if no custom label provided
               if (!f.label && !ALLOWED.includes(category)) {
-                if (category.includes('NAME') || category.includes('PERSON') || category.includes('NOME')) category = 'FULL_NAME';
-                else if (category.includes('SUR') || category.includes('LAST') || category.includes('COGN')) category = 'SURNAME';
-                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA') || category.includes('CORP')) category = 'ORGANIZATION';
-                else if (category.includes('ADDR') || category.includes('INDIRIZZO')) category = 'FULL_ADDRESS';
-                else if (category.includes('STREET') || category.includes('VIA')) category = 'STREET';
+                if (category.includes('NAME') || category.includes('PERSON') || category.includes('NOME')) category = 'NOME';
+                else if (category.includes('SUR') || category.includes('LAST') || category.includes('COGN')) category = 'COGNOME';
+                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA') || category.includes('CORP')) return; // Drop organization
+                else if (category.includes('ADDR') || category.includes('INDIRIZZO') || category.includes('STREET') || category.includes('VIA') || category.includes('CITY') || category.includes('CITTA') || category.includes('PROV') || category.includes('ZIP') || category.includes('CAP')) category = 'INDIRIZZO';
                 else if (category.includes('MAIL')) category = 'EMAIL';
-                else if (category.includes('TEL') || category.includes('PHONE') || category.includes('CELL')) category = 'PHONE_NUMBER';
-                else if (category.includes('BANK') || category.includes('IBAN')) category = 'IBAN';
-                else if (category.includes('CITY') || category.includes('CITTA')) category = 'CITY';
-                else if (category.includes('STATE') || category.includes('PROV')) category = 'STATE_PROVINCE';
-                else if (category.includes('COUNTRY') || category.includes('NATION') || category.includes('NAZION')) category = 'COUNTRY';
-                else if (category.includes('TAX') || category.includes('SOCIAL') || category.includes('FISCAL') || category.includes('CODICE')) category = 'TAX_ID';
-                else if (category.includes('VAT') || category.includes('IVA')) category = 'VAT_NUMBER';
-                else if (category.includes('ZIP') || category.includes('POST') || category.includes('CAP')) category = 'ZIP_CODE';
+                else if (category.includes('TEL') || category.includes('PHONE') || category.includes('CELL')) category = 'TELEFONO';
+                else if (category.includes('BANK') || category.includes('IBAN') || category.includes('FINAN')) category = 'DATI_FINANZIARI';
+                else if (category.includes('TAX') || category.includes('SOCIAL') || category.includes('FISCAL') || category.includes('CODICE')) category = 'CODICE_FISCALE';
+                else if (category.includes('VAT') || category.includes('IVA')) category = 'PARTITA_IVA';
                 else if (category.includes('BIRTH')) {
-                  if (category.includes('PLACE') || category.includes('LUOGO')) category = 'PLACE_OF_BIRTH';
-                  else category = 'DATE_OF_BIRTH';
+                  if (category.includes('PLACE') || category.includes('LUOGO')) category = 'LUOGO_NASCITA';
+                  else category = 'DATA_NASCITA';
                 }
-                else if (category.includes('DOC') || category.includes('NUMBER')) category = 'DOCUMENT_ID';
-                else if (category.includes('ROLE') || category.includes('JOB') || category.includes('RUOLO')) category = 'JOB_TITLE';
-                else category = 'MISC';
+                else if (category.includes('DOC') || category.includes('NUMBER')) category = 'DOCUMENTO';
+                else if (category.includes('ROLE') || category.includes('JOB') || category.includes('RUOLO')) category = 'RUOLO';
+                else category = 'ALTRO';
               }
 
               let token = "";

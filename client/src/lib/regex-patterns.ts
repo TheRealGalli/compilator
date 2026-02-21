@@ -11,11 +11,11 @@ export const PII_REGEX_PATTERNS = {
 
     // Italian Codice Fiscale (Strict 16 chars alphanumeric)
     // Format: 6 letters, 2 digits, 1 letter, 2 digits, 1 letter, 3 digits, 1 letter
-    FISCAL_CODE: /\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/g,
+    CODICE_FISCALE: /\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/g,
 
     // Italian VAT Number (Partita IVA) - 11 digits
     // Often preceded by IT, P.IVA, PI, Partita IVA
-    VAT_NUMBER: /\b(?:IT|P\.IVA|PI|Partita IVA)\s*[:.]?\s*([0-9]{11})\b/gi,
+    PARTITA_IVA: /\b(?:IT|P\.IVA|PI|Partita IVA)\s*[:.]?\s*([0-9]{11})\b/gi,
 
     // IBAN (International Bank Account Number) - Italian starts with IT, 27 chars total
     // Supports spacing groups (e.g. IT00 A123 4567...)
@@ -24,27 +24,27 @@ export const PII_REGEX_PATTERNS = {
     // Phone Numbers (Italian mobile/landline + International)
     // Matches: +39..., 0039..., or standard Italian 333... 02...
     // Now includes generic international: Prefix (1-4 digits) + 9+ digits
-    PHONE_NUMBER: /(?:(?:\+|00)\d{1,4}[\s.-]*\d{9,})|(?:(?:\+|00)39)?\s*(?:3\d{2}|0\d{1,4})\s*[ .\-]?\s*\d{3,4}\s*[ .\-]?\s*\d{3,4}\b/g,
+    TELEFONO: /(?:(?:\+|00)\d{1,4}[\s.-]*\d{9,})|(?:(?:\+|00)39)?\s*(?:3\d{2}|0\d{1,4})\s*[ .\-]?\s*\d{3,4}\s*[ .\-]?\s*\d{3,4}\b/g,
 
     // Dates (DD/MM/YYYY or YYYY-MM-DD or DD-MM-YYYY)
     // Avoids matching simple fractions like 10/20
-    DATE: /\b(0[1-9]|[12][0-9]|3[01])[-/.](0[1-9]|1[012])[-/.](19|20)\d{2}\b|\b(19|20)\d{2}[-/.](0[1-9]|1[012])[-/.](0[1-9]|[12][0-9]|3[01])\b/g,
+    DATA: /\b(0[1-9]|[12][0-9]|3[01])[-/.](0[1-9]|1[012])[-/.](19|20)\d{2}\b|\b(19|20)\d{2}[-/.](0[1-9]|1[012])[-/.](0[1-9]|[12][0-9]|3[01])\b/g,
 
     // Credit Card (Major brands, simple check, excludes Luhn for speed unless needed)
-    CREDIT_CARD: /\b(?:\d{4}[ -]?){3}\d{4}\b/g,
+    CARTA_CREDITO: /\b(?:\d{4}[ -]?){3}\d{4}\b/g,
 
     // IP Addresses (IPv4)
-    IP_ADDRESS: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
+    INDIRIZZO_IP: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
 
     // URLs (http/https)
     URL: /\bhttps?:\/\/[^\s/$.?#].[^\s]*\b/g,
 
     // US EIN (Employer Identification Number) - Format: XX-XXXXXXX (2 digits, dash, 7 digits)
     // Common in IRS forms (5472, W-9, etc.) e.g. 36-5157311
-    US_EIN: /\b\d{2}-\d{7}\b/g,
+    EIN_USA: /\b\d{2}-\d{7}\b/g,
 
     // US Date formats (MM/DD/YYYY or MM-DD-YYYY) - Common in US tax forms
-    US_DATE: /\b(0[1-9]|1[012])[-/](0[1-9]|[12][0-9]|3[01])[-/](19|20)\d{2}\b/g
+    DATA_USA: /\b(0[1-9]|1[012])[-/](0[1-9]|[12][0-9]|3[01])[-/](19|20)\d{2}\b/g
 };
 
 /**
@@ -58,13 +58,7 @@ const NAME_INDICATORS = [
     'nominativo', 'dipendente', 'cliente', 'paziente'
 ];
 
-// 2. ORGANIZATION INDICATORS (Prefixes for companies/entities)
-const ORGANIZATION_INDICATORS = [
-    'ente', 'società', 'ditta', 'azienda', 'studio', 'banca', 'istituto', 'associazione',
-    'comune di', 'provincia di', 'regione', 'ministero', 'tribunale'
-];
-
-// 3. BIRTHPLACE INDICATORS (Prefixes for places)
+// 2. BIRTHPLACE INDICATORS (Prefixes for places)
 const BIRTHPLACE_INDICATORS = [
     'nato a', 'nata a', 'nati a', 'residente a', 'residente in', 'vivente a', 'domiciliato a',
     'sito in', 'sede a', 'luogo di nascita'
@@ -160,31 +154,36 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
 
 
     // 1. STRICT REGEX PASS
-    for (const [category, regex] of Object.entries(PII_REGEX_PATTERNS)) {
+    for (const [rawCategory, regex] of Object.entries(PII_REGEX_PATTERNS)) {
         let localRegex = new RegExp(regex.source, regex.flags);
         let match;
         while ((match = localRegex.exec(text)) !== null) {
             let val = match[0];
             let cleanVal = val;
+            let category = rawCategory;
 
-            if (category === 'VAT_NUMBER' && match[1]) {
+            // Normalize category names to schema
+            if (category === 'DATA_USA') category = 'DATA';
+            if (category === 'EIN_USA') category = 'EIN_USA'; // Keep as is
+            if (category === 'CARTA_CREDITO') category = 'DATI_FINANZIARI';
+
+            if (category === 'PARTITA_IVA' && match[1]) {
                 val = match[1];
                 cleanVal = val;
             }
             if (category === 'IBAN') {
                 cleanVal = val.replace(/\s+/g, '');
             }
-            if (category === 'CREDIT_CARD') {
+            if (rawCategory === 'CARTA_CREDITO') {
                 cleanVal = val.replace(/[\s-]/g, '');
             }
 
             // ALGORITHMIC VALIDATION
-            if (category === 'FISCAL_CODE' && !isValidFiscalCode(cleanVal)) continue;
-            if (category === 'CREDIT_CARD' && !isValidLuhn(cleanVal)) continue;
+            if (rawCategory === 'CODICE_FISCALE' && !isValidFiscalCode(cleanVal)) continue;
+            if (rawCategory === 'CARTA_CREDITO' && !isValidLuhn(cleanVal)) continue;
 
             let conf: 'HIGH' | 'MEDIUM' | 'LOW' = 'HIGH';
-            if (category === 'PHONE_NUMBER' || category === 'DATE' || category === 'US_DATE') conf = 'MEDIUM';
-            if (category === 'US_EIN') conf = 'HIGH';
+            if (category === 'TELEFONO' || category === 'DATA') conf = 'MEDIUM';
 
             addCandidate(val, category, match.index, conf);
         }
@@ -211,7 +210,7 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
             const potentialValue = match[2].trim();
 
             // STRICT FILTERING for NAMES
-            if (type === 'FULL_NAME') {
+            if (type === 'NOME') {
                 const words = potentialValue.split(/\s+/).map(w => w.toUpperCase());
 
                 // Rule 1: Must be at least 2 words (Name Surname)
@@ -245,7 +244,7 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
             if (potentialValue.length > 3) {
                 let conf: 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM';
 
-                if (type === 'FULL_NAME') {
+                if (type === 'NOME') {
                     const words = potentialValue.toUpperCase().split(' ');
                     const nameMatch = words.some(w => NAMES_SET.has(w));
                     const surnameMatch = words.some(w => SURNAMES_SET.has(w));
@@ -255,16 +254,15 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
                     else conf = 'LOW'; // "Pincopallo Vattelapesca" (Neither found)
                 }
 
-                if (type === 'PLACE_OF_BIRTH') conf = 'MEDIUM';
+                if (type === 'LUOGO_NASCITA') conf = 'MEDIUM';
 
                 addCandidate(potentialValue, type, match.index + match[0].indexOf(potentialValue), conf);
             }
         }
     };
 
-    matchHeuristic(NAME_INDICATORS, 'FULL_NAME');
-    matchHeuristic(ORGANIZATION_INDICATORS, 'ORGANIZATION');
-    matchHeuristic(BIRTHPLACE_INDICATORS, 'PLACE_OF_BIRTH');
+    matchHeuristic(NAME_INDICATORS, 'NOME');
+    matchHeuristic(BIRTHPLACE_INDICATORS, 'LUOGO_NASCITA');
 
     // 3. DICTIONARY SWEEP (Find "Name Surname" anywhere)
     // This catches "Mario Rossi" even without "Sig." prefix.
@@ -287,7 +285,7 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
                 const regex = new RegExp(`\\b${w1}[\\s]+${w2}\\b`, 'gi');
                 let match;
                 while ((match = regex.exec(text)) !== null) {
-                    addCandidate(match[0], 'FULL_NAME', match.index, 'HIGH');
+                    addCandidate(match[0], 'NOME', match.index, 'HIGH');
                 }
             }
         }

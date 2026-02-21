@@ -534,7 +534,7 @@ ${llmText}
             // ANTI-ECHO FILTER: Reject when model echoes back category names from the prompt
             // e.g. "CATEGORY: NAME, ADDRESS, DATE, PHONE, EMAIL, TAX_ID, DOCUMENT, ORGANIZATION"
             if (key === 'CATEGORY' || key === 'CATEGORIES' || key === 'FORMAT' || key === 'SCHEMA') return null;
-            const KNOWN_CATS = ['NAME', 'ADDRESS', 'DATE', 'PHONE', 'EMAIL', 'TAX_ID', 'DOCUMENT', 'ORGANIZATION', 'CONTACT', 'NOME', 'INDIRIZZO', 'CONTATTO', 'CODICE_FISCALE', 'DOCUMENTO', 'DATA_NASCITA', 'LUOGO_NASCITA', 'SESSO', 'NAZIONALITA', 'DATI_SALUTE', 'DATI_FINANZIARI', 'DATI_BIOMETRICI', 'DATI_GENETICI', 'OPINIONI_POLITICHE', 'CONVINZIONI_RELIGIOSE', 'SINDACATO', 'ORIENTAMENTO_SESSUALE', 'DATI_COMPORTAMENTALI', 'RUOLO', 'PARTITA_IVA', 'GENERIC_PII'];
+            const KNOWN_CATS = ['NOME', 'INDIRIZZO', 'DATA', 'PARTITA_IVA', 'CODICE_FISCALE', 'CONTATTO', 'DATI_FINANZIARI', 'DOCUMENTO', 'RUOLO', 'DATI_SENSIBILI', 'NAZIONALITA', 'DATI_COMPORTAMENTALI', 'DATA_NASCITA', 'LUOGO_NASCITA', 'SESSO', 'DATI_SALUTE', 'DATI_BIOMETRICI', 'DATI_GENETICI', 'OPINIONI_POLITICHE', 'CONVINZIONI_RELIGIOSE', 'SINDACATO', 'ORIENTAMENTO_SESSUALE', 'GENERIC_PII'];
             const commaWords = val.split(',').map(s => s.trim().toUpperCase());
             if (commaWords.length >= 3 && commaWords.filter(w => KNOWN_CATS.includes(w)).length >= 3) return null;
 
@@ -560,21 +560,21 @@ ${llmText}
 
             // Map generic keys to our CATEGORIES (Supports both English and Italian schema tokens)
             let type = 'UNKNOWN';
-            if (key.includes('NAME') || key.includes('NOME') || key.includes('TITOLARE') || key.includes('SOGGETTO') || key.includes('COGNOME') || key.includes('SURNAME')) type = 'NAME';
-            else if (key.includes('ADDRESS') || key.includes('INDIRIZZO') || key.includes('DOMICILIO') || key.includes('CITY') || key.includes('LOCATION')) type = 'ADDRESS';
-            else if (key.includes('LUOGO') && key.includes('NASCITA')) type = 'ADDRESS';
-            else if (key.includes('DATE') || key.includes('DATA') || key.includes('INIZIO') || key.includes('FINE')) type = 'DATE';
-            else if (key.includes('PARTITA') || key.includes('IVA') || key.includes('VAT') || key.includes('PIVA')) type = 'VAT_NUMBER';
-            else if (key.includes('CODICE') || key.includes('FISCAL') || key.includes('CF') || key.includes('TAX')) type = 'TAX_ID';
-            else if (key.includes('CONTATTO') || key.includes('MAIL') || key.includes('EMAIL') || key.includes('PHONE') || key.includes('TEL') || key.includes('CELL')) type = 'CONTACT';
-            else if (key.includes('ORGANIZATION') || key.includes('COMPANY') || key.includes('DITTA') || key.includes('SOCIETA') || key.includes('BUSINESS') || key.includes('DENOMINAZIONE')) type = 'ORGANIZATION';
-            else if (key.includes('IBAN') || key.includes('BANK') || key.includes('CONTO') || key.includes('FINANZIAR')) type = 'FINANCIAL';
-            else if (key.includes('DOCUMENTO') || key.includes('DOCUMENT')) type = 'DOCUMENT_ID';
-            else if (key.includes('RUOLO') || key.includes('PROFESSION')) type = 'ROLE';
-            else if (key.includes('SALUTE') || key.includes('HEALTH') || key.includes('BIOMETRIC') || key.includes('GENETIC')) type = 'SENSITIVE_DATA';
-            else if (key.includes('SESSO') || key.includes('GENDER') || key.includes('ORIENTAMENTO') || key.includes('RELIGIOS') || key.includes('POLITIC') || key.includes('SINDACAL') || key.includes('SINDACATO') || key.includes('CONVINZION')) type = 'SENSITIVE_DATA';
-            else if (key.includes('NAZIONAL')) type = 'NATIONALITY';
-            else if (key.includes('COMPORTAMENT')) type = 'BEHAVIORAL_DATA';
+            if (key.includes('NAME') || key.includes('NOME') || key.includes('TITOLARE') || key.includes('SOGGETTO') || key.includes('COGNOME') || key.includes('SURNAME')) type = 'NOME';
+            else if (key.includes('ADDRESS') || key.includes('INDIRIZZO') || key.includes('DOMICILIO') || key.includes('CITY') || key.includes('LOCATION')) type = 'INDIRIZZO';
+            else if (key.includes('LUOGO') && key.includes('NASCITA')) type = 'LUOGO_NASCITA';
+            else if (key.includes('DATE') || key.includes('DATA') || key.includes('INIZIO') || key.includes('FINE')) type = 'DATA';
+            else if (key.includes('PARTITA') || key.includes('IVA') || key.includes('VAT') || key.includes('PIVA')) type = 'PARTITA_IVA';
+            else if (key.includes('CODICE') || key.includes('FISCAL') || key.includes('CF') || key.includes('TAX')) type = 'CODICE_FISCALE';
+            else if (key.includes('CONTATTO') || key.includes('MAIL') || key.includes('EMAIL') || key.includes('PHONE') || key.includes('TEL') || key.includes('CELL')) type = 'CONTATTO';
+            else if (key.includes('ORGANIZATION') || key.includes('COMPANY') || key.includes('DITTA') || key.includes('SOCIETA') || key.includes('BUSINESS') || key.includes('DENOMINAZIONE')) return null; // Organizations are not personal data
+            else if (key.includes('IBAN') || key.includes('BANK') || key.includes('CONTO') || key.includes('FINANZIAR')) type = 'DATI_FINANZIARI';
+            else if (key.includes('DOCUMENTO') || key.includes('DOCUMENT')) type = 'DOCUMENTO';
+            else if (key.includes('RUOLO') || key.includes('PROFESSION')) type = 'RUOLO';
+            else if (key.includes('SALUTE') || key.includes('HEALTH') || key.includes('BIOMETRIC') || key.includes('GENETIC')) type = 'DATI_SENSIBILI';
+            else if (key.includes('SESSO') || key.includes('GENDER') || key.includes('ORIENTAMENTO') || key.includes('RELIGIOS') || key.includes('POLITIC') || key.includes('SINDACAL') || key.includes('SINDACATO') || key.includes('CONVINZION')) type = 'DATI_SENSIBILI';
+            else if (key.includes('NAZIONAL')) type = 'NAZIONALITA';
+            else if (key.includes('COMPORTAMENT')) type = 'DATI_COMPORTAMENTALI';
             else type = 'GENERIC_PII';
 
             // NORMALIZED LABEL
