@@ -560,21 +560,24 @@ ${llmText}
 
             // Map generic keys to our CATEGORIES (Supports both English and Italian schema tokens)
             let type = 'UNKNOWN';
-            if (key.includes('NAME') || key.includes('NOME') || key.includes('TITOLARE') || key.includes('SOGGETTO') || key.includes('COGNOME') || key.includes('SURNAME')) type = 'NOME';
-            else if (key.includes('ADDRESS') || key.includes('INDIRIZZO') || key.includes('DOMICILIO') || key.includes('CITY') || key.includes('LOCATION')) type = 'INDIRIZZO';
-            else if (key.includes('LUOGO') && key.includes('NASCITA')) type = 'LUOGO_NASCITA';
-            else if (key.includes('DATE') || key.includes('DATA') || key.includes('INIZIO') || key.includes('FINE')) type = 'DATA';
-            else if (key.includes('PARTITA') || key.includes('IVA') || key.includes('VAT') || key.includes('PIVA')) type = 'PARTITA_IVA';
-            else if (key.includes('CODICE') || key.includes('FISCAL') || key.includes('CF') || key.includes('TAX')) type = 'CODICE_FISCALE';
-            else if (key.includes('CONTATTO') || key.includes('MAIL') || key.includes('EMAIL') || key.includes('PHONE') || key.includes('TEL') || key.includes('CELL')) type = 'CONTATTO';
-            else if (key.includes('ORGANIZATION') || key.includes('COMPANY') || key.includes('DITTA') || key.includes('SOCIETA') || key.includes('BUSINESS') || key.includes('DENOMINAZIONE')) return null; // Organizations are not personal data
-            else if (key.includes('IBAN') || key.includes('BANK') || key.includes('CONTO') || key.includes('FINANZIAR')) type = 'DATI_FINANZIARI';
-            else if (key.includes('DOCUMENTO') || key.includes('DOCUMENT')) type = 'DOCUMENTO';
-            else if (key.includes('RUOLO') || key.includes('PROFESSION')) type = 'RUOLO';
-            else if (key.includes('SALUTE') || key.includes('HEALTH') || key.includes('BIOMETRIC') || key.includes('GENETIC')) type = 'DATI_SENSIBILI';
-            else if (key.includes('SESSO') || key.includes('GENDER') || key.includes('ORIENTAMENTO') || key.includes('RELIGIOS') || key.includes('POLITIC') || key.includes('SINDACAL') || key.includes('SINDACATO') || key.includes('CONVINZION')) type = 'DATI_SENSIBILI';
-            else if (key.includes('NAZIONAL')) type = 'NAZIONALITA';
-            else if (key.includes('COMPORTAMENT')) type = 'DATI_COMPORTAMENTALI';
+            const has = (t: string) => key.includes(t);
+            const isStrictIVA = key === 'IVA' || key === 'P_IVA' || key === 'P.IVA' || key === 'PARTITA_IVA' || key.startsWith('IVA_') || key.includes('_IVA') || (has('PARTITA') && has('IVA'));
+
+            if (has('NAME') || has('NOME') || has('TITOLARE') || has('SOGGETTO') || has('COGNOME') || has('SURNAME')) type = 'NOME';
+            else if (has('ADDRESS') || has('INDIRIZZO') || has('DOMICILIO') || has('CITY') || has('LOCATION')) type = 'INDIRIZZO';
+            else if (has('LUOGO') && has('NASCITA')) type = 'LUOGO_NASCITA';
+            else if (has('DATE') || has('DATA') || has('INIZIO') || has('FINE')) type = 'DATA';
+            else if (isStrictIVA || has('VAT') || has('PIVA')) type = 'PARTITA_IVA';
+            else if (has('CODICE') || has('FISCAL') || has('CF') || has('TAX')) type = 'CODICE_FISCALE';
+            else if (has('CONTATTO') || has('MAIL') || has('EMAIL') || has('PHONE') || has('TEL') || has('CELL')) type = 'CONTATTO';
+            else if (has('ORGANIZATION') || has('COMPANY') || has('DITTA') || has('SOCIETA') || has('BUSINESS') || has('DENOMINAZIONE')) return null; // Organizations are not personal data
+            else if (has('IBAN') || has('BANK') || has('CONTO') || has('FINANZIAR')) type = 'DATI_FINANZIARI';
+            else if (has('DOCUMENTO') || has('DOCUMENT')) type = 'DOCUMENTO';
+            else if (has('RUOLO') || (has('PROFESSION') && !has('PROFESSIONISTA'))) type = 'RUOLO';
+            else if (has('SALUTE') || has('HEALTH') || has('BIOMETRIC') || has('GENETIC')) type = 'DATI_SENSIBILI';
+            else if (has('SESSO') || has('GENDER') || has('ORIENTAMENTO') || has('RELIGIOS') || has('POLITIC') || has('SINDACAL') || has('SINDACATO') || has('CONVINZION')) type = 'DATI_SENSIBILI';
+            else if (has('NAZIONAL')) type = 'NAZIONALITA';
+            else if (has('COMPORTAMENT')) type = 'DATI_COMPORTAMENTALI';
             else type = 'GENERIC_PII';
 
             // NORMALIZED LABEL
