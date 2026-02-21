@@ -455,8 +455,10 @@ ${llmText}
             options
         };
 
-        // Only disable thinking for non-reasoning models
-        if (!isOSSModel) {
+        // GPT-OSS Optimization: Use 'low' reasoning effort to prevent excessive tracing
+        if (isOSSModel) {
+            payload.think = "low";
+        } else {
             payload.think = false;
         }
 
@@ -466,18 +468,19 @@ ${llmText}
         // DEBUG: Inspect actual response structure
         console.log("[OllamaLocal] Response keys:", JSON.stringify(Object.keys(data)));
 
-        // Extract response content
+        // Extract response content - Robust extraction for Ollama, OpenAI and various Cloud Proxies
         let rawResponse = data.message?.content  // Ollama native format
             || data.choices?.[0]?.message?.content  // OpenAI-compatible format
-            || data.response  // Ollama generate format
+            || data.choices?.[0]?.delta?.content    // Streaming fallback (even if stream is false, some proxies use it)
+            || data.choices?.[0]?.text              // Legacy text format
+            || data.response                        // Ollama generate format
+            || data.message?.reasoning_content      // Some OpenAI-style reasoning models use this
+            || data.choices?.[0]?.message?.reasoning_content // Common OpenAI reasoning field
             || (typeof data.raw === 'string' ? data.raw : '')  // Bridge fallback
             || "";
 
-        // FALLBACK for OSS: Cloud relay may put everything in thinking field
-        if (!rawResponse && data.message?.thinking) {
-            console.warn(`[OllamaLocal] Content empty, using thinking field (${data.message.thinking.length} chars) as fallback.`);
-            rawResponse = data.message.thinking;
-        }
+        // FALLBACK removed as per user request (Do not parse thinking/reasoning prose)
+
 
         console.log(`[OllamaLocal] RAW RESPONSE (${rawResponse.length} chars): ${rawResponse.substring(0, 300)}...`);
 
@@ -525,6 +528,7 @@ ${llmText}
 
             // Simple hygiene
             if (val.length < 2) return null;
+            if (key.length > 40) return null; // Garbage from reasoning prose parsed as key
             if (key.includes("EXPLANATION") || key.includes("NOTE")) return null;
 
             // ANTI-ECHO FILTER: Reject when model echoes back category names from the prompt

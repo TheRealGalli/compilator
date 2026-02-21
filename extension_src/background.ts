@@ -118,7 +118,8 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
         const fetchOptions: any = {
             method: options.method || 'GET',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...(options.headers || {})
             },
             mode: 'cors',
             credentials: 'omit',
