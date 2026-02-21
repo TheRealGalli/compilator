@@ -427,25 +427,42 @@ ${llmText}
 `;
     }
 
-    console.log(`[OllamaLocal] Using ${isLargeModel ? 'FULL' : 'SIMPLE'} prompt for model ${modelId}`);
+    // Detect OSS reasoning models (Ollama Cloud relay)
+    const isOSSModel = modelId.includes('gpt-oss') || modelId.includes('oss');
+
+    console.log(`[OllamaLocal] Using ${isLargeModel ? 'FULL' : 'SIMPLE'} prompt for model ${modelId}${isOSSModel ? ' (OSS reasoning)' : ''}`);
 
     // DEBUG: Removed sensitive prompt log
 
     try {
-        const payload = {
+        // Build messages: OSS models get a system instruction to control reasoning
+        const messages: { role: string, content: string }[] = [];
+
+        if (isOSSModel) {
+            messages.push({
+                role: 'system',
+                content: 'You are a PII extraction tool. Keep your reasoning VERY brief (under 2000 tokens). Then provide the final answer as a clean list of "CATEGORY: VALUE" lines. Do NOT repeat yourself in reasoning. Go straight to analysis, then output results.'
+            });
+        }
+        messages.push({ role: 'user', content: prompt });
+
+        const payload: any = {
             model: modelId,
-            messages: [{ role: 'user', content: prompt }],
+            messages,
             stream: false,
-            // format: 'json', // REMOVE JSON FORMAT ENFORCEMENT - Let it speak naturally
             options: {
                 temperature: 0.15,
                 num_ctx: CONTEXT_WINDOW,
-                num_predict: 1024, // CAP output tokens (PII extraction doesn't need more)
+                num_predict: isOSSModel ? 4048 : 1024, // OSS needs budget for thinking + content
                 top_k: 20,
                 top_p: 0.9
-            },
-            think: false // Disable reasoning — PII extraction is a simple task, thinking causes loops
+            }
         };
+
+        // Only disable thinking for non-reasoning models
+        if (!isOSSModel) {
+            payload.think = false;
+        }
 
         const data = await _extractWithRetry(payload, 2);
         let findings: any[] = [];
@@ -453,12 +470,18 @@ ${llmText}
         // DEBUG: Inspect actual response structure
         console.log("[OllamaLocal] Response keys:", JSON.stringify(Object.keys(data)));
 
-        // Extract response content (never use thinking field)
+        // Extract response content
         let rawResponse = data.message?.content  // Ollama native format
             || data.choices?.[0]?.message?.content  // OpenAI-compatible format
             || data.response  // Ollama generate format
             || (typeof data.raw === 'string' ? data.raw : '')  // Bridge fallback
             || "";
+
+        // FALLBACK for OSS: Cloud relay may put everything in thinking field
+        if (!rawResponse && data.message?.thinking) {
+            console.warn(`[OllamaLocal] Content empty, using thinking field (${data.message.thinking.length} chars) as fallback.`);
+            rawResponse = data.message.thinking;
+        }
 
         console.log(`[OllamaLocal] RAW RESPONSE (${rawResponse.length} chars): ${rawResponse.substring(0, 300)}...`);
 
