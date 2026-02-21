@@ -49,25 +49,52 @@ function isBridgeAvailable(): boolean {
  * Helper per eseguire fetch tramite l'estensione "Gromit Bridge".
  */
 async function fetchViaBridge(url: string, options: any): Promise<any> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const requestId = Math.random().toString(36).substring(7);
-        const timeout = setTimeout(() => {
+        const signal = options.signal;
+
+        const cleanup = () => {
+            clearTimeout(timeout);
             window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+            if (signal) {
+                signal.removeEventListener('abort', abortHandler);
+            }
+        };
+
+        const timeout = setTimeout(() => {
+            cleanup();
             console.warn(`[GromitBridge] TIMEOUT su ${url} dopo 120s`);
             resolve({ success: false, error: 'TIMEOUT (Estensione non risponde)', status: 408 });
         }, 120000);
 
         const handler = (event: any) => {
             if (event.detail.requestId === requestId) {
-                clearTimeout(timeout);
-                window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+                cleanup();
                 resolve(event.detail.response);
             }
         };
 
+        const abortHandler = () => {
+            cleanup();
+            // Send a cancellation message to the bridge if supported
+            window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
+                detail: { detail: { type: 'CANCEL_FETCH', requestId }, requestId }
+            }));
+            const error = new Error('The user aborted a request.');
+            error.name = 'AbortError';
+            reject(error);
+        };
+
+        if (signal) {
+            if (signal.aborted) {
+                return abortHandler();
+            }
+            signal.addEventListener('abort', abortHandler);
+        }
+
         window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
         window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
-            detail: { detail: { type: 'OLLAMA_FETCH', url, options }, requestId }
+            detail: { detail: { type: 'OLLAMA_FETCH', url, options: { ...options, signal: undefined } }, requestId }
         }));
     });
 }
