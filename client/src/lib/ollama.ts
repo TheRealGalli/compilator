@@ -425,7 +425,7 @@ ${llmText}
         // SIMPLE PROMPT for small models (≤4B) and OSS reasoning models
         prompt = `List all personal data found in the text below.
 Format: CATEGORY: VALUE (one per line)
-Categories: NAME, ADDRESS, DATE, PHONE, EMAIL, TAX_ID, DOCUMENT, ORGANIZATION
+Categories: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA_NASCITA, LUOGO_NASCITA, SESSO, NAZIONALITA, DATI_SALUTE, DATI_FINANZIARI, RUOLO, PARTITA_IVA, GENERIC_PII
 No explanations. Only data.
 
 Text:
@@ -528,7 +528,7 @@ ${llmText}
             // ANTI-ECHO FILTER: Reject when model echoes back category names from the prompt
             // e.g. "CATEGORY: NAME, ADDRESS, DATE, PHONE, EMAIL, TAX_ID, DOCUMENT, ORGANIZATION"
             if (key === 'CATEGORY' || key === 'CATEGORIES' || key === 'FORMAT' || key === 'SCHEMA') return null;
-            const KNOWN_CATS = ['NAME', 'ADDRESS', 'DATE', 'PHONE', 'EMAIL', 'TAX_ID', 'DOCUMENT', 'ORGANIZATION', 'CONTACT', 'NOME', 'INDIRIZZO', 'CONTATTO'];
+            const KNOWN_CATS = ['NAME', 'ADDRESS', 'DATE', 'PHONE', 'EMAIL', 'TAX_ID', 'DOCUMENT', 'ORGANIZATION', 'CONTACT', 'NOME', 'INDIRIZZO', 'CONTATTO', 'CODICE_FISCALE', 'DOCUMENTO', 'DATA_NASCITA', 'LUOGO_NASCITA', 'SESSO', 'NAZIONALITA', 'DATI_SALUTE', 'DATI_FINANZIARI', 'DATI_BIOMETRICI', 'DATI_GENETICI', 'OPINIONI_POLITICHE', 'CONVINZIONI_RELIGIOSE', 'SINDACATO', 'ORIENTAMENTO_SESSUALE', 'DATI_COMPORTAMENTALI', 'RUOLO', 'PARTITA_IVA', 'GENERIC_PII'];
             const commaWords = val.split(',').map(s => s.trim().toUpperCase());
             if (commaWords.length >= 3 && commaWords.filter(w => KNOWN_CATS.includes(w)).length >= 3) return null;
 
