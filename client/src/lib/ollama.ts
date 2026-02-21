@@ -399,8 +399,14 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
     // TWO-TIER PROMPT: Small models get a simple prompt, large models get the full schema
     let prompt: string;
 
-    if (isLargeModel) {
-        // FULL PROMPT with schema for large models (≥12B)
+    // Detect OSS reasoning models (Ollama Cloud relay)
+    const isOSSModel = modelId.includes('gpt-oss') || modelId.includes('oss');
+
+    // OSS models get the SIMPLE prompt — the full schema causes infinite reasoning loops
+    const useFullSchema = isLargeModel && !isOSSModel;
+
+    if (useFullSchema) {
+        // FULL PROMPT with schema for large LOCAL models (≥12B, non-OSS)
         prompt = `Find PERSONAL data in the text for pseudonymization.
 RULES:
 1. Strict limit: 1024 tokens. BE CONCISE.
@@ -416,7 +422,7 @@ Text:
 ${llmText}
 `;
     } else {
-        // SIMPLE PROMPT for small models (≤4B) — no schema, minimal instructions
+        // SIMPLE PROMPT for small models (≤4B) and OSS reasoning models
         prompt = `List all personal data found in the text below.
 Format: CATEGORY: VALUE (one per line)
 Categories: NAME, ADDRESS, DATE, PHONE, EMAIL, TAX_ID, DOCUMENT, ORGANIZATION
@@ -427,24 +433,12 @@ ${llmText}
 `;
     }
 
-    // Detect OSS reasoning models (Ollama Cloud relay)
-    const isOSSModel = modelId.includes('gpt-oss') || modelId.includes('oss');
-
-    console.log(`[OllamaLocal] Using ${isLargeModel ? 'FULL' : 'SIMPLE'} prompt for model ${modelId}${isOSSModel ? ' (OSS reasoning)' : ''}`);
+    console.log(`[OllamaLocal] Using ${useFullSchema ? 'FULL' : 'SIMPLE'} prompt for model ${modelId}${isOSSModel ? ' (OSS reasoning)' : ''}`);
 
     // DEBUG: Removed sensitive prompt log
 
     try {
-        // Build messages: OSS models get a system instruction to control reasoning
-        const messages: { role: string, content: string }[] = [];
-
-        if (isOSSModel) {
-            messages.push({
-                role: 'system',
-                content: 'You are a PII extraction tool. Keep your reasoning VERY brief (under 2000 tokens). Then provide the final answer as a clean list of "CATEGORY: VALUE" lines. Do NOT repeat yourself in reasoning. Go straight to analysis, then output results.'
-            });
-        }
-        messages.push({ role: 'user', content: prompt });
+        const messages = [{ role: 'user', content: prompt }];
 
         const payload: any = {
             model: modelId,
