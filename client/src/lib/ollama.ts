@@ -381,12 +381,10 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
     // 2. LLM SWEEPER (Full Text Discovery)
     // Regex runs on FULL text above, but LLM has a context window limit (num_ctx: 4096 ≈ 3k tokens).
     // We truncate text for the LLM only to avoid 120s timeouts on large documents.
-    // 2. LLM SWEEPER (Full Text Discovery)
-    // Regex runs on FULL text above, but LLM has a context window limit (num_ctx: 4096 ≈ 3k tokens).
-    // We truncate text for the LLM only to avoid 120s timeouts on large documents.
     // DYNAMIC LIMITS based on Model Capacity
-    const isSmallModel = modelId.includes('1b');
-    // User requested: 16k chars for 1b, 32k tokens (~128k chars) for others
+    const isSmallModel = modelId.includes('1b') || modelId.includes('4b');
+    const isLargeModel = !isSmallModel;
+
     const MAX_LLM_CHARS = isSmallModel ? 16000 : 128000;
     const CONTEXT_WINDOW = isSmallModel ? 8192 : 32768;
 
@@ -398,24 +396,38 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
         console.log(`[OllamaLocal] Text truncated for LLM: ${text.length} -> ${MAX_LLM_CHARS} chars (Model: ${modelId})`);
     }
 
-    // ULTRA-CONCISE PROMPT (Improved for Small Models)
-    // We use a strictly formatted list with Italian examples to guide the model better.
-    // We use a strictly formatted list with Italian examples to guide the model better.
-    const prompt = `find PERSONAL data in the text and do a token for pseudonymization.
-IMPORTANT RULES:
-1. You have a strict limit of 1024 tokens. BE CONCISE.
-2. Return ONLY a list in this format: "CATEGORY: VALUE".
-3. Use the categories defined in the SCHEMA below.
-4. If you find a value that is clearly PERSONAL DATA but does not fit any schema category, use "GENERIC_PII".
-5. Do NOT include descriptions, explanations, or markdown formatting like **bold**.
-6. Do NOT output the examples provided in the schema.
-7. IF NO PII IS FOUND, RETURN AN EMPTY LIST.
+    // TWO-TIER PROMPT: Small models get a simple prompt, large models get the full schema
+    let prompt: string;
+
+    if (isLargeModel) {
+        // FULL PROMPT with schema for large models (≥12B)
+        prompt = `Find PERSONAL data in the text for pseudonymization.
+RULES:
+1. Strict limit: 1024 tokens. BE CONCISE.
+2. Return ONLY a list: "CATEGORY: VALUE" (one per line).
+3. Use the categories from the SCHEMA below.
+4. For data not in schema, use "GENERIC_PII".
+5. No descriptions, no explanations, no markdown.
+6. If no PII found, return empty.
 
 ${PII_SCHEMA_DEFINITIONS}
 
 Text:
 ${llmText}
 `;
+    } else {
+        // SIMPLE PROMPT for small models (≤4B) — no schema, minimal instructions
+        prompt = `List all personal data found in the text below.
+Format: CATEGORY: VALUE (one per line)
+Categories: NAME, ADDRESS, DATE, PHONE, EMAIL, TAX_ID, DOCUMENT, ORGANIZATION
+No explanations. Only data.
+
+Text:
+${llmText}
+`;
+    }
+
+    console.log(`[OllamaLocal] Using ${isLargeModel ? 'FULL' : 'SIMPLE'} prompt for model ${modelId}`);
 
     // DEBUG: Removed sensitive prompt log
 
