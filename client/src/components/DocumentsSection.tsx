@@ -1,7 +1,7 @@
 import { FileUploadZone } from "./FileUploadZone";
 import { FileCard } from "./FileCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2, Send, Cpu, Check, ChevronDown, Download, Cloud } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Inbox, Tag, Users, Info, Search, X, FileText, Paperclip, Trash2, Send, Cpu, Check, ChevronDown, Download, Cloud, Asterisk } from "lucide-react";
 import { FaChessKing } from "react-icons/fa6";
 import {
   Popover,
@@ -30,10 +30,40 @@ import { useGoogleDrive, DriveCategory } from "@/contexts/GoogleDriveContext";
 import { useQuery } from "@tanstack/react-query";
 import { LoginOverlay } from "./LoginOverlay";
 import { AVAILABLE_MODELS } from "@/lib/ollama";
+import { isBridgeAvailable } from "@/lib/local-extractor";
 
 
 export function DocumentsSection() {
   const [view, setView] = useState<'main' | 'gmail' | 'drive'>('main');
+  const [isBridgeActive, setIsBridgeActive] = useState(false);
+
+  useEffect(() => {
+    // Initial check
+    setIsBridgeActive(isBridgeAvailable());
+
+    // Listen to DOM mutations for dynamically injected attributes
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'data-gromit-bridge-active') {
+          setIsBridgeActive(isBridgeAvailable());
+        }
+      }
+    });
+
+    observer.observe(document.documentElement, { attributes: true });
+
+    // Poll to be absolutely sure
+    const interval = setInterval(() => {
+      if (isBridgeAvailable()) {
+        setIsBridgeActive(true);
+      }
+    }, 1500);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
+  }, []);
 
   // Auth Check
   const { data: user, isLoading: isLoadingAuth } = useQuery({
@@ -681,7 +711,7 @@ export function DocumentsSection() {
           disabled={isUploading || !isAuthenticated}
         />
 
-        {(isConnected || isConnectedDrive || ollamaStatus === 'connected') && (
+        {(isConnected || isConnectedDrive || ollamaStatus === 'connected' || isBridgeActive) && (
           <div className="flex flex-col gap-4 relative">
             <div className="flex items-center gap-4">
               <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
@@ -717,6 +747,24 @@ export function DocumentsSection() {
                   <DriveLogo className="w-4 h-4" />
                   Google Drive
                 </Button>
+              )}
+              {isBridgeActive && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="border-slate-50 hover:bg-slate-50 hover:text-slate-600 transition-all hover:border-slate-200 shadow-sm shrink-0"
+                      >
+                        <Asterisk className="w-5 h-5 text-black" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Gromit Bridge Attivo</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               {ollamaStatus === 'connected' && (
                 <DropdownMenu>

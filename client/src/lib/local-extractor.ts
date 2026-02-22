@@ -10,7 +10,7 @@ export interface ExtractedDocument {
  * Checks if the Gromit Bridge extension is available in the DOM.
  * Now checks multiple indicators for robustness.
  */
-function isBridgeAvailable(): boolean {
+export function isBridgeAvailable(): boolean {
     if (typeof window === 'undefined') return false;
     return (
         document.documentElement.getAttribute('data-gromit-bridge-active') === 'true' ||
