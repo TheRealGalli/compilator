@@ -484,10 +484,15 @@ Text:
 ${llmText}
 `;
     } else {
-        prompt = `Extract ALL personal data found in the text below. 
-Return a JSON array of objects: [{"category": "...", "value": "..."}].
-Categories: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA_NASCITA, LUOGO_NASCITA, RUOLO, GENERIC_PII.
-BE COMPREHENSIVE. Extract everything. No explanations or intro text. ONLY valid and real JSON.
+        prompt = `Extract ONLY the personal data explicitly mentioned in the text below for pseudonymization.
+RULES:
+1. Return a JSON object with a single key "findings" containing an array of objects: 
+   {"findings": [{"category": "...", "value": "..."}]}
+2. Name the category based on the data type (e.g., NOME, INDIRIZZO, CONTATTO, DATA, CODICE_FISCALE, RUOLO).
+3. DO NOT include data that is not explicitly in the text.
+4. DO NOT include empty fields, "N/A", "null", or "Non specificato". If a category is not present, simply omit it.
+5. IF NO DATA IS FOUND, return {"findings": []}.
+6. NO explanations, NO intro text. ONLY output the valid JSON object.
 
 Text:
 ${llmText}
@@ -537,7 +542,7 @@ ${llmText}
         console.log(`[OllamaLocal] RAW RESPONSE (${rawResponse.length} chars): ${rawResponse}`);
 
         // Helper to parse a single line "KEY: VALUE"
-        const parseLine = (line: string): { value: string, type: string, label: string } | null => {
+        const parseLine = (line: string): { value: string, category: string, label: string } | null => {
             let cleanLine = line.trim()
                 .replace(/^#{1,6}\s+/, '')
                 .replace(/\*\*/g, '')
@@ -600,7 +605,7 @@ ${llmText}
             else type = 'GENERIC_PII';
 
             const normalizedLabel = key.replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
-            return { value: val, type, label: normalizedLabel };
+            return { value: val, category: type, label: normalizedLabel };
         };
 
         const jsonRaw = extractJsonFromResponse(rawResponse);
@@ -626,7 +631,7 @@ ${llmText}
                         // If parseLine fails to categorize (unusual key), keep model's word
                         findings.push({
                             value: value,
-                            type: rawCat.toUpperCase().replace(/[^A-Z_]/g, '_'),
+                            category: rawCat.toUpperCase().replace(/[^A-Z_]/g, '_'),
                             label: rawCat
                         });
                     }
