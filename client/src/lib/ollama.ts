@@ -25,7 +25,9 @@ export function isNoisyPII(value: string): boolean {
     const technicalNoise = [
         'cast', 'schema', 'undefined', 'null', 'n/a', 'none', 'no data', 'no info',
         'unknown', 'generic', 'pii', 'token', 'value', 'type', 'id', 'uuid',
-        'hidden', 'error', 'failed', 'empty', 'missing', 'not provided', 'provided'
+        'hidden', 'error', 'failed', 'empty', 'missing', 'not provided', 'provided',
+        'not mentioned', 'not specified', 'non specificato', 'not explicitly stated', 'not available',
+        '(none)', '(not provided)', '(n/a)'
     ];
 
     // Clean value from non-alphanumeric chars for comparison
@@ -36,7 +38,11 @@ export function isNoisyPII(value: string): boolean {
     if (/^[a-zA-Z]+-[0-9]+$/.test(v)) return true; // match "prefix-number"
     if (/^[0-9a-f]{8,}$/i.test(v)) return true;    // long hex strings
 
-    // 3. Short garbage
+    // 3. Time/Hour Filtering (hallucinations like "8:00 AM", "11:30 PM")
+    // Values that look like time ranges or specific hours are often false positives
+    if (/^(?:\d{1,2}:\d{2}(?:\s?[AP]M)?)|(?:\d{1,2}\s?[AP]M)$/i.test(v)) return true;
+
+    // 4. Short garbage
     if (v.length < 2) return true;
 
     // 4. Common descriptive text (if LLM hallucinates descriptions as values)
@@ -418,18 +424,15 @@ function normalizeFindings(input: any): any[] {
 export async function extractPIILocal(text: string, modelId: string = DEFAULT_OLLAMA_MODEL): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
-    // console.log(`[OllamaLocal] Starting Hybrid PII Extraction on ${text.length} chars...`);
-    // Value -> { type, label }
-    const unifiedFindings = new Map<string, { type: string, label?: string }>();
+    console.log(`[OllamaLocal] Starting PII Discovery on ${text.length} chars (Model: ${modelId})...`);
 
-    // 1. REGEX SNIPER (Trusted High Confidence)
-    // We run regex first to catch obvious things (IBAN, Email, CF) which are mathematically verifiable.
+    // 1. REGEX SNIPER (Trusted High/Medium/Low Confidence)
     const { scanTextCandidates } = await import('./regex-patterns');
     const candidates = scanTextCandidates(text);
-    // User requested opening up to MEDIUM and LOW confidence
     const regexCandidates = candidates.filter(c => ['HIGH', 'MEDIUM', 'LOW'].includes(c.confidence));
 
-    // console.log(`[OllamaLocal] Regex found ${regexCandidates.length} items (High/Medium/Low).`);
+    // Value -> { type, label }
+    const unifiedFindings = new Map<string, { type: string, label?: string }>();
 
     // Auto-accept Regex Candidates
     for (const c of regexCandidates) {
@@ -437,34 +440,26 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
     }
 
     // 2. LLM SWEEPER (Full Text Discovery)
-    // Regex runs on FULL text above, but LLM has a context window limit (num_ctx: 4096 ≈ 3k tokens).
-    // We truncate text for the LLM only to avoid 120s timeouts on large documents.
-    // DYNAMIC LIMITS based on Model Capacity
     const isSmallModel = modelId.includes('1b') || modelId.includes('4b');
-    const isLargeModel = !isSmallModel;
+    const isReasoningModel = modelId.includes('gpt-oss') || modelId.includes('deepseek-r1') || modelId.includes('oss');
+    const isLargeModel = !isSmallModel && !isReasoningModel;
 
     const MAX_LLM_CHARS = isSmallModel ? 16000 : 128000;
-    const CONTEXT_WINDOW = isSmallModel ? 8192 : 32768;
+    const CONTEXT_WINDOW = 32768; // Standardized for robustness
 
     const llmText = text.length > MAX_LLM_CHARS
         ? text.substring(0, MAX_LLM_CHARS) + '\n[...]'
         : text;
 
     if (text.length > MAX_LLM_CHARS) {
-        console.log(`[OllamaLocal] Text truncated for LLM: ${text.length} -> ${MAX_LLM_CHARS} chars (Model: ${modelId})`);
+        console.log(`[OllamaLocal] Text truncated for LLM: ${text.length} -> ${MAX_LLM_CHARS} chars`);
     }
 
-    // TWO-TIER PROMPT: Small models get a simple prompt, large models get the full schema
     let prompt: string;
-
-    // Detect OSS reasoning models (Ollama Cloud relay)
     const isOSSModel = modelId.includes('gpt-oss') || modelId.includes('oss');
-
-    // OSS models get the SIMPLE prompt — the full schema causes infinite reasoning loops
     const useFullSchema = isLargeModel && !isOSSModel;
 
     if (useFullSchema) {
-        // FULL PROMPT with schema for large LOCAL models (≥12B, non-OSS)
         prompt = `Find PERSONAL data in the text for pseudonymization.
 RULES:
 1. Strict limit: 1024 tokens. BE CONCISE.
@@ -480,11 +475,11 @@ Text:
 ${llmText}
 `;
     } else {
-        // SIMPLE PROMPT for small models (≤4B) and OSS reasoning models
         prompt = `List all personal data found in the text below.
 Format: CATEGORY: VALUE (one per line)
 Categories: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA_NASCITA, LUOGO_NASCITA, SESSO, NAZIONALITA, DATI_SALUTE, DATI_FINANZIARI, RUOLO, PARTITA_IVA, GENERIC_PII
-No explanations. Only data.
+No explanations. Only data found in the document.
+Do not hallucinate data that is not explicitly mentioned.
 
 Text:
 ${llmText}
@@ -493,15 +488,12 @@ ${llmText}
 
     console.log(`[OllamaLocal] Using ${useFullSchema ? 'FULL' : 'SIMPLE'} prompt for model ${modelId}${isOSSModel ? ' (OSS reasoning)' : ''}`);
 
-    // DEBUG: Removed sensitive prompt log
-
     try {
         const messages = [{ role: 'user', content: prompt }];
-
         const options: any = {
             temperature: 0.15,
             num_ctx: isOSSModel ? 32768 : CONTEXT_WINDOW,
-            num_predict: isOSSModel ? 4096 : 1024, // OSS: budget for thinking+content, others: content only
+            num_predict: isOSSModel ? 8192 : 1024,
             top_k: 20,
             top_p: 0.9
         };
@@ -513,64 +505,45 @@ ${llmText}
             options
         };
 
-        // GPT-OSS Optimization: Use 'low' reasoning effort to prevent excessive tracing
         if (isOSSModel) {
             payload.think = "low";
         }
-        // Local models (Gemma) do not support the 'think' field, so we don't set it.
 
         const data = await _extractWithRetry(payload, 2);
         let findings: any[] = [];
 
-        // DEBUG: Inspect actual response structure
-        console.log("[OllamaLocal] Response keys:", JSON.stringify(Object.keys(data)));
-
-        // Extract response content - Robust extraction for Ollama, OpenAI and various Cloud Proxies
-        let rawResponse = data.message?.content  // Ollama native format
-            || data.choices?.[0]?.message?.content  // OpenAI-compatible format
-            || data.choices?.[0]?.delta?.content    // Streaming fallback (even if stream is false, some proxies use it)
-            || data.choices?.[0]?.text              // Legacy text format
-            || data.response                        // Ollama generate format
-            || data.message?.reasoning_content      // Some OpenAI-style reasoning models use this
-            || data.choices?.[0]?.message?.reasoning_content // Common OpenAI reasoning field
-            || (typeof data.raw === 'string' ? data.raw : '')  // Bridge fallback
+        // Extract response content (Strictly ignoring reasoning/thinking)
+        let rawResponse = data.message?.content
+            || data.choices?.[0]?.message?.content
+            || data.choices?.[0]?.delta?.content
+            || data.choices?.[0]?.text
+            || data.response
+            || (typeof data.raw === 'string' ? data.raw : '')
             || "";
 
-        // FALLBACK removed as per user request (Do not parse thinking/reasoning prose)
-
-
-        console.log(`[OllamaLocal] RAW RESPONSE (${rawResponse.length} chars): ${rawResponse.substring(0, 300)}...`);
+        console.log(`[OllamaLocal] RAW RESPONSE (${rawResponse.length} chars): ${rawResponse.substring(0, 100)}...`);
 
         // Helper to parse a single line "KEY: VALUE"
         const parseLine = (line: string): { value: string, type: string, label: string } | null => {
-            // Pre-clean: Remove markdown formatting, list markers, quotes, trailing commas
             let cleanLine = line.trim()
-                .replace(/^#{1,6}\s+/, '')        // Remove markdown headers (# ## ### etc.)
-                .replace(/\*\*/g, '')              // Remove bold **text**
-                .replace(/(?<!\w)\*(?!\*)/g, '')   // Remove italic *text* (not **)
-                .replace(/^[-•]\s+/, '')           // Remove list markers (- •)
-                .replace(/^\d+[\.\)]\s+/, '')      // Remove numbered list markers (1. 2) etc.)
-                .replace(/^"|",?$/g, '').replace(/^'|',?$/g, '')  // Remove surrounding quotes
-                .replace(/`/g, '')                 // Remove inline code backticks
-                .replace(/[\[\]]/g, '')            // Remove square brackets (schema tokens like [NOME_PERSONA] -> NOME_PERSONA)
+                .replace(/^#{1,6}\s+/, '')
+                .replace(/\*\*/g, '')
+                .replace(/(?<!\w)\*(?!\*)/g, '')
+                .replace(/^[-•]\s+/, '')
+                .replace(/^\d+[\.\)]\s+/, '')
+                .replace(/^"|",?$/g, '').replace(/^'|',?$/g, '')
+                .replace(/`/g, '')
+                .replace(/[\[\]]/g, '')
                 .trim();
 
-            // HEURISTIC: The model sometimes prefixes everything with "TOKEN: " or "PII: "
-            // Also handle "TOKEN: FULL_NAME: John Doe"
             cleanLine = cleanLine.replace(/^(TOKEN|PII|Label|Data)\s*[:=]\s*/i, '').trim();
 
-            // Matches: "NAME: Mario Rossi", "P.IVA: 123"
-            // Support for hierarchical keys like "PII: FULL_NAME: Value"
             const match = cleanLine.match(/^\s*([A-Za-z0-9_ \-\.\'àèìòùÀÈÌÒÙ]+)\s*[:=]\s*(.+)\s*$/);
             if (!match) return null;
 
             let key = match[1].trim().toUpperCase();
             let val = match[2].trim();
 
-            // If the value itself has another colon, it might be "CATEGORY: VALUE"
-            // e.g. "FULL_NAME: Mario" -> key="FULL_NAME", val="Mario"
-            // Some models do "PII: NAME: Mario" -> key="PII", val="NAME: Mario"
-            // We want to extract the deepest key if the first key is generic. 
             const GENERIC_KEYS = ['TOKEN', 'PII', 'DATA', 'VALUE', 'INFO', 'FINDING', 'ITEM'];
             if (GENERIC_KEYS.includes(key) && val.includes(':')) {
                 const subMatch = val.match(/^\s*([A-Za-z0-9_ \-\.\']+)\s*[:=]\s*(.+)\s*$/);
@@ -580,42 +553,15 @@ ${llmText}
                 }
             }
 
-            // Remove potential trailing quotes/comma from value if regex missed them
             val = val.replace(/",?$/, '').replace(/',?$/, '');
 
-            // Simple hygiene
             if (val.length < 2) return null;
-            if (key.length > 40) return null; // Garbage from reasoning prose parsed as key
+            if (key.length > 40) return null;
             if (key.includes("EXPLANATION") || key.includes("NOTE")) return null;
 
-            // ANTI-ECHO FILTER: Reject when model echoes back category names from the prompt
-            // e.g. "CATEGORY: NAME, ADDRESS, DATE, PHONE, EMAIL, TAX_ID, DOCUMENT, ORGANIZATION"
             if (key === 'CATEGORY' || key === 'CATEGORIES' || key === 'FORMAT' || key === 'SCHEMA') return null;
-            const KNOWN_CATS = ['NOME', 'INDIRIZZO', 'DATA', 'PARTITA_IVA', 'CODICE_FISCALE', 'CONTATTO', 'DATI_FINANZIARI', 'DOCUMENTO', 'RUOLO', 'DATI_SENSIBILI', 'NAZIONALITA', 'DATI_COMPORTAMENTALI', 'DATA_NASCITA', 'LUOGO_NASCITA', 'SESSO', 'DATI_SALUTE', 'DATI_BIOMETRICI', 'DATI_GENETICI', 'OPINIONI_POLITICHE', 'CONVINZIONI_RELIGIOSE', 'SINDACATO', 'ORIENTAMENTO_SESSUALE', 'GENERIC_PII'];
-            const commaWords = val.split(',').map(s => s.trim().toUpperCase());
-            if (commaWords.length >= 3 && commaWords.filter(w => KNOWN_CATS.includes(w)).length >= 3) return null;
 
-            // SANITY: PHONE values must be only digits (10 digits, or +XX 12 digits)
-            // Valid: "3985729897", "+393985729897", "+39 3985729897", "1-800-829-4933"
-            // Invalid: "7901 4TH ST N STE 300" (contains letters = not a phone)
-            if (key.includes('PHONE') || key.includes('TEL') || key.includes('CELL') || key.includes('CONTATTO')) {
-                const digitsOnly = val.replace(/[\s\-\+\(\)\.]/g, '');
-                if (/[a-zA-Z]/.test(digitsOnly)) return null; // Contains letters → not a phone
-            }
-
-            // QUALITY FILTER: Reject values that are descriptions, not actual data.
-            // Real PII: "Carlo Galli", "36-5157311", "VIA CAMPANA 45"
-            // Garbage:  "The country where the corporation is incorporated"
-            const valLower = val.toLowerCase();
-            const DESCRIPTION_STARTERS = /^(the |a |an |whether |if |this |that |it |for |which |where |when |how |used |refers |indicates |specifies |describes |represents |shows )/i;
-            if (DESCRIPTION_STARTERS.test(val)) return null;
-            // Reject values with too many common English words (description pattern)
-            const descWords = valLower.split(/\s+/);
-            const FILLER_WORDS = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'of', 'for', 'to', 'in', 'on', 'at', 'by', 'with', 'from', 'or', 'and', 'not', 'if', 'whether', 'that', 'which', 'where', 'when', 'how', 'has', 'have', 'had', 'does', 'do', 'did']);
-            const fillerCount = descWords.filter(w => FILLER_WORDS.has(w)).length;
-            if (descWords.length >= 4 && fillerCount / descWords.length > 0.4) return null;
-
-            // Map generic keys to our CATEGORIES (Supports both English and Italian schema tokens)
+            // Map generic keys to our CATEGORIES
             let type = 'UNKNOWN';
             const has = (t: string) => key.includes(t);
             const isStrictIVA = key === 'IVA' || key === 'P_IVA' || key === 'P.IVA' || key === 'PARTITA_IVA' || key.startsWith('IVA_') || key.includes('_IVA') || (has('PARTITA') && has('IVA'));
@@ -627,7 +573,7 @@ ${llmText}
             else if (isStrictIVA || has('VAT') || has('PIVA')) type = 'PARTITA_IVA';
             else if (has('CODICE') || has('FISCAL') || has('CF') || has('TAX')) type = 'CODICE_FISCALE';
             else if (has('CONTATTO') || has('MAIL') || has('EMAIL') || has('PHONE') || has('TEL') || has('CELL')) type = 'CONTATTO';
-            else if (has('ORGANIZATION') || has('COMPANY') || has('DITTA') || has('SOCIETA') || has('BUSINESS') || has('DENOMINAZIONE')) return null; // Organizations are not personal data
+            else if (has('ORGANIZATION') || has('COMPANY') || has('DITTA') || has('SOCIETA') || has('BUSINESS') || has('DENOMINAZIONE')) return null;
             else if (has('IBAN') || has('BANK') || has('CONTO') || has('FINANZIAR')) type = 'DATI_FINANZIARI';
             else if (has('DOCUMENTO') || has('DOCUMENT')) type = 'DOCUMENTO';
             else if (has('RUOLO') || (has('PROFESSION') && !has('PROFESSIONISTA'))) type = 'RUOLO';
@@ -637,25 +583,19 @@ ${llmText}
             else if (has('COMPORTAMENT')) type = 'DATI_COMPORTAMENTALI';
             else type = 'GENERIC_PII';
 
-            // NORMALIZED LABEL
             const normalizedLabel = key.replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
             return { value: val, type, label: normalizedLabel };
         };
 
-        // STRATEGY 1: Try JSON Parse
         const jsonRaw = extractJsonFromResponse(rawResponse);
         const jsonResult = normalizeFindings(jsonRaw);
 
-        // Handle JSON Array of Strings (common output for this prompt)
         if (Array.isArray(jsonResult) && jsonResult.length > 0) {
-            console.log("[OllamaLocal] JSON parsed successfully. Processing items...");
             for (const item of jsonResult) {
                 if (typeof item === 'string') {
-                    // "KEY: Value"
                     const parsed = parseLine(item);
                     if (parsed) findings.push(parsed);
                 } else if (typeof item === 'object') {
-                    // { "type": "NAME", "value": "Mario" }
                     if (item.value && (item.type || item.category)) {
                         findings.push({
                             value: item.value,
@@ -667,9 +607,7 @@ ${llmText}
             }
         }
 
-        // STRATEGY 2: Parse Line-by-Line (Fallback if JSON failed or returned nothing)
         if (findings.length === 0 && rawResponse.includes(':')) {
-            console.log("[OllamaLocal] JSON failed or empty. Trying Line-by-Line parsing...");
             const lines = rawResponse.split('\n');
             for (const line of lines) {
                 const parsed = parseLine(line);
@@ -677,10 +615,6 @@ ${llmText}
             }
         }
 
-        // NOTE: Strategy 3 (prose extraction from thinking) removed.
-        // Reasoning models should produce structured output in content, not thinking.
-
-        // DEDUP: If same value appears with different labels, keep the first one
         const seenValues = new Set<string>();
         findings = findings.filter(f => {
             const key = f.value.toLowerCase().trim();
@@ -689,9 +623,6 @@ ${llmText}
             return true;
         });
 
-        if (!Array.isArray(findings)) findings = [];
-
-        // SANITY FILTER: Remove placeholder hallucinations (John Doe, etc.)
         const isPlaceholder = (val: string) => {
             const v = val.toLowerCase().trim();
             const placeholders = ['john doe', 'jane doe', 'mario rossi', 'new york', '01/01/1980', '123 main st', 'san francisco'];
@@ -699,48 +630,30 @@ ${llmText}
         };
         findings = findings.filter(f => !isPlaceholder(f.value) && !isNoisyPII(f.value));
 
-        if (findings.length === 0) {
-            console.warn("[OllamaLocal] LLM returned 0 findings (after parsing).");
-        }
-
-        console.log(`[OllamaLocal] LLM parsed ${findings.length} items from response.`);
-
-        // Merge findings
         for (const finding of findings) {
             if (finding.value && finding.value.length > 1) {
                 const val = finding.value.trim();
-
-                // CHECK FOR DUPLICATES
                 if (unifiedFindings.has(val)) {
                     const existing = unifiedFindings.get(val);
-                    // If existing is generic (label == type) and new is specific (label != type), UPGRADE IT
-                    if (existing && existing.label === existing.type && finding.label && finding.label !== finding.category) {
-                        console.log(`[OllamaLocal] UPGRADING duplicate for label: [${finding.label}]`);
+                    if (existing && existing.label === existing.type && finding.label && finding.label !== finding.type) {
                         unifiedFindings.set(val, { type: finding.type, label: finding.label });
                     }
                     continue;
                 }
-
-                // Add to findings directly (Trusting the Model)
-                // Use the Captured Label if available, otherwise fallback to Type
                 const finalLabel = finding.label || finding.type;
                 unifiedFindings.set(val, { type: finding.type, label: finalLabel });
-                console.log(`[OllamaLocal] + NEW FINDING (${finding.type}) [Label: ${finalLabel}]`);
             }
         }
 
     } catch (err) {
-        console.error(`[OllamaLocal] Full Text Extraction failed:`, err);
-        // On fatal error, ensure we at least keep strict regex findings
+        console.error(`[OllamaLocal] LLM Full Text Extraction failed:`, err);
     }
 
-    // 3. Convert Map to Array
     const finalResults: PIIFinding[] = [];
     for (const [value, data] of unifiedFindings.entries()) {
-        finalResults.push({ value, category: data.type, label: data.label });
+        finalResults.push({ value, category: data.type, label: data.label || data.type });
     }
 
-    // console.log(`[OllamaLocal] Discovery Complete. Total Unique PII: ${finalResults.length}`);
     return finalResults;
 }
 
@@ -810,8 +723,11 @@ export async function unifyPIIFindings(
 
     // SKIP UNIFIER FOR SMALL MODELS (Gemma 1b/4b) per User Request
     // These models take 1-2 mins and don't provide enough value in unification
+    // Large models (12b/27b/OSS) still use it.
     const isSmallModel = modelId.includes('1b') || modelId.includes('4b');
-    if (isSmallModel && !modelId.includes('gpt-oss')) {
+    const isOSSModel = modelId.includes('gpt-oss') || modelId.includes('oss');
+
+    if (isSmallModel && !isOSSModel) {
         console.log(`[OllamaLocal] Skipping Unifier for small model: ${modelId}`);
         const identity: Record<string, string> = {};
         values.forEach(v => identity[v] = v);
@@ -829,7 +745,6 @@ Data list:
 ${filteredValues.join('\n')}
 `;
 
-    const isOSSModel = modelId.includes('gpt-oss') || modelId.includes('oss');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s for Unification
 
@@ -875,7 +790,7 @@ ${filteredValues.join('\n')}
 
     } catch (err: any) {
         if (err.name === 'AbortError') {
-            console.warn("[OllamaLocal] PII Unification TIMEOUT (20s) - returning identity map.");
+            console.warn("[OllamaLocal] PII Unification TIMEOUT (60s) - returning identity map.");
         } else {
             console.error("[OllamaLocal] PII Unification failed:", err);
         }
