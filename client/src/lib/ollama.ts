@@ -484,21 +484,33 @@ Text:
 ${llmText}
 `;
     } else {
-        // SIMPLE PROMPT for small models (≤4B). 
-        // We use TEXT format instead of JSON because small Gemma models loop in JSON mode.
-        prompt = `Extract all personal data explicitly present in the text below.
-Format: CATEGORY: VALUE (one per line)
-Categories to use: NAME, ADDRESS, CONTACT, TAX_ID, DOCUMENT, DATE, BIRTH_PLACE, ROLE etc.
+    } else {
+        // STRICT FEW-SHOT PROMPT for small models (≤4B). 
+        // Small models (like Gemma 1B) ignore complex instructions and negative constraints.
+        // They learn best by mimicking structural examples (few-shot).
+        prompt = `Extract personal data from the input text. Match the exact output format.
+Categories: NAME, ADDRESS, CONTACT, TAX_ID, DOCUMENT, DATE, BIRTH_PLACE, ROLE.
 
-STRICT RULES:
-1. ONLY extract data explicitly written in the text.
-2. IF NO PERSONAL DATA IS FOUND, output EXACTLY the word "NONE" and stop. DO NOT output a template of empty categories.
-3. DO NOT invent data or include "N/A", "null", or informative text.
-4. DO NOT extract standalone numbers, checkbox labels, or form line numbers.
-5. NO explanations, NO intro text. ONLY output the list of "CATEGORY: VALUE".
+Input:
+dati personali :
+Output:
+NONE
 
-Text:
+Input:
+Name: John Doe Address: 123 Main St, New York, NY 10001
+Output:
+NAME: John Doe
+ADDRESS: 123 Main St, New York, NY 10001
+
+Input:
+1. Legal name of entity CyberSpace LLC 2. Trade name 3. Executor 4a. Mailing address 7901 4TH ST N
+Output:
+NAME: CyberSpace LLC
+ADDRESS: 7901 4TH ST N
+
+Input:
 ${llmText}
+Output:
 `;
     }
 
