@@ -50,7 +50,7 @@ export default function Home() {
       // we should probably just let the server generate a new one if no cookie is present.
       // So we clear the localStorage 'csd_sid' on every mount.
       localStorage.removeItem('csd_sid');
-      console.log("[Session] Page refresh detected. Clearing localStorage session ghost.");
+      // console.log("[Session] Page refresh detected. Clearing localStorage session ghost.");
     }
   }, []);
 

@@ -65,7 +65,7 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
                 const models = await getRunningModels();
                 setInstalledModels(models);
             } else {
-                console.log('[OllamaContext] Connessione locale FALLITA.');
+                // console.log('[OllamaContext] Connessione locale FALLITA.');
                 setStatus('disconnected');
                 setInstalledModels([]);
             }

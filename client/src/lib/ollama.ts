@@ -177,13 +177,13 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
             const status = bridgeResult?.status ?? 503;
             const errorMsg = bridgeResult?.error || 'Bridge connection failed';
 
-            // Log specifically if it's a network error
-            console.warn(`[OllamaLocal 5.8.10] Bridge Error for ${url}: ${errorMsg} (Status: ${status})`);
+            // Logs are now silenced to avoid console spam when extension is loaded but server is down
+            // console.warn(`[OllamaLocal 5.8.10] Bridge Error for ${url}: ${errorMsg} (Status: ${status})`);
 
-            if (status === 0 || errorMsg.includes('Failed to fetch') || errorMsg.includes('Extension context invalidated')) {
-                console.info(`[OllamaLocal] 💡 Suggerimento: Verifica che Ollama sia attivo (ollama list) e che l'URL sia corretto.`);
-                console.info(`[OllamaLocal] 💡 Se hai appena aggiornato l'estensione, RICARICA LA PAGINA (F5) per ristabilire il contatto.`);
-            }
+            // if (status === 0 || errorMsg.includes('Failed to fetch') || errorMsg.includes('Extension context invalidated')) {
+            //     console.info(`[OllamaLocal] 💡 Suggerimento: Verifica che Ollama sia attivo (ollama list) e che l'URL sia corretto.`);
+            //     console.info(`[OllamaLocal] 💡 Se hai appena aggiornato l'estensione, RICARICA LA PAGINA (F5) per ristabilire il contatto.`);
+            // }
 
             return {
                 ok: false,
@@ -216,7 +216,7 @@ export async function testOllamaConnection(): Promise<boolean> {
             const response = await smartFetch(`${url}/api/tags`, { method: 'GET' });
 
             if (!response.ok) {
-                console.warn(`[OllamaLocal] ${url} risponde, ma con errore ${response.status}`);
+                // console.warn(`[OllamaLocal] ${url} risponde, ma con errore ${response.status}`);
                 continue;
             }
 
@@ -242,15 +242,16 @@ export async function testOllamaConnection(): Promise<boolean> {
             }
         } catch (err) {
             lastError = err;
-            if (lastError instanceof TypeError && lastError.message.includes('fetch')) {
-                console.error('[OllamaLocal] BLOCCO DI SICUREZZA RILEVATO.');
-                console.info('[OllamaLocal] Se l\'estensione Gromit Bridge è attiva, prova a ricaricare la pagina.');
-            } else if (lastError instanceof Error && lastError.message.includes('403')) {
-                console.error('[OllamaLocal] ERRORE 403 (FORBIDDEN).');
-                console.info('[OllamaLocal] L\'estensione bridge non sembra riuscire a pulire gli headers. Ricarica l\'estensione.');
-            } else {
-                console.error('[OllamaLocal] Errore di rete:', lastError);
-            }
+            // Silenced connection errors when Ollama is unavailable
+            // if (lastError instanceof TypeError && lastError.message.includes('fetch')) {
+            //     console.error('[OllamaLocal] BLOCCO DI SICUREZZA RILEVATO.');
+            //     console.info('[OllamaLocal] Se l\'estensione Gromit Bridge è attiva, prova a ricaricare la pagina.');
+            // } else if (lastError instanceof Error && lastError.message.includes('403')) {
+            //     console.error('[OllamaLocal] ERRORE 403 (FORBIDDEN).');
+            //     console.info('[OllamaLocal] L\'estensione bridge non sembra riuscire a pulire gli headers. Ricarica l\'estensione.');
+            // } else {
+            //     console.error('[OllamaLocal] Errore di rete:', lastError);
+            // }
         }
     }
 
