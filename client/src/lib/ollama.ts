@@ -488,7 +488,7 @@ ${llmText}
         // We use TEXT format instead of JSON because small Gemma models loop in JSON mode.
         prompt = `Extract all personal data explicitly present in the text below.
 Format: CATEGORY: VALUE (one per line)
-Categories to use: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA, LUOGO_NASCITA, RUOLO.
+Categories to use: NAME, ADDRESS, CONTACT, TAX_ID, DOCUMENT, DATE, BIRTH_PLACE, ROLE etc.
 
 STRICT RULES:
 1. ONLY extract data explicitly written in the text.
