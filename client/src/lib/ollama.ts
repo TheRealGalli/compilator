@@ -12,7 +12,7 @@ export interface PIIFinding {
 import { PII_SCHEMA_DEFINITIONS } from './pii-schema';
 
 let currentBaseUrl = 'http://localhost:11434';
-export const DEFAULT_OLLAMA_MODEL = 'gemma3:1b';
+export const DEFAULT_OLLAMA_MODEL = 'gpt-oss:20b';
 
 /**
  * Filtra valori che non sono vero PII ma rumore tecnico o semantico.
@@ -53,10 +53,6 @@ export function isNoisyPII(value: string): boolean {
 
 export const AVAILABLE_MODELS = {
     local: [
-        { id: 'gemma3:1b', label: 'Gemma 3 (1B)', size: '1.5GB' },
-        { id: 'gemma3:4b', label: 'Gemma 3 (4B)', size: '3.0GB' },
-        { id: 'gemma3:12b', label: 'Gemma 3 (12B)', size: '8.0GB' },
-        { id: 'gemma3:27b', label: 'Gemma 3 (27B)', size: '18GB' },
         { id: 'gpt-oss:20b', label: 'GPT-OSS (20B)', size: '14GB' },
         { id: 'gpt-oss:120b', label: 'GPT-OSS (120B)', size: '75GB' },
     ],
@@ -224,12 +220,10 @@ export async function testOllamaConnection(): Promise<boolean> {
             const models = (data.models || []).map((m: any) => m.name.toLowerCase());
             anySuccess = true;
 
-            // Controllo per gemma3:1b
+            // Controllo per il modello di default
             const hasModel = models.some((name: string) =>
                 name === DEFAULT_OLLAMA_MODEL ||
-                name.startsWith(`${DEFAULT_OLLAMA_MODEL}:`) ||
-                name === 'gemma3:latest' ||
-                (name.includes('gemma3') && name.includes('1b'))
+                name.startsWith(`${DEFAULT_OLLAMA_MODEL}:`)
             );
 
             if (hasModel) {
@@ -451,11 +445,7 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
     }
 
     // 2. LLM SWEEPER (Full Text Discovery)
-    const isSmallModel = modelId.includes('1b') || modelId.includes('4b');
-    const isReasoningModel = modelId.includes('gpt-oss') || modelId.includes('deepseek-r1') || modelId.includes('oss');
-    const isLargeModel = !isSmallModel && !isReasoningModel;
-
-    const MAX_LLM_CHARS = isSmallModel ? 16000 : 128000;
+    const MAX_LLM_CHARS = 128000;
     const CONTEXT_WINDOW = 32768; // Standardized for robustness
 
     const llmText = text.length > MAX_LLM_CHARS
@@ -466,12 +456,7 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
         console.log(`[OllamaLocal] Text truncated for LLM: ${text.length} -> ${MAX_LLM_CHARS} chars`);
     }
 
-    let prompt: string;
-    const isOSSModel = modelId.includes('gpt-oss') || modelId.includes('oss');
-    const useFullSchema = isLargeModel || isOSSModel;
-
-    if (useFullSchema) {
-        prompt = `Find PERSONAL data in the text for pseudonymization.
+    const prompt = `Find PERSONAL data in the text for pseudonymization.
 RULES:
 1. Return ONLY a JSON array of objects: [{"category": "...", "value": "..."}].
 2. Use the categories from the SCHEMA below.
@@ -484,30 +469,15 @@ ${PII_SCHEMA_DEFINITIONS}
 Text:
 ${llmText}
 `;
-    } else {
-        // STRICT FEW-SHOT PROMPT for small models (≤4B). 
-        // Based on the "Golden Prompt" from commit 3aca663.
-        prompt = `find PERSONAL data in the text and do a token for pseuddonimiz it , return only the list of DATA as a tokenized format.
-IMPORTANT RULES:
-1. You have a strict limit of 1024 tokens. BE CONCISE.
-2. Return ONLY a list in this format: "TOKEN: VALUE".
-3. If you find a value but don't know the category, use "General_PII".
-4. Do NOT include descriptions, explanations, or markdown formatting like **bold**.
-5. If no PII is found , return "NONE". DO NOT INVENT DATA.
 
-Text:
-${llmText}
-`;
-    }
-
-    console.log(`[OllamaLocal] Using ${useFullSchema ? 'FULL' : 'SIMPLE'} prompt for model ${modelId}${isOSSModel ? ' (OSS reasoning)' : ''}`);
+    console.log(`[OllamaLocal] Using FULL prompt for model ${modelId} (OSS reasoning)`);
 
     try {
         const messages = [{ role: 'user', content: prompt }];
         const options: any = {
             temperature: 0.15,
-            num_ctx: isOSSModel ? 32768 : CONTEXT_WINDOW,
-            num_predict: isOSSModel ? 8192 : 1024,
+            num_ctx: CONTEXT_WINDOW,
+            num_predict: 8192,
             top_k: 20,
             top_p: 0.9
         };
@@ -516,17 +486,10 @@ ${llmText}
             model: modelId,
             messages,
             stream: false,
-            options
+            options,
+            format: 'json',
+            think: "low"
         };
-
-        // Use format: 'json' ONLY for OSS models that are really good at it.
-        // Small models natively loop or hallucinate in JSON mode, so we use raw text parsing for them.
-        if (isOSSModel) {
-            payload.format = 'json';
-        }
-        if (isOSSModel) {
-            payload.think = "low";
-        }
 
         const data = await _extractWithRetry(payload, 2);
         let findings: any[] = [];
@@ -765,19 +728,6 @@ export async function unifyPIIFindings(
         return identity;
     }
 
-    // SKIP UNIFIER FOR SMALL MODELS (Gemma 1b/4b) per User Request
-    // These models take 1-2 mins and don't provide enough value in unification
-    // Large models (12b/27b/OSS) still use it.
-    const isSmallModel = modelId.includes('1b') || modelId.includes('4b');
-    const isOSSModel = modelId.includes('gpt-oss') || modelId.includes('oss');
-
-    if (isSmallModel && !isOSSModel) {
-        console.log(`[OllamaLocal] Skipping Unifier for small model: ${modelId}`);
-        const identity: Record<string, string> = {};
-        values.forEach(v => identity[v] = v);
-        return identity;
-    }
-
     const prompt = `Unify the following personal data strings. Group variations of the same entity (e.g. same address with different formatting, same name).
 RULES:
 1. Return ONLY a JSON object: {"variation": "canonical_value"}.
@@ -800,15 +750,12 @@ ${filteredValues.join('\n')}
             stream: false,
             options: {
                 temperature: 0.1,
-                num_ctx: isOSSModel ? 32768 : 4096,
-                num_predict: isOSSModel ? 4096 : 1024
+                num_ctx: 32768,
+                num_predict: 4096
             }
         };
 
-        if (isOSSModel) {
-            payload.think = "low";
-        }
-        // Local models (Gemma) do not support the 'think' field.
+        payload.think = "low";
 
         const data = await _extractWithRetry(payload, 2, 2000, controller.signal);
         const rawResponse = data.message?.content

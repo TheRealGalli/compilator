@@ -11,7 +11,7 @@ export class AiService {
     private modelId = 'gemini-2.5-flash';
     private dlpClient: DlpServiceClient;
     private ollamaUrl = 'http://localhost:11434/api/generate';
-    private ollamaModel = 'gemma3:1b';
+    private ollamaModel = 'gpt-oss:20b';
     private categoryCounters: Record<string, number> = {};
 
     constructor(projectId: string, location: string = 'europe-west1') {
@@ -203,7 +203,7 @@ export class AiService {
     }
 
     /**
-     * Professional PII Anonymization using Local Ollama (e.g. Gemma 3 1B).
+     * Professional PII Anonymization using Local Ollama (e.g. GPT-OSS 20B).
      * This ensures 100% data privacy (Zero-Data) as no data leaves localhost.
      * Uses a refined prompt to ensure high recall and precise tagging.
      */

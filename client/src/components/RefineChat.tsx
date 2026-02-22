@@ -59,7 +59,7 @@ export function RefineChat({
     pendingMention,
     onMentionConsumed,
     onMentionCreated,
-    selectedModel = "gemma2:9b" // Default fallback
+    selectedModel = "gpt-oss:20b" // Default fallback
 }: RefineChatProps) {
     const {
         messages, setMessages,

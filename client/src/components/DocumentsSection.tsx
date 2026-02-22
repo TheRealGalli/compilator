@@ -38,31 +38,11 @@ export function DocumentsSection() {
   const [isBridgeActive, setIsBridgeActive] = useState(false);
 
   useEffect(() => {
-    // Initial check
     setIsBridgeActive(isBridgeAvailable());
-
-    // Listen to DOM mutations for dynamically injected attributes
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'data-gromit-bridge-active') {
-          setIsBridgeActive(isBridgeAvailable());
-        }
-      }
-    });
-
-    observer.observe(document.documentElement, { attributes: true });
-
-    // Poll to be absolutely sure
-    const interval = setInterval(() => {
-      if (isBridgeAvailable()) {
-        setIsBridgeActive(true);
-      }
-    }, 1500);
-
-    return () => {
-      observer.disconnect();
-      clearInterval(interval);
-    };
+    const timer = setTimeout(() => {
+      setIsBridgeActive(isBridgeAvailable());
+    }, 1000);
+    return () => clearTimeout(timer);
   }, []);
 
   // Auth Check
@@ -775,7 +755,7 @@ export function DocumentsSection() {
                       disabled={!isAuthenticated}
                     >
                       <Cpu className="w-4 h-4" />
-                      {selectedModel ? selectedModel.replace('gemma3:', 'Gemma ').replace('gpt-oss:', 'GPT-OSS ').replace('-cloud', '') : 'Ollama'}
+                      {selectedModel ? selectedModel.replace('gpt-oss:', 'GPT-OSS ').replace('-cloud', '') : 'Ollama'}
                       <ChevronDown className="w-3 h-3 opacity-50" />
                     </Button>
                   </DropdownMenuTrigger>

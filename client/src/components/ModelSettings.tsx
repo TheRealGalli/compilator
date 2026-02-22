@@ -392,7 +392,7 @@ export function ModelSettings({
                                   <p className="text-[10px] max-w-[150px] leading-tight mt-1">{piece.description}</p>
                                   {piece.id === 'pawn' && (
                                     <>
-                                      <p className="text-[9px] text-blue-500 font-medium mt-1">powered by Ollama (Gemma 3 1B) - 100% Locale</p>
+                                      <p className="text-[9px] text-blue-500 font-medium mt-1">powered by Ollama (GPT-OSS 20B) - 100% Locale</p>
                                       {ollamaStatus !== 'connected' && (
                                         <p className="text-[9px] text-red-500 font-bold mt-1 uppercase italic">⚠️ Disconnesso</p>
                                       )}

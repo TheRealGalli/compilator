@@ -50,7 +50,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log(`[GromitBridge] TURBO PII: Analyzing ${text.length} chars...`);
 
         const payload = {
-            model: model || 'gemma3:1b',
+            model: model || 'gpt-oss:20b',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: `<INPUT_DATA>\n${text}\n</INPUT_DATA>` }
