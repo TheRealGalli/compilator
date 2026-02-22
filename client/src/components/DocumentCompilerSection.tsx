@@ -288,6 +288,7 @@ export function DocumentCompilerSection({
   const [manualInputScanId, setManualInputScanId] = useState<string | null>(null);
   const [manualInputText, setManualInputText] = useState("");
   const sourceTextCache = useRef<Array<{ name: string; text: string; originalText?: string }>>([]);
+  const sweepVaultRef = useRef<[string, string][]>([]);
 
   const handleMention = (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => {
     setMentionCounts(prev => {
@@ -841,7 +842,7 @@ export function DocumentCompilerSection({
 
           // 4. Intelligent Unification (Post-Processing Refinement)
           // This groups variations of the same PII (e.g. addresses, names)
-          let finalValueToTokenMap: Record<string, string> = {};
+          let finalSweepVault: [string, string][] = [];
 
           try {
             console.log(`[DocumentCompiler] STEP 3: Unifying ${uniqueFoundValues.size} variations...`);
@@ -850,44 +851,54 @@ export function DocumentCompilerSection({
 
             // Group existing tokens by their canonical values
             const canonicalToToken = new Map<string, string>();
-            const processedValues = new Set<string>();
+            const collapsedVault = new Map<string, string>();
+            const collapsedCounts = new Map<string, number>();
 
-            // Re-build vault and mapping based on canonical results
+            // Process every entry in our current vault
             for (const [token, originalValue] of Array.from(vaultMap.entries())) {
               const canonical = unificationMap[originalValue] || originalValue;
               const normalizedCanonical = canonical.toLowerCase();
 
               if (!canonicalToToken.has(normalizedCanonical)) {
-                // Keep the first token assigned to this canonical group
+                // This is the first time we see this entity - it "wins" and remains in the vault
                 canonicalToToken.set(normalizedCanonical, token);
-                // Update vault with the most canonical name if it exists
-                vaultMap.set(token, canonical);
+                collapsedVault.set(token, canonical);
+                collapsedCounts.set(token, vaultCounts.get(token) || 0);
+              } else {
+                // This is a variation of an already registered entity - merge its count into the "winner"
+                const targetToken = canonicalToToken.get(normalizedCanonical)!;
+                collapsedCounts.set(targetToken, (collapsedCounts.get(targetToken) || 0) + (vaultCounts.get(token) || 0));
+                console.log(`[DocumentCompiler] Merged variation '${originalValue}' into token ${targetToken}`);
               }
 
+              // In either case, we want to sweep this ORIGINAL value and replace it with the WINNER token
               const targetToken = canonicalToToken.get(normalizedCanonical)!;
-              finalValueToTokenMap[originalValue] = targetToken;
-              finalValueToTokenMap[canonical] = targetToken;
-
-              // If merged, we might want to update counts (optional for now)
+              finalSweepVault.push([targetToken, originalValue]);
+              // Also add the canonical just in case it's a completely new string from the LLM
+              finalSweepVault.push([targetToken, canonical]);
             }
+
+            // Sync original maps with collapsed versions for UI state
+            vaultMap.clear();
+            collapsedVault.forEach((v, k) => vaultMap.set(k, v));
+            vaultCounts.clear();
+            collapsedCounts.forEach((v, k) => vaultCounts.set(k, v));
+
+            // Persist the wide sweep mapping for final compilation
+            sweepVaultRef.current = finalSweepVault;
+
           } catch (uErr) {
             console.error("[DocumentCompiler] Unification Refinement failed, using identity mapping:", uErr);
-            // Fallback: simple token mapping
-            for (const [token, value] of Array.from(vaultMap.entries())) {
-              finalValueToTokenMap[value] = token;
-            }
+            finalSweepVault = Array.from(vaultMap.entries());
           }
 
           const masterVault = Object.fromEntries(vaultMap);
           const masterCounts = Object.fromEntries(vaultCounts);
 
           // --- PHASE 3: MECHANICAL GLOBAL SWEEP (LOCAL) ---
-          // --- PHASE 3: MECHANICAL GLOBAL SWEEP (LOCAL) ---
-          // console.log('[Gromit Frontend] STEP 3: Mechanical Global Sweep (Local-Privacy)...');
-
-          // Apply anonymity to ALL documents locally
+          // Apply anonymity to ALL documents locally using the WIDE sweep vault
           const anonymizedDocs = allDocs.map(doc => {
-            const anonymizedText = performMechanicalGlobalSweep(doc.text, finalValueToTokenMap);
+            const anonymizedText = performMechanicalGlobalSweep(doc.text, finalSweepVault);
             return {
               ...doc,
               text: anonymizedText,
@@ -932,19 +943,24 @@ export function DocumentCompilerSection({
       if (activeGuardrails.includes('pawn')) {
         console.log('[DocumentCompiler] Preparing Zero-Data Payload (Local Anonymization)...');
 
+        // Create a combined wide mapping (variations + user edits from UI)
+        const combinedSweepVault: [string, string][] = [
+          ...sweepVaultRef.current,
+          ...Object.entries(guardrailVault)
+        ];
+
         // 1. Mechanical sweep for Template & Notes (Local)
-        finalTemplate = performMechanicalGlobalSweep(templateContent, guardrailVault);
-        finalNotes = performMechanicalGlobalSweep(notes, guardrailVault);
+        finalTemplate = performMechanicalGlobalSweep(templateContent, combinedSweepVault);
+        finalNotes = performMechanicalGlobalSweep(notes, combinedSweepVault);
 
         // 2. Prepare Sources (Text Only - Anonymized)
         const getAnonymizedText = async (source: any) => {
           // Try to find in cache first
           const cached = sourceTextCache.current.find(d => d.name === source.name);
 
-          // CRITICAL FIX: If we have ORIGINAL text, re-anonymize it with the UPDATED vault (post-user-edits)
+          // CRITICAL FIX: If we have ORIGINAL text, re-anonymize it with the combined mapping
           if (cached && cached.originalText) {
-            // console.log(`[Gromit Frontend] Re-anonymizing cached source '${source.name}' with updated vault...`);
-            const reAnonymized = performMechanicalGlobalSweep(cached.originalText, guardrailVault);
+            const reAnonymized = performMechanicalGlobalSweep(cached.originalText, combinedSweepVault);
             console.log(`[Gromit Frontend] >> FINAL ANONYMIZED PAYLOAD FOR '${source.name}' <<\n${reAnonymized}\n>> END PAYLOAD <<`);
             return reAnonymized;
           }
@@ -977,7 +993,12 @@ export function DocumentCompilerSection({
           }
 
           // Apply Sweep
-          const freshAnonymized = performMechanicalGlobalSweep(text, guardrailVault);
+          // Apply Sweep with combined wide mapping (variations + user edits)
+          const combinedSweepVault: [string, string][] = [
+            ...sweepVaultRef.current,
+            ...Object.entries(guardrailVault)
+          ];
+          const freshAnonymized = performMechanicalGlobalSweep(text, combinedSweepVault);
           console.log(`[Gromit Frontend] >> FINAL ANONYMIZED PAYLOAD FOR '${source.name}' (Fresh Extract) <<\n${freshAnonymized}\n>> END PAYLOAD <<`);
           return freshAnonymized;
         };

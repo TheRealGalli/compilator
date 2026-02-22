@@ -7,13 +7,17 @@ import { extractPIILocal } from './ollama';
  * STRICT BOUNDARIES: Uses \\b to avoid partial matches (e.g. GALLI inside GALLIPOLI).
  * WHITESPACE AGNOSTIC FIX: Matches "Carlo Galli" even if text is "Carlo\\nGalli".
  */
-export const performMechanicalGlobalSweep = (text: string, vault: Record<string, string>): string => {
-    if (!text || Object.keys(vault).length === 0) return text;
+export const performMechanicalGlobalSweep = (text: string, vault: Record<string, string> | [string, string][]): string => {
+    if (!text) return text;
+    const entries = Array.isArray(vault) ? vault : Object.entries(vault);
+    if (entries.length === 0) return text;
+
     let result = text;
     // Order by value length descending to avoid partial matches
-    const sortedValues = Object.entries(vault).sort((a, b) => b[1].length - a[1].length);
+    // entry[1] is the value to find
+    const sortedEntries = [...entries].sort((a, b) => b[1].length - a[1].length);
 
-    for (const [token, value] of sortedValues) {
+    for (const [token, value] of sortedEntries) {
         if (!value || value.length < 2) continue;
 
         // STRIP ALL WHITESPACE from the value to match characters regardless of spacing in the source
