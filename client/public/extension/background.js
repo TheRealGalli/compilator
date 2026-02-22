@@ -76,19 +76,27 @@
     if (request.type === "OLLAMA_FETCH") {
       const { url, options } = request;
       console.log(`[GromitBridge ${BRIDGE_VERSION}] Fetching: ${url}`);
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => {
+        controller.abort();
+        console.warn(`[GromitBridge ${BRIDGE_VERSION}] Fetch ABORTED after 120s: ${url}`);
+      }, 12e4);
       const fetchOptions = {
         method: options.method || "GET",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...options.headers || {}
         },
         mode: "cors",
         credentials: "omit",
-        referrerPolicy: "no-referrer"
+        referrerPolicy: "no-referrer",
+        signal: controller.signal
       };
       if (options.body && options.method !== "GET") {
         fetchOptions.body = options.body;
       }
       fetch(url, fetchOptions).then(async (response) => {
+        clearTimeout(fetchTimeout);
         const ok = response.ok;
         const status = response.status;
         const text = await response.text().catch(() => "");
@@ -100,16 +108,17 @@
         }
         sendResponse({ success: true, ok, status, data });
       }).catch((error) => {
-        if (!error.status || error.status === 0) {
+        clearTimeout(fetchTimeout);
+        if (error.name === "AbortError") {
+          console.warn(`[GromitBridge ${BRIDGE_VERSION}] Fetch timed out for: ${url}`);
+          sendResponse({ success: false, error: "TIMEOUT (120s)", status: 408 });
+        } else if (!error.status || error.status === 0) {
           console.debug(`[GromitBridge ${BRIDGE_VERSION}] Fetch failed (System Offline):`, url);
+          sendResponse({ success: false, error: error.message || "Unknown Network Error", status: 0 });
         } else {
           console.error(`[GromitBridge ${BRIDGE_VERSION}] Fetch Error:`, error);
+          sendResponse({ success: false, error: error.message || "Unknown Network Error", status: 0 });
         }
-        sendResponse({
-          success: false,
-          error: error.message || "Unknown Network Error",
-          status: 0
-        });
       });
       return true;
     }

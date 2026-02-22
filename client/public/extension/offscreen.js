@@ -89271,13 +89271,12 @@
     return text.replace(/\r\n/g, "\n").replace(/\u00A0/g, " ").replace(/[ \t]+/g, " ").replace(/\n\s+\n/g, "\n\n").replace(/\n{3,}/g, "\n\n").trim();
   }
   async function extractPdfText(arrayBuffer, fileName, fileBase64) {
-    let formHeader = "";
+    const allPageItems = [];
+    const fieldMap = /* @__PURE__ */ new Map();
     try {
       const pdfDoc = await PDFDocument_default.load(arrayBuffer);
       const form = pdfDoc.getForm();
       const fields = form.getFields();
-      let validFieldsCount = 0;
-      let tempHeader = "";
       fields.forEach((field) => {
         try {
           const name = field.getName();
@@ -89292,50 +89291,97 @@
           } else if (field instanceof PDFRadioGroup_default) {
             value = field.getSelected() || "";
           }
-          let cleanName = name.split(".").pop() || name;
-          cleanName = cleanName.replace(/\[\d+\]/g, "");
-          cleanName = cleanName.replace(/^[fc]\d+_/, "");
-          cleanName = cleanName.replace(/_/g, " ").trim();
           if (value && value.trim().length > 0 && value !== "Off") {
-            tempHeader += `${cleanName}: ${value}
-`;
-            validFieldsCount++;
+            const widgets = field.acroField.getWidgets();
+            widgets.forEach((widget) => {
+              const pages = pdfDoc.getPages();
+              const pageRef = widget.P();
+              let pageIndex = -1;
+              if (pageRef) {
+                pageIndex = pages.findIndex((p) => p.ref === pageRef);
+              }
+              if (pageIndex === -1) {
+                pageIndex = pages.findIndex((p) => {
+                  const annots = p.node.Annots();
+                  if (!annots) return false;
+                  return annots.asArray().some((a) => {
+                    if (!(a instanceof PDFRef_default)) return false;
+                    const lookup3 = pdfDoc.context.lookup(a);
+                    return lookup3 === widget.dict;
+                  });
+                });
+              }
+              if (pageIndex !== -1) {
+                const rect = widget.getRectangle();
+                if (!fieldMap.has(pageIndex)) fieldMap.set(pageIndex, []);
+                fieldMap.get(pageIndex).push({
+                  type: "field",
+                  str: value,
+                  x: rect.x,
+                  y: rect.y,
+                  w: rect.width,
+                  h: rect.height
+                });
+              }
+            });
           }
         } catch (err) {
         }
       });
-      if (validFieldsCount > 0) {
-        formHeader += "--- [GROMIT INSIGHT] DATI ESTRATTI DAL MODULO ---\n";
-        formHeader += tempHeader;
-        formHeader += "--- FINE DATI MODULO ---\n\n";
-      }
     } catch (e) {
       console.warn("[GromitOffscreen] AcroForm extraction failed:", e);
     }
     const loadingTask = __webpack_exports__getDocument({
       data: new Uint8Array(arrayBuffer.slice(0)),
       useSystemFonts: false,
-      // SURGICAL: Prevent system font conflicts in offscreen
       disableFontFace: true,
-      // SURGICAL: Prevent hanging on font injection
       enableXfa: true
-      // CRITICAL (v5.8.10): Support IRS/XFA modules to prevent hanging
     });
     const doc = await loadingTask.promise;
-    let bodyText = "";
+    let fullText = "";
     try {
       for (let i = 1; i <= doc.numPages; i++) {
+        const pageIndex = i - 1;
         const page = await doc.getPage(i);
         const content = await page.getTextContent();
-        const pageText = content.items.map((item) => item.str).join(" ");
+        const items = content.items.map((item) => ({
+          type: "text",
+          str: item.str,
+          x: item.transform[4],
+          y: item.transform[5],
+          w: item.width || 0,
+          h: item.height || 0
+        }));
+        if (fieldMap.has(pageIndex)) {
+          items.push(...fieldMap.get(pageIndex));
+        }
+        const Y_THRESHOLD = 5;
+        items.sort((a, b) => {
+          if (Math.abs(a.y - b.y) > Y_THRESHOLD) {
+            return b.y - a.y;
+          }
+          return a.x - b.x;
+        });
+        let pageText = "";
+        let currentLineY = items.length > 0 ? items[0].y : 0;
+        items.forEach((item, idx) => {
+          const isNewText = item.type === "text";
+          const prefix = Math.abs(item.y - currentLineY) > Y_THRESHOLD ? "\n" : " ";
+          if (item.type === "field") {
+            pageText += ` ${item.str}`;
+          } else {
+            pageText += (idx === 0 ? "" : prefix) + item.str;
+          }
+          currentLineY = item.y;
+        });
         if (pageText.trim().length > 10) {
-          bodyText += pageText + " ";
+          fullText += pageText + "\n\n";
         }
       }
     } catch (err) {
       console.error("[GromitOffscreen] pdf.js extraction failed:", err);
     }
-    if (bodyText.replace(/\s/g, "").length < 50 && doc.numPages > 0) {
+    if (fullText.replace(/\s/g, "").length < 50 && doc.numPages > 0) {
       console.log("[GromitOffscreen] Testo insufficiente. Richiesta Swift Native OCR Bridge...");
       try {
         const nativeResponse = await Promise.race([
@@ -89347,21 +89393,15 @@
           new Promise((_3, reject2) => setTimeout(() => reject2(new Error("NATIVE_OCR_TIMEOUT")), 2e4))
         ]);
         if (nativeResponse && nativeResponse.success && nativeResponse.text?.trim()) {
-          console.log("[GromitOffscreen] Native OCR Success.");
-          bodyText = nativeResponse.text;
-          return (formHeader + bodyText).trim();
+          return nativeResponse.text.trim();
         }
-        console.warn("[GromitOffscreen] Native OCR returned no results or failed.");
-        bodyText = "[[GROMIT_SCAN_DETECTED]]";
+        return "[[GROMIT_SCAN_DETECTED]]";
       } catch (err) {
-        console.warn("[GromitOffscreen] Native OCR skipped (Bridge unavailable or Timeout):", err);
-        bodyText = "[[GROMIT_SCAN_DETECTED]]";
+        console.warn("[GromitOffscreen] Native OCR skipped:", err);
+        return "[[GROMIT_SCAN_DETECTED]]";
       }
     }
-    const finalResult = (formHeader + bodyText).trim();
-    formHeader = "";
-    bodyText = "";
-    return finalResult;
+    return fullText.trim();
   }
   async function extractImageText(arrayBuffer, fileName, fileBase64) {
     try {
