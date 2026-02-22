@@ -25,9 +25,12 @@ export function isNoisyPII(value: string): boolean {
     const technicalNoise = [
         'cast', 'schema', 'undefined', 'null', 'n/a', 'none', 'no data', 'no info',
         'unknown', 'generic', 'pii', 'token', 'value', 'type', 'id', 'uuid',
-        'hidden', 'error', 'failed', 'empty', 'missing'
+        'hidden', 'error', 'failed', 'empty', 'missing', 'not provided', 'provided'
     ];
-    if (technicalNoise.some(noise => v === noise || v.startsWith(noise + ':'))) return true;
+
+    // Clean value from non-alphanumeric chars for comparison
+    const cleanV = v.replace(/[^a-z0-9 ]/g, '').trim();
+    if (technicalNoise.some(noise => cleanV === noise || cleanV.startsWith(noise + ':'))) return true;
 
     // 2. Fragment IDs or hex strings (e.g. "cast-281923")
     if (/^[a-zA-Z]+-[0-9]+$/.test(v)) return true; // match "prefix-number"
@@ -745,7 +748,7 @@ ${llmText}
 /**
  * Esegue l'estrazione con logica di retry per gestire errori 503 (Ollama sovraccarico o in caricamento)
  */
-async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promise<any> {
+async function _extractWithRetry(payload: any, retries = 3, delay = 2000, signal?: AbortSignal): Promise<any> {
     console.log(`[OllamaLocal] _extractWithRetry starting... (Model: ${payload.model})`);
     for (let i = 0; i < retries; i++) {
         try {
@@ -753,6 +756,7 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000): Promi
             const response = await smartFetch(`${currentBaseUrl}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal,
                 body: JSON.stringify(payload)
             });
 
@@ -816,33 +820,41 @@ Data list:
 ${filteredValues.join('\n')}
 `;
 
+    const isOSSModel = modelId.includes('gpt-oss') || modelId.includes('oss');
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s for Unification
 
     try {
         const messages = [{ role: 'user', content: prompt }];
-        const response = await smartFetch(`${currentBaseUrl}/api/chat`, {
-            method: 'POST',
-            signal: controller.signal,
-            body: JSON.stringify({
-                model: modelId,
-                messages,
-                stream: false,
-                format: 'json',
-                options: {
-                    temperature: 0.1,
-                    num_predict: 2048
-                }
-            })
-        });
+        const payload: any = {
+            model: modelId,
+            messages,
+            stream: false,
+            format: 'json',
+            options: {
+                temperature: 0.1,
+                num_predict: 2048
+            }
+        };
 
-        const result = await response.json();
+        if (isOSSModel) {
+            payload.think = "low";
+        } else {
+            payload.think = false;
+        }
 
-        if (result.message?.content) {
-            console.log(`[OllamaLocal] RAW UNIFIER RESPONSE: ${result.message.content}`);
+        const result = await _extractWithRetry(payload, 2, 2000, controller.signal);
+
+        // Extract content from result
+        let content = result.message?.content
+            || result.choices?.[0]?.message?.content
+            || (typeof result.raw === 'string' ? result.raw : "");
+
+        if (content) {
+            console.log(`[OllamaLocal] RAW UNIFIER RESPONSE: ${content}`);
             try {
                 // Remove potential markdown blocks
-                const rawContent = result.message.content.replace(/```json|```/g, '').trim();
+                const rawContent = content.replace(/```json|```/g, '').trim();
                 const mapping = JSON.parse(rawContent);
                 console.log(`[OllamaLocal] PII Unifier: Mapped ${Object.keys(mapping).length} variations.`);
                 return mapping;
@@ -855,7 +867,7 @@ ${filteredValues.join('\n')}
         }
     } catch (err: any) {
         if (err.name === 'AbortError') {
-            console.warn("[OllamaLocal] PII Unification TIMEOUT (20s) - returning identity map.");
+            console.warn("[OllamaLocal] PII Unification TIMEOUT (60s) - returning identity map.");
         } else {
             console.error("[OllamaLocal] PII Unification failed:", err);
         }
