@@ -992,12 +992,7 @@ export function DocumentCompilerSection({
             }
           }
 
-          // Apply Sweep
           // Apply Sweep with combined wide mapping (variations + user edits)
-          const combinedSweepVault: [string, string][] = [
-            ...sweepVaultRef.current,
-            ...Object.entries(guardrailVault)
-          ];
           const freshAnonymized = performMechanicalGlobalSweep(text, combinedSweepVault);
           console.log(`[Gromit Frontend] >> FINAL ANONYMIZED PAYLOAD FOR '${source.name}' (Fresh Extract) <<\n${freshAnonymized}\n>> END PAYLOAD <<`);
           return freshAnonymized;
