@@ -390,30 +390,38 @@ function extractJsonFromResponse(text: string): any[] {
  */
 function normalizeFindings(input: any): any[] {
     if (!input) return [];
+
+    // 1. If it's already an array, check elements
     if (Array.isArray(input)) {
-        // Could be ["k:v", "k:v"] or [{"value":...}, {...}]
-        return input.flatMap(item => {
+        return input.map(item => {
+            // If it's a string, we'll parse it later with parseLine
+            if (typeof item === 'string') return item;
+
+            // If it's an object with category/value, keep it structured
             if (typeof item === 'object' && item !== null) {
-                // If it's a deep object, recurse once to flatten
-                return Object.entries(item).map(([k, v]) => {
-                    if (typeof v === 'string') return `${k}: ${v}`;
-                    return `${k}: ${JSON.stringify(v)}`;
-                });
+                const val = item.value || item.val || item.content;
+                const cat = item.category || item.type || item.label || 'GENERIC_PII';
+                if (val) return { value: String(val), category: String(cat), label: String(cat) };
             }
-            return item;
-        });
+            return null;
+        }).filter(Boolean);
     }
+
+    // 2. If it's a top-level object, might be { "findings": [...] } or { "PII": "value" }
     if (typeof input === 'object' && input !== null) {
-        // Did it return { "findings": [...] }?
         if (Array.isArray(input.findings)) return normalizeFindings(input.findings);
         if (Array.isArray(input.data)) return normalizeFindings(input.data);
+        if (Array.isArray(input.pii)) return normalizeFindings(input.pii);
 
-        // Or just a k-v map?
+        // Or just a k-v map like { "Name": "Mario" }
         return Object.entries(input).map(([k, v]) => {
-            if (typeof v === 'string') return `${k}: ${v}`;
-            return `${k}: ${JSON.stringify(v)}`;
+            if (typeof v === 'object' && v !== null) {
+                return { value: JSON.stringify(v), category: k, label: k };
+            }
+            return { value: String(v), category: k, label: k };
         });
     }
+
     return [];
 }
 
@@ -474,10 +482,10 @@ Text:
 ${llmText}
 `;
     } else {
-        prompt = `List all personal data found in the text below as a JSON array of strings.
-Format: ["CATEGORY: VALUE", ...]
-Categories: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA_NASCITA, LUOGO_NASCITA, SESSO, NAZIONALITA, DATI_SALUTE, DATI_FINANZIARI, RUOLO, PARTITA_IVA, GENERIC_PII
-NO explanations. ONLY valid JSON.
+        prompt = `Extract all personal data found in the text below.
+Return a JSON array of objects: [{"category": "...", "value": "..."}].
+Categories: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA_NASCITA, LUOGO_NASCITA, RUOLO, GENERIC_PII.
+Only extract data explicitly mentioned. No explanations. ONLY valid JSON.
 
 Text:
 ${llmText}
@@ -598,12 +606,23 @@ ${llmText}
                 if (typeof item === 'string') {
                     const parsed = parseLine(item);
                     if (parsed) findings.push(parsed);
-                } else if (typeof item === 'object') {
-                    if (item.value && (item.type || item.category)) {
+                } else if (typeof item === 'object' && item !== null) {
+                    // Item is already structured from normalizeFindings
+                    const value = item.value;
+                    const rawCat = item.category || 'GENERIC_PII';
+
+                    // Use parseLine to get standard categorization for this category key
+                    const mockLine = `${rawCat}: ${value}`;
+                    const refined = parseLine(mockLine);
+
+                    if (refined) {
+                        findings.push(refined);
+                    } else {
+                        // If parseLine fails to categorize (unusual key), keep model's word
                         findings.push({
-                            value: item.value,
-                            type: item.type || item.category || 'UNKNOWN',
-                            label: item.label || item.type || item.category || 'UNKNOWN'
+                            value: value,
+                            type: rawCat.toUpperCase().replace(/[^A-Z_]/g, '_'),
+                            label: rawCat
                         });
                     }
                 }
