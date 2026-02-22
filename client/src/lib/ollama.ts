@@ -484,33 +484,26 @@ Text:
 ${llmText}
 `;
     } else {
-    } else {
         // STRICT FEW-SHOT PROMPT for small models (≤4B). 
-        // Small models (like Gemma 1B) ignore complex instructions and negative constraints.
-        // They learn best by mimicking structural examples (few-shot).
-        prompt = `Extract personal data from the input text. Match the exact output format.
-Categories: NAME, ADDRESS, CONTACT, TAX_ID, DOCUMENT, DATE, BIRTH_PLACE, ROLE.
+        // Based on the "Golden Prompt" from commit 3aca663.
+        prompt = `find PERSONAL data in the text and do a token for pseuddonimiz it , return only the list of DATA as a tokenized format.
+IMPORTANT RULES:
+1. You have a strict limit of 1024 tokens. BE CONCISE.
+2. Return ONLY a list in this format: "TOKEN: VALUE".
+3. If you find a value but don't know the category, use "General_PII".
+4. Do NOT include descriptions, explanations, or markdown formatting like **bold**.
+5. If no PII is found , return "NONE". DO NOT INVENT DATA, DO NOT USE EXAMPLE INPUT DATAS.
 
-Input:
-dati personali :
-Output:
-NONE
+EXAMPLE INPUT:
+"John Doe was born in New York on 01/01/1980."
 
-Input:
-Name: John Doe Address: 123 Main St, New York, NY 10001
-Output:
+EXAMPLE OUTPUT:
 NAME: John Doe
-ADDRESS: 123 Main St, New York, NY 10001
+PLACE_OF_BIRTH: New York
+DATE: 01/01/1980
 
-Input:
-1. Legal name of entity CyberSpace LLC 2. Trade name 3. Executor 4a. Mailing address 7901 4TH ST N
-Output:
-NAME: CyberSpace LLC
-ADDRESS: 7901 4TH ST N
-
-Input:
+Text:
 ${llmText}
-Output:
 `;
     }
 
@@ -554,7 +547,7 @@ Output:
             || (typeof data.raw === 'string' ? data.raw : '')
             || "";
 
-        console.log(`[OllamaLocal] RAW RESPONSE (${rawResponse.length} chars): ${rawResponse}`);
+        console.log(`[OllamaLocal] RAW RESPONSE(${rawResponse.length} chars): ${rawResponse} `);
 
         // Helper to parse a single line "KEY: VALUE"
         const parseLine = (line: string): { value: string, category: string, label: string } | null => {
