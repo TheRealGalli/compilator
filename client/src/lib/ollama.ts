@@ -457,17 +457,16 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
 
     let prompt: string;
     const isOSSModel = modelId.includes('gpt-oss') || modelId.includes('oss');
-    const useFullSchema = isLargeModel && !isOSSModel;
+    const useFullSchema = isLargeModel || isOSSModel;
 
     if (useFullSchema) {
         prompt = `Find PERSONAL data in the text for pseudonymization.
 RULES:
-1. Strict limit: 1024 tokens. BE CONCISE.
-2. Return ONLY a list: "CATEGORY: VALUE" (one per line).
-3. Use the categories from the SCHEMA below.
-4. For data not in schema, use "GENERIC_PII".
-5. No descriptions, no explanations, no markdown.
-6. If no PII found, return empty.
+1. Return ONLY a JSON array of objects: [{"category": "...", "value": "..."}].
+2. Use the categories from the SCHEMA below.
+3. For data not in schema, use "GENERIC_PII".
+4. Return valid JSON. No descriptions, no explanations.
+5. If no PII found, return [].
 
 ${PII_SCHEMA_DEFINITIONS}
 
@@ -475,11 +474,10 @@ Text:
 ${llmText}
 `;
     } else {
-        prompt = `List all personal data found in the text below.
-Format: CATEGORY: VALUE (one per line)
+        prompt = `List all personal data found in the text below as a JSON array of strings.
+Format: ["CATEGORY: VALUE", ...]
 Categories: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA_NASCITA, LUOGO_NASCITA, SESSO, NAZIONALITA, DATI_SALUTE, DATI_FINANZIARI, RUOLO, PARTITA_IVA, GENERIC_PII
-No explanations. Only data found in the document.
-Do not hallucinate data that is not explicitly mentioned.
+NO explanations. ONLY valid JSON.
 
 Text:
 ${llmText}
@@ -505,6 +503,11 @@ ${llmText}
             options
         };
 
+        // ONLY use format: 'json' for small models.
+        // OSS/Reasoning models must remain "free" to think but return JSON (requested in prompt).
+        if (!isOSSModel && isSmallModel) {
+            payload.format = 'json';
+        }
         if (isOSSModel) {
             payload.think = "low";
         }
@@ -521,7 +524,7 @@ ${llmText}
             || (typeof data.raw === 'string' ? data.raw : '')
             || "";
 
-        console.log(`[OllamaLocal] RAW RESPONSE (${rawResponse.length} chars): ${rawResponse.substring(0, 100)}...`);
+        console.log(`[OllamaLocal] RAW RESPONSE (${rawResponse.length} chars): ${rawResponse}`);
 
         // Helper to parse a single line "KEY: VALUE"
         const parseLine = (line: string): { value: string, type: string, label: string } | null => {
