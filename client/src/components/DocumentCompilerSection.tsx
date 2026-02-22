@@ -800,11 +800,12 @@ export function DocumentCompilerSection({
                 }
                 else if (category.includes('DOC') || category.includes('NUMBER')) category = 'DOCUMENTO';
                 else if (category.includes('ROLE') || category.includes('JOB') || category.includes('RUOLO')) category = 'RUOLO';
-                else category = 'ALTRO';
+                // If it doesn't match English heuristics, keep the model's chosen category
+                // This allows dynamic/custom categories to generate their own specific tokens (e.g. [CONTACT_1])
               }
 
               // Register in set for unification later
-              if (category !== 'ALTRO' && !category.includes('GENERIC_PII')) {
+              if (!category.includes('GENERIC_PII')) {
                 uniqueFoundValues.add(rawValue);
               }
 
