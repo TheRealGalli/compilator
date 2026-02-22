@@ -485,7 +485,7 @@ ${llmText}
         prompt = `Extract all personal data found in the text below.
 Return a JSON array of objects: [{"category": "...", "value": "..."}].
 Categories: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA_NASCITA, LUOGO_NASCITA, RUOLO, GENERIC_PII.
-Only extract data explicitly mentioned. No explanations. ONLY valid JSON.
+Only extract data explicitly mentioned. No explanations or intro text. ONLY valid and real JSON.
 
 Text:
 ${llmText}
