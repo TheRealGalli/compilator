@@ -216,24 +216,18 @@ export async function testOllamaConnection(): Promise<boolean> {
                 continue;
             }
 
+            // Se Ollama risponde, è connesso. Che ci siano modelli o meno non importa per lo stato
+            // della connessione (se non ci sono modelli, semplicemente non appariranno nella select).
             const data = await response.json();
-            const models = (data.models || []).map((m: any) => m.name.toLowerCase());
+            currentBaseUrl = url;
             anySuccess = true;
 
-            // Controllo per il modello di default
-            const hasModel = models.some((name: string) =>
-                name === DEFAULT_OLLAMA_MODEL ||
-                name.startsWith(`${DEFAULT_OLLAMA_MODEL}:`)
-            );
-
-            if (hasModel) {
-                // console.log(`[OllamaLocal] PRONTO! Modello ${DEFAULT_OLLAMA_MODEL} trovato su ${url}.`);
-                currentBaseUrl = url;
-                return true;
-            } else {
-                console.warn(`[OllamaLocal] Ollama attivo su ${url}, ma il modello '${DEFAULT_OLLAMA_MODEL}' non trovato.`);
-                console.info(`[OllamaLocal] SOLUZIONE: Esegui 'ollama pull ${DEFAULT_OLLAMA_MODEL}'`);
+            const models = (data.models || []);
+            if (models.length === 0) {
+                console.info(`[OllamaLocal] Ollama attivo su ${url}, ma non hai ancora scaricato alcun modello.`);
             }
+
+            return true;
         } catch (err) {
             lastError = err;
             // Silenced connection errors when Ollama is unavailable
