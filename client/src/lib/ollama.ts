@@ -26,7 +26,7 @@ export function isNoisyPII(value: string): boolean {
         'cast', 'schema', 'undefined', 'null', 'n/a', 'none', 'no data', 'no info',
         'unknown', 'generic', 'pii', 'token', 'value', 'type', 'id', 'uuid',
         'hidden', 'error', 'failed', 'empty', 'missing', 'not provided', 'provided',
-        'not mentioned', 'not specified', 'non specificato', 'not explicitly stated', 'not available',
+        'not mentioned', 'not specified', 'non specificato', 'not available',
         '(none)', '(not provided)', '(n/a)'
     ];
 
@@ -376,6 +376,8 @@ function extractJsonFromResponse(text: string): any[] {
             tryParse(text.substring(firstB, lastB + 1));
         }
 
+        // Return only the LAST valid JSON objects found, as models usually reason first 
+        // and then provide the final structured output at the end.
         return results;
     }
 }
@@ -482,10 +484,10 @@ Text:
 ${llmText}
 `;
     } else {
-        prompt = `Extract all personal data found in the text below.
+        prompt = `Extract ALL personal data found in the text below. 
 Return a JSON array of objects: [{"category": "...", "value": "..."}].
 Categories: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA_NASCITA, LUOGO_NASCITA, RUOLO, GENERIC_PII.
-Only extract data explicitly mentioned. No explanations or intro text. ONLY valid and real JSON.
+BE COMPREHENSIVE. Extract everything. No explanations or intro text. ONLY valid and real JSON.
 
 Text:
 ${llmText}
@@ -572,18 +574,21 @@ ${llmText}
 
             if (key === 'CATEGORY' || key === 'CATEGORIES' || key === 'FORMAT' || key === 'SCHEMA') return null;
 
+            // Garbage filter: Reject if it's just punctuation or symbols
+            if (/^[^a-zA-Z0-9]+$/.test(val)) return null;
+
             // Map generic keys to our CATEGORIES
             let type = 'UNKNOWN';
             const has = (t: string) => key.includes(t);
             const isStrictIVA = key === 'IVA' || key === 'P_IVA' || key === 'P.IVA' || key === 'PARTITA_IVA' || key.startsWith('IVA_') || key.includes('_IVA') || (has('PARTITA') && has('IVA'));
 
-            if (has('NAME') || has('NOME') || has('TITOLARE') || has('SOGGETTO') || has('COGNOME') || has('SURNAME')) type = 'NOME';
-            else if (has('ADDRESS') || has('INDIRIZZO') || has('DOMICILIO') || has('CITY') || has('LOCATION')) type = 'INDIRIZZO';
+            if (has('NAME') || has('NOME') || has('TITOLARE') || has('SOGGETTO') || has('COGNOME') || has('SURNAME') || has('PERSONA')) type = 'NOME';
+            else if (has('ADDRESS') || has('INDIRIZZO') || has('DOMICILIO') || has('CITY') || has('LOCATION') || has('ADDR') || has('VIA') || has('PIAZZA')) type = 'INDIRIZZO';
             else if (has('LUOGO') && has('NASCITA')) type = 'LUOGO_NASCITA';
             else if (has('DATE') || has('DATA') || has('INIZIO') || has('FINE')) type = 'DATA';
             else if (isStrictIVA || has('VAT') || has('PIVA')) type = 'PARTITA_IVA';
             else if (has('CODICE') || has('FISCAL') || has('CF') || has('TAX')) type = 'CODICE_FISCALE';
-            else if (has('CONTATTO') || has('MAIL') || has('EMAIL') || has('PHONE') || has('TEL') || has('CELL')) type = 'CONTATTO';
+            else if (has('CONTATTO') || has('CONTACT') || has('MAIL') || has('EMAIL') || has('PHONE') || has('TEL') || has('CELL') || has('MOB')) type = 'CONTATTO';
             else if (has('ORGANIZATION') || has('COMPANY') || has('DITTA') || has('SOCIETA') || has('BUSINESS') || has('DENOMINAZIONE')) return null;
             else if (has('IBAN') || has('BANK') || has('CONTO') || has('FINANZIAR')) type = 'DATI_FINANZIARI';
             else if (has('DOCUMENTO') || has('DOCUMENT')) type = 'DOCUMENTO';

@@ -24,7 +24,8 @@ export const PII_REGEX_PATTERNS = {
     // Phone Numbers (Italian mobile/landline + International)
     // Matches: +39..., 0039..., or standard Italian 333... 02...
     // Now includes generic international: Prefix (1-4 digits) + 9+ digits
-    TELEFONO: /(?:(?:\+|00)\d{1,4}[\s.-]*\d{9,})|(?:(?:\+|00)39)?\s*(?:3\d{2}|0\d{1,4})\s*[ .\-]?\s*\d{3,4}\s*[ .\-]?\s*\d{3,4}\b/g,
+    // Added support for parentheses like +1 (551) ...
+    TELEFONO: /(?:\+(?:\d{1,3})?[\s.-]*\(?\d{1,4}\)?[\s.-]*\d{3,}[\s.-]*\d{3,})|(?:\b(?:0039|39)?\s*(?:3\d{2}|0\d{1,4})\s*[ .\-]?\s*\d{3,4}\s*[ .\-]?\s*\d{3,4}\b)/g,
 
     // Dates (DD/MM/YYYY or YYYY-MM-DD or DD-MM-YYYY)
     // Avoids matching simple fractions like 10/20
