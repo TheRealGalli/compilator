@@ -492,15 +492,7 @@ IMPORTANT RULES:
 2. Return ONLY a list in this format: "TOKEN: VALUE".
 3. If you find a value but don't know the category, use "General_PII".
 4. Do NOT include descriptions, explanations, or markdown formatting like **bold**.
-5. If no PII is found , return "NONE". DO NOT INVENT DATA, DO NOT USE EXAMPLE INPUT DATAS.
-
-EXAMPLE INPUT:
-"John Doe was born in New York on 01/01/1980."
-
-EXAMPLE OUTPUT:
-NAME: John Doe
-PLACE_OF_BIRTH: New York
-DATE: 01/01/1980
+5. If no PII is found , return "NONE". DO NOT INVENT DATA.
 
 Text:
 ${llmText}
@@ -589,6 +581,15 @@ ${llmText}
 
             // Garbage filter: Reject if it's just punctuation or symbols
             if (/^[^a-zA-Z0-9]+$/.test(val)) return null;
+
+            // HALLUCINATION FILTER for Small Models
+            // Small models often fill templates with "Unknown" or the key name itself if they don't find data.
+            const vUpper = val.toUpperCase();
+            const HALLUCINATED_VALUES = ['UNKNOWN', 'NONE', 'N/A', 'NULL', 'UNSPECIFIED', 'GENERAL_PII', 'DATI PERSONALI', 'NOT APPLICABLE'];
+            if (HALLUCINATED_VALUES.includes(vUpper)) return null;
+
+            // Reject if the value is basically just repeating the key (e.g. "NAME: Name")
+            if (vUpper === key || vUpper.replace(/_/g, ' ') === key.replace(/_/g, ' ')) return null;
 
             // Map generic keys to our CATEGORIES
             let type = 'UNKNOWN';
