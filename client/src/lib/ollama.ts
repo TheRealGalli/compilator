@@ -494,16 +494,10 @@ IMPORTANT RULES:
 4. Do NOT include descriptions, explanations, or markdown formatting like **bold**.
 5. If no PII is found , return "NONE". DO NOT INVENT DATA, DO NOT USE EXAMPLE INPUT DATAS.
 
-EXAMPLE INPUT 1:
-"Dati personali :"
-
-EXAMPLE OUTPUT 1:
-NONE
-
-EXAMPLE INPUT 2:
+EXAMPLE INPUT:
 "John Doe was born in New York on 01/01/1980."
 
-EXAMPLE OUTPUT 2:
+EXAMPLE OUTPUT:
 NAME: John Doe
 PLACE_OF_BIRTH: New York
 DATE: 01/01/1980
