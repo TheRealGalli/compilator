@@ -1,5 +1,5 @@
 /// <reference types="chrome"/>
-import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFOptionList, PDFRadioGroup } from 'pdf-lib';
+import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFOptionList, PDFRadioGroup, PDFRef } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 // import { GlobalWorkerOptions } from 'pdfjs-dist'; // Avoid direct import triggers
 import mammoth from 'mammoth';
@@ -151,16 +151,23 @@ function cleanText(text: string): string {
 // --- EXTRACTORS ---
 
 async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBase64: string): Promise<string> {
-    // 1. AcroForm Extraction (Form-First Strategy)
-    let formHeader = "";
+    interface PageItem {
+        type: 'text' | 'field';
+        str: string;
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+    }
+
+    const allPageItems: PageItem[][] = [];
+
+    // 1. AcroForm Extraction (Position-Aware)
+    const fieldMap = new Map<number, PageItem[]>();
     try {
         const pdfDoc = await PDFDocument.load(arrayBuffer);
         const form = pdfDoc.getForm();
         const fields = form.getFields();
-
-        // Count valid fields first
-        let validFieldsCount = 0;
-        let tempHeader = "";
 
         fields.forEach(field => {
             try {
@@ -178,70 +185,126 @@ async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBa
                     value = field.getSelected() || "";
                 }
 
-                // HEURISTIC: Clean up the field name to make it look like a "Question" or Label
-                // 1. Remove XFA path noise (topmostSubform[0]...)
-                let cleanName = name.split('.').pop() || name;
-                // 2. Remove array indices [0]
-                cleanName = cleanName.replace(/\[\d+\]/g, '');
-                // 3. Remove prefixes like "f1_" or "c1_" if present (common in IRS forms)
-                cleanName = cleanName.replace(/^[fc]\d+_/, '');
-                // 4. Split camelCase or snake_case into words, but keep it tight
-                cleanName = cleanName.replace(/_/g, ' ').trim();
-
-                // STRICT CHECK: Only include if value is non-empty and meaningful
                 if (value && value.trim().length > 0 && value !== "Off") {
-                    // Format: "LABEL: VALUE" (Simple and Direct)
-                    tempHeader += `${cleanName}: ${value}\n`;
-                    validFieldsCount++;
+                    const widgets = field.acroField.getWidgets();
+                    widgets.forEach(widget => {
+                        const pages = pdfDoc.getPages();
+                        // Find which page this widget belongs to (this is a bit slow but necessary)
+                        // Actually, widget.P (Parent page) is often available or we can find it
+                        const pageRef = widget.P();
+                        let pageIndex = -1;
+                        if (pageRef) {
+                            pageIndex = pages.findIndex(p => p.ref === pageRef);
+                        }
+
+                        // Fallback: search all pages if pageRef is missing
+                        if (pageIndex === -1) {
+                            // Safer fallback: iterate through pages and check annotations (widgets)
+                            pageIndex = pages.findIndex(p => {
+                                const annots = p.node.Annots();
+                                if (!annots) return false;
+                                // In pdf-lib, widget doesn't expose 'ref' directly easily, 
+                                // but we can check if the widget fruit is the same.
+                                return annots.asArray().some(a => {
+                                    if (!(a instanceof PDFRef)) return false;
+                                    const lookup = pdfDoc.context.lookup(a);
+                                    return lookup === widget.dict;
+                                });
+                            });
+                        }
+
+                        if (pageIndex !== -1) {
+                            const rect = widget.getRectangle();
+                            if (!fieldMap.has(pageIndex)) fieldMap.set(pageIndex, []);
+                            fieldMap.get(pageIndex)!.push({
+                                type: 'field',
+                                str: value,
+                                x: rect.x,
+                                y: rect.y,
+                                w: rect.width,
+                                h: rect.height
+                            });
+                        }
+                    });
                 }
             } catch (err) { /* Ignore specific field error */ }
         });
-
-        if (validFieldsCount > 0) {
-            // Use a very simple header that looks like document text
-            formHeader += "--- [GROMIT INSIGHT] DATI ESTRATTI DAL MODULO ---\n";
-            formHeader += tempHeader;
-            formHeader += "--- FINE DATI MODULO ---\n\n";
-        }
     } catch (e) {
         console.warn("[GromitOffscreen] AcroForm extraction failed:", e);
     }
 
-    // 2. Standard Text Extraction (pdf.js)
+    // 2. Standard Text Extraction (pdf.js) with spatial awareness
     const loadingTask = pdfjsLib.getDocument({
         data: new Uint8Array(arrayBuffer.slice(0)),
-        useSystemFonts: false,          // SURGICAL: Prevent system font conflicts in offscreen
-        disableFontFace: true,          // SURGICAL: Prevent hanging on font injection
-        enableXfa: true,                // CRITICAL (v5.8.10): Support IRS/XFA modules to prevent hanging
+        useSystemFonts: false,
+        disableFontFace: true,
+        enableXfa: true,
     });
 
     const doc = await loadingTask.promise;
-    let bodyText = "";
+    let fullText = "";
 
     try {
         for (let i = 1; i <= doc.numPages; i++) {
+            const pageIndex = i - 1;
             const page = await doc.getPage(i);
             const content = await page.getTextContent();
 
-            // Basic text stitching
-            const pageText = content.items.map((item: any) => item.str).join(' ');
+            const items: PageItem[] = content.items.map((item: any) => ({
+                type: 'text',
+                str: item.str,
+                x: item.transform[4],
+                y: item.transform[5],
+                w: item.width || 0,
+                h: item.height || 0
+            }));
 
-            // Only add to bodyText if there is actual content
+            // Add fields for this page
+            if (fieldMap.has(pageIndex)) {
+                items.push(...fieldMap.get(pageIndex)!);
+            }
+
+            // 3. SPATIAL INTERLEAVING
+            // Sort by Y descending (top to bottom), then X ascending (left to right)
+            const Y_THRESHOLD = 5; // Points tolerance for same line
+            items.sort((a, b) => {
+                if (Math.abs(a.y - b.y) > Y_THRESHOLD) {
+                    return b.y - a.y;
+                }
+                return a.x - b.x;
+            });
+
+            // Group into lines to handle spacing
+            let pageText = "";
+            let currentLineY = items.length > 0 ? items[0].y : 0;
+
+            items.forEach((item, idx) => {
+                const isNewText = item.type === 'text';
+                const prefix = (Math.abs(item.y - currentLineY) > Y_THRESHOLD) ? "\n" : " ";
+
+                if (item.type === 'field') {
+                    // Inject value. If it follows a text item closely, use a colon or just space.
+                    // We'll just use a space to let the LLM see "Label Value"
+                    pageText += ` ${item.str}`;
+                } else {
+                    pageText += (idx === 0 ? "" : prefix) + item.str;
+                }
+
+                currentLineY = item.y;
+            });
+
             if (pageText.trim().length > 10) {
-                bodyText += pageText + " ";
+                fullText += pageText + "\n\n";
             }
         }
     } catch (err) {
         console.error("[GromitOffscreen] pdf.js extraction failed:", err);
     }
 
-    // 3. OCR Detection (EXCLUSIVELY Native Bridge v5.8.12)
-    // Check clean length. If < 50 chars, we assume it's a scan (or just empty).
-    if (bodyText.replace(/\s/g, '').length < 50 && doc.numPages > 0) {
+    // 4. OCR Detection (Fallback)
+    if (fullText.replace(/\s/g, '').length < 50 && doc.numPages > 0) {
         console.log("[GromitOffscreen] Testo insufficiente. Richiesta Swift Native OCR Bridge...");
-
         try {
-            // v5.8.13: Added 20s safety timeout for complex documents
             const nativeResponse = await Promise.race([
                 chrome.runtime.sendMessage({
                     type: 'NATIVE_OCR',
@@ -252,27 +315,16 @@ async function extractPdfText(arrayBuffer: ArrayBuffer, fileName: string, fileBa
             ]);
 
             if (nativeResponse && nativeResponse.success && nativeResponse.text?.trim()) {
-                console.log("[GromitOffscreen] Native OCR Success.");
-                bodyText = nativeResponse.text;
-                return (formHeader + bodyText).trim();
+                return nativeResponse.text.trim();
             }
-
-            console.warn("[GromitOffscreen] Native OCR returned no results or failed.");
-            bodyText = "[[GROMIT_SCAN_DETECTED]]";
+            return "[[GROMIT_SCAN_DETECTED]]";
         } catch (err) {
-            console.warn("[GromitOffscreen] Native OCR skipped (Bridge unavailable or Timeout):", err);
-            bodyText = "[[GROMIT_SCAN_DETECTED]]";
+            console.warn("[GromitOffscreen] Native OCR skipped:", err);
+            return "[[GROMIT_SCAN_DETECTED]]";
         }
     }
 
-    // Combined Result: Header (Forms) + Body (Text/OCR)
-    const finalResult = (formHeader + bodyText).trim();
-
-    // SECURITY: Clear text variables before return (Hint for GC)
-    formHeader = "";
-    bodyText = "";
-
-    return finalResult;
+    return fullText.trim();
 }
 
 /**
