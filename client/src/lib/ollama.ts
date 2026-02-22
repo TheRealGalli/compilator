@@ -453,11 +453,13 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
     const prompt = `Find PERSONAL data in the text for pseudonymization.
 RULES:
 1. Return ONLY a JSON array of objects: [{"category": "...", "value": "..."}].
-2. Use the categories from the SCHEMA below.
-3. For data not in schema, use "GENERIC_PII".
-4. Return valid JSON. No descriptions, no explanations.
-5. If no PII found, return [].
+2. Extract absolutely EVERYTHING relevant: Names, Surnames, Companies, Organizations, Addresses (Street, City, ZIP, State, Country), Dates (Birth, Contract, Document dates), Roles, Phone Numbers, Emails, Tax IDs, VAT numbers, Document Numbers (ID cards, Passports), Bank details (IBANs), and any other sensitive data.
+3. Use the most appropriate category from the SCHEMA below if possible.
+4. If a data point doesn't perfectly fit the schema, DO NOT ignore it. Use "GENERIC_PII" or create a concise, snake_case category name that describes it (e.g., "LICENSE_PLATE", "HEALTH_CONDITION").
+5. Return valid JSON. No descriptions, no explanations, no conversational text.
+6. If no PII is found, return [].
 
+SCHEMA DEFINITIONS (Use these preferentially, but don't limit yourself if other PII exists):
 ${PII_SCHEMA_DEFINITIONS}
 
 Text:
