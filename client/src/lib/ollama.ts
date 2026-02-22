@@ -500,7 +500,7 @@ ${llmText}
 
         const options: any = {
             temperature: 0.15,
-            num_ctx: CONTEXT_WINDOW,
+            num_ctx: isOSSModel ? 32768 : CONTEXT_WINDOW,
             num_predict: isOSSModel ? 4096 : 1024, // OSS: budget for thinking+content, others: content only
             top_k: 20,
             top_p: 0.9
@@ -808,6 +808,16 @@ export async function unifyPIIFindings(
         return identity;
     }
 
+    // SKIP UNIFIER FOR SMALL MODELS (Gemma 1b/4b) per User Request
+    // These models take 1-2 mins and don't provide enough value in unification
+    const isSmallModel = modelId.includes('1b') || modelId.includes('4b');
+    if (isSmallModel && !modelId.includes('gpt-oss')) {
+        console.log(`[OllamaLocal] Skipping Unifier for small model: ${modelId}`);
+        const identity: Record<string, string> = {};
+        values.forEach(v => identity[v] = v);
+        return identity;
+    }
+
     const prompt = `Unify the following personal data strings. Group variations of the same entity (e.g. same address with different formatting, same name).
 RULES:
 1. Return ONLY a JSON object: {"variation": "canonical_value"}.
@@ -829,10 +839,10 @@ ${filteredValues.join('\n')}
             model: modelId,
             messages,
             stream: false,
-            format: 'json',
             options: {
                 temperature: 0.1,
-                num_predict: 2048
+                num_ctx: isOSSModel ? 32768 : 4096,
+                num_predict: isOSSModel ? 4096 : 1024
             }
         };
 
@@ -841,28 +851,28 @@ ${filteredValues.join('\n')}
         }
         // Local models (Gemma) do not support the 'think' field.
 
-        const result = await _extractWithRetry(payload, 2, 2000, controller.signal);
+        const data = await _extractWithRetry(payload, 2, 2000, controller.signal);
+        const rawResponse = data.message?.content
+            || data.choices?.[0]?.message?.content
+            || data.response
+            || "";
 
-        // Extract content from result
-        let content = result.message?.content
-            || result.choices?.[0]?.message?.content
-            || (typeof result.raw === 'string' ? result.raw : "");
+        console.log(`[OllamaLocal] RAW UNIFIER RESPONSE: ${rawResponse.substring(0, 100)}...`);
 
-        if (content) {
-            console.log(`[OllamaLocal] RAW UNIFIER RESPONSE: ${content}`);
-            try {
-                // Remove potential markdown blocks
-                const rawContent = content.replace(/```json|```/g, '').trim();
-                const mapping = JSON.parse(rawContent);
-                console.log(`[OllamaLocal] PII Unifier: Mapped ${Object.keys(mapping).length} variations.`);
-                return mapping;
-            } catch (pErr) {
-                console.warn("[OllamaLocal] Unification JSON parse failed, returning identity map.");
-                const identity: Record<string, string> = {};
-                values.forEach(v => identity[v] = v);
-                return identity;
+        // Use robust JSON extraction
+        const jsonList = extractJsonFromResponse(rawResponse);
+        const result: Record<string, string> = {};
+
+        // Convert the first object found in the response to our mapping
+        if (jsonList.length > 0) {
+            const map = jsonList[0];
+            for (const key in map) {
+                result[key] = String(map[key]);
             }
+            console.log(`[OllamaLocal] PII Unifier: Mapped ${Object.keys(result).length} variations.`);
+            return result;
         }
+
     } catch (err: any) {
         if (err.name === 'AbortError') {
             console.warn("[OllamaLocal] PII Unification TIMEOUT (20s) - returning identity map.");
