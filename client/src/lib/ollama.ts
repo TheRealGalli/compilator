@@ -484,15 +484,16 @@ Text:
 ${llmText}
 `;
     } else {
-        prompt = `Extract ONLY the personal data explicitly mentioned in the text below for pseudonymization.
+        // SIMPLE PROMPT for small models (≤4B). 
+        // We use TEXT format instead of JSON because small Gemma models loop in JSON mode.
+        prompt = `Extract all personal data found in the text below for pseudonymization.
+Format: CATEGORY: VALUE (one per line)
+Categories to use: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA, LUOGO_NASCITA, RUOLO.
+
 RULES:
-1. Return a JSON object with a single key "findings" containing an array of objects: 
-   {"findings": [{"category": "...", "value": "..."}]}
-2. Name the category based on the data type (e.g., NOME, INDIRIZZO, CONTATTO, DATA, CODICE_FISCALE, RUOLO).
-3. DO NOT include data that is not explicitly in the text.
-4. DO NOT include empty fields, "N/A", "null", or "Non specificato". If a category is not present, simply omit it.
-5. IF NO DATA IS FOUND, return {"findings": []}.
-6. NO explanations, NO intro text. ONLY output the valid JSON object.
+1. ONLY extract data explicitly mentioned in the text.
+2. DO NOT invent data or include "N/A", "null", or informative text.
+3. NO explanations, NO intro text. ONLY output the list of "CATEGORY: VALUE".
 
 Text:
 ${llmText}
@@ -518,9 +519,9 @@ ${llmText}
             options
         };
 
-        // ONLY use format: 'json' for small models.
-        // OSS/Reasoning models must remain "free" to think but return JSON (requested in prompt).
-        if (!isOSSModel && isSmallModel) {
+        // Use format: 'json' ONLY for OSS models that are really good at it.
+        // Small models natively loop or hallucinate in JSON mode, so we use raw text parsing for them.
+        if (isOSSModel) {
             payload.format = 'json';
         }
         if (isOSSModel) {
