@@ -516,9 +516,8 @@ ${llmText}
         // GPT-OSS Optimization: Use 'low' reasoning effort to prevent excessive tracing
         if (isOSSModel) {
             payload.think = "low";
-        } else {
-            payload.think = false;
         }
+        // Local models (Gemma) do not support the 'think' field, so we don't set it.
 
         const data = await _extractWithRetry(payload, 2);
         let findings: any[] = [];
@@ -839,9 +838,8 @@ ${filteredValues.join('\n')}
 
         if (isOSSModel) {
             payload.think = "low";
-        } else {
-            payload.think = false;
         }
+        // Local models (Gemma) do not support the 'think' field.
 
         const result = await _extractWithRetry(payload, 2, 2000, controller.signal);
 
@@ -867,7 +865,7 @@ ${filteredValues.join('\n')}
         }
     } catch (err: any) {
         if (err.name === 'AbortError') {
-            console.warn("[OllamaLocal] PII Unification TIMEOUT (60s) - returning identity map.");
+            console.warn("[OllamaLocal] PII Unification TIMEOUT (20s) - returning identity map.");
         } else {
             console.error("[OllamaLocal] PII Unification failed:", err);
         }
