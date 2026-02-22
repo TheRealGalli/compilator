@@ -486,14 +486,16 @@ ${llmText}
     } else {
         // SIMPLE PROMPT for small models (≤4B). 
         // We use TEXT format instead of JSON because small Gemma models loop in JSON mode.
-        prompt = `Extract all personal data found in the text below for pseudonymization.
+        prompt = `Extract all personal data explicitly present in the text below.
 Format: CATEGORY: VALUE (one per line)
 Categories to use: NOME, INDIRIZZO, CONTATTO, CODICE_FISCALE, DOCUMENTO, DATA, LUOGO_NASCITA, RUOLO.
 
-RULES:
-1. ONLY extract data explicitly mentioned in the text.
-2. DO NOT invent data or include "N/A", "null", or informative text.
-3. NO explanations, NO intro text. ONLY output the list of "CATEGORY: VALUE".
+STRICT RULES:
+1. ONLY extract data explicitly written in the text.
+2. IF NO PERSONAL DATA IS FOUND, output EXACTLY the word "NONE" and stop. DO NOT output a template of empty categories.
+3. DO NOT invent data or include "N/A", "null", or informative text.
+4. DO NOT extract standalone numbers, checkbox labels, or form line numbers.
+5. NO explanations, NO intro text. ONLY output the list of "CATEGORY: VALUE".
 
 Text:
 ${llmText}
@@ -643,6 +645,8 @@ ${llmText}
         if (findings.length === 0 && rawResponse.includes(':')) {
             const lines = rawResponse.split('\n');
             for (const line of lines) {
+                // Ignore the "NONE" stop word
+                if (line.trim().toUpperCase() === 'NONE') continue;
                 const parsed = parseLine(line);
                 if (parsed) findings.push(parsed);
             }
