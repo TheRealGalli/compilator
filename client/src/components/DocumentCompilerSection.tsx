@@ -882,14 +882,16 @@ export function DocumentCompilerSection({
           const cached = sourceTextCache.current.find(d => d.id === s.id);
           if (cached && (cached.originalText || cached.text)) {
             const anonymized = await getAnonymizedText(s);
+            const newName = `${s.name.replace(/\.[^/.]+$/, "")}.txt`;
             // PERSISTENCE SWAP
             updateSource(s.id, {
+              name: newName,
               base64: toBase64(anonymized),
               type: 'text/plain'
             });
             // PAYLOAD
             finalSources.push({
-              name: s.name,
+              name: newName,
               type: 'text/plain',
               base64: toBase64(anonymized),
               anonymizedText: anonymized,
@@ -905,12 +907,14 @@ export function DocumentCompilerSection({
           const cached = sourceTextCache.current.find(d => d.id === masterSource.id);
           if (cached && (cached.originalText || cached.text)) {
             const anonymizedMaster = await getAnonymizedText(masterSource);
+            const newName = `${masterSource.name.replace(/\.[^/.]+$/, "")}.txt`;
             updateSource(masterSource.id, {
+              name: newName,
               base64: toBase64(anonymizedMaster),
               type: 'text/plain'
             });
             finalMasterSource = {
-              name: masterSource.name,
+              name: newName,
               type: 'text/plain',
               base64: toBase64(anonymizedMaster),
               anonymizedText: anonymizedMaster,

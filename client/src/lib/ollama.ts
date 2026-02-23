@@ -220,6 +220,7 @@ export async function testOllamaConnection(): Promise<boolean> {
             const data = await response.json();
             currentBaseUrl = url;
             anySuccess = true;
+            console.log(`[Ollama] Connessione fisica stabilita con ${url} (Pronto)`);
 
             const models = (data.models || []);
             if (models.length === 0) {
@@ -478,6 +479,7 @@ ${llmText}
             top_p: 0.9,
             keep_alive: -1
         };
+        console.log(`[Ollama] Richiesta estrazione PII: Mantenimento in RAM attivo (keep_alive: -1)`);
 
         const payload: any = {
             model: modelId,
@@ -806,6 +808,7 @@ export async function preloadModel(modelId: string): Promise<void> {
                 }
             })
         });
+        console.log(`[Ollama] Modello ${modelId} CARICATO in RAM (Sessione Alive: -1)`);
     } catch (err) {
         console.warn(`[OllamaLocal] Preload fallito per ${modelId}:`, err);
     }
@@ -824,11 +827,12 @@ export async function unloadModel(modelId: string): Promise<void> {
             method: 'POST',
             body: JSON.stringify({
                 model: modelId,
-                prompt: "",
-                stream: false,
-                keep_alive: 0
+                options: {
+                    keep_alive: 0
+                }
             })
         });
+        console.log(`[Ollama] Modello ${modelId} SCARICATO dalla RAM (Sessione Alive: 0)`);
     } catch (err) {
         console.warn(`[OllamaLocal] Unload fallito per ${modelId}:`, err);
     }

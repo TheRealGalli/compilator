@@ -217,8 +217,8 @@ export class AiService {
 Categorie: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA.
 
 ESEMPIO 1:
-TESTO: Mi chiamo Carlo Galli e lavoro per CSD Station. Mail: carlo@galli.it
-JSON: {"findings": [{"value": "Carlo Galli", "category": "NOME_PERSONA"}, {"value": "CSD Station", "category": "ORGANIZZAZIONE"}, {"value": "carlo@galli.it", "category": "EMAIL"}]}
+TESTO: Mi chiamo Mario Rossi e lavoro per XYZ Corp. Mail: mario@xyz.it
+JSON: {"findings": [{"value": "Mario Rossi", "category": "NOME_PERSONA"}, {"value": "XYZ Corp", "category": "ORGANIZZAZIONE"}, {"value": "mario@xyz.it", "category": "EMAIL"}]}
 
 ESEMPIO 2:
 TESTO: L'ufficio è in Via Roma 10, Milano. Tel: 02 1234567. P.IVA 12345678901.
@@ -288,7 +288,7 @@ ${text} [/INST]`;
             // --- CODE-ASSISTED REPLACEMENT & VAULTING ---
             let anonymizedText = text;
 
-            // Sort findings by length descending to replace "Carlo Galli" before "Carlo"
+            // Sort findings by length descending to replace "Mario Rossi" before "Mario"
             const sortedFindings = findings.sort((a, b) => (b.value.length - a.value.length));
 
             for (const finding of sortedFindings) {

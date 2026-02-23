@@ -1629,7 +1629,8 @@ ${isPawnActive ? `
 3. **QUESTI NON SONO DATI MANCANTI**. Rappresentano dati REALI e VALIDI che l'utente possiede.
 4. **NON** provare a "indovinare" o riempire questi token.
 5. **TRATTALI COME VALORI DEFINITIVI**. Inseriscili nel documento finale ESATTAMENTE come li trovi.
-6. Costruisci le frasi attorno a questi token in modo naturale.
+6. **DIVIETO DI RIPETIZIONE (CRITICO)**: Usa ogni token ESATTAMENTE UNA VOLTA per ogni occorrenza del dato reale che rappresenta. NON ripetere lo stesso token più volte per "riempire" un campo (es. se l'indirizzo è frammentato, usa [INDIRIZZO_1] una volta sola, non scrivere "[INDIRIZZO_1] [INDIRIZZO_1] DI [INDIRIZZO_1]").
+7. Costruisci le frasi attorno a questi token in modo naturale.
 
 **ECCEZIONE DI VALIDAZIONE CONTESTUALE (FALSO POSITIVO):**
 - **SOLO SE** un token appare in un contesto **PALESEMENTE ILLOGICO** (es. "Il muro era color [NOME_1]"), considera l'opzione che il sistema locale abbia sbagliato (es. confondendo la parola "GIALLI" con il cognome "GALLI").
@@ -2065,7 +2066,7 @@ ISTRUZIONI OUTPUT:
         detailedAnalysis: compileContext.detailedAnalysis,
         webResearch: compileContext.webResearch,
         multimodalFiles,
-        fetchedCompilerContext: isPawnActive ? '' : fetchedCompilerContext,
+        fetchedCompilerContext,
         hasExternalSources,
         isPawnActive
       });
@@ -2105,7 +2106,8 @@ ${isPawnActive ? `
 3. **QUESTI NON SONO DATI MANCANTI**. Rappresentano dati REALI e VALIDI.
 4. **NON** provare a "indovinare" o riempire questi token.
 5. **TRATTALI COME VALORI DEFINITIVI**. Inseriscili nel documento finale ESATTAMENTE come li trovi.
-6. **NO MARKDOWN SUI TOKEN**: Non mettere mai i token in **grassetto** o *corsivo*. Scrivili esattamente come sono (es. [NOME_1], non **[NOME_1]**).
+6. **DIVIETO DI RIPETIZIONE (CRITICO)**: Usa ogni token ESATTAMENTE UNA VOLTA per ogni occorrenza del dato reale che rappresenta. NON ripetere lo stesso token più volte per "riempire" un campo (es. se l'indirizzo è frammentato, usa [INDIRIZZO_1] una volta sola, non scrivere "[INDIRIZZO_1] [INDIRIZZO_1] DI [INDIRIZZO_1]").
+7. **NO MARKDOWN SUI TOKEN**: Non mettere mai i token in **grassetto** o *corsivo*. Scrivili esattamente come sono (es. [NOME_1], non **[NOME_1]**).
 
 **GESTIONE FONTI VISIVE (OCR/SCANSIONI):**
 - Se una fonte inizia con il tag **[FONTE ESTRATTA DA SCANSIONE/VISION]**:

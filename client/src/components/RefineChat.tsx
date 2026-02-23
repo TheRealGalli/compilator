@@ -346,7 +346,10 @@ export function RefineChat({
                 userInstruction: finalUserInstruction,
                 mentions: sweptMentions.map(m => ({ source: m.source, text: m.text, label: m.label, start: m.start, end: m.end, surroundingContext: m.surroundingContext })),
                 mentionRegistry: sweptRegistry.map(m => ({ source: m.source, text: m.text, label: m.label, start: m.start, end: m.end, surroundingContext: m.surroundingContext })),
-                chatHistory: messages.map(m => ({ role: m.role, text: m.text })),
+                chatHistory: messages.map(m => ({
+                    role: m.role,
+                    text: isPawnActive ? performMechanicalGlobalSweep(m.text, updatedVault) : m.text
+                })),
                 webResearch: compileContext.webResearch,
                 guardrailVault: updatedVault // Send updated vault
             });
