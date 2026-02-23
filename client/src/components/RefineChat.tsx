@@ -106,6 +106,8 @@ export function RefineChat({
                 id: 'init-analysis',
                 role: 'ai',
                 // DE-ANONYMIZE INITIAL ANALYSIS (Reverse Sweep)
+                // Se Pawn è attivo, mostriamo la risposta de-pseudonimizzata nel chat (per comodità utente)
+                // ma il template di anteprima rimarrà pseudonimizzato per controllo sicurezza.
                 text: (compileContext.activeGuardrails?.includes('pawn') && data.explanation)
                     ? performMechanicalReverseSweep(data.explanation, guardrailVault)
                     : (data.explanation || "Analisi completata. Pronti per le tue modifiche."),
@@ -384,8 +386,10 @@ export function RefineChat({
             setMessages(prev => [...prev, aiMsg]);
 
             if (data.newContent) {
-                // If Pawn was active, the server returned tokens. We need to de-anonymize locally before previewing.
-                const contentToShow = isPawnActive ? performMechanicalReverseSweep(data.newContent, data.guardrailVault || updatedVault) : data.newContent;
+                // PAWN: In anteprima (Reviewing) mostriamo i TOKEN se Pawn è attivo.
+                // Questo permette all'utente di verificare che l'AI non abbia "leakato" dati reali.
+                // Al momento dell'accettazione finale verrà comunque applicato il reverse sweep.
+                const contentToShow = isPawnActive ? data.newContent : data.newContent;
                 onPreview(contentToShow, data.newContent);
             }
 

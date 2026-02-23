@@ -1,0 +1,64 @@
+client/src/components/CompiledOutput.tsx(2,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+client/src/components/CompiledOutput.tsx(3,58): error TS2307: Cannot find module '@/components/ui/card' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(4,28): error TS2307: Cannot find module '@/components/ui/three-stars' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(5,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(6,79): error TS2307: Cannot find module '@/components/ui/select' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(11,75): error TS2307: Cannot find module '@/components/ui/card' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(17,26): error TS2307: Cannot find module '@/hooks/use-toast' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(18,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(19,39): error TS2307: Cannot find module '@/utils/screenshot' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(20,57): error TS2307: Cannot find module '@/components/ui/popover' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(21,26): error TS2307: Cannot find module '@/components/ui/checkbox' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(22,23): error TS2307: Cannot find module '@/components/ui/label' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(23,28): error TS2307: Cannot find module '@/components/ui/scroll-area' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(24,28): error TS2307: Cannot find module '@/contexts/SourcesContext' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(25,29): error TS2307: Cannot find module '@/contexts/CompilerContext' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(26,23): error TS2307: Cannot find module '@/components/ui/input' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(27,24): error TS2307: Cannot find module '@/components/ui/slider' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(37,27): error TS2307: Cannot find module '@/lib/api-config' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(38,28): error TS2307: Cannot find module '@/lib/queryClient' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(39,36): error TS2307: Cannot find module '@/lib/local-extractor' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(41,27): error TS2307: Cannot find module '@/contexts/OllamaContext' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(42,103): error TS2307: Cannot find module '@/lib/privacy' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(51,8): error TS2307: Cannot find module '@/components/ui/dialog' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(54,26): error TS2307: Cannot find module '@/components/ui/textarea' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(392,43): error TS2307: Cannot find module '@/lib/queryClient' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(393,42): error TS2307: Cannot find module '@/lib/api-config' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(539,43): error TS2307: Cannot find module '@/lib/queryClient' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(540,42): error TS2307: Cannot find module '@/lib/api-config' or its corresponding type declarations.
+client/src/components/DocumentCompilerSection.tsx(607,36): error TS2802: Type 'MapIterator<[string, string]>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+client/src/components/DocumentCompilerSection.tsx(758,60): error TS2802: Type 'MapIterator<[string, string]>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+client/src/components/DocumentCompilerSection.tsx(863,13): error TS2322: Type '[string, unknown][]' is not assignable to type '[string, string][]'.
+  Type '[string, unknown]' is not assignable to type '[string, string]'.
+    Type at position 1 in source is not compatible with type at position 1 in target.
+      Type 'unknown' is not assignable to type 'string'.
+client/src/components/FormattedMessage.tsx(2,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(2,26): error TS2307: Cannot find module '@/components/ui/textarea' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(3,23): error TS2307: Cannot find module '@/components/ui/label' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(4,24): error TS2307: Cannot find module '@/components/ui/slider' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(5,24): error TS2307: Cannot find module '@/components/ui/switch' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(6,28): error TS2307: Cannot find module '@/components/ui/scroll-area' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(7,27): error TS2307: Cannot find module '@/components/ui/separator' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(8,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(14,74): error TS2307: Cannot find module '@/components/ui/tooltip' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(15,26): error TS2307: Cannot find module '@/hooks/use-toast' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(16,27): error TS2307: Cannot find module '@/lib/api-config' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(18,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(19,29): error TS2307: Cannot find module '@/contexts/CompilerContext' or its corresponding type declarations.
+client/src/components/ModelSettings.tsx(20,27): error TS2307: Cannot find module '@/contexts/OllamaContext' or its corresponding type declarations.
+client/src/components/PdfPreview.tsx(3,22): error TS2307: Cannot find module '@/components/ui/card' or its corresponding type declarations.
+client/src/components/PdfPreview.tsx(4,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+client/src/components/PdfPreview.tsx(18,23): error TS2307: Cannot find module '@/components/ui/input' or its corresponding type declarations.
+client/src/components/PdfPreview.tsx(24,8): error TS2307: Cannot find module '@/components/ui/dropdown-menu' or its corresponding type declarations.
+client/src/components/PdfPreview.tsx(25,26): error TS2307: Cannot find module '@/hooks/use-toast' or its corresponding type declarations.
+client/src/components/PdfPreview.tsx(26,28): error TS2307: Cannot find module '@/lib/queryClient' or its corresponding type declarations.
+client/src/components/RefineChat.tsx(2,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+client/src/components/RefineChat.tsx(3,26): error TS2307: Cannot find module '@/components/ui/textarea' or its corresponding type declarations.
+client/src/components/RefineChat.tsx(4,28): error TS2307: Cannot find module '@/components/ui/scroll-area' or its corresponding type declarations.
+client/src/components/RefineChat.tsx(7,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+client/src/components/RefineChat.tsx(8,27): error TS2307: Cannot find module '@/lib/api-config' or its corresponding type declarations.
+client/src/components/RefineChat.tsx(9,28): error TS2307: Cannot find module '@/lib/queryClient' or its corresponding type declarations.
+client/src/components/RefineChat.tsx(13,29): error TS2307: Cannot find module '@/contexts/CompilerContext' or its corresponding type declarations.
+client/src/components/RefineChat.tsx(14,103): error TS2307: Cannot find module '@/lib/privacy' or its corresponding type declarations.
+client/src/components/ui/button.tsx(5,20): error TS2307: Cannot find module '@/lib/utils' or its corresponding type declarations.
+client/src/lib/ollama.ts(649,33): error TS2802: Type 'MapIterator<[string, { type: string; label?: string; }]>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.

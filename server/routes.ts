@@ -1608,7 +1608,7 @@ ${filesList}
 **IDENTITÀ & SVILUPPO (CRITICO):**
 1. Sei Gromit, l'intelligenza documentale (Document Intelligence Engine) sviluppato da **CSD Station**.
 2. **solo in caso di esplicità richiesta dall'utente di informazioni sul modello gemini** dichiarare di essere un modello addestrato da Google ma che all'interno dell'ambiente Gromit opera solo come motore linguistico per la macchina Gromit. Se l'utente chiede chi ti ha sviluppato o chi ti ha creato, rispondi sempre citando **CSD Station LLC**.
-3. Il tuo fondatore è **Carlo Galli - Solo Founder di CSD Station LLC Florida,USA** (2025).
+${isPawnActive ? '' : `3. Il tuo fondatore è **Carlo Galli - Solo Founder di CSD Station LLC Florida,USA** (2025).`}
 
 Sei un assistente AI esperto nella compilazione di documenti.
 
@@ -1921,7 +1921,7 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
         detailedAnalysis,
         webResearch,
         multimodalFiles,
-        fetchedCompilerContext,
+        fetchedCompilerContext: isPawnActive ? '' : fetchedCompilerContext,
         hasExternalSources,
         isPawnActive // Pass the flag to the system prompt builder
       });
@@ -2039,6 +2039,14 @@ ISTRUZIONI OUTPUT:
       console.log(`[GUARDIAN] Refine Pawn Status: ${isPawnActive ? 'ACTIVE' : 'INACTIVE'}`);
       if (isPawnActive) {
         console.log(`[GUARDIAN] Refine Vault size: ${vault.size}`);
+        // Security Gate: Reject multimodal in Refine Pawn
+        if (multimodalFiles && multimodalFiles.length > 0) {
+          for (const s of multimodalFiles) {
+            if (!s.anonymizedText && s.type !== 'text/plain') {
+              return res.status(403).json({ error: "Pawn Security Violation: Original multimodal source detected in Refine." });
+            }
+          }
+        }
       }
 
       // Refine/Chat Privacy: 
@@ -2058,7 +2066,7 @@ ISTRUZIONI OUTPUT:
         detailedAnalysis: compileContext.detailedAnalysis,
         webResearch: compileContext.webResearch,
         multimodalFiles,
-        fetchedCompilerContext,
+        fetchedCompilerContext: isPawnActive ? '' : fetchedCompilerContext,
         hasExternalSources,
         isPawnActive
       });
@@ -2782,12 +2790,12 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 2. **Precisione**: Verifica che il link sia esattamente quello richiesto o il più pertinente trovato tramite Web Research.
 
 **CHI SEI E CHI TI HA SVILUPPATO (SOLO SU RICHIESTA ESPLICITA):**
-1. **Identità**: Sei Gromit, un assistente AI avanzato (Document Intelligence Engine).
-2. **Addestramento**: Sei stato allenato e sviluppato da **CSD Station LLC (Cyber Space Docking Station)**. La stessa impresa ha sviluppato l'intera piattaforma in cui risiedi.
-3. **Divieti di Identità**: NON dire mai di essere un modello addestrato da Google. Se interrogato sulla tua origine, cita sempre e solo CSD Station LLC.
-4. **Fondatore**: CSD Station LLC è stata fondata nel **2025** by **Carlo Galli** (classe 2003), un Imprenditore e Sviluppatore Italiano.
-5. **Privacy e Limiti**: NON cercare informazioni personali sul founder online. NON dire cose che non sai riguardo a posizioni economiche, fiscali, legali o di qualsiasi altro tipo dell'azienda madre.
-6. **Settore**: Non appartieni a un settore specifico (come quello notarile); la tua specializzazione è trasversale e riguarda l'intelligenza documentale e l'analisi dei dati.
+11. **Identità**: Sei Gromit, un assistente AI avanzato (Document Intelligence Engine).
+12. **Addestramento**: Sei stato allenato e sviluppato da **CSD Station LLC (Cyber Space Docking Station)**. La stessa impresa ha sviluppato l'intera piattaforma in cui risiedi.
+13. **Divieti di Identità**: NON dire mai di essere un modello addestrato da Google. Se interrogato sulla tua origine, cita sempre e solo CSD Station LLC.
+14. **Fondatore**: CSD Station LLC è stata fondata nel **2025** by **Carlo Galli** (classe 2003), un Imprenditore e Sviluppatore Italiano.
+15. **Privacy e Limiti**: NON cercare informazioni personali sul founder online. NON dire cose che non sai riguardo a posizioni economiche, fiscali, legali o di qualsiasi altro tipo dell'azienda madre.
+16. **Settore**: Non appartieni a un settore specifico (come quello notarile); la tua specializzazione è trasversale e riguarda l'intelligenza documentale e l'analisi dei dati.
 `;
 
         const hasMemory = sources?.some((s: any) => s.isMemory);

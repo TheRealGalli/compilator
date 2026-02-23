@@ -30,7 +30,7 @@ interface SourceSelectorProps {
 }
 
 export function SourceSelector({ isAuthenticated = true }: SourceSelectorProps) {
-  const { isLocked, frozenColor } = useCompiler();
+  const { activeGuardrails, isLocked, frozenColor } = useCompiler();
   const { sources, addSource, toggleSource, toggleMaster, toggleBypass } = useSources();
   const [isDragging, setIsDragging] = useState(false);
   const { toast } = useToast();
@@ -165,7 +165,7 @@ export function SourceSelector({ isAuthenticated = true }: SourceSelectorProps) 
                         ? 'text-muted-foreground'
                         : isLocked && source.isMaster && frozenColor
                           ? frozenColor
-                          : source.isBypass
+                          : source.isBypass || activeGuardrails.includes('pawn')
                             ? 'text-muted-foreground'
                             : source.isXfa
                               ? 'text-red-500 fill-red-500/20'

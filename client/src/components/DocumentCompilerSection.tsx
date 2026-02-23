@@ -882,16 +882,14 @@ export function DocumentCompilerSection({
           const cached = sourceTextCache.current.find(d => d.id === s.id);
           if (cached && (cached.originalText || cached.text)) {
             const anonymized = await getAnonymizedText(s);
-            const newName = `[PAWN] ${s.name.split('.')[0]}.txt`;
             // PERSISTENCE SWAP
             updateSource(s.id, {
-              name: newName,
               base64: toBase64(anonymized),
               type: 'text/plain'
             });
             // PAYLOAD
             finalSources.push({
-              name: newName,
+              name: s.name,
               type: 'text/plain',
               base64: toBase64(anonymized),
               anonymizedText: anonymized,
@@ -907,14 +905,12 @@ export function DocumentCompilerSection({
           const cached = sourceTextCache.current.find(d => d.id === masterSource.id);
           if (cached && (cached.originalText || cached.text)) {
             const anonymizedMaster = await getAnonymizedText(masterSource);
-            const newName = `[PAWN] ${masterSource.name.split('.')[0]}.txt`;
             updateSource(masterSource.id, {
-              name: newName,
               base64: toBase64(anonymizedMaster),
               type: 'text/plain'
             });
             finalMasterSource = {
-              name: newName,
+              name: masterSource.name,
               type: 'text/plain',
               base64: toBase64(anonymizedMaster),
               anonymizedText: anonymizedMaster,
@@ -970,7 +966,7 @@ export function DocumentCompilerSection({
         const context = {
           sources: finalSources.map(s => ({ ...s })),
           masterSource: finalMasterSource,
-          notes,
+          notes: isPawnActive ? finalNotes : notes,
           temperature,
           webResearch,
           detailedAnalysis,
@@ -997,7 +993,7 @@ export function DocumentCompilerSection({
         if (masterSource) {
           setIsLocked(true);
           let color = 'text-muted-foreground';
-          if (!masterSource.isBypass) {
+          if (!masterSource.isBypass && !isPawnActive) {
             if (masterSource.isXfa) color = 'text-red-500 fill-red-500/20';
             else if (masterSource.isAlreadyFilled) color = 'text-orange-500 fill-orange-500/20';
             else if (masterSource.isFillable) color = 'text-green-500 fill-green-500/20';
