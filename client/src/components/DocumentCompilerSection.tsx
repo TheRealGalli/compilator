@@ -804,10 +804,8 @@ export function DocumentCompilerSection({
                 // This allows dynamic/custom categories to generate their own specific tokens (e.g. [CONTACT_1])
               }
 
-              // Register in set for unification later
-              if (!category.includes('GENERIC_PII')) {
-                uniqueFoundValues.add(rawValue);
-              }
+              // Register in set for unification later (Allow GENERIC_PII so unmapped dates get unified)
+              uniqueFoundValues.add(rawValue);
 
               let token = "";
               const normalizedValue = rawValue.toLowerCase();
