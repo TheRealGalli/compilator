@@ -252,7 +252,9 @@ export function DocumentCompilerSection({
     pinnedSourceId, setPinnedSourceId,
     takeStandardSnapshot, restoreStandardSnapshot,
     takeMasterSnapshot, restoreMasterSnapshot,
-    resetSession
+    resetSession,
+    anonymizedContent, setAnonymizedContent,
+    pendingAnonymizedContent, setPendingAnonymizedContent
   } = useCompiler();
 
   const { status: ollamaStatus, selectedModel } = useOllama();
@@ -1160,6 +1162,7 @@ export function DocumentCompilerSection({
 
         setLastCompileContext(context);
         setCompiledContent(finalContent);
+        setAnonymizedContent(sanitizedContent); // Store pseudonymized version
         setTemplateContent(finalContent);
         setIsCompiledView(true);
         setIsRefiningMode(true); // Auto-trigger Copilot Mode
@@ -1209,17 +1212,20 @@ export function DocumentCompilerSection({
     if (pendingContent) {
       const finalContent = performMechanicalReverseSweep(pendingContent, guardrailVault);
       setCompiledContent(finalContent);
+      setAnonymizedContent(pendingAnonymizedContent || pendingContent); // Update anonymized version
       setTemplateContent(finalContent); // Update template content as well
       if (onCompile) onCompile(finalContent);
       toast({ title: "Modifica Accettata", description: "Il documento è stato aggiornato e de-anonimizzato." });
     }
     setIsReviewing(false);
     setPendingContent(null);
+    setPendingAnonymizedContent(null);
   };
 
   const handleRejectRefinement = () => {
     setIsReviewing(false);
     setPendingContent(null);
+    setPendingAnonymizedContent(null);
     toast({ title: "Modifica Annullata", description: "Ripristinata versione precedente." });
   };
 
@@ -1726,8 +1732,10 @@ export function DocumentCompilerSection({
                     minimal={true}
                     compileContext={lastCompileContext}
                     currentContent={pendingContent || compiledContent}
-                    onPreview={(newContent) => {
+                    anonymizedContent={pendingAnonymizedContent || anonymizedContent}
+                    onPreview={(newContent, newAnonymizedContent) => {
                       setPendingContent(newContent);
+                      if (newAnonymizedContent) setPendingAnonymizedContent(newAnonymizedContent);
                       setIsReviewing(true);
                     }}
                     isReviewing={isReviewing}

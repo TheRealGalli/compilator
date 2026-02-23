@@ -8,14 +8,17 @@ interface SessionState {
     mentionRegistry: any[];
     activeGuardrails: string[];
     guardrailVault: Record<string, string>;
+    anonymizedContent: string;
 }
 
 interface CompilerState {
     templateContent: string;
     compiledContent: string;
+    anonymizedContent: string;
     isRefiningMode: boolean;
     isReviewing: boolean;
     pendingContent: string | null;
+    pendingAnonymizedContent: string | null;
     lastCompileContext: any;
     notes: string;
     temperature: number;
@@ -41,6 +44,8 @@ interface CompilerContextType extends CompilerState {
     setIsRefiningMode: (val: boolean) => void;
     setIsReviewing: (val: boolean) => void;
     setPendingContent: (val: string | null) => void;
+    setAnonymizedContent: (val: string) => void;
+    setPendingAnonymizedContent: (val: string | null) => void;
     setLastCompileContext: (val: any) => void;
     setNotes: (val: string) => void;
     setTemperature: (val: number) => void;
@@ -69,9 +74,11 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
     const [state, setState] = useState<CompilerState>({
         templateContent: '',
         compiledContent: '',
+        anonymizedContent: '',
         isRefiningMode: false,
         isReviewing: false,
         pendingContent: null,
+        pendingAnonymizedContent: null,
         lastCompileContext: null,
         notes: '',
         temperature: 0.7,
@@ -99,6 +106,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
     const setIsRefiningMode = (val: boolean) => setState(prev => ({ ...prev, isRefiningMode: val }));
     const setIsReviewing = (val: boolean) => setState(prev => ({ ...prev, isReviewing: val }));
     const setPendingContent = (val: string | null) => setState(prev => ({ ...prev, pendingContent: val }));
+    const setPendingAnonymizedContent = (val: string | null) => setState(prev => ({ ...prev, pendingAnonymizedContent: val }));
+    const setAnonymizedContent = (val: string) => setState(prev => ({ ...prev, anonymizedContent: val }));
     const setLastCompileContext = (val: any) => setState(prev => ({ ...prev, lastCompileContext: val }));
     const setNotes = (val: string) => setState(prev => ({ ...prev, notes: val }));
     const setTemperature = (val: number) => setState(prev => ({ ...prev, temperature: val }));
@@ -161,6 +170,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 mentionRegistry: [...prev.mentionRegistry],
                 activeGuardrails: [...prev.activeGuardrails],
                 guardrailVault: { ...prev.guardrailVault },
+                anonymizedContent: prev.anonymizedContent,
             }
         }));
     }, []);
@@ -178,7 +188,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                     frozenColor: prev.frozenColor,
                     mentionRegistry: [...prev.mentionRegistry],
                     activeGuardrails: [...prev.activeGuardrails],
-                    guardrailVault: { ...prev.guardrailVault }
+                    guardrailVault: { ...prev.guardrailVault },
+                    anonymizedContent: prev.anonymizedContent,
                 };
             }
 
@@ -204,6 +215,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 mentionRegistry: prev.standardSnapshot.mentionRegistry,
                 activeGuardrails: prev.standardSnapshot.activeGuardrails,
                 guardrailVault: prev.standardSnapshot.guardrailVault,
+                anonymizedContent: prev.standardSnapshot.anonymizedContent,
                 isLocked: false,
                 frozenColor: null,
                 isRefiningMode: prev.standardSnapshot.compiledContent !== '',
@@ -224,7 +236,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                     frozenColor: prev.frozenColor,
                     mentionRegistry: [...prev.mentionRegistry],
                     activeGuardrails: [...prev.activeGuardrails],
-                    guardrailVault: { ...prev.guardrailVault }
+                    guardrailVault: { ...prev.guardrailVault },
+                    anonymizedContent: prev.anonymizedContent,
                 }
             }
         }));
@@ -240,6 +253,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                     ...prev,
                     templateContent: '',
                     compiledContent: '',
+                    anonymizedContent: '',
                     messages: [],
                     mentionRegistry: [],
                     frozenColor: null,
@@ -257,6 +271,7 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
                 mentionRegistry: snapshot.mentionRegistry || [],
                 activeGuardrails: snapshot.activeGuardrails || [],
                 guardrailVault: snapshot.guardrailVault || {},
+                anonymizedContent: snapshot.anonymizedContent || '',
                 frozenColor: snapshot.frozenColor,
                 isRefiningMode: snapshot.compiledContent !== '',
                 isLocked: true,
@@ -270,9 +285,11 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
         setState({
             templateContent: '',
             compiledContent: '',
+            anonymizedContent: '',
             isRefiningMode: false,
             isReviewing: false,
             pendingContent: null,
+            pendingAnonymizedContent: null,
             lastCompileContext: null,
             notes: '',
             temperature: 0.7,
@@ -301,6 +318,8 @@ export function CompilerProvider({ children }: { children: React.ReactNode }) {
             setIsRefiningMode,
             setIsReviewing,
             setPendingContent,
+            setPendingAnonymizedContent,
+            setAnonymizedContent,
             setLastCompileContext,
             setNotes,
             setTemperature,

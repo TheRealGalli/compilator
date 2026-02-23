@@ -15,10 +15,30 @@ export const performMechanicalGlobalSweep = (text: string, vault: Record<string,
     let result = text;
     // Order by value length descending to avoid partial matches
     // entry[1] is the value to find
-    const sortedEntries = [...entries].sort((a, b) => b[1].length - a[1].length);
+    const initialEntries = Array.isArray(vault) ? [...vault] : Object.entries(vault);
+
+    // AGGRESSIVE: If a value has multiple words (e.g. "Mario Rossi"), 
+    // we should ALSO censor individual words (if > 2 chars) to avoid leaks.
+    const expandedEntries: [string, string][] = [];
+    for (const [token, value] of initialEntries) {
+        if (!value || value.length < 2) continue;
+        expandedEntries.push([token, value]);
+
+        // Skip common short street types or noise if possible, but keep it simple for now as per user request
+        if (value.includes(' ')) {
+            const parts = value.split(/[\s\/]+/).filter(p => p.length > 2);
+            for (const part of parts) {
+                // Only add if not already present as a full value tracking to the same or different token
+                if (!expandedEntries.some(e => e[1].toLowerCase() === part.toLowerCase())) {
+                    expandedEntries.push([token, part]);
+                }
+            }
+        }
+    }
+
+    const sortedEntries = expandedEntries.sort((a, b) => b[1].length - a[1].length);
 
     for (const [token, value] of sortedEntries) {
-        if (!value || value.length < 2) continue;
 
         // STRIP ALL WHITESPACE from the value to match characters regardless of spacing in the source
         // e.g. "Carlo Galli" -> "CarloGalli" (chars) -> C[\s...]*a[\s...]*r...
@@ -61,7 +81,9 @@ export const performMechanicalGlobalSweep = (text: string, vault: Record<string,
  */
 export const performMechanicalReverseSweep = (text: string, vault: Record<string, string>): string => {
     if (!text || Object.keys(vault).length === 0) return text;
-    let result = text;
+
+    // CLEANUP: Repair "split" or "broken" tokens often returned by LLMs (e.g. [NOME _1] or [NOME\n_1])
+    let result = text.replace(/\[\s*([A-Z_]+)\s*(_\d+)\s*\]/g, '[$1$2]');
 
     // Sort vault by token length descending to avoid partial replacements if any overlap exists
     const sortedTokens = Object.entries(vault).sort((a, b) => b[0].length - a[0].length);

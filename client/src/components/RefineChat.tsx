@@ -24,7 +24,8 @@ interface ChatMessage {
 interface RefineChatProps {
     compileContext: any;
     currentContent: string;
-    onPreview: (newContent: string) => void;
+    anonymizedContent?: string;
+    onPreview: (newContent: string, newAnonymizedContent?: string) => void;
     isReviewing: boolean;
     onAccept: () => void;
     onReject: () => void;
@@ -50,6 +51,7 @@ interface MentionContext {
 export function RefineChat({
     compileContext,
     currentContent,
+    anonymizedContent,
     onPreview,
     isReviewing,
     onAccept,
@@ -89,7 +91,7 @@ export function RefineChat({
             const analysisPrompt = "Effettua un'analisi iniziale del documento appena compilato. Riassumi brevemente il contenuto, identifica chiaramente quale documento è stato usato come Master Pin (se presente) e quali fonti hai consultato. Concludi chiedendo come posso aiutarti oggi.";
             const response = await apiRequest('POST', '/api/refine', {
                 compileContext,
-                currentContent,
+                currentContent: (compileContext.activeGuardrails?.includes('pawn') && anonymizedContent) ? anonymizedContent : currentContent,
                 userInstruction: analysisPrompt,
                 chatHistory: [],
                 webResearch: compileContext.webResearch,
@@ -293,7 +295,7 @@ export function RefineChat({
             console.log(`[RefineChat] Pawn Guardrail is ${isPawnActive ? 'ACTIVE' : 'INACTIVE'}`);
 
             let finalUserInstruction = userMsg.text;
-            let finalCurrentContent = currentContent;
+            let finalCurrentContent = anonymizedContent || currentContent;
             let finalNotes = compileContext.notes;
             let updatedVault = guardrailVault;
             let sweptMentions = mentions;
@@ -384,7 +386,7 @@ export function RefineChat({
             if (data.newContent) {
                 // If Pawn was active, the server returned tokens. We need to de-anonymize locally before previewing.
                 const contentToShow = isPawnActive ? performMechanicalReverseSweep(data.newContent, data.guardrailVault || updatedVault) : data.newContent;
-                onPreview(contentToShow);
+                onPreview(contentToShow, data.newContent);
             }
 
         } catch (error) {
