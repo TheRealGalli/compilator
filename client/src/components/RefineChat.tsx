@@ -44,6 +44,7 @@ interface MentionContext {
     source: 'copilot' | 'template' | 'anteprema';
     start?: number;
     end?: number;
+    surroundingContext?: string;
 }
 
 export function RefineChat({
@@ -180,8 +181,8 @@ export function RefineChat({
                 if (sel && sel.toString().trim().length > 0 && containerRef.current) {
                     if (containerRef.current.contains(sel.anchorNode)) {
                         // Use mouse coordinates for stable positioning
-                        // Clamp X so button never goes off-screen (min 160px from left for button width)
-                        const clampedX = Math.max(160, Math.min(e.clientX + 12, window.innerWidth - 20));
+                        // Clamp X so button never goes off-screen (min 20px from left)
+                        const clampedX = Math.max(20, Math.min(e.clientX + 12, window.innerWidth - 80));
                         setSelection({
                             text: sel.toString().trim(),
                             x: clampedX,
@@ -220,7 +221,25 @@ export function RefineChat({
             let charEnd: number | undefined;
             let surroundingContext = '';
 
-            if (currentContent) {
+            // Get precise surrounding text directly from the DOM node the user selected in!
+            // This perfectly disambiguates duplicate text (e.g., two identical names in different paragraphs)
+            const sel = window.getSelection();
+            if (sel && sel.anchorNode && sel.anchorNode.textContent) {
+                surroundingContext = sel.anchorNode.textContent.trim();
+                // Truncate if ridiculously long, but keep a good chunk
+                if (surroundingContext.length > 200) {
+                    const localIdx = surroundingContext.indexOf(selection.text);
+                    if (localIdx !== -1) {
+                        const ctxStart = Math.max(0, localIdx - 60);
+                        const ctxEnd = Math.min(surroundingContext.length, localIdx + selection.text.length + 60);
+                        surroundingContext = surroundingContext.substring(ctxStart, ctxEnd);
+                    } else {
+                        surroundingContext = surroundingContext.substring(0, 200) + '...';
+                    }
+                }
+            }
+
+            if (currentContent && !surroundingContext) {
                 const idx = currentContent.indexOf(selection.text);
                 if (idx !== -1) {
                     charStart = idx;
@@ -239,7 +258,8 @@ export function RefineChat({
                 label: `Selection-${Date.now().toString().slice(-4)}`,
                 source: isReviewing ? 'anteprema' : 'copilot',
                 start: charStart,
-                end: charEnd
+                end: charEnd,
+                surroundingContext
             };
             onMentionCreated?.(selection.text, isReviewing ? 'anteprema' : 'copilot', charStart, charEnd);
             setMentionRegistry(prev => [...prev, newMention]);
@@ -275,6 +295,8 @@ export function RefineChat({
             let finalCurrentContent = currentContent;
             let finalNotes = compileContext.notes;
             let updatedVault = guardrailVault;
+            let sweptMentions = mentions;
+            let sweptRegistry = mentionRegistry;
 
             if (isPawnActive) {
                 // PRIVACY: Anonymize user instruction locally before sending
@@ -293,6 +315,20 @@ export function RefineChat({
                 // PRIVACY CRITICAL: Anonymize the DOCUMENT CONTENT and NOTES using the updated vault.
                 finalCurrentContent = performMechanicalGlobalSweep(currentContent, updatedVault);
                 finalNotes = compileContext.notes ? performMechanicalGlobalSweep(compileContext.notes, updatedVault) : compileContext.notes;
+
+                // PRIVACY CRITICAL: Anonymize MENTIONS payload because the user highlighted deciphered text
+                // but the backend AI only understands pseudonymized text!
+                sweptMentions = mentions.map(m => ({
+                    ...m,
+                    text: performMechanicalGlobalSweep(m.text, updatedVault),
+                    surroundingContext: m.surroundingContext ? performMechanicalGlobalSweep(m.surroundingContext, updatedVault) : undefined
+                }));
+
+                sweptRegistry = mentionRegistry.map(m => ({
+                    ...m,
+                    text: performMechanicalGlobalSweep(m.text, updatedVault),
+                    surroundingContext: m.surroundingContext ? performMechanicalGlobalSweep(m.surroundingContext, updatedVault) : undefined
+                }));
             }
 
             const response = await apiRequest('POST', '/api/refine', {
@@ -303,8 +339,8 @@ export function RefineChat({
                 currentContent: finalCurrentContent, // Send potentially anonymized content
 
                 userInstruction: finalUserInstruction,
-                mentions: mentions.map(m => ({ source: m.source, text: m.text, label: m.label, start: m.start, end: m.end })),
-                mentionRegistry: mentionRegistry.map(m => ({ source: m.source, text: m.text, label: m.label, start: m.start, end: m.end })),
+                mentions: sweptMentions.map(m => ({ source: m.source, text: m.text, label: m.label, start: m.start, end: m.end, surroundingContext: m.surroundingContext })),
+                mentionRegistry: sweptRegistry.map(m => ({ source: m.source, text: m.text, label: m.label, start: m.start, end: m.end, surroundingContext: m.surroundingContext })),
                 chatHistory: messages.map(m => ({ role: m.role, text: m.text })),
                 webResearch: compileContext.webResearch,
                 guardrailVault: updatedVault // Send updated vault
