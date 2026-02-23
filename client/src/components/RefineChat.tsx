@@ -97,6 +97,7 @@ export function RefineChat({
             });
 
             const data = await response.json();
+            console.log(`[RefineChat] >> RAW SERVER RESPONSE (Initial Analysis) <<\n${data.explanation}\n>> END RESPONSE <<`);
             if (!data.success) throw new Error(data.error);
 
             const aiMsg: ChatMessage = {
@@ -347,6 +348,10 @@ export function RefineChat({
             });
 
             const data = await response.json();
+            console.log(`[RefineChat] >> RAW SERVER RESPONSE (Explanation) <<\n${data.explanation}\n>> END RESPONSE <<`);
+            if (data.newContent) {
+                console.log(`[RefineChat] >> RAW SERVER RESPONSE (New Content) <<\n${data.newContent}\n>> END RESPONSE <<`);
+            }
 
             // Success might be true even if JSON parsing failed but fallback was used
             if (!data.success) throw new Error(data.error);

@@ -1120,6 +1120,7 @@ export function DocumentCompilerSection({
       });
 
       const data = await response.json();
+      console.log(`[DocumentCompiler] >> RAW SERVER RESPONSE <<\n${data.compiledContent}\n>> END RAW RESPONSE <<`);
 
       if (data.compiledContent) {
         // Sanitize escaped brackets
