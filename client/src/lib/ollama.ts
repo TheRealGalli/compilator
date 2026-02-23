@@ -420,7 +420,7 @@ function normalizeFindings(input: any): any[] {
 // Note: The actual prompt is now generated dynamically inside extractPIILocal
 
 
-export async function extractPIILocal(text: string, modelId: string = DEFAULT_OLLAMA_MODEL): Promise<PIIFinding[]> {
+export async function extractPIILocal(text: string, modelId: string = DEFAULT_OLLAMA_MODEL, isScanned: boolean = false): Promise<PIIFinding[]> {
     if (!text || text.trim() === "") return [];
 
     console.log(`[OllamaLocal] Starting PII Discovery on ${text.length} chars (Model: ${modelId})...`);
@@ -451,6 +451,7 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
     }
 
     const prompt = `Find PERSONAL data in the text for pseudonymization.
+${isScanned ? 'WARNING: This text comes from a LOW-QUALITY SCAN (OCR). It may contain noise, broken characters, or duplicates. Be EXTREMELY selective: extract only clearly identifiable PII and avoid repeating the same value multiple times.' : ''}
 RULES:
 1. Return ONLY a JSON array of objects: [{"category": "...", "value": "..."}].
 2. Extract absolutely EVERYTHING relevant: Names, Surnames, Companies, Organizations, Addresses (Street, City, ZIP, State, Country), Dates (Birth, Contract, Document dates), Roles, Phone Numbers, Emails, Tax IDs, VAT numbers, Document Numbers (ID cards, Passports), Bank details (IBANs), and any other sensitive data.
@@ -705,33 +706,35 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000, signal
  * Returns a mapping: { "Original Value": "Canonical Value" }
  */
 export async function unifyPIIFindings(
-    values: string[],
+    entries: { value: string, isScanned: boolean }[],
     modelId: string = DEFAULT_OLLAMA_MODEL
 ): Promise<Record<string, string>> {
-    if (!values || values.length <= 1) {
+    if (!entries || entries.length <= 1) {
         const result: Record<string, string> = {};
-        values.forEach(v => result[v] = v);
+        entries.forEach(e => result[e.value] = e.value);
         return result;
     }
 
     // Filter out obvious noise before sending to LLM
-    const filteredValues = values.filter(v => !isNoisyPII(v));
-    if (filteredValues.length === 0) {
-        console.warn("[OllamaLocal] No valid PII values to unify after filtering noise.");
+    const validEntries = entries.filter(e => !isNoisyPII(e.value));
+    if (validEntries.length === 0) {
         const identity: Record<string, string> = {};
-        values.forEach(v => identity[v] = v);
+        entries.forEach(e => identity[e.value] = e.value);
         return identity;
     }
+
+    const promptData = validEntries.map(e => `${e.value} [${e.isScanned ? 'SCAN' : 'DIGITAL'}]`).join('\n');
 
     const prompt = `Unify the following personal data strings. Group variations of the same entity (e.g. same address with different formatting, same name).
 RULES:
 1. Return ONLY a JSON object: {"variation": "canonical_value"}.
-2. The "canonical_value" must be the most complete version from the list.
-3. If a value is unique, map it to itself.
-4. No explanations, no markdown, no other text.
+2. IMPORTANT: If a "DIGITAL" version of a value exists, ALWAYS choose it as the "canonical_value" over any "SCAN" version. Scanned versions often have OCR errors.
+3. The "canonical_value" must be the most complete and accurate version from the list.
+4. If a value is unique, map it to itself.
+5. No explanations, no markdown, no other text.
 
-Data list:
-${filteredValues.join('\n')}
+Data list (format: value [source_type]):
+${promptData}
 `;
 
     const controller = new AbortController();
@@ -785,6 +788,6 @@ ${filteredValues.join('\n')}
     }
 
     const fallback: Record<string, string> = {};
-    values.forEach(v => fallback[v] = v);
+    entries.forEach(e => fallback[e.value] = e.value);
     return fallback;
 }

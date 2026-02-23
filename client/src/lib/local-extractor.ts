@@ -38,7 +38,7 @@ function fileToBase64(file: File): Promise<string> {
 /**
  * Sends a message to the Gromit Bridge extension to extract text.
  */
-async function extractViaBridge(file: File): Promise<string> {
+async function extractViaBridge(file: File): Promise<{ text: string, isScanned: boolean }> {
     // 1. Pre-check
     if (!isBridgeAvailable()) {
         // Retry once after 500ms in case of race condition during load
@@ -68,7 +68,10 @@ async function extractViaBridge(file: File): Promise<string> {
                 if (response && response.success) {
                     // SECURITY: Do not log full text content in production
                     // console.log(`[LocalExtractor] Extracted Text Preview (from Bridge):\n${response.text.substring(0, 500)}...\n[...${response.text.length} chars total]`);
-                    resolve(response.text);
+
+                    // The extension returns isScanned if it detected a scan (based on char count < 50 or image type)
+                    const isScanned = response.isScanned === true;
+                    resolve({ text: response.text, isScanned });
                 } else {
                     const errorMsg = response?.error || "Errore sconosciuto dall'estensione";
                     console.error("[LocalExtractor] Bridge Error:", errorMsg);
@@ -97,7 +100,7 @@ async function extractViaBridge(file: File): Promise<string> {
 /**
  * Extracts raw text from a File using the Gromit Bridge Extension ("Sanctuary").
  */
-export async function extractTextLocally(file: File): Promise<string> {
+export async function extractTextLocally(file: File): Promise<{ text: string, isScanned: boolean }> {
     const fileName = file.name.toLowerCase();
 
     // Fallback for plain text files (can be done locally without libs)
@@ -126,19 +129,19 @@ export async function extractTextLocally(file: File): Promise<string> {
                 description: "Per analizzare PDF/Excel/Docx in sicurezza locale, l'estensione Gromit Bridge è necessaria.",
                 variant: "destructive"
             });
-            return `[ERRORE: Estensione Gromit Bridge non attiva. Impossibile leggere ${fileName} in modalità sicura.]`;
+            return { text: `[ERRORE: Estensione Gromit Bridge non attiva. Impossibile leggere ${fileName} in modalità sicura.]`, isScanned: false };
         }
     } catch (error: any) {
         console.error(`[LocalExtractor] Error extracting text from ${fileName}:`, error);
-        return `[ERRORE: Impossibile leggere il file ${fileName}. Dettagli: ${error.message}]`;
+        return { text: `[ERRORE: Impossibile leggere il file ${fileName}. Dettagli: ${error.message}]`, isScanned: false };
     }
 }
 
 // Helper for local plaintext extraction (Zero-Dependency)
-async function extractPlainText(file: File): Promise<string> {
+async function extractPlainText(file: File): Promise<{ text: string, isScanned: boolean }> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).trim());
+        reader.onload = () => resolve({ text: (reader.result as string).trim(), isScanned: false });
         reader.onerror = reject;
         reader.readAsText(file);
     });

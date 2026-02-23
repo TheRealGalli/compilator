@@ -704,13 +704,13 @@ export function DocumentCompilerSection({
 
               try {
                 const file = base64ToFile(sData.base64, sData.name, sData.type);
-                const text = await extractTextLocally(file);
+                const { text, isScanned } = await extractTextLocally(file);
 
                 if (text === "[[GROMIT_SCAN_DETECTED]]") {
                   currentUnsupported.push({ id, name: sData.name, type: 'Scansione' });
                   // We don't add scans to localExtractedDocs as they are not supportable by Pawn for anonymization
                 } else {
-                  localExtractedDocs.push({ name: sData.name, text, originalText: text });
+                  localExtractedDocs.push({ name: sData.name, text, originalText: text, isScanned });
                 }
               } catch (e) {
                 console.error(`[DocumentCompiler] Local extraction failed for ${sData.name}:`, e);
@@ -720,8 +720,8 @@ export function DocumentCompilerSection({
             setUnsupportedSources(currentUnsupported);
 
             const rawDocs = [
-              ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent, originalText: templateContent }] : []),
-              ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes, originalText: notes }] : []),
+              ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent, originalText: templateContent, isScanned: false }] : []),
+              ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes, originalText: notes, isScanned: false }] : []),
               ...localExtractedDocs
             ];
 
@@ -734,11 +734,12 @@ export function DocumentCompilerSection({
           const flatResults = [];
           for (let i = 0; i < allDocs.length; i++) {
             const doc = allDocs[i];
-            const charCount = doc.text.length;
+            const charCount = (doc as any).text.length;
+            const isScanned = (doc as any).isScanned === true;
             console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
             console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
 
-            const findings = await extractPIILocal(doc.text, selectedModel);
+            const findings = await extractPIILocal(doc.text, selectedModel, isScanned);
 
             console.log(`[DocumentCompiler] <- '${doc.name}' finito: ${findings.length} elementi trovati.`);
             flatResults.push({ name: doc.name, findings });
@@ -760,14 +761,23 @@ export function DocumentCompilerSection({
             'DATI_SENSIBILI', 'DATI_COMPORTAMENTALI', 'INDIRIZZO_IP', 'ALTRO'
           ];
 
-          const uniqueFoundValues = new Set<string>();
+          // Map to track if a value comes from a digital doc (false) or scanned doc (true)
+          // We prioritize false (digital) if both exist for the same value
+          const valueToScanStatus = new Map<string, boolean>();
 
           for (const res of flatResults) {
             console.log(`[DocumentCompiler] Processing PII findings from: ${res.name} (${res.findings.length} findings)`);
+            const doc = allDocs.find(d => d.name === res.name);
+            const isScanned = (doc as any)?.isScanned === true;
 
             for (const f of res.findings) {
               const rawValue = f.value.trim();
               if (!rawValue || rawValue.length < 2) continue;
+
+              // Track scan status for unification
+              if (!valueToScanStatus.has(rawValue) || valueToScanStatus.get(rawValue) === true) {
+                valueToScanStatus.set(rawValue, isScanned);
+              }
 
               // Grounding Check
               if (rawValue.includes('[') || rawValue.includes(']') || rawValue.includes('<')) continue;
@@ -799,7 +809,7 @@ export function DocumentCompilerSection({
               }
 
               // Register in set for unification later (Allow GENERIC_PII so unmapped dates get unified)
-              uniqueFoundValues.add(rawValue);
+              // uniqueFoundValues.add(rawValue); // Replaced by valueToScanStatus
 
               let token = "";
               const normalizedValue = rawValue.toLowerCase();
@@ -838,8 +848,9 @@ export function DocumentCompilerSection({
           let finalSweepVault: [string, string][] = [];
 
           try {
-            console.log(`[DocumentCompiler] STEP 3: Unifying ${uniqueFoundValues.size} variations...`);
-            const unificationMap = await unifyPIIFindings(Array.from(uniqueFoundValues), selectedModel);
+            console.log(`[DocumentCompiler] STEP 3: Unifying ${valueToScanStatus.size} variations...`);
+            const unificationEntries = Array.from(valueToScanStatus.entries()).map(([value, isScanned]) => ({ value, isScanned }));
+            const unificationMap = await unifyPIIFindings(unificationEntries, selectedModel);
             console.log(`[DocumentCompiler] STEP 3 COMPLETE: LLM returned ${Object.keys(unificationMap).length} mappings.`);
 
             // Group existing tokens by their canonical values
@@ -979,7 +990,8 @@ export function DocumentCompilerSection({
             };
             try {
               const file = base64ToFile(source.base64, source.name, source.type);
-              text = await extractTextLocally(file);
+              const result = await extractTextLocally(file);
+              text = result.text;
             } catch (e) {
               console.error("Local extract error fallback:", e);
             }
