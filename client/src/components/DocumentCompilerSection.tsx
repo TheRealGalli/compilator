@@ -679,7 +679,7 @@ export function DocumentCompilerSection({
                 if (text === "[[GROMIT_SCAN_DETECTED]]") {
                   currentUnsupported.push({ id, name: sData.name, type: 'Scansione' });
                 } else {
-                  localExtractedDocs.push({ name: sData.name, text, originalText: text, isScanned });
+                  localExtractedDocs.push({ id, name: sData.name, text, originalText: text, isScanned });
                 }
               } catch (e) {
                 console.error(`[DocumentCompiler] Local extraction failed for ${sData.name}:`, e);
@@ -819,7 +819,8 @@ export function DocumentCompilerSection({
           const anonymizedDocs = allDocs.map(doc => {
             const anonymizedText = performMechanicalGlobalSweep(doc.text, finalSweepVault);
             return {
-              ...doc,
+              id: doc.id,
+              name: doc.name,
               text: anonymizedText,
               originalText: doc.text
             };
@@ -866,7 +867,7 @@ export function DocumentCompilerSection({
       ];
 
       const getAnonymizedText = async (source: any) => {
-        const cached = sourceTextCache.current.find(d => d.name === source.name);
+        const cached = sourceTextCache.current.find(d => d.id === source.id);
         if (cached && cached.originalText) {
           return performMechanicalGlobalSweep(cached.originalText, combinedSweepVault);
         }
@@ -878,17 +879,19 @@ export function DocumentCompilerSection({
 
         // 1. Swap and Prepare Payload
         for (const s of selectedSources) {
-          const cached = sourceTextCache.current.find(d => d.name === s.name);
+          const cached = sourceTextCache.current.find(d => d.id === s.id);
           if (cached && (cached.originalText || cached.text)) {
             const anonymized = await getAnonymizedText(s);
+            const newName = `[PAWN] ${s.name.split('.')[0]}.txt`;
             // PERSISTENCE SWAP
             updateSource(s.id, {
+              name: newName,
               base64: toBase64(anonymized),
               type: 'text/plain'
             });
             // PAYLOAD
             finalSources.push({
-              name: s.name,
+              name: newName,
               type: 'text/plain',
               base64: toBase64(anonymized),
               anonymizedText: anonymized,
@@ -901,15 +904,17 @@ export function DocumentCompilerSection({
         }
 
         if (masterSource) {
-          const cached = sourceTextCache.current.find(d => d.name === masterSource.name);
+          const cached = sourceTextCache.current.find(d => d.id === masterSource.id);
           if (cached && (cached.originalText || cached.text)) {
             const anonymizedMaster = await getAnonymizedText(masterSource);
+            const newName = `[PAWN] ${masterSource.name.split('.')[0]}.txt`;
             updateSource(masterSource.id, {
+              name: newName,
               base64: toBase64(anonymizedMaster),
               type: 'text/plain'
             });
             finalMasterSource = {
-              name: masterSource.name,
+              name: newName,
               type: 'text/plain',
               base64: toBase64(anonymizedMaster),
               anonymizedText: anonymizedMaster,
@@ -953,6 +958,7 @@ export function DocumentCompilerSection({
       });
 
       const data = await response.json();
+      console.log('[DocumentCompiler] >> RAW SERVER RESPONSE <<', data.compiledContent);
       if (data.compiledContent) {
         let sanitizedContent = data.compiledContent
           .replace(/\\+\s*\[/g, '[')
