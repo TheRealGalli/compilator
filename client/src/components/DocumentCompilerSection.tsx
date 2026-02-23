@@ -731,29 +731,16 @@ export function DocumentCompilerSection({
 
           // console.log(`[Gromit Frontend] STEP 2: Avvio Ultra-Drive Analysis su ${allDocs.length} sorgenti...`);
           const startTime = Date.now();
-          const DOC_BATCH_SIZE = 3; // Process 3 docs in parallel (Optimized for performance)
-          const flatResults = [];
+          const flatResults = await Promise.all(allDocs.map(async (doc) => {
+            const charCount = doc.text.length;
+            console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
+            console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
 
-          for (let i = 0; i < allDocs.length; i += DOC_BATCH_SIZE) {
-            const batch = allDocs.slice(i, i + DOC_BATCH_SIZE);
-            const batchNum = (i / DOC_BATCH_SIZE) + 1;
-            const totalBatches = Math.ceil(allDocs.length / DOC_BATCH_SIZE);
+            const findings = await extractPIILocal(doc.text, selectedModel);
 
-            console.log(`[DocumentCompiler] [Batch ${batchNum}/${totalBatches}] In elaborazione...`);
-
-            const batchResults = await Promise.all(batch.map(async (doc) => {
-              const charCount = doc.text.length;
-              console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
-              console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
-
-              const findings = await extractPIILocal(doc.text, selectedModel);
-
-              console.log(`[DocumentCompiler] <- '${doc.name}' finito: ${findings.length} elementi trovati.`);
-              return { name: doc.name, findings };
-            }));
-
-            flatResults.push(...batchResults);
-          }
+            console.log(`[DocumentCompiler] <- '${doc.name}' finito: ${findings.length} elementi trovati.`);
+            return { name: doc.name, findings };
+          }));
 
           const totalTime = (Date.now() - startTime) / 1000;
           // console.log(`[DocumentCompiler] Estrazione completata in ${totalTime.toFixed(1)}s (${(totalTime / allDocs.length).toFixed(1)}s per doc).`);
