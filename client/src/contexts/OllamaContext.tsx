@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { testOllamaConnection, getRunningModels, DEFAULT_OLLAMA_MODEL } from '@/lib/ollama';
+import { testOllamaConnection, getRunningModels, DEFAULT_OLLAMA_MODEL, preloadModel, unloadModel } from '@/lib/ollama';
 import { useQuery } from '@tanstack/react-query';
 
 type OllamaStatus = 'loading' | 'connected' | 'disconnected';
@@ -125,9 +125,38 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const setModel = useCallback((model: string) => {
+        const oldModel = selectedModel;
         setSelectedModel(model);
         localStorage.setItem('ollama_selected_model', model);
-    }, []);
+
+        // Lifecycle: Unload old model to free VRAM and preload new one
+        if (oldModel && oldModel !== model) {
+            unloadModel(oldModel);
+        }
+        preloadModel(model);
+    }, [selectedModel]);
+
+    // Lifecycle: Proactive preload on mount or visibility
+    useEffect(() => {
+        if (status === 'connected' && selectedModel) {
+            preloadModel(selectedModel);
+        }
+    }, [status, selectedModel]);
+
+    // Lifecycle: Unload on browser close / refresh
+    useEffect(() => {
+        const handleUnload = () => {
+            if (selectedModel) {
+                // We use a "fire and forget" or sync approach if possible, 
+                // but since unloadModel uses fetch, we hope it completes 
+                // or the browser extension (Bridge) handles the handover.
+                unloadModel(selectedModel);
+            }
+        };
+
+        window.addEventListener('beforeunload', handleUnload);
+        return () => window.removeEventListener('beforeunload', handleUnload);
+    }, [selectedModel]);
 
     return (
         <OllamaContext.Provider value={{

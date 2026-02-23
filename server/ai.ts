@@ -242,6 +242,8 @@ ${text} [/INST]`;
                     stream: false,
                     options: {
                         temperature: 0.1,
+                        num_ctx: 32768,
+                        keep_alive: -1,
                     }
                 })
             });

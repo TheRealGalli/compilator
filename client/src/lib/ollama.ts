@@ -475,7 +475,8 @@ ${llmText}
             num_ctx: CONTEXT_WINDOW,
             num_predict: 8192,
             top_k: 20,
-            top_p: 0.9
+            top_p: 0.9,
+            keep_alive: -1
         };
 
         const payload: any = {
@@ -782,4 +783,53 @@ ${promptData}
     const fallback: Record<string, string> = {};
     entries.forEach(e => fallback[e.value] = e.value);
     return fallback;
+}
+
+/**
+ * Forza il caricamento del modello in VRAM inviando una richiesta minima.
+ * Questo riduce la latenza della prima richiesta reale ("Cold Start").
+ */
+export async function preloadModel(modelId: string): Promise<void> {
+    if (!modelId || modelId.includes('-cloud')) return; // Solo per modelli locali
+
+    console.log(`[OllamaLocal] Precaricamento proattivo: ${modelId}`);
+    try {
+        await smartFetch(`${currentBaseUrl}/api/generate`, {
+            method: 'POST',
+            body: JSON.stringify({
+                model: modelId,
+                prompt: "",
+                stream: false,
+                options: {
+                    num_ctx: 32768,
+                    keep_alive: -1
+                }
+            })
+        });
+    } catch (err) {
+        console.warn(`[OllamaLocal] Preload fallito per ${modelId}:`, err);
+    }
+}
+
+/**
+ * Rilascia il modello dalla VRAM immediatamente impostando keep_alive a 0.
+ * Utilizzato per il cambio modello o la chiusura della sessione browser.
+ */
+export async function unloadModel(modelId: string): Promise<void> {
+    if (!modelId || modelId.includes('-cloud')) return; // Solo per modelli locali
+
+    console.log(`[OllamaLocal] Scaricamento proattivo: ${modelId}`);
+    try {
+        await smartFetch(`${currentBaseUrl}/api/generate`, {
+            method: 'POST',
+            body: JSON.stringify({
+                model: modelId,
+                prompt: "",
+                stream: false,
+                keep_alive: 0
+            })
+        });
+    } catch (err) {
+        console.warn(`[OllamaLocal] Unload fallito per ${modelId}:`, err);
+    }
 }
