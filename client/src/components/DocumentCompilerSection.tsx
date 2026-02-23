@@ -779,33 +779,45 @@ export function DocumentCompilerSection({
                 valueToScanStatus.set(rawValue, isScanned);
               }
 
-              // Grounding Check
-              if (rawValue.includes('[') || rawValue.includes(']') || rawValue.includes('<')) continue;
+              // Robust Grounding Check: RELAXED
+              // Reject only if it looks like a template tag [TOKEN] or <tag>, not if it contains brackets naturally
+              if (/^\[[A-Z_]+(?:_\d+)?\]$/.test(rawValue)) continue;
+              if (/^<[^>]+>$/.test(rawValue)) continue;
+
               if (rawValue.toLowerCase() === 'null' || rawValue.toLowerCase() === 'undefined') continue;
               if (isNoisyPII(rawValue)) continue;
 
               // 1. Determine Category
-              let category = f.label ? f.label : f.category.toUpperCase().replace(/[^A-Z_]/g, '_');
+              let category = f.category?.toUpperCase() || 'GENERIC_PII';
+              if (f.label && f.label !== f.category) {
+                // If a specific label was provided (common in JSON), use it
+                category = f.label.toUpperCase().replace(/[^A-Z_]/g, '_');
+              }
 
-              // 2. Category normalization (English-First)
-              if (!f.label && !ALLOWED.includes(category)) {
-                if (category.includes('NAME') || category.includes('PERSON') || category.includes('NOME')) category = 'NOME';
-                else if (category.includes('SUR') || category.includes('LAST') || category.includes('COGN')) category = 'COGNOME';
-                else if (category.includes('ORG') || category.includes('COMPANY') || category.includes('AZIENDA') || category.includes('CORP')) continue; // Reject organization
-                else if (category.includes('ADDR') || category.includes('INDIRIZZO') || category.includes('STREET') || category.includes('VIA') || category.includes('CITY') || category.includes('CITTA') || category.includes('PROV') || category.includes('ZIP') || category.includes('CAP')) category = 'INDIRIZZO';
-                else if (category.includes('MAIL')) category = 'EMAIL';
-                else if (category.includes('TEL') || category.includes('PHONE') || category.includes('CELL')) category = 'TELEFONO';
-                else if (category.includes('BANK') || category.includes('IBAN') || category.includes('FINAN')) category = 'DATI_FINANZIARI';
-                else if (category.includes('TAX') || category.includes('SOCIAL') || category.includes('FISCAL') || category.includes('CODICE')) category = 'CODICE_FISCALE';
-                else if (category.includes('VAT') || category.includes('IVA')) category = 'PARTITA_IVA';
-                else if (category.includes('BIRTH')) {
-                  if (category.includes('PLACE') || category.includes('LUOGO')) category = 'LUOGO_NASCITA';
+              // 2. Category normalization (English-First & Robust)
+              if (!ALLOWED.includes(category)) {
+                const c = category;
+                if (c.includes('NAME') || c.includes('PERSON') || c.includes('NOME') || c.includes('TITOLARE') || c.includes('SOGGETTO')) category = 'NOME';
+                else if (c.includes('SUR') || c.includes('LAST') || c.includes('COGN')) category = 'COGNOME';
+                else if (c.includes('ORG') || c.includes('COMPANY') || c.includes('AZIENDA') || c.includes('CORP')) {
+                  // Organizations are not PII for our purpose, skip
+                  continue;
+                }
+                else if (c.includes('ADDR') || c.includes('INDIRIZZO') || c.includes('STREET') || c.includes('VIA') || c.includes('CITY') || c.includes('CITTA') || c.includes('PROV') || c.includes('ZIP') || c.includes('CAP') || c.includes('DOMICILIO')) category = 'INDIRIZZO';
+                else if (c.includes('MAIL') || c.includes('PEC')) category = 'EMAIL';
+                else if (c.includes('TEL') || c.includes('PHONE') || c.includes('CELL') || c.includes('MOB') || c.includes('CONTATTO')) category = 'TELEFONO';
+                else if (c.includes('BANK') || c.includes('IBAN') || c.includes('FINAN') || c.includes('CONTO')) category = 'DATI_FINANZIARI';
+                else if (c.includes('TAX') || c.includes('SOCIAL') || c.includes('FISCAL') || c.includes('CODICE') || c.includes('IVA') || c.includes('VAT')) {
+                  if (c.includes('IVA') || c.includes('VAT')) category = 'PARTITA_IVA';
+                  else category = 'CODICE_FISCALE';
+                }
+                else if (c.includes('BIRTH') || c.includes('NASCITA')) {
+                  if (c.includes('PLACE') || c.includes('LUOGO')) category = 'LUOGO_NASCITA';
                   else category = 'DATA_NASCITA';
                 }
-                else if (category.includes('DOC') || category.includes('NUMBER')) category = 'DOCUMENTO';
-                else if (category.includes('ROLE') || category.includes('JOB') || category.includes('RUOLO')) category = 'RUOLO';
-                // If it doesn't match English heuristics, keep the model's chosen category
-                // This allows dynamic/custom categories to generate their own specific tokens (e.g. [CONTACT_1])
+                else if (c.includes('DOC') || c.includes('NUMBER') || c.includes('ID') || c.includes('PASS')) category = 'DOCUMENTO';
+                else if (c.includes('ROLE') || c.includes('JOB') || c.includes('RUOLO') || c.includes('PROFESSION')) category = 'RUOLO';
+                else category = 'ALTRO';
               }
 
               // Register in set for unification later (Allow GENERIC_PII so unmapped dates get unified)

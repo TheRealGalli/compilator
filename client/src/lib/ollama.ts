@@ -34,19 +34,18 @@ export function isNoisyPII(value: string): boolean {
     const cleanV = v.replace(/[^a-z0-9 ]/g, '').trim();
     if (technicalNoise.some(noise => cleanV === noise || cleanV.startsWith(noise + ':'))) return true;
 
-    // 2. Fragment IDs or hex strings (e.g. "cast-281923")
-    if (/^[a-zA-Z]+-[0-9]+$/.test(v)) return true; // match "prefix-number"
-    if (/^[0-9a-f]{8,}$/i.test(v)) return true;    // long hex strings
+    // 2. Fragment IDs or hex strings (RELAXED: allows common short IDs that might be valid)
+    if (/^[a-zA-Z]+-[0-9]{5,}$/.test(v)) return true; // only match long prefix-number pairs
+    if (/^[0-9a-f]{16,}$/i.test(v)) return true;    // only very long hex strings
 
-    // 3. Time/Hour Filtering (hallucinations like "8:00 AM", "11:30 PM")
-    // Values that look like time ranges or specific hours are often false positives
-    if (/^(?:\d{1,2}:\d{2}(?:\s?[AP]M)?)|(?:\d{1,2}\s?[AP]M)$/i.test(v)) return true;
+    // 3. Time/Hour Filtering
+    if (/^(?:\d{1,2}:\d{2}(?:\s?[AP]M)?)$/i.test(v)) return true;
 
-    // 4. Short garbage
-    if (v.length < 2) return true;
+    // 4. Short garbage (Reduced from 2 to 1 for flexibility with single-char indicators if any)
+    if (v.length < 1) return true;
 
-    // 4. Common descriptive text (if LLM hallucinates descriptions as values)
-    if (v.split(' ').length > 10) return true; // Way too long to be a standard PII value
+    // 5. Common descriptive text (hallucinations)
+    if (v.split(' ').length > 20) return true; // Relaxed from 10 to 20 for long addresses
 
     return false;
 }
@@ -586,22 +585,15 @@ ${llmText}
                     const parsed = parseLine(item);
                     if (parsed) findings.push(parsed);
                 } else if (typeof item === 'object' && item !== null) {
-                    // Item is already structured from normalizeFindings
-                    const value = item.value;
-                    const rawCat = item.category || 'GENERIC_PII';
+                    // JSON-FIRST: Use structured data directly, avoiding restrictive regex refinement
+                    const val = String(item.value || item.val || '').trim();
+                    const rawCat = String(item.category || item.type || item.label || 'GENERIC_PII').toUpperCase();
 
-                    // Use parseLine to get standard categorization for this category key
-                    const mockLine = `${rawCat}: ${value}`;
-                    const refined = parseLine(mockLine);
-
-                    if (refined) {
-                        findings.push(refined);
-                    } else {
-                        // If parseLine fails to categorize (unusual key), keep model's word
+                    if (val && val.length >= 2) {
                         findings.push({
-                            value: value,
-                            category: rawCat.toUpperCase().replace(/[^A-Z_]/g, '_'),
-                            label: rawCat
+                            value: val,
+                            category: rawCat.replace(/[^A-Z_]/g, '_'),
+                            label: item.category || item.type || item.label || rawCat
                         });
                     }
                 }
