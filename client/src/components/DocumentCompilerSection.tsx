@@ -289,7 +289,7 @@ export function DocumentCompilerSection({
   const [isManualInputOpen, setIsManualInputOpen] = useState(false);
   const [manualInputScanId, setManualInputScanId] = useState<string | null>(null);
   const [manualInputText, setManualInputText] = useState("");
-  const sourceTextCache = useRef<Array<{ name: string; text: string; originalText?: string }>>([]);
+  const sourceTextCache = useRef<Array<{ id?: string; name: string; text: string; originalText?: string }>>([]);
   const sweepVaultRef = useRef<[string, string][]>([]);
 
   const handleMention = (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => {

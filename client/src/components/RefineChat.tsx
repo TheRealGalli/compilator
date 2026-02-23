@@ -386,10 +386,11 @@ export function RefineChat({
             setMessages(prev => [...prev, aiMsg]);
 
             if (data.newContent) {
-                // PAWN: In anteprima (Reviewing) mostriamo i TOKEN se Pawn è attivo.
-                // Questo permette all'utente di verificare che l'AI non abbia "leakato" dati reali.
-                // Al momento dell'accettazione finale verrà comunque applicato il reverse sweep.
-                const contentToShow = isPawnActive ? data.newContent : data.newContent;
+                // PAWN: In anteprima (Reviewing), mostriamo i dati REALI all'utente (Reverse Sweep).
+                // Lo scambio con il server rimane basato sui token, ma l'utente deve vedere il risultato finale.
+                const contentToShow = isPawnActive
+                    ? performMechanicalReverseSweep(data.newContent, data.guardrailVault || updatedVault)
+                    : data.newContent;
                 onPreview(contentToShow, data.newContent);
             }
 
