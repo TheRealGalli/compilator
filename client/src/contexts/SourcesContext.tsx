@@ -24,6 +24,7 @@ interface SourcesContextType {
     toggleSource: (id: string) => void;
     toggleMaster: (id: string) => void;
     toggleBypass: (id: string) => void;
+    updateSource: (id: string, updates: Partial<Source>) => void;
     selectedSources: Source[];
     masterSource: Source | undefined; // New: Master Source Reference
     maxSources: number;
@@ -294,6 +295,10 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         setSources(prev => prev.map(s => (s.id === id ? { ...s, isBypass: !s.isBypass } : s)));
     }, []);
 
+    const updateSource = useCallback((id: string, updates: Partial<Source>) => {
+        setSources(prev => prev.map(s => (s.id === id ? { ...s, ...updates } : s)));
+    }, []);
+
     const selectedSources = sources.filter(s => !s.isMemory && s.selected);
     const masterSource = sources.find(s => s.isMaster);
 
@@ -306,6 +311,7 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
                 toggleSource,
                 toggleMaster,
                 toggleBypass,
+                updateSource,
                 selectedSources,
                 masterSource,
                 maxSources: MAX_SOURCES

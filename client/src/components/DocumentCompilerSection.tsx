@@ -263,7 +263,7 @@ export function DocumentCompilerSection({
   const [isCompiledView, setIsCompiledView] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const { toast } = useToast();
-  const { sources, selectedSources, masterSource, toggleMaster } = useSources();
+  const { sources, selectedSources, masterSource, toggleMaster, updateSource } = useSources();
 
   // Template Generation State
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -521,7 +521,7 @@ export function DocumentCompilerSection({
     }
   };
 
-  const handleCompile = async () => {
+  const handleCompile = async (isConfirmed: boolean = false) => {
     if (isCompiling || isPdfMode) return;
 
     // Allow empty template if masterSource is present (Classic Workflow)
@@ -539,8 +539,10 @@ export function DocumentCompilerSection({
       const { apiRequest } = await import("@/lib/queryClient");
       const { getApiUrl } = await import("@/lib/api-config");
 
+      const isPawnActive = activeGuardrails.includes('pawn');
+
       // --- NEW: PREVENTIVE PAWN CHECK (LOCAL-FIRST) ---
-      if (activeGuardrails.includes('pawn') && !isWaitingForPawnApproval) {
+      if (isPawnActive && !isConfirmed) {
         console.log('[DocumentCompiler] Hybrid Pawn Check triggered...');
 
         if (ollamaStatus !== 'connected') {
@@ -565,9 +567,6 @@ export function DocumentCompilerSection({
           const extractAndVault = async (text: string, vMap: Map<string, string>, vCounts: Map<string, number>) => {
             if (!text || text.trim().length === 0) return;
             const findings = await extractPIILocal(text, selectedModel);
-
-            // Dynamic Category Strategy: LLM is the source of truth.
-            // We only keep the synonym mapping but allow ANY new category.
 
             for (const f of findings) {
               const rawValue = f.value.trim();
@@ -597,39 +596,23 @@ export function DocumentCompilerSection({
               }
               else if (category.includes('DOC') || category.includes('NUMBER')) category = 'DOCUMENT_ID';
               else if (category.includes('ROLE') || category.includes('JOB') || category.includes('RUOLO')) category = 'JOB_TITLE';
-              // If not a synonym, we KEEP the LLM's category as is.
 
               const value = rawValue;
               let token = "";
               const normalizedValue = value.toLowerCase();
 
-              // GLOBAL DEDUPLICATION & UPGRADE SCHEME (User-Dictated "LLM Supremacy")
-              // Rule: If the VALUE exists, we must align with the LLM's categorization, 
-              // effectively overwriting the "dumber" Regex/Generic extraction.
-
               let existingTokenToNuke = "";
-              let existingValue = ""; // To store the value associated with existingTokenToNuke
+              let existingValue = "";
 
-              for (const [t, v] of vMap.entries()) {
-                // Loose matching: case-insensitive, trim spaces
+              for (const [t, v] of Array.from(vMap.entries())) {
                 if (v.toLowerCase().trim() === normalizedValue.trim()) {
                   token = t;
-                  existingValue = v; // Store the existing value
-
-                  // DECISION: Do we upgrade?
-                  // If the current token is generic (e.g. ORGANIZATION) 
-                  // and the new category is specific/custom (e.g. TITOLO)
-                  // OR even if just different, if LLM is confident (implicit), we prefer LLM's context.
-                  // User said: "If Regex found X, and LLM found X but calls it Y, we use Y".
-
+                  existingValue = v;
                   const currentCategory = t.replace(/^\[|_\d+\]$/g, '');
                   const newCategory = category;
-
-                  // If categories mismatch and the new one is not just a synonym but likely better
                   if (currentCategory !== newCategory) {
-                    // We decide to UPGRADE to the LLM's definition.
                     existingTokenToNuke = t;
-                    token = ""; // Force creation of new token below
+                    token = "";
                   }
                   break;
                 }
@@ -638,12 +621,9 @@ export function DocumentCompilerSection({
               if (existingTokenToNuke) {
                 console.log(`[DocumentCompiler] LEVELLING UP '${existingValue}': ${existingTokenToNuke} -> [${category}_...]`);
                 vMap.delete(existingTokenToNuke);
-                // effectively removing the old key, so the code below will generate a fresh one
               }
 
               if (!token) {
-                // VALUE IS NEW OR UPGRADED: Create a new token for this category.
-                // Find how many tokens already exist for THIS category to increment the index.
                 let nextIndex = 1;
                 const existingIndices = Array.from(vMap.keys())
                   .filter(t => t.startsWith(`[${category}_`))
@@ -660,8 +640,6 @@ export function DocumentCompilerSection({
                 vMap.set(token, value);
                 console.log(`[DocumentCompiler] Vault registered: ${token} (Redacted Value)`);
               }
-
-              // Count total occurrences of this value (via its unique token)
               vCounts.set(token, (vCounts.get(token) || 0) + 1);
             }
           };
@@ -672,21 +650,15 @@ export function DocumentCompilerSection({
             console.log('[DocumentCompiler] [Cache] Using cached source texts.');
             allDocs = sourceTextCache.current;
           } else {
-
-            // NEW: Gather all unique sources (Selected + Master) to avoid double extraction
             const uniqueFiles = new Map<string, { name: string; type: string; base64: string }>();
-
             selectedSources.forEach(s => {
               if (s.base64) uniqueFiles.set(s.id || s.name, { name: s.name, type: s.type, base64: s.base64 });
             });
-
             if (masterSource && masterSource.base64) {
               uniqueFiles.set(masterSource.id || masterSource.name, { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 });
             }
 
             const localExtractedDocs: any[] = [];
-
-            // Helper to convert base64 to File for local extraction
             const base64ToFile = (base64: string, filename: string, mimeType: string): File => {
               const byteCharacters = atob(base64);
               const byteNumbers = new Array(byteCharacters.length);
@@ -698,19 +670,14 @@ export function DocumentCompilerSection({
               return new File([blob], filename, { type: mimeType });
             };
 
-            // Sequential Extraction (Safe for 8GB RAM)
             const currentUnsupported: Array<{ id: string; name: string; type: string }> = [];
-
             for (const source of Array.from(uniqueFiles.entries())) {
               const [id, sData] = source;
-
               try {
                 const file = base64ToFile(sData.base64, sData.name, sData.type);
                 const { text, isScanned } = await extractTextLocally(file);
-
                 if (text === "[[GROMIT_SCAN_DETECTED]]") {
                   currentUnsupported.push({ id, name: sData.name, type: 'Scansione' });
-                  // We don't add scans to localExtractedDocs as they are not supportable by Pawn for anonymization
                 } else {
                   localExtractedDocs.push({ name: sData.name, text, originalText: text, isScanned });
                 }
@@ -718,44 +685,25 @@ export function DocumentCompilerSection({
                 console.error(`[DocumentCompiler] Local extraction failed for ${sData.name}:`, e);
               }
             }
-
             setUnsupportedSources(currentUnsupported);
-
-            const rawDocs = [
+            allDocs = [
               ...(templateContent.trim() ? [{ name: 'Template [Form]', text: templateContent, originalText: templateContent, isScanned: false }] : []),
               ...(notes.trim() ? [{ name: 'Note [Aggiuntive]', text: notes, originalText: notes, isScanned: false }] : []),
               ...localExtractedDocs
             ];
-
-            allDocs = rawDocs;
             sourceTextCache.current = allDocs;
           }
 
-          // console.log(`[Gromit Frontend] STEP 2: Avvio Ultra-Drive Analysis su ${allDocs.length} sorgenti...`);
-          const startTime = Date.now();
           const flatResults = [];
           for (let i = 0; i < allDocs.length; i++) {
             const doc = allDocs[i];
-            const charCount = (doc as any).text.length;
-            const isScanned = (doc as any).isScanned === true;
-            console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
-            console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
-
-            const findings = await extractPIILocal(doc.text, selectedModel, isScanned);
-
-            console.log(`[DocumentCompiler] <- '${doc.name}' finito: ${findings.length} elementi trovati.`);
+            const findings = await extractPIILocal(doc.text, selectedModel, (doc as any).isScanned === true);
             flatResults.push({ name: doc.name, findings });
-
-            // Add a small 100ms delay to give the local server a breath between documents
             if (i < allDocs.length - 1) {
               await new Promise(resolve => setTimeout(resolve, 100));
             }
           }
 
-          const totalTime = (Date.now() - startTime) / 1000;
-          // console.log(`[DocumentCompiler] Estrazione completata in ${totalTime.toFixed(1)}s (${(totalTime / allDocs.length).toFixed(1)}s per doc).`);
-
-          // 3. Robust Vault Registration (Pawn Style)
           const ALLOWED = [
             'NOME', 'COGNOME', 'DATA_NASCITA', 'LUOGO_NASCITA', 'CODICE_FISCALE',
             'PARTITA_IVA', 'EIN_USA', 'INDIRIZZO', 'TELEFONO', 'EMAIL', 'URL',
@@ -763,48 +711,31 @@ export function DocumentCompilerSection({
             'DATI_SENSIBILI', 'DATI_COMPORTAMENTALI', 'INDIRIZZO_IP', 'ALTRO'
           ];
 
-          // Map to track if a value comes from a digital doc (false) or scanned doc (true)
-          // We prioritize false (digital) if both exist for the same value
           const valueToScanStatus = new Map<string, boolean>();
-
           for (const res of flatResults) {
-            console.log(`[DocumentCompiler] Processing PII findings from: ${res.name} (${res.findings.length} findings)`);
             const doc = allDocs.find(d => d.name === res.name);
             const isScanned = (doc as any)?.isScanned === true;
-
             for (const f of res.findings) {
               const rawValue = f.value.trim();
               if (!rawValue || rawValue.length < 2) continue;
-
-              // Track scan status for unification
               if (!valueToScanStatus.has(rawValue) || valueToScanStatus.get(rawValue) === true) {
                 valueToScanStatus.set(rawValue, isScanned);
               }
-
-              // Robust Grounding Check: RELAXED
-              // Reject only if it looks like a template tag [TOKEN] or <tag>, not if it contains brackets naturally
               if (/^\[[A-Z_]+(?:_\d+)?\]$/.test(rawValue)) continue;
               if (/^<[^>]+>$/.test(rawValue)) continue;
-
               if (rawValue.toLowerCase() === 'null' || rawValue.toLowerCase() === 'undefined') continue;
               if (isNoisyPII(rawValue)) continue;
 
-              // 1. Determine Category
               let category = f.category?.toUpperCase() || 'GENERIC_PII';
               if (f.label && f.label !== f.category) {
-                // If a specific label was provided (common in JSON), use it
                 category = f.label.toUpperCase().replace(/[^A-Z_]/g, '_');
               }
 
-              // 2. Category normalization (English-First & Robust)
               if (!ALLOWED.includes(category)) {
                 const c = category;
                 if (c.includes('NAME') || c.includes('PERSON') || c.includes('NOME') || c.includes('TITOLARE') || c.includes('SOGGETTO')) category = 'NOME';
                 else if (c.includes('SUR') || c.includes('LAST') || c.includes('COGN')) category = 'COGNOME';
-                else if (c.includes('ORG') || c.includes('COMPANY') || c.includes('AZIENDA') || c.includes('CORP')) {
-                  // Organizations are not PII for our purpose, skip
-                  continue;
-                }
+                else if (c.includes('ORG') || c.includes('COMPANY') || c.includes('AZIENDA') || c.includes('CORP')) continue;
                 else if (c.includes('ADDR') || c.includes('INDIRIZZO') || c.includes('STREET') || c.includes('VIA') || c.includes('CITY') || c.includes('CITTA') || c.includes('PROV') || c.includes('ZIP') || c.includes('CAP') || c.includes('DOMICILIO')) category = 'INDIRIZZO';
                 else if (c.includes('MAIL') || c.includes('PEC')) category = 'EMAIL';
                 else if (c.includes('TEL') || c.includes('PHONE') || c.includes('CELL') || c.includes('MOB') || c.includes('CONTATTO')) category = 'TELEFONO';
@@ -822,13 +753,8 @@ export function DocumentCompilerSection({
                 else category = 'ALTRO';
               }
 
-              // Register in set for unification later (Allow GENERIC_PII so unmapped dates get unified)
-              // uniqueFoundValues.add(rawValue); // Replaced by valueToScanStatus
-
               let token = "";
               const normalizedValue = rawValue.toLowerCase();
-
-              // Deduplication (Case-Insensitive)
               for (const [existingToken, existingValue] of vaultMap.entries()) {
                 if (existingValue.toLowerCase() === normalizedValue) {
                   token = existingToken;
@@ -844,98 +770,68 @@ export function DocumentCompilerSection({
                     const match = t.match(/_(\d+)\]$/);
                     return match ? parseInt(match[1]) : 0;
                   });
-
                 if (existingIndices.length > 0) {
                   nextIndex = Math.max(...existingIndices) + 1;
                 }
-
                 token = `[${category}_${nextIndex}]`;
                 vaultMap.set(token, rawValue);
-                console.log(`[DocumentCompiler] Registered: ${token} -> ${rawValue}`);
               }
               vaultCounts.set(token, (vaultCounts.get(token) || 0) + 1);
             }
           }
 
-          // 4. Intelligent Unification (Post-Processing Refinement)
-          // This groups variations of the same PII (e.g. addresses, names)
           let finalSweepVault: [string, string][] = [];
-
           try {
-            console.log(`[DocumentCompiler] STEP 3: Unifying ${valueToScanStatus.size} variations...`);
+            console.log(`[DocumentCompiler] STEP 3: Unifying variations...`);
             const unificationEntries = Array.from(valueToScanStatus.entries()).map(([value, isScanned]) => ({ value, isScanned }));
             const unificationMap = await unifyPIIFindings(unificationEntries, selectedModel);
-            console.log(`[DocumentCompiler] STEP 3 COMPLETE: LLM returned ${Object.keys(unificationMap).length} mappings.`);
-
-            // Group existing tokens by their canonical values
             const canonicalToToken = new Map<string, string>();
             const collapsedVault = new Map<string, string>();
             const collapsedCounts = new Map<string, number>();
 
-            // Process every entry in our current vault
             for (const [token, originalValue] of Array.from(vaultMap.entries())) {
               const canonical = unificationMap[originalValue] || originalValue;
               const normalizedCanonical = canonical.toLowerCase();
-
               if (!canonicalToToken.has(normalizedCanonical)) {
-                // This is the first time we see this entity - it "wins" and remains in the vault
                 canonicalToToken.set(normalizedCanonical, token);
                 collapsedVault.set(token, canonical);
                 collapsedCounts.set(token, vaultCounts.get(token) || 0);
               } else {
-                // This is a variation of an already registered entity - merge its count into the "winner"
                 const targetToken = canonicalToToken.get(normalizedCanonical)!;
                 collapsedCounts.set(targetToken, (collapsedCounts.get(targetToken) || 0) + (vaultCounts.get(token) || 0));
-                console.log(`[DocumentCompiler] Merged variation '${originalValue}' into token ${targetToken}`);
               }
-
-              // In either case, we want to sweep this ORIGINAL value and replace it with the WINNER token
               const targetToken = canonicalToToken.get(normalizedCanonical)!;
               finalSweepVault.push([targetToken, originalValue]);
-              // Also add the canonical just in case it's a completely new string from the LLM
               finalSweepVault.push([targetToken, canonical]);
             }
-
-            // Sync original maps with collapsed versions for UI state
             vaultMap.clear();
             collapsedVault.forEach((v, k) => vaultMap.set(k, v));
             vaultCounts.clear();
             collapsedCounts.forEach((v, k) => vaultCounts.set(k, v));
-
-            // Persist the wide sweep mapping for final compilation
             sweepVaultRef.current = finalSweepVault;
-
           } catch (uErr) {
-            console.error("[DocumentCompiler] Unification Refinement failed, using identity mapping:", uErr);
+            console.error("[DocumentCompiler] Unification Refinement failed:", uErr);
             finalSweepVault = Array.from(vaultMap.entries());
           }
 
           const masterVault = Object.fromEntries(vaultMap);
           const masterCounts = Object.fromEntries(vaultCounts);
-
-          // --- PHASE 3: MECHANICAL GLOBAL SWEEP (LOCAL) ---
-          // Apply anonymity to ALL documents locally using the WIDE sweep vault
           const anonymizedDocs = allDocs.map(doc => {
             const anonymizedText = performMechanicalGlobalSweep(doc.text, finalSweepVault);
             return {
               ...doc,
               text: anonymizedText,
-              originalText: doc.text // Keep for preview if needed
+              originalText: doc.text
             };
           });
-
-          // Update Source Cache with anonymized versions
           sourceTextCache.current = anonymizedDocs;
-
-          console.log('[DocumentCompiler] Local Anonymization Complete.');
-
           setReportVault(masterVault);
           setReportVaultCounts(masterCounts);
-          setGuardrailVault(masterVault); // FIX: Ensure context is updated with local PII
+          setGuardrailVault(masterVault);
           setIsWaitingForPawnApproval(true);
           setIsAnonymizationReportOpen(true);
           setIsCompiling(false);
-          return; // STOP HERE until user approves
+          return;
         } catch (error) {
           console.error('[DocumentCompiler] Privacy Check Error:', error);
           toast({
@@ -948,125 +844,70 @@ export function DocumentCompilerSection({
         }
       }
 
-      // --- COMPILATION PHASE (Post-Approval or No-Guardrail) ---
+      // --- COMPILATION PHASE ---
       console.log('[DocumentCompiler] Starting Compilation Phase...');
-
-      // Define final payload variables
       let finalTemplate = templateContent;
       let finalNotes = notes;
       let finalSources: any[] = [];
       let finalMasterSource: any = null;
 
-      // PREPARE PAYLOAD FOR SERVER (ZERO-DATA COMPLIANCE)
-      if (activeGuardrails.includes('pawn')) {
-        console.log('[DocumentCompiler] Preparing Zero-Data Payload (Local Anonymization)...');
+      const toBase64 = (str: string) => {
+        try {
+          return btoa(unescape(encodeURIComponent(str)));
+        } catch (e) {
+          console.error("Base64 encode error", e);
+          return "";
+        }
+      };
 
-        // Create a combined wide mapping (variations + user edits from UI)
-        const combinedSweepVault: [string, string][] = [
-          ...sweepVaultRef.current,
-          ...Object.entries(guardrailVault)
-        ];
+      const combinedSweepVault: [string, string][] = [
+        ...sweepVaultRef.current,
+        ...(Object.entries(guardrailVault) as [string, string][])
+      ];
 
-        // 1. Mechanical sweep for Template & Notes (Local)
-        finalTemplate = performMechanicalGlobalSweep(templateContent, combinedSweepVault);
-        finalNotes = performMechanicalGlobalSweep(notes, combinedSweepVault);
+      const getAnonymizedText = async (source: any) => {
+        const cached = sourceTextCache.current.find(d => d.name === source.name);
+        if (cached && cached.originalText) {
+          return performMechanicalGlobalSweep(cached.originalText, combinedSweepVault);
+        }
+        return cached?.text || "";
+      };
 
-        // 2. Prepare Sources (Text Only - Anonymized)
-        const getAnonymizedText = async (source: any) => {
-          // Try to find in cache first
-          const cached = sourceTextCache.current.find(d => d.name === source.name);
+      if (isPawnActive) {
+        console.log('[DocumentCompiler] [Pawn] Zero-Data Enforcement: Source Swapping & Pseudonymization');
 
-          // CRITICAL FIX: If we have ORIGINAL text, re-anonymize it with the combined mapping
-          if (cached && cached.originalText) {
-            const reAnonymized = performMechanicalGlobalSweep(cached.originalText, combinedSweepVault);
-            console.log(`[Gromit Frontend] >> FINAL ANONYMIZED PAYLOAD FOR '${source.name}' <<\n${reAnonymized}\n>> END PAYLOAD <<`);
-            return reAnonymized;
-          }
-
-          // Fallback: Use previously anonymized text if original is missing (shouldn't happen for text docs)
-          if (cached && cached.text) {
-            console.warn(`[Pawn] Warning: Using cached anonymized text for '${source.name}' (No re-sweep possible).`);
-            return cached.text;
-          }
-
-          // If not in cache, extract now (fallback) and Anonymize on the fly
-          let text = "";
-          if (source.base64 && !source.type.startsWith('image/')) {
-            const base64ToFile = (base64: string, filename: string, mimeType: string): File => {
-              const byteCharacters = atob(base64);
-              const byteNumbers = new Array(byteCharacters.length);
-              for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-              }
-              const byteArray = new Uint8Array(byteNumbers);
-              const blob = new Blob([byteArray], { type: mimeType });
-              return new File([blob], filename, { type: mimeType });
-            };
-            try {
-              const file = base64ToFile(source.base64, source.name, source.type);
-              const result = await extractTextLocally(file);
-              text = result.text;
-            } catch (e) {
-              console.error("Local extract error fallback:", e);
-            }
-          }
-
-          // Apply Sweep with combined wide mapping (variations + user edits)
-          const freshAnonymized = performMechanicalGlobalSweep(text, combinedSweepVault);
-          console.log(`[Gromit Frontend] >> FINAL ANONYMIZED PAYLOAD FOR '${source.name}' (Fresh Extract) <<\n${freshAnonymized}\n>> END PAYLOAD <<`);
-          return freshAnonymized;
-        };
-
-        // Helper to encode UTF-8 text to Base64
-        const toBase64 = (str: string) => {
-          try {
-            return btoa(unescape(encodeURIComponent(str)));
-          } catch (e) {
-            console.error("Base64 encode error", e);
-            return "";
-          }
-        };
-
-
-        // Construct Sources Payload
+        // 1. Swap and Prepare Payload
         for (const s of selectedSources) {
           const cached = sourceTextCache.current.find(d => d.name === s.name);
-
-          // ZERO-DATA ENFORCEMENT for Visual Sources (Images/Scans)
-          // If we have extracted text (either automatic OCR or Manual Input), we send ONLY that text.
-          // We DO NOT send the original image/pdf base64.
           if (cached && (cached.originalText || cached.text)) {
-            const anonymizedText = await getAnonymizedText(s);
-            console.log(`[Pawn] Converting '${s.name}' (${s.type}) to Text-Only Payload for Privacy.`);
-
-            // PREPEND OCR/VISION TAG ensures server knows this is reconstructed text
-            const taggedText = `[FONTE ESTRATTA DA SCANSIONE/VISION]\n${anonymizedText}`;
-
+            const anonymized = await getAnonymizedText(s);
+            // PERSISTENCE SWAP
+            updateSource(s.id, {
+              base64: toBase64(anonymized),
+              type: 'text/plain'
+            });
+            // PAYLOAD
             finalSources.push({
               name: s.name,
-              type: 'text/plain', // Force type to text/plain
-              base64: toBase64(taggedText),
-              anonymizedText: taggedText,
+              type: 'text/plain',
+              base64: toBase64(anonymized),
+              anonymizedText: anonymized,
               originalType: s.type
             });
           } else {
-            // It's an unsupported source (Image, Audio, or unhandled Scan) WITHOUT text.
-            // This will trigger the warning in the UI, and if user proceeds, it sends original.
-            console.warn(`[Pawn] Source '${s.name}' has no extracted text. Sending original base64.`);
-            finalSources.push({
-              name: s.name,
-              type: s.type,
-              base64: s.base64,
-            });
+            // Fallback for non-text sources (Warning already triggered)
+            finalSources.push({ name: s.name, type: s.type, base64: s.base64 });
           }
         }
 
-        // Construct Master Payload
         if (masterSource) {
           const cached = sourceTextCache.current.find(d => d.name === masterSource.name);
           if (cached && (cached.originalText || cached.text)) {
             const anonymizedMaster = await getAnonymizedText(masterSource);
-            console.log(`[Pawn] Converting Master '${masterSource.name}' to Text-Only Payload.`);
+            updateSource(masterSource.id, {
+              base64: toBase64(anonymizedMaster),
+              type: 'text/plain'
+            });
             finalMasterSource = {
               name: masterSource.name,
               type: 'text/plain',
@@ -1075,18 +916,13 @@ export function DocumentCompilerSection({
               originalType: masterSource.type
             };
           } else {
-            // Unsupported Master
-            finalMasterSource = {
-              name: masterSource.name,
-              type: masterSource.type,
-              base64: masterSource.base64,
-            };
+            finalMasterSource = { name: masterSource.name, type: masterSource.type, base64: masterSource.base64 };
           }
         }
 
+        finalTemplate = performMechanicalGlobalSweep(templateContent, combinedSweepVault);
+        finalNotes = performMechanicalGlobalSweep(notes, combinedSweepVault);
       } else {
-        // Standard Flow (Send Base64) - Legacy or Non-Pawn
-        // console.log('[DocumentCompiler] Preparing Standard Payload (Base64)...');
         finalSources = selectedSources.map((source) => ({
           name: source.name,
           type: source.type,
@@ -1101,8 +937,6 @@ export function DocumentCompilerSection({
         }
       }
 
-      console.log(`[DocumentCompiler] Sending ${finalSources.length} sources to server...`);
-
       const response = await apiRequest('POST', '/api/compile', {
         template: finalTemplate,
         modelProvider,
@@ -1115,31 +949,20 @@ export function DocumentCompilerSection({
         formalTone,
         studioFontSize,
         currentMode,
-        // ZERO-DATA: We DO NOT send the vault to the server. 
-        // The server processes tokens (e.g. [NOME_1]) and returns them.
-        // We handle de-anonymization locally upon receipt.
         pawnVault: undefined
       });
 
       const data = await response.json();
-      console.log(`[DocumentCompiler] >> RAW SERVER RESPONSE <<\n${data.compiledContent}\n>> END RAW RESPONSE <<`);
-
       if (data.compiledContent) {
-        // Sanitize escaped brackets
         let sanitizedContent = data.compiledContent
           .replace(/\\+\s*\[/g, '[')
           .replace(/\\+\s*\]/g, ']')
           .replace(/\\-/g, '-')
           .replace(/\\\*/g, '*');
-
-        // Force checkboxes to be list items for Tiptap
         sanitizedContent = sanitizedContent.replace(/^(\s*)\[([ xX])\]/gm, '$1- [$2]');
 
-        // Context Construction for Refinement
         const context = {
-          sources: finalSources.map(s => ({
-            ...s,
-          })),
+          sources: finalSources.map(s => ({ ...s })),
           masterSource: finalMasterSource,
           notes,
           temperature,
@@ -1153,21 +976,18 @@ export function DocumentCompilerSection({
           groundingMetadata: data.groundingMetadata
         };
 
-        // Restoration of original values for the user (Reverse Sweep)
         let finalContent = sanitizedContent;
-        if (activeGuardrails.includes('pawn')) {
+        if (isPawnActive) {
           finalContent = performMechanicalReverseSweep(sanitizedContent, guardrailVault);
-          console.log('[DocumentCompiler] De-anonymization complete.');
         }
 
         setLastCompileContext(context);
         setCompiledContent(finalContent);
-        setAnonymizedContent(sanitizedContent); // Store pseudonymized version
+        setAnonymizedContent(sanitizedContent);
         setTemplateContent(finalContent);
         setIsCompiledView(true);
-        setIsRefiningMode(true); // Auto-trigger Copilot Mode
+        setIsRefiningMode(true);
 
-        // FREEZE UI if master pin is active
         if (masterSource) {
           setIsLocked(true);
           let color = 'text-muted-foreground';
@@ -1183,11 +1003,7 @@ export function DocumentCompilerSection({
         }
 
         if (onCompile) onCompile(sanitizedContent);
-
-        if (data.guardrailVault) {
-          setGuardrailVault(data.guardrailVault);
-        }
-
+        if (data.guardrailVault) setGuardrailVault(data.guardrailVault);
         setIsWaitingForPawnApproval(false);
 
         toast({
@@ -1197,6 +1013,7 @@ export function DocumentCompilerSection({
       }
     } catch (error: any) {
       console.error('Errore compilazione:', error);
+      setIsWaitingForPawnApproval(false);
       toast({
         title: "Errore",
         description: error.message || "Impossibile compilare il documento.",
@@ -1587,7 +1404,7 @@ export function DocumentCompilerSection({
                 </Select>
 
                 <Button
-                  onClick={handleCompile}
+                  onClick={() => handleCompile()}
                   disabled={(!templateContent && !masterSource) || isCompiling}
                   data-testid="button-compile"
                   className="w-full sm:w-auto gap-2"
@@ -2069,7 +1886,7 @@ export function DocumentCompilerSection({
               onClick={() => {
                 setIsAnonymizationReportOpen(false);
                 // Confirm: guardrailVault is already properly updated by the inputs
-                handleCompile();
+                handleCompile(true);
               }}
             >
               {isWaitingForPawnApproval ? "Conferma e Compila con AI" : "Chiudi"}

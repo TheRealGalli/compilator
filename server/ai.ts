@@ -232,6 +232,9 @@ REGOLE:
 TESTO:
 ${text} [/INST]`;
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
             const response = await fetch(this.ollamaUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -245,8 +248,9 @@ ${text} [/INST]`;
                         num_ctx: 32768,
                         keep_alive: -1,
                     }
-                })
-            });
+                }),
+                signal: controller.signal
+            }).finally(() => clearTimeout(timeoutId));
 
             if (!response.ok) {
                 console.warn(`[AiService] Ollama unreachable on port 11434.`);

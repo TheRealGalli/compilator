@@ -1885,36 +1885,17 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
 
       if (isPawnActive) {
         if (multimodalFiles && multimodalFiles.length > 0) {
-          console.log(`[API compile] Pawn Guardrail active: Processing ${multimodalFiles.length} sources...`);
+          console.log(`[API compile] Pawn Guardrail active: Strictly enforcing zero-data integrity for ${multimodalFiles.length} sources...`);
           for (const s of multimodalFiles) {
-            // Priority 1: Client provided pre-anonymized text
+            // Strictly require pre-anonymized text from client
             if (s.anonymizedText) {
               preProcessedParts.push({ text: `[FONTE: ${s.name}]\n` + s.anonymizedText });
-              continue;
-            }
-
-            const cleanedB64 = cleanBase64(s.base64);
-            const mime = s.mimeType || s.type;
-
-            // Priority 2: Images (excluded from Pawn for now)
-            if (mime.startsWith('image/')) {
-              preProcessedParts.push({
-                fileData: { mimeType: mime, data: cleanedB64 }
+            } else {
+              // Security Gate: No binary or non-pseudonymized data allowed in Pawn mode
+              console.error(`[Pawn Violation] Received non-anonymized or multimodal source in Pawn mode: ${s.name}`);
+              return res.status(403).json({
+                error: "Sicurezza Pawn Violata: Dati non pseudonimizzati rilevati nel payload. Operazione bloccata per la tua privacy."
               });
-              continue;
-            }
-
-            // Priority 3: Try server-side extraction/anonymization (fallback/local only)
-            try {
-              const buffer = Buffer.from(cleanedB64, 'base64');
-              const text = await extractText(buffer, mime);
-              if (text) {
-                // This might fail if Ollama is not local
-                const anonymized = await aiService.anonymizeWithOllama(text, vault);
-                preProcessedParts.push({ text: `[FONTE: ${s.name}]\n` + anonymized });
-              }
-            } catch (err) {
-              console.warn(`[API compile] Skip source "${s.name}" due to pawn extraction/anonymization error.`);
             }
           }
         }
@@ -1923,18 +1904,10 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
           if (masterSource.anonymizedText) {
             preProcessedMasterParts = [{ text: `[MASTER: ${masterSource.name}]\n` + masterSource.anonymizedText }];
           } else {
-            const cleanedB64 = cleanBase64(masterSource.base64);
-            const mime = masterSource.mimeType || masterSource.type;
-            if (!mime.startsWith('image/')) {
-              try {
-                const buffer = Buffer.from(cleanedB64, 'base64');
-                const text = await extractText(buffer, mime);
-                if (text) {
-                  const anonymized = await aiService.anonymizeWithOllama(text, vault);
-                  preProcessedMasterParts = [{ text: `[MASTER: ${masterSource.name}]\n` + anonymized }];
-                }
-              } catch (err) { }
-            }
+            console.error(`[Pawn Violation] Received non-anonymized master source in Pawn mode: ${masterSource.name}`);
+            return res.status(403).json({
+              error: "Sicurezza Pawn Violata: Documento Master non pseudonimizzato rilevato. Operazione bloccata per la tua privacy."
+            });
           }
         }
       }
