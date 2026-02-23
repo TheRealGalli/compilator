@@ -731,7 +731,9 @@ export function DocumentCompilerSection({
 
           // console.log(`[Gromit Frontend] STEP 2: Avvio Ultra-Drive Analysis su ${allDocs.length} sorgenti...`);
           const startTime = Date.now();
-          const flatResults = await Promise.all(allDocs.map(async (doc) => {
+          const flatResults = [];
+          for (let i = 0; i < allDocs.length; i++) {
+            const doc = allDocs[i];
             const charCount = doc.text.length;
             console.log(`[Gromit Frontend] STEP 2.1: Analizzando '${doc.name}' (${charCount} char)...`);
             console.log(`[Gromit Frontend] >> RAW EXTRACTED TEXT FOR '${doc.name}' <<\n${doc.text}\n>> END RAW TEXT <<`);
@@ -739,8 +741,13 @@ export function DocumentCompilerSection({
             const findings = await extractPIILocal(doc.text, selectedModel);
 
             console.log(`[DocumentCompiler] <- '${doc.name}' finito: ${findings.length} elementi trovati.`);
-            return { name: doc.name, findings };
-          }));
+            flatResults.push({ name: doc.name, findings });
+
+            // Add a small 100ms delay to give the local server a breath between documents
+            if (i < allDocs.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          }
 
           const totalTime = (Date.now() - startTime) / 1000;
           // console.log(`[DocumentCompiler] Estrazione completata in ${totalTime.toFixed(1)}s (${(totalTime / allDocs.length).toFixed(1)}s per doc).`);
