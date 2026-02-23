@@ -483,7 +483,6 @@ ${llmText}
             messages,
             stream: false,
             options,
-            format: 'json',
             think: "low"
         };
 
