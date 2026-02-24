@@ -2089,7 +2089,39 @@ ISTRUZIONI OUTPUT:
         return `- SESSIONE: #${m.label} -> "${m.text}"`;
       }).join('\n');
 
-      const refineInstructions = `
+      const isPdfMode = masterSource?.mimeType === 'application/pdf';
+
+      const refineInstructions = isPdfMode ? `
+*** MODALITÀ RAFFINAMENTO MODULO PDF ATTIVA ***
+Hai già compilato una bozza dei campi del PDF. Ora l'utente vuole discuterne o modificarlo.
+
+DOC ATTUALE (Stato dei campi):
+"""
+${processedContent}
+"""
+
+${formattedMentions ? `### ⚠️ FOCUS ATTUALE: PARTI MENZIONATE
+L'utente ha evidenziato i seguenti frammenti per un intervento MIRATO:
+${formattedMentions}
+
+**REGOLA DI LOCALIZZAZIONE STRETTA:**
+Agisci **SOLO E SOLTANTO** sui campi correlati a questi testi evidenziati.` : ''}
+
+STORICO CHAT:
+${(processedChatHistory || []).map((m: any) => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
+
+ISTRUZIONI OPERATIVE (CRITICO):
+1. MODIFICA: Se l'utente chiede di cambiare un dato (es. indirizzo, CAP, importo), devi restituire **ESCLUSIVAMENTE** le nuove proposte per i campi che cambiano o che vengono compilati ex-novo.
+2. FORMATO JSON:
+   Restituisci JSON con questa struttura:
+   {
+     "newContent": "{\\"proposals\\": [{\\"name\\": \\"ID_CAMPO_TECNICO\\", \\"label\\": \\"Etichetta Umana\\", \\"value\\": \\"Nuovo Valore\\", \\"reasoning\\": \\"Trovato nello storico\\"}]}",
+     "explanation": "Spiegazione breve di cosa hai modificato."
+   }
+   - **NOTA BENE**: "newContent" deve contenere una STRINGA TESTUALE formato JSON (con doppio escape), non un oggetto reale.
+3. DOMANDE/ANALISI: Se l'utente pone una domanda e non chiede modifiche, restituisci:
+   { "newContent": null, "explanation": "La tua risposta..." }
+` : `
 *** MODALITÀ RAFFINAMENTO / CHAT ATTIVA ***
 Hai già compilato una prima bozza del documento. Ora l'utente vuole discuterne o modificarlo.
 

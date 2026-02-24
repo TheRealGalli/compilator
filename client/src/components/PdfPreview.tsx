@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ interface PdfPreviewProps {
     webResearch?: boolean;
     modelProvider?: string;
     onCompile?: (content: string, metadata?: { extractedFields?: any[], manualAnnotations?: any[], fetchedCompilerContext?: string }) => void;
+    refinerProposals?: string | null;
 }
 
 export function PdfPreview({
@@ -49,7 +50,8 @@ export function PdfPreview({
     notes = "",
     webResearch = false,
     modelProvider = 'gemini',
-    onCompile
+    onCompile,
+    refinerProposals
 }: PdfPreviewProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [pageNumber, setPageNumber] = useState<number>(1);
@@ -68,6 +70,36 @@ export function PdfPreview({
     const [hasRefinerProposals, setHasRefinerProposals] = useState(false);
     const [rollbackValues, setRollbackValues] = useState<Record<string, string | boolean>>({});
     const [hasCompiledOnce, setHasCompiledOnce] = useState(false);
+
+    const documentOptions = useMemo(() => ({
+        cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+        cMapPacked: true,
+        standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+        enableXfa: true,
+    }), []);
+
+    // Listen for new proposals coming from the Refiner Chat
+    useEffect(() => {
+        if (refinerProposals && !isCompiling) {
+            try {
+                const parsed = JSON.parse(refinerProposals);
+                const propsList = parsed.proposals || [];
+                if (propsList.length > 0) {
+                    setProposals(propsList);
+                    const currentVals = captureCurrentFormValues();
+                    setRollbackValues(currentVals);
+                    applyProposalsToDom(propsList);
+                    setHasRefinerProposals(true);
+                    toast({
+                        title: "Modifiche Applicate",
+                        description: "Verifica e conferma le modifiche dal menu in alto a destra.",
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to parse refinerProposals:", e);
+            }
+        }
+    }, [refinerProposals]);
 
     useEffect(() => {
         if (!fileBase64) return;
@@ -604,12 +636,7 @@ export function PdfPreview({
                             file={blobUrl}
                             onLoadSuccess={onDocumentLoadSuccess}
                             onLoadError={onDocumentLoadError}
-                            options={{
-                                cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
-                                cMapPacked: true,
-                                standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
-                                enableXfa: true,
-                            }}
+                            options={documentOptions}
                             loading={null}
                         >
                             <Page

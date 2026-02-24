@@ -102,10 +102,11 @@ ${webResearch ? `5. **Ricerca Web**: Se l'etichetta è ambigua (es: "Box 13 code
 REGOLE PER I VALORI:
 - **Testo**: Inserisci il valore pulito. Se un campo chiede "Anno", scrivi "2025", non "L'anno è 2025".
 - **Checkbox**: Rispondi SOLO true o false.
-- **Dati Mancanti**: Se non trovi l'informazione esatta nelle FONTI, scrivi "[DATO MANCANTE]". NON provare mai a indovinare, ipotizzare o inventare valori plausibili. L'integrità del dato è più importante della completezza.
+- **Valori Preesistenti (CRITICO)**: Se un campo ha già un Valore Attuale sensato (es: '0', 'N/A', o un numero), **NON SOVRASCRIVERLO** con stringhe vuote o avvisi a meno che le FONTI non indichino esplicitamente un valore diverso per quel campo.
+- **Dati Mancanti**: Se non trovi l'informazione nelle FONTI e il campo è vuoto, lascialo vuoto (stringa vuota ""). Usa "[DATO MANCANTE]" **SOLO ED ESCLUSIVAMENTE** come ultima risorsa se l'assenza del dato invalida palesemente il documento. NON inventare mai valori plausibili.
 
 CAMPI DA ANALIZZARE:
-${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label Attuale: "${f.label || 'N/A'}"`).join('\n')}
+${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
 
 TESTO FONTI:
 ${sourceContext}

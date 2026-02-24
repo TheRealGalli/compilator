@@ -1515,6 +1515,7 @@ export function DocumentCompilerSection({
                   notes={notes}
                   webResearch={webResearch}
                   modelProvider={modelProvider}
+                  refinerProposals={isReviewing ? pendingContent : undefined}
                   onCompile={(content, metadata) => {
                     // Synchronize state when PDF is compiled via AI assist
                     setIsCompiledView(true);
