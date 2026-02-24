@@ -40,6 +40,8 @@ export const performMechanicalGlobalSweep = (text: string, vault: Record<string,
         // Common noise
         'codice', 'identificativo', 'valido', 'fino', 'data', 'numero', 'tipo',
         'nato', 'nata', 'residente', 'domiciliato', 'domiciliata',
+        'iban', 'swift', 'bban', 'sepa', // Financial labels (not PII themselves)
+        'lyon', 'remo', 'elsa', 'siena', 'roma', 'milano', 'napoli', 'torino', // Common city names/fragments
         'with', 'from', 'this', 'that', 'have', 'been', 'were', 'will', 'would',
         'could', 'should', 'about', 'after', 'before', 'between', 'under', 'over',
     ]);
@@ -106,6 +108,19 @@ export const performMechanicalGlobalSweep = (text: string, vault: Record<string,
             result = result.replace(regex, token);
         }
     }
+
+    // POST-SWEEP DEDUPLICATION: Merge adjacent identical tokens
+    // e.g. "[NOME_1] [NOME_1]" or "[INDIRIZZO_1]\n[INDIRIZZO_1]" -> "[NOME_1]", "[INDIRIZZO_1]"
+    // This is crucial because if we censor "Carlo Galli", "Carlo", and "Galli" all as [NOME_1],
+    // the text "Carlo Galli" might become "[NOME_1] [NOME_1]" or even "[NOME_1] [NOME_1] [NOME_1]".
+    // We use a regex backreference \1 to find consecutive identical tokens separated by whitespace or common punctuation.
+    const tokenCollapseRegex = /(\[[A-Z_]+(?:\_\d+)?\])(?:[\s\r\n.,;:\-]*\1)+/g;
+    let previousResult = "";
+    while (result !== previousResult) {
+        previousResult = result;
+        result = result.replace(tokenCollapseRegex, '$1');
+    }
+
     return result;
 };
 
