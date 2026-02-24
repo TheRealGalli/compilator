@@ -13,13 +13,64 @@ export const performMechanicalGlobalSweep = (text: string, vault: Record<string,
     if (entries.length === 0) return text;
 
     let result = text;
-    // Order by value length descending to match longest (most specific) values first.
-    // This ensures "7901 4TH ST N STE 300, ST. PETERSBURG, FL 33702" matches before any substring.
-    // NO word-splitting: only sweep COMPLETE values as extracted by Ollama/Regex.
+
+    // SMART WORD-SPLITTING: Split compound values to catch individual name parts (e.g. "QAMIL" from "QAMIL DULE")
+    // BUT filter out common/short/noise words to avoid false positives (e.g. "Via", "STE", "LLC", "300")
+    const STOP_WORDS = new Set([
+        // Italian geo/address terms
+        'via', 'viale', 'piazza', 'piazzale', 'corso', 'largo', 'strada', 'vicolo',
+        'colle', 'della', 'delle', 'degli', 'nella', 'nelle', 'dello', 'dalla',
+        'comune', 'provincia', 'regione', 'stato', 'citta', 'paese', 'localita',
+        'piano', 'interno', 'scala', 'palazzina', 'snc',
+        // English geo/address terms
+        'street', 'avenue', 'road', 'drive', 'lane', 'boulevard', 'court', 'place',
+        'north', 'south', 'east', 'west', 'suite', 'floor', 'unit', 'building',
+        'city', 'state', 'county', 'town', 'village',
+        'florida', 'california', 'texas', 'york', 'ohio', 'virginia', 'georgia',
+        'petersburg', 'cincinnati',
+        // Common legal/business terms
+        'registered', 'agents', 'incorporated', 'corporation', 'company', 'limited',
+        'association', 'foundation', 'group', 'partners', 'services',
+        // Date/time words
+        'january', 'february', 'march', 'april', 'june', 'july', 'august',
+        'september', 'october', 'november', 'december',
+        'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato', 'domenica',
+        'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
+        'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre',
+        // Common noise
+        'codice', 'identificativo', 'valido', 'fino', 'data', 'numero', 'tipo',
+        'nato', 'nata', 'residente', 'domiciliato', 'domiciliata',
+        'with', 'from', 'this', 'that', 'have', 'been', 'were', 'will', 'would',
+        'could', 'should', 'about', 'after', 'before', 'between', 'under', 'over',
+    ]);
+
     const initialEntries: [string, string][] = (Array.isArray(vault) ? [...vault] : Object.entries(vault))
         .filter(([_, value]) => value && value.length >= 2);
 
-    const sortedEntries = initialEntries.sort((a, b) => b[1].length - a[1].length);
+    // Expand multi-word values with SMART filtering
+    const expandedEntries: [string, string][] = [];
+    for (const [token, value] of initialEntries) {
+        expandedEntries.push([token, value]); // Always keep the full value
+
+        // Split compound values into individual words, but ONLY keep distinctive ones
+        if (value.includes(' ') || value.includes(',')) {
+            const parts = value.split(/[\s,\/]+/).filter(p => {
+                const clean = p.replace(/[^a-zA-Z0-9\u00C0-\u024F]/g, ''); // Strip punctuation for check
+                if (clean.length < 4) return false;              // Too short (Via, STE, LLC, NEW, ST., FL.)
+                if (/^\d+$/.test(clean)) return false;            // Pure numbers (7901, 33702, 53034)
+                if (STOP_WORDS.has(clean.toLowerCase())) return false; // Common stop words
+                return true;
+            });
+            for (const part of parts) {
+                const cleanPart = part.replace(/[,;.]$/, ''); // Remove trailing punctuation
+                if (cleanPart.length >= 4 && !expandedEntries.some(e => e[1].toLowerCase() === cleanPart.toLowerCase())) {
+                    expandedEntries.push([token, cleanPart]);
+                }
+            }
+        }
+    }
+
+    const sortedEntries = expandedEntries.sort((a, b) => b[1].length - a[1].length);
 
     for (const [token, value] of sortedEntries) {
 
