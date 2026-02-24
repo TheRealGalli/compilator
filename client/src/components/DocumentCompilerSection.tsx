@@ -1883,15 +1883,9 @@ export function DocumentCompilerSection({
           <DialogFooter className="flex-col sm:flex-row gap-2 p-6 pt-2 border-t bg-slate-50/50">
             <Button
               variant="outline"
-              onClick={async () => {
+              onClick={() => {
                 setIsAnonymizationReportOpen(false);
                 setIsWaitingForPawnApproval(false);
-                // Free VRAM: unload the model since user cancelled the review
-                if (selectedModel) {
-                  await unloadModel(selectedModel);
-                  // Immediately reload so it's warm for the next compile
-                  preloadModel(selectedModel); // fire-and-forget, no await
-                }
               }}
             >
               Annulla
