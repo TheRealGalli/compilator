@@ -711,7 +711,8 @@ export function DocumentCompilerSection({
             'DATI_SENSIBILI', 'DATI_COMPORTAMENTALI', 'INDIRIZZO_IP', 'ALTRO'
           ];
 
-          const valueToDetails = new Map<string, { isScanned: boolean, category: string }>();
+          // Key by category + value to preserve miscategorized duplicates for the unifier
+          const uniqueFindingsMap = new Map<string, { isScanned: boolean, category: string, value: string }>();
           for (const res of flatResults) {
             const doc = allDocs.find(d => d.name === res.name);
             const isScanned = (doc as any)?.isScanned === true;
@@ -750,8 +751,9 @@ export function DocumentCompilerSection({
                 else category = 'ALTRO';
               }
 
-              if (!valueToDetails.has(rawValue) || valueToDetails.get(rawValue)?.isScanned === true) {
-                valueToDetails.set(rawValue, { isScanned, category });
+              const uniqueKey = `${category}::${rawValue}`;
+              if (!uniqueFindingsMap.has(uniqueKey) || uniqueFindingsMap.get(uniqueKey)?.isScanned === true) {
+                uniqueFindingsMap.set(uniqueKey, { isScanned, category, value: rawValue });
               }
 
               let token = "";
@@ -784,7 +786,7 @@ export function DocumentCompilerSection({
           let finalSweepVault: [string, string][] = [];
           try {
             console.log(`[DocumentCompiler] STEP 3: Unifying variations...`);
-            const unificationEntries = Array.from(valueToDetails.entries()).map(([value, details]) => ({ value, category: details.category, isScanned: details.isScanned }));
+            const unificationEntries = Array.from(uniqueFindingsMap.values());
             const unificationMap = await unifyPIIFindings(unificationEntries, selectedModel);
             const canonicalToToken = new Map<string, string>();
             const collapsedVault = new Map<string, string>();

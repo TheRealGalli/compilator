@@ -730,20 +730,25 @@ export async function unifyPIIFindings(
         return identity;
     }
 
-    const promptData = validEntries.map(e => `[${e.category}] ${e.value} (${e.isScanned ? 'SCAN' : 'DIGITAL'})`).join('\n');
+    const formattedData = validEntries.map(e => ({
+        category: e.category,
+        value: e.value,
+        source: e.isScanned ? 'SCAN' : 'DIGITAL'
+    }));
 
-    const prompt = `Unify the following personal data strings. Group variations of the same entity (e.g. same address with different formatting, same name).
-The data includes the CATEGORY of each entity to provide context. DO NOT unify entities of different categories.
+    const prompt = `Unify the following personal data extracted from documents. Group variations of the same entity (e.g. same address with different formatting, same name).
+You are receiving the raw JSON output from the extraction phase.
 
 RULES:
-1. Return ONLY a JSON object: {"variation": "canonical_value"}.
+1. Return ONLY a JSON object mapping each variation to its canonical value: {"variation": "canonical_value"}.
 2. IMPORTANT: If a "DIGITAL" version of a value exists, ALWAYS choose it as the "canonical_value" over any "SCAN" version. Scanned versions often have OCR errors.
 3. The "canonical_value" must be the most complete and accurate version from the list.
-4. If a value is unique, map it to itself.
-5. No explanations, no markdown, no other text.
+4. IMPORTANT: If the extraction assigned DIFFERENT categories to variations of the SAME entity, YOU MUST STILL UNIFY THEM. (e.g., if an address is marked as birthplace in one doc and address in another, unify them).
+5. If a value is unique, map it to itself.
+6. No explanations, no markdown, no other text.
 
-Data list (format: [CATEGORY] value (source_type)):
-${promptData}
+Data list:
+${JSON.stringify(formattedData, null, 2)}
 `;
 
     const controller = new AbortController();
