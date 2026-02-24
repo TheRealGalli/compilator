@@ -604,16 +604,16 @@ export function RefineChat({
                             >
                                 <div
                                     className={cn(
-                                        "max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm",
+                                        "max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm break-words overflow-hidden",
                                         msg.role === 'user'
                                             ? "bg-blue-600 text-white rounded-br-none"
                                             : "bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 rounded-bl-none"
                                     )}
                                 >
                                     {msg.role === 'user' ? (
-                                        <p className="whitespace-pre-wrap">{msg.text}</p>
+                                        <p className="whitespace-pre-wrap break-words">{msg.text}</p>
                                     ) : (
-                                        <div className="prose prose-sm max-w-none prose-slate chat-markdown">
+                                        <div className="prose prose-sm max-w-none prose-slate chat-markdown break-words">
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
                                                 components={{

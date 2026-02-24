@@ -15,7 +15,6 @@ import {
     Asterisk,
     AlertCircle
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -24,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Check, X } from "lucide-react";
 
 // Use a more reliable worker source
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -65,16 +65,21 @@ export function PdfPreview({
     const [proposals, setProposals] = useState<any[]>([]);
     const [cacheKey, setCacheKey] = useState<string | null>(null);
     const [isXfaAdobe, setIsXfaAdobe] = useState(false);
+    const [hasRefinerProposals, setHasRefinerProposals] = useState(false);
+    const [rollbackValues, setRollbackValues] = useState<Record<string, string | boolean>>({});
+    const [hasCompiledOnce, setHasCompiledOnce] = useState(false);
 
     useEffect(() => {
         if (!fileBase64) return;
         setIsLoading(true);
         setIsDocumentLoading(true); // Reset document loading state to avoid error flashes
         setError(null);
-        // Stop any active compilation when switching documents
         setIsCompiling(false);
         setProposals([]);
         setCacheKey(null);
+        setHasRefinerProposals(false);
+        setRollbackValues({});
+        setHasCompiledOnce(false);
 
         try {
             const base64Data = fileBase64.includes(',') ? fileBase64.split(',')[1] : fileBase64;
@@ -215,8 +220,102 @@ export function PdfPreview({
 
     };
 
+    const captureCurrentFormValues = (): Record<string, string | boolean> => {
+        const fields: Record<string, string | boolean> = {};
+        const annotationLayer = document.querySelector('.annotationLayer');
+        if (annotationLayer) {
+            const inputs = annotationLayer.querySelectorAll('input, textarea, select');
+            inputs.forEach((el: any) => {
+                if (el.name) {
+                    if (el.type === 'checkbox') {
+                        fields[el.name] = el.checked;
+                    } else if (el.type === 'radio') {
+                        if (el.checked) fields[el.name] = el.value;
+                    } else {
+                        fields[el.name] = el.value;
+                    }
+                }
+            });
+        }
+        return fields;
+    };
+
+    const handleAcceptProposals = () => {
+        setHasRefinerProposals(false);
+        setRollbackValues({});
+        setHasCompiledOnce(true);
+        toast({
+            title: "Modifiche Accettate",
+            description: "I campi sono stati compilati correttamente."
+        });
+    };
+
+    const handleRejectProposals = () => {
+        if (Object.keys(rollbackValues).length > 0) {
+            const annotationLayer = document.querySelector('.annotationLayer');
+            if (annotationLayer) {
+                const inputs = annotationLayer.querySelectorAll('input, textarea, select');
+                inputs.forEach((el: any) => {
+                    if (el.name && rollbackValues[el.name] !== undefined) {
+                        const val = rollbackValues[el.name];
+                        if (el.type === 'checkbox') {
+                            if (el.checked !== val) {
+                                el.checked = val as boolean;
+                                el.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        } else if (el.type === 'radio') {
+                            if (el.value === String(val)) {
+                                el.checked = true;
+                                el.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        } else {
+                            if (el.value !== String(val)) {
+                                el.value = String(val);
+                                el.dispatchEvent(new Event('input', { bubbles: true }));
+                                el.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        setHasRefinerProposals(false);
+        setRollbackValues({});
+        setProposals([]);
+        toast({
+            title: "Modifiche Annullate",
+            description: "Il modulo è stato riportato allo stato precedente."
+        });
+    };
+
     const handleEyeClick = async () => {
-        if (isCompiling || !fileBase64) return;
+        if (isCompiling || !fileBase64 || hasRefinerProposals) return;
+
+        if (isXfaAdobe) {
+            setIsEyeSpinning(true);
+            setTimeout(() => {
+                setIsEyeSpinning(false);
+                setIsCompiling(false);
+                toast({
+                    title: "Documento Letto a Sola Lettura o Cifrato",
+                    description: "Compilazione automatizzata non permessa.",
+                    variant: "destructive"
+                });
+            }, 1000);
+            return;
+        }
+
+        if (hasCompiledOnce) {
+            setIsEyeSpinning(true);
+            setTimeout(() => {
+                setIsEyeSpinning(false);
+                toast({
+                    title: "Compilazione già effettuata",
+                    description: "Per ulteriori modifiche, utilizza la Chat Refine.",
+                });
+            }, 1000);
+            return;
+        }
 
         // Start compilation immediately, ignoring pre-filled status
         // so the user can always use AI assist if they want.
@@ -260,8 +359,13 @@ export function PdfPreview({
 
             setProposals(newProposals || []);
 
+            // Capture the state immediately before apply so we can jump back
+            const currentVals = captureCurrentFormValues();
+            setRollbackValues(currentVals);
+
             // Immediate apply for the current page
             applyProposalsToDom(newProposals || []);
+            setHasRefinerProposals(true);
 
             toast({
                 title: "Compilazione completata",
@@ -385,7 +489,7 @@ export function PdfPreview({
     return (
         <Card className={`relative flex flex-col h-full overflow-hidden border-none shadow-none bg-slate-900/5 ${className}`}>
             {/* Custom Toolbar - Matching ModeSettings style */}
-            <div className="flex items-center justify-between px-4 py-1.5 bg-muted/30 border-b select-none z-10 shadow-sm">
+            <div className="flex items-center justify-between px-4 py-1.5 bg-muted/30 border-b select-none z-10 shadow-sm h-12">
                 <div className="flex items-center gap-4">
                     <span className="text-sm font-medium truncate max-w-[200px] flex items-center gap-2">
                         Documento PDF
@@ -398,43 +502,67 @@ export function PdfPreview({
                     )}
                 </div>
 
-                <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 hidden md:flex">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setScale(s => Math.max(0.5, s - 0.1))}>
-                        <ZoomOut className="h-3.5 w-3.5" />
-                    </Button>
-                    <span className="text-[10px] font-medium w-12 text-center">{Math.round(scale * 100)}%</span>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setScale(s => Math.min(3, s + 0.1))}>
-                        <ZoomIn className="h-3.5 w-3.5" />
-                    </Button>
-                </div>
-
-                <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 hidden sm:flex" onClick={() => setRotation(r => (r + 90) % 360)}>
-                        <RotateCw className="h-3.5 w-3.5" />
-                    </Button>
-                    <div className="h-4 w-[1px] bg-border mx-1 hidden sm:block" />
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload}>
-                        <Download className="h-3.5 w-3.5" />
-                    </Button>
-
-                    <div className="h-4 w-[1px] bg-border mx-1" />
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 p-0 flex items-center justify-center group/eye"
-                        onClick={handleEyeClick}
-                        disabled={isCompiling}
-                        title="Gromit Assist"
-                    >
-                        <div className="relative flex items-center justify-center">
-                            <Asterisk
-                                className={`text-blue-500 transition-transform ${isCompiling || isEyeSpinning ? 'animate-spin' : ''}`}
-                                size={26}
-                                strokeWidth={3}
-                            />
+                {hasRefinerProposals ? (
+                    <div className="flex items-center gap-2 absolute right-4">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-3 text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors rounded-full"
+                            onClick={handleRejectProposals}
+                        >
+                            <X className="h-4 w-4 mr-1.5" />
+                            Rifiuta
+                        </Button>
+                        <Button
+                            size="sm"
+                            className="h-8 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-all shadow-sm"
+                            onClick={handleAcceptProposals}
+                        >
+                            <Check className="h-4 w-4 mr-1.5" />
+                            Accetta
+                        </Button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 hidden md:flex">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setScale(s => Math.max(0.5, s - 0.1))}>
+                                <ZoomOut className="h-3.5 w-3.5" />
+                            </Button>
+                            <span className="text-[10px] font-medium w-12 text-center">{Math.round(scale * 100)}%</span>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setScale(s => Math.min(3, s + 0.1))}>
+                                <ZoomIn className="h-3.5 w-3.5" />
+                            </Button>
                         </div>
-                    </Button>
-                </div>
+
+                        <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 hidden sm:flex" onClick={() => setRotation(r => (r + 90) % 360)}>
+                                <RotateCw className="h-3.5 w-3.5" />
+                            </Button>
+                            <div className="h-4 w-[1px] bg-border mx-1 hidden sm:block" />
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload}>
+                                <Download className="h-3.5 w-3.5" />
+                            </Button>
+
+                            <div className="h-4 w-[1px] bg-border mx-1" />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 p-0 flex items-center justify-center group/eye"
+                                onClick={handleEyeClick}
+                                disabled={isCompiling}
+                                title="Gromit Assist"
+                            >
+                                <div className="relative flex items-center justify-center">
+                                    <Asterisk
+                                        className={`text-blue-500 transition-transform ${isCompiling || isEyeSpinning ? 'animate-spin' : ''}`}
+                                        size={26}
+                                        strokeWidth={3}
+                                    />
+                                </div>
+                            </Button>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Pagination Controls Floating */}
