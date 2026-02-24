@@ -711,16 +711,13 @@ export function DocumentCompilerSection({
             'DATI_SENSIBILI', 'DATI_COMPORTAMENTALI', 'INDIRIZZO_IP', 'ALTRO'
           ];
 
-          const valueToScanStatus = new Map<string, boolean>();
+          const valueToDetails = new Map<string, { isScanned: boolean, category: string }>();
           for (const res of flatResults) {
             const doc = allDocs.find(d => d.name === res.name);
             const isScanned = (doc as any)?.isScanned === true;
             for (const f of res.findings) {
               const rawValue = f.value.trim();
               if (!rawValue || rawValue.length < 2) continue;
-              if (!valueToScanStatus.has(rawValue) || valueToScanStatus.get(rawValue) === true) {
-                valueToScanStatus.set(rawValue, isScanned);
-              }
               if (/^\[[A-Z_]+(?:_\d+)?\]$/.test(rawValue)) continue;
               if (/^<[^>]+>$/.test(rawValue)) continue;
               if (rawValue.toLowerCase() === 'null' || rawValue.toLowerCase() === 'undefined') continue;
@@ -753,6 +750,10 @@ export function DocumentCompilerSection({
                 else category = 'ALTRO';
               }
 
+              if (!valueToDetails.has(rawValue) || valueToDetails.get(rawValue)?.isScanned === true) {
+                valueToDetails.set(rawValue, { isScanned, category });
+              }
+
               let token = "";
               const normalizedValue = rawValue.toLowerCase();
               for (const [existingToken, existingValue] of vaultMap.entries()) {
@@ -783,7 +784,7 @@ export function DocumentCompilerSection({
           let finalSweepVault: [string, string][] = [];
           try {
             console.log(`[DocumentCompiler] STEP 3: Unifying variations...`);
-            const unificationEntries = Array.from(valueToScanStatus.entries()).map(([value, isScanned]) => ({ value, isScanned }));
+            const unificationEntries = Array.from(valueToDetails.entries()).map(([value, details]) => ({ value, category: details.category, isScanned: details.isScanned }));
             const unificationMap = await unifyPIIFindings(unificationEntries, selectedModel);
             const canonicalToToken = new Map<string, string>();
             const collapsedVault = new Map<string, string>();

@@ -713,7 +713,7 @@ async function _extractWithRetry(payload: any, retries = 3, delay = 2000, signal
  * Returns a mapping: { "Original Value": "Canonical Value" }
  */
 export async function unifyPIIFindings(
-    entries: { value: string, isScanned: boolean }[],
+    entries: { value: string, category: string, isScanned: boolean }[],
     modelId: string = DEFAULT_OLLAMA_MODEL
 ): Promise<Record<string, string>> {
     if (!entries || entries.length <= 1) {
@@ -730,9 +730,11 @@ export async function unifyPIIFindings(
         return identity;
     }
 
-    const promptData = validEntries.map(e => `${e.value} [${e.isScanned ? 'SCAN' : 'DIGITAL'}]`).join('\n');
+    const promptData = validEntries.map(e => `[${e.category}] ${e.value} (${e.isScanned ? 'SCAN' : 'DIGITAL'})`).join('\n');
 
     const prompt = `Unify the following personal data strings. Group variations of the same entity (e.g. same address with different formatting, same name).
+The data includes the CATEGORY of each entity to provide context. DO NOT unify entities of different categories.
+
 RULES:
 1. Return ONLY a JSON object: {"variation": "canonical_value"}.
 2. IMPORTANT: If a "DIGITAL" version of a value exists, ALWAYS choose it as the "canonical_value" over any "SCAN" version. Scanned versions often have OCR errors.
@@ -740,7 +742,7 @@ RULES:
 4. If a value is unique, map it to itself.
 5. No explanations, no markdown, no other text.
 
-Data list (format: value [source_type]):
+Data list (format: [CATEGORY] value (source_type)):
 ${promptData}
 `;
 
