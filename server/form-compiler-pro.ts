@@ -120,8 +120,7 @@ Restituisci JSON:
     { 
       "name": "ID tecnico originale (es: f1_1[0])", 
       "label": "Etichetta Umana leggibile (es: 1a Name)", 
-      "value": "Valore Proposto", 
-      "reasoning": "Breve logica (es: Trovato nel box 1a del Master)" 
+      "value": "Valore Proposto"
     }
   ]
 }
