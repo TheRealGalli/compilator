@@ -545,9 +545,6 @@ export function DocumentCompilerSection({
       if (isPawnActive && !isConfirmed) {
         console.log('[DocumentCompiler] Hybrid Pawn Check triggered...');
 
-        // Ensure model is loaded in VRAM (may have been unloaded after a cancelled review)
-        await preloadModel(selectedModel);
-
         if (ollamaStatus !== 'connected') {
           toast({
             title: "Ollama non connesso",
@@ -1892,6 +1889,8 @@ export function DocumentCompilerSection({
                 // Free VRAM: unload the model since user cancelled the review
                 if (selectedModel) {
                   await unloadModel(selectedModel);
+                  // Immediately reload so it's warm for the next compile
+                  preloadModel(selectedModel); // fire-and-forget, no await
                 }
               }}
             >
