@@ -1629,8 +1629,8 @@ ${isPawnActive ? `
 3. **QUESTI NON SONO DATI MANCANTI**. Rappresentano dati REALI e VALIDI che l'utente possiede.
 4. **NON** provare a "indovinare" o riempire questi token.
 5. **TRATTALI COME VALORI DEFINITIVI**. Inseriscili nel documento finale ESATTAMENTE come li trovi.
-6. **DIVIETO DI RIPETIZIONE (CRITICO)**: Usa ogni token ESATTAMENTE UNA VOLTA per ogni occorrenza del dato reale che rappresenta. NON ripetere lo stesso token più volte per "riempire" un campo (es. se l'indirizzo è frammentato, usa [INDIRIZZO_1] una volta sola, non scrivere "[INDIRIZZO_1] [INDIRIZZO_1] DI [INDIRIZZO_1]").
-7. Costruisci le frasi attorno a questi token in modo naturale.
+6. **DIVIETO DI RIPETIZIONE (TASSATIVO)**: È severamente vietato concatenare o ripetere lo stesso token più volte per rappresentare un singolo dato (es: NON scrivere "[INDIRIZZO_1] [INDIRIZZO_1] DI [INDIRIZZO_1]"). Usa il token UNA SOLA VOLTA per ogni occorrenza logica del dato. Qualsiasi ripetizione di token identici adiacenti verrà considerata un errore grave di privacy.
+7. **FLUIDITÀ TESTUALE**: Costruisci le frasi attorno ai token in modo naturale. Se un indirizzo è frammentato, usa il token [INDIRIZZO_1] nel punto più appropriato e ricostruisci il resto del testo statico in modo fluido.
 
 **ECCEZIONE DI VALIDAZIONE CONTESTUALE (FALSO POSITIVO):**
 - **SOLO SE** un token appare in un contesto **PALESEMENTE ILLOGICO** (es. "Il muro era color [NOME_1]"), considera l'opzione che il sistema locale abbia sbagliato (es. confondendo la parola "GIALLI" con il cognome "GALLI").
@@ -1994,7 +1994,7 @@ ISTRUZIONI OUTPUT:
         compiledContent: restoredContent,
         groundingMetadata,
         aiMetadata,
-        fetchedCompilerContext, // For tracing
+        fetchedCompilerContext: isPawnActive ? '' : fetchedCompilerContext, // Cleared if Pawn is active
         extractedFields,
         manualAnnotations,
         guardrailVault: Object.fromEntries(vault)
@@ -2025,14 +2025,13 @@ ISTRUZIONI OUTPUT:
       const masterSource = compileContext.masterSource;
       const notes = compileContext.notes;
       const hasMemory = multimodalFiles?.some((s: any) => s.isMemory);
+      const isPawnActive = compileContext.activeGuardrails?.includes('pawn');
       // We use the fetched context passed from frontend to avoid re-fetching
-      const fetchedCompilerContext = compileContext.fetchedCompilerContext || '';
+      const fetchedCompilerContext = isPawnActive ? '' : (compileContext.fetchedCompilerContext || '');
       const hasExternalSources = fetchedCompilerContext.length > 0;
 
       const now = new Date();
       const dateTimeIT = now.toLocaleString('it-IT', { timeZone: 'Europe/Rome', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-      const isPawnActive = compileContext.activeGuardrails?.includes('pawn');
       // Priorità alla vault inviata specificamente per il refine, fallback a quella del contesto
       const vault = new Map<string, string>(Object.entries(refinementVault || compileContext.guardrailVault || {}));
 

@@ -792,7 +792,7 @@ ${promptData}
  * Questo riduce la latenza della prima richiesta reale ("Cold Start").
  */
 export async function preloadModel(modelId: string): Promise<void> {
-    if (!modelId || modelId.includes('-cloud')) return; // Solo per modelli locali
+    if (!modelId) return;
 
     console.log(`[OllamaLocal] Precaricamento proattivo: ${modelId}`);
     try {
@@ -819,7 +819,7 @@ export async function preloadModel(modelId: string): Promise<void> {
  * Utilizzato per il cambio modello o la chiusura della sessione browser.
  */
 export async function unloadModel(modelId: string): Promise<void> {
-    if (!modelId || modelId.includes('-cloud')) return; // Solo per modelli locali
+    if (!modelId) return;
 
     console.log(`[OllamaLocal] Scaricamento proattivo: ${modelId}`);
     try {

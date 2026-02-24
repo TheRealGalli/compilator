@@ -979,7 +979,9 @@ export function DocumentCompilerSection({
           fetchedCompilerContext: data.fetchedCompilerContext,
           extractedFields: data.extractedFields,
           manualAnnotations: data.manualAnnotations,
-          groundingMetadata: data.groundingMetadata
+          groundingMetadata: data.groundingMetadata,
+          activeGuardrails: activeGuardrails,
+          guardrailVault: isPawnActive ? data.guardrailVault : undefined
         };
 
         let finalContent = sanitizedContent;
@@ -1468,8 +1470,10 @@ export function DocumentCompilerSection({
                     minimal={true}
                     compileContext={lastCompileContext}
                     currentContent={pendingContent || compiledContent}
-                    onPreview={(newContent) => {
+                    anonymizedContent={pendingAnonymizedContent || anonymizedContent}
+                    onPreview={(newContent, newAnonymizedContent) => {
                       setPendingContent(newContent);
+                      if (newAnonymizedContent) setPendingAnonymizedContent(newAnonymizedContent);
                       setIsReviewing(true);
                     }}
                     isReviewing={isReviewing}

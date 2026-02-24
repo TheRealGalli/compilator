@@ -91,7 +91,9 @@ export function RefineChat({
             const analysisPrompt = "Effettua un'analisi iniziale del documento appena compilato. Riassumi brevemente il contenuto, identifica chiaramente quale documento è stato usato come Master Pin (se presente) e quali fonti hai consultato. Concludi chiedendo come posso aiutarti oggi.";
             const response = await apiRequest('POST', '/api/refine', {
                 compileContext,
-                currentContent: (compileContext.activeGuardrails?.includes('pawn') && anonymizedContent) ? anonymizedContent : currentContent,
+                currentContent: compileContext.activeGuardrails?.includes('pawn')
+                    ? performMechanicalGlobalSweep(anonymizedContent || currentContent, guardrailVault)
+                    : currentContent,
                 userInstruction: analysisPrompt,
                 chatHistory: [],
                 webResearch: compileContext.webResearch,
@@ -318,7 +320,8 @@ export function RefineChat({
                 setGuardrailVault(updatedVault);
 
                 // PRIVACY CRITICAL: Anonymize the DOCUMENT CONTENT and NOTES using the updated vault.
-                finalCurrentContent = performMechanicalGlobalSweep(currentContent, updatedVault);
+                // We base our sweep on anonymizedContent if available to avoid re-introducing clear text.
+                finalCurrentContent = performMechanicalGlobalSweep(anonymizedContent || currentContent, updatedVault);
                 finalNotes = compileContext.notes ? performMechanicalGlobalSweep(compileContext.notes, updatedVault) : compileContext.notes;
 
                 // PRIVACY CRITICAL: Anonymize MENTIONS payload because the user highlighted deciphered text
