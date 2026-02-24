@@ -61,8 +61,12 @@ const NAME_INDICATORS = [
 
 // 2. BIRTHPLACE INDICATORS (Prefixes for places)
 const BIRTHPLACE_INDICATORS = [
-    'nato a', 'nata a', 'nati a', 'residente a', 'residente in', 'vivente a', 'domiciliato a',
-    'sito in', 'sede a', 'luogo di nascita'
+    'nato a', 'nata a', 'nati a', 'luogo di nascita'
+];
+
+// 2b. ADDRESS INDICATORS (Prefixes for residential/business addresses)
+const ADDRESS_INDICATORS = [
+    'residente a', 'residente in', 'vivente a', 'domiciliato a', 'sito in', 'sede a', 'con sede in'
 ];
 
 // Helper to grab context around a match
@@ -255,7 +259,10 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
                     else conf = 'LOW'; // "Pincopallo Vattelapesca" (Neither found)
                 }
 
-                if (type === 'LUOGO_NASCITA') conf = 'MEDIUM';
+                if (type === 'LUOGO_NASCITA' || type === 'INDIRIZZO') {
+                    // Addresses and birthplaces are typically valid if they match the heuristic
+                    conf = 'MEDIUM';
+                }
 
                 addCandidate(potentialValue, type, match.index + match[0].indexOf(potentialValue), conf);
             }
@@ -264,6 +271,7 @@ export function scanTextCandidates(text: string): CandidateFinding[] {
 
     matchHeuristic(NAME_INDICATORS, 'NOME');
     matchHeuristic(BIRTHPLACE_INDICATORS, 'LUOGO_NASCITA');
+    matchHeuristic(ADDRESS_INDICATORS, 'INDIRIZZO');
 
     // 3. DICTIONARY SWEEP (Find "Name Surname" anywhere)
     // This catches "Mario Rossi" even without "Sig." prefix.
