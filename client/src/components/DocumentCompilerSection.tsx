@@ -980,8 +980,7 @@ export function DocumentCompilerSection({
           extractedFields: data.extractedFields,
           manualAnnotations: data.manualAnnotations,
           groundingMetadata: data.groundingMetadata,
-          activeGuardrails: activeGuardrails,
-          guardrailVault: isPawnActive ? data.guardrailVault : undefined
+          activeGuardrails: activeGuardrails
         };
 
         let finalContent = sanitizedContent;
@@ -1011,7 +1010,7 @@ export function DocumentCompilerSection({
         }
 
         if (onCompile) onCompile(sanitizedContent);
-        if (data.guardrailVault) setGuardrailVault(data.guardrailVault);
+        // ZERO-DATA: Vault stays client-side, server never sends it back
         setIsWaitingForPawnApproval(false);
 
         toast({

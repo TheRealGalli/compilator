@@ -96,8 +96,7 @@ export function RefineChat({
                     : currentContent,
                 userInstruction: analysisPrompt,
                 chatHistory: [],
-                webResearch: compileContext.webResearch,
-                guardrailVault: guardrailVault // Use session vault
+                webResearch: compileContext.webResearch
             });
 
             const data = await response.json();
@@ -117,9 +116,7 @@ export function RefineChat({
                 groundingMetadata: data.groundingMetadata
             };
 
-            if (data.guardrailVault) {
-                setGuardrailVault(data.guardrailVault);
-            }
+            // ZERO-DATA: Vault stays client-side, server never sends it back
 
             setMessages(prev => {
                 if (prev.length > 0) {
@@ -353,8 +350,8 @@ export function RefineChat({
                     role: m.role,
                     text: isPawnActive ? performMechanicalGlobalSweep(m.text, updatedVault) : m.text
                 })),
-                webResearch: compileContext.webResearch,
-                guardrailVault: updatedVault // Send updated vault
+                webResearch: compileContext.webResearch
+                // ZERO-DATA: Vault NEVER sent to server
             });
 
             const data = await response.json();
@@ -372,7 +369,7 @@ export function RefineChat({
 
             // Only de-anonymize if Pawn was active (otherwise server returned clear text)
             if (isPawnActive) {
-                deanonymizedExplanation = performMechanicalReverseSweep(rawExplanation, data.guardrailVault || updatedVault);
+                deanonymizedExplanation = performMechanicalReverseSweep(rawExplanation, updatedVault);
             }
 
             // Add de-anonymized AI message to chat history
@@ -385,9 +382,7 @@ export function RefineChat({
             };
 
 
-            if (data.guardrailVault) {
-                setGuardrailVault(data.guardrailVault);
-            }
+            // ZERO-DATA: Vault stays client-side, server never sends it back
 
             setMessages(prev => [...prev, aiMsg]);
 
@@ -395,7 +390,7 @@ export function RefineChat({
                 // PAWN: In anteprima (Reviewing), mostriamo i dati REALI all'utente (Reverse Sweep).
                 // Lo scambio con il server rimane basato sui token, ma l'utente deve vedere il risultato finale.
                 const contentToShow = isPawnActive
-                    ? performMechanicalReverseSweep(data.newContent, data.guardrailVault || updatedVault)
+                    ? performMechanicalReverseSweep(data.newContent, updatedVault)
                     : data.newContent;
                 onPreview(contentToShow, data.newContent);
             }

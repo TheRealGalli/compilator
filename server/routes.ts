@@ -1814,7 +1814,7 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
 
   app.post('/api/compile', checkLimit('compilation'), async (req: Request, res: Response) => {
     try {
-      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations, activeGuardrails, guardrailVault } = req.body;
+      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations, activeGuardrails } = req.body;
 
       console.log('[API compile] Request received:', {
         modelProvider,
@@ -1870,7 +1870,6 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
       const hasMemory = multimodalFiles?.some((s: any) => s.isMemory);
 
       const isPawnActive = activeGuardrails?.includes('pawn');
-      const vault = new Map<string, string>(Object.entries(guardrailVault || {}));
 
       console.log(`[GUARDIAN] Pawn Status: ${isPawnActive ? 'ACTIVE' : 'INACTIVE'}`);
 
@@ -1996,8 +1995,7 @@ ISTRUZIONI OUTPUT:
         aiMetadata,
         fetchedCompilerContext: isPawnActive ? '' : fetchedCompilerContext, // Cleared if Pawn is active
         extractedFields,
-        manualAnnotations,
-        guardrailVault: Object.fromEntries(vault)
+        manualAnnotations
       });
 
       // Increment usage count if middleware attached method
@@ -2016,7 +2014,7 @@ ISTRUZIONI OUTPUT:
   // --- NEW: Refine / Chat Endpoint ---
   app.post('/api/refine', checkLimit('chat'), async (req: Request, res: Response) => {
     try {
-      const { compileContext, currentContent, userInstruction, chatHistory, mentions, mentionRegistry, webResearch, guardrailVault: refinementVault } = req.body;
+      const { compileContext, currentContent, userInstruction, chatHistory, mentions, mentionRegistry, webResearch } = req.body;
 
       console.log(`[API refine] Request received | Mentions: ${mentions?.length || 0} | Registry: ${mentionRegistry?.length || 0}`);
 
@@ -2032,12 +2030,11 @@ ISTRUZIONI OUTPUT:
 
       const now = new Date();
       const dateTimeIT = now.toLocaleString('it-IT', { timeZone: 'Europe/Rome', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      // Priorità alla vault inviata specificamente per il refine, fallback a quella del contesto
-      const vault = new Map<string, string>(Object.entries(refinementVault || compileContext.guardrailVault || {}));
+      // ZERO-DATA: The vault (token -> real value) NEVER leaves the client.
+      // The server only sees anonymized text with tokens.
 
       console.log(`[GUARDIAN] Refine Pawn Status: ${isPawnActive ? 'ACTIVE' : 'INACTIVE'}`);
       if (isPawnActive) {
-        console.log(`[GUARDIAN] Refine Vault size: ${vault.size}`);
         // Security Gate: Reject multimodal in Refine Pawn
         if (multimodalFiles && multimodalFiles.length > 0) {
           for (const s of multimodalFiles) {
@@ -2188,8 +2185,7 @@ ISTRUZIONI OPERATIVE:
         success: true,
         newContent: finalParsed.newContent,
         explanation: finalParsed.explanation,
-        groundingMetadata: groundingMetadata,
-        guardrailVault: Object.fromEntries(vault)
+        groundingMetadata: groundingMetadata
       });
 
       // Increment usage count

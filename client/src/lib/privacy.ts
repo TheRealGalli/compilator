@@ -13,30 +13,13 @@ export const performMechanicalGlobalSweep = (text: string, vault: Record<string,
     if (entries.length === 0) return text;
 
     let result = text;
-    // Order by value length descending to avoid partial matches
-    // entry[1] is the value to find
-    const initialEntries = Array.isArray(vault) ? [...vault] : Object.entries(vault);
+    // Order by value length descending to match longest (most specific) values first.
+    // This ensures "7901 4TH ST N STE 300, ST. PETERSBURG, FL 33702" matches before any substring.
+    // NO word-splitting: only sweep COMPLETE values as extracted by Ollama/Regex.
+    const initialEntries: [string, string][] = (Array.isArray(vault) ? [...vault] : Object.entries(vault))
+        .filter(([_, value]) => value && value.length >= 2);
 
-    // AGGRESSIVE: If a value has multiple words (e.g. "Mario Rossi"), 
-    // we should ALSO censor individual words (if > 2 chars) to avoid leaks.
-    const expandedEntries: [string, string][] = [];
-    for (const [token, value] of initialEntries) {
-        if (!value || value.length < 2) continue;
-        expandedEntries.push([token, value]);
-
-        // Skip common short street types or noise if possible, but keep it simple for now as per user request
-        if (value.includes(' ')) {
-            const parts = value.split(/[\s\/]+/).filter(p => p.length > 2);
-            for (const part of parts) {
-                // Only add if not already present as a full value tracking to the same or different token
-                if (!expandedEntries.some(e => e[1].toLowerCase() === part.toLowerCase())) {
-                    expandedEntries.push([token, part]);
-                }
-            }
-        }
-    }
-
-    const sortedEntries = expandedEntries.sort((a, b) => b[1].length - a[1].length);
+    const sortedEntries = initialEntries.sort((a, b) => b[1].length - a[1].length);
 
     for (const [token, value] of sortedEntries) {
 
