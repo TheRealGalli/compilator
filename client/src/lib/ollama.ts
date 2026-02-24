@@ -806,9 +806,9 @@ ${promptData}
 export async function preloadModel(modelId: string): Promise<void> {
     if (!modelId) return;
 
-    console.log(`[OllamaLocal] Precaricamento proattivo: ${modelId}`);
+    console.log(`[OllamaLocal] Invio richiesta precaricamento: ${modelId}...`);
     try {
-        await smartFetch(`${currentBaseUrl}/api/generate`, {
+        const response = await smartFetch(`${currentBaseUrl}/api/generate`, {
             method: 'POST',
             body: JSON.stringify({
                 model: modelId,
@@ -820,9 +820,13 @@ export async function preloadModel(modelId: string): Promise<void> {
                 }
             })
         });
-        console.log(`[Ollama] Modello ${modelId} CARICATO in RAM (Sessione Alive: -1)`);
+        if (response && response.ok !== false) {
+            console.log(`[Ollama] Modello ${modelId} CARICATO in RAM (Sessione Alive: -1)`);
+        } else {
+            console.warn(`[Ollama] Preload ${modelId}: risposta non confermata (status: ${response?.status})`);
+        }
     } catch (err) {
-        console.warn(`[OllamaLocal] Preload fallito per ${modelId}:`, err);
+        console.warn(`[OllamaLocal] Preload FALLITO per ${modelId}:`, err);
     }
 }
 
@@ -833,19 +837,25 @@ export async function preloadModel(modelId: string): Promise<void> {
 export async function unloadModel(modelId: string): Promise<void> {
     if (!modelId) return;
 
-    console.log(`[OllamaLocal] Scaricamento proattivo: ${modelId}`);
+    console.log(`[OllamaLocal] Invio richiesta scaricamento: ${modelId}...`);
     try {
-        await smartFetch(`${currentBaseUrl}/api/generate`, {
+        const response = await smartFetch(`${currentBaseUrl}/api/generate`, {
             method: 'POST',
             body: JSON.stringify({
                 model: modelId,
+                prompt: "",
+                stream: false,
                 options: {
                     keep_alive: 0
                 }
             })
         });
-        console.log(`[Ollama] Modello ${modelId} SCARICATO dalla RAM (Sessione Alive: 0)`);
+        if (response && response.ok !== false) {
+            console.log(`[Ollama] Modello ${modelId} SCARICATO dalla RAM (Sessione Alive: 0)`);
+        } else {
+            console.warn(`[Ollama] Unload ${modelId}: risposta non confermata (status: ${response?.status})`);
+        }
     } catch (err) {
-        console.warn(`[OllamaLocal] Unload fallito per ${modelId}:`, err);
+        console.warn(`[OllamaLocal] Unload FALLITO per ${modelId}:`, err);
     }
 }

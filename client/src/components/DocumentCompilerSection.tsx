@@ -37,7 +37,7 @@ import { Slider } from "@/components/ui/slider";
 import { getApiUrl } from "@/lib/api-config";
 import { apiRequest } from "@/lib/queryClient";
 import { extractTextLocally } from "@/lib/local-extractor";
-import { extractPIILocal, unifyPIIFindings, isNoisyPII, DEFAULT_OLLAMA_MODEL, AVAILABLE_MODELS } from '../lib/ollama';
+import { extractPIILocal, unifyPIIFindings, isNoisyPII, DEFAULT_OLLAMA_MODEL, AVAILABLE_MODELS, preloadModel, unloadModel } from '../lib/ollama';
 import { useOllama } from "@/contexts/OllamaContext";
 import { performMechanicalGlobalSweep, performMechanicalReverseSweep, anonymizeWithOllamaLocal } from "@/lib/privacy";
 
@@ -544,6 +544,9 @@ export function DocumentCompilerSection({
       // --- NEW: PREVENTIVE PAWN CHECK (LOCAL-FIRST) ---
       if (isPawnActive && !isConfirmed) {
         console.log('[DocumentCompiler] Hybrid Pawn Check triggered...');
+
+        // Ensure model is loaded in VRAM (may have been unloaded after a cancelled review)
+        await preloadModel(selectedModel);
 
         if (ollamaStatus !== 'connected') {
           toast({
@@ -1883,9 +1886,13 @@ export function DocumentCompilerSection({
           <DialogFooter className="flex-col sm:flex-row gap-2 p-6 pt-2 border-t bg-slate-50/50">
             <Button
               variant="outline"
-              onClick={() => {
+              onClick={async () => {
                 setIsAnonymizationReportOpen(false);
                 setIsWaitingForPawnApproval(false);
+                // Free VRAM: unload the model since user cancelled the review
+                if (selectedModel) {
+                  await unloadModel(selectedModel);
+                }
               }}
             >
               Annulla
