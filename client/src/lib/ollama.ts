@@ -451,7 +451,7 @@ export async function extractPIILocal(text: string, modelId: string = DEFAULT_OL
     }
 
     const prompt = `Find PERSONAL data in the text for pseudonymization.
-${isScanned ? 'WARNING: This text comes from a LOW-QUALITY SCAN (OCR). It may contain noise, broken characters, or duplicates. Be EXTREMELY selective: extract only clearly identifiable PII and avoid repeating the same value multiple times.' : ''}
+${isScanned ? 'WARNING: This text comes from a LOW-QUALITY SCAN (OCR). It may contain noise, broken characters, or duplicates. Be EXTREMELY selective: extract only clearly identifiable PII and avoid repeating the same value multiple times.\nCRITICAL: If a PII candidate appears heavily corrupted by OCR (e.g., a Codice Fiscale with spaces like "L T L P R Z", a name with random symbols/numbers, or fragmented text), DO NOT EXTRACT IT. IGNORE IT COMPLETELY.' : ''}
 RULES:
 1. Return ONLY a JSON array of objects: [{"category": "...", "value": "..."}].
 2. Extract absolutely EVERYTHING relevant: Names, Surnames, Companies, Organizations, Addresses (Street, City, ZIP, State, Country), Dates (Birth, Contract, Document dates), Roles, Phone Numbers, Emails, Tax IDs, VAT numbers, Document Numbers (ID cards, Passports), Bank details (IBANs), and any other sensitive data.
@@ -744,8 +744,10 @@ RULES:
 2. IMPORTANT: If a "DIGITAL" version of a value exists, ALWAYS choose it as the "canonical_value" over any "SCAN" version. Scanned versions often have OCR errors.
 3. The "canonical_value" must be the most complete and accurate version from the list.
 4. IMPORTANT: If the extraction assigned DIFFERENT categories to variations of the SAME entity, YOU MUST STILL UNIFY THEM. (e.g., if an address is marked as birthplace in one doc and address in another, unify them).
-5. If a value is unique, map it to itself.
-6. No explanations, no markdown, no other text.
+5. SAFETY: DO NOT merge distinct individuals or different entities (e.g. DO NOT merge two completely different tax IDs or different people's names). Only merge true variations/typos of the SAME entity.
+6. OCR CORRUPTION: If a variation is clearly a corrupted OCR artifact (e.g., "LTLPRZ68R63" instead of a full tax ID, or a string of random characters) AND there is no valid canonical version to merge it into, map it to "DROP_THIS_CORRUPTED_VALUE" so we can discard it.
+7. If a value is unique and valid, map it to itself.
+8. No explanations, no markdown, no other text.
 
 Data list:
 ${JSON.stringify(formattedData, null, 2)}

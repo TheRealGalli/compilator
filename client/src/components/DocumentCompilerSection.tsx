@@ -794,6 +794,14 @@ export function DocumentCompilerSection({
 
             for (const [token, originalValue] of Array.from(vaultMap.entries())) {
               const canonical = unificationMap[originalValue] || originalValue;
+
+              if (canonical === 'DROP_THIS_CORRUPTED_VALUE') {
+                console.log(`[Privacy] Dropping corrupted scan artifact: '${originalValue}'`);
+                vaultMap.delete(token); // completely remove from memory
+                vaultCounts.delete(token);
+                continue;
+              }
+
               const normalizedCanonical = canonical.toLowerCase();
               if (!canonicalToToken.has(normalizedCanonical)) {
                 canonicalToToken.set(normalizedCanonical, token);
@@ -802,6 +810,8 @@ export function DocumentCompilerSection({
               } else {
                 const targetToken = canonicalToToken.get(normalizedCanonical)!;
                 collapsedCounts.set(targetToken, (collapsedCounts.get(targetToken) || 0) + (vaultCounts.get(token) || 0));
+                // We still need to sweep the original token from text, but map to canonical
+                vaultMap.delete(token); // Remap token pointer logically by just excluding it from 'vaultMap' later
               }
               const targetToken = canonicalToToken.get(normalizedCanonical)!;
               finalSweepVault.push([targetToken, originalValue]);
