@@ -1631,6 +1631,7 @@ ${isPawnActive ? `
 5. **TRATTALI COME VALORI DEFINITIVI**. Inseriscili nel documento finale ESATTAMENTE come li trovi.
 6. **DIVIETO DI RIPETIZIONE (TASSATIVO)**: È severamente vietato concatenare o ripetere lo stesso token più volte per rappresentare un singolo dato (es: NON scrivere "[INDIRIZZO_1] [INDIRIZZO_1] DI [INDIRIZZO_1]"). Usa il token UNA SOLA VOLTA per ogni occorrenza logica del dato. Qualsiasi ripetizione di token identici adiacenti verrà considerata un errore grave di privacy.
 7. **FLUIDITÀ TESTUALE**: Costruisci le frasi attorno ai token in modo naturale. Se un indirizzo è frammentato, usa il token [INDIRIZZO_1] nel punto più appropriato e ricostruisci il resto del testo statico in modo fluido.
+8. **EPURA DATI RESIDUI (TASSATIVO)**: Se attorno a un token trovi testo che sembra un frammento di dato personale non oscurato, non affiancare o combinare MAI un token alle parti del valore non anonimizzate. Il token sostituisce l'intera entità non è parziale.
 
 **ECCEZIONE DI VALIDAZIONE CONTESTUALE (FALSO POSITIVO):**
 - **SOLO SE** un token appare in un contesto **PALESEMENTE ILLOGICO** (es. "Il muro era color [NOME_1]"), considera l'opzione che il sistema locale abbia sbagliato (es. confondendo la parola "GIALLI" con il cognome "GALLI").
