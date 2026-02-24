@@ -459,6 +459,8 @@ RULES:
 4. If a data point doesn't perfectly fit the schema, DO NOT ignore it. Use "GENERIC_PII" or create a concise, snake_case category name that describes it (e.g., "LICENSE_PLATE", "HEALTH_CONDITION").
 5. Return valid JSON. No descriptions, no explanations, no conversational text.
 6. If no PII is found, return [].
+7. **ANTI-LOOP (CRITICAL)**: NEVER output the same object twice. Each {"category", "value"} pair MUST appear EXACTLY ONCE in the array. If a name appears 5 times in the text, extract it ONCE. Duplicates = failure.
+8. **STOP CONDITION**: Once you have listed all unique PII items, CLOSE the JSON array with ] and STOP generating. Do NOT repeat the array or any items.
 
 SCHEMA DEFINITIONS (Use these preferentially, but don't limit yourself if other PII exists):
 ${PII_SCHEMA_DEFINITIONS}
@@ -613,11 +615,21 @@ ${llmText}
             }
         }
 
+        // DEDUP: Remove exact duplicates by value (case-insensitive)
         const seenValues = new Set<string>();
         findings = findings.filter(f => {
             const key = f.value.toLowerCase().trim();
             if (seenValues.has(key)) return false;
             seenValues.add(key);
+            return true;
+        });
+
+        // DEDUP: Remove duplicates by category+value combo (anti-loop safety net)
+        const seenCatValue = new Set<string>();
+        findings = findings.filter(f => {
+            const key = `${f.category}::${f.value.toLowerCase().trim()}`;
+            if (seenCatValue.has(key)) return false;
+            seenCatValue.add(key);
             return true;
         });
 
