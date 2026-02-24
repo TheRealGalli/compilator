@@ -883,7 +883,13 @@ export function DocumentCompilerSection({
           if (cached && (cached.originalText || cached.text)) {
             const anonymized = await getAnonymizedText(s);
             const newName = `${s.name.replace(/\.[^/.]+$/, "")}.txt`;
-            // PAYLOAD (source swap deferred to after compilation succeeds)
+            // PERSISTENCE SWAP
+            updateSource(s.id, {
+              name: newName,
+              base64: toBase64(anonymized),
+              type: 'text/plain'
+            });
+            // PAYLOAD
             finalSources.push({
               name: newName,
               type: 'text/plain',
@@ -902,7 +908,11 @@ export function DocumentCompilerSection({
           if (cached && (cached.originalText || cached.text)) {
             const anonymizedMaster = await getAnonymizedText(masterSource);
             const newName = `${masterSource.name.replace(/\.[^/.]+$/, "")}.txt`;
-            // PAYLOAD (source swap deferred to after compilation succeeds)
+            updateSource(masterSource.id, {
+              name: newName,
+              base64: toBase64(anonymizedMaster),
+              type: 'text/plain'
+            });
             finalMasterSource = {
               name: newName,
               type: 'text/plain',
@@ -1000,32 +1010,6 @@ export function DocumentCompilerSection({
         }
 
         if (onCompile) onCompile(sanitizedContent);
-
-        // DEFERRED SOURCE SWAP: Only update source icons/types AFTER compilation succeeds
-        if (isPawnActive) {
-          for (const s of selectedSources) {
-            const cached = sourceTextCache.current.find(d => d.id === s.id);
-            if (cached && (cached.originalText || cached.text)) {
-              const newName = `${s.name.replace(/\.[^/.]+$/, "")}.txt`;
-              updateSource(s.id, {
-                name: newName,
-                base64: toBase64(cached.text || ''),
-                type: 'text/plain'
-              });
-            }
-          }
-          if (masterSource) {
-            const cached = sourceTextCache.current.find(d => d.id === masterSource.id);
-            if (cached && (cached.originalText || cached.text)) {
-              const newName = `${masterSource.name.replace(/\.[^/.]+$/, "")}.txt`;
-              updateSource(masterSource.id, {
-                name: newName,
-                base64: toBase64(cached.text || ''),
-                type: 'text/plain'
-              });
-            }
-          }
-        }
         // ZERO-DATA: Vault stays client-side, server never sends it back
         setIsWaitingForPawnApproval(false);
 
