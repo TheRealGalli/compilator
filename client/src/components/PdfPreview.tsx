@@ -589,7 +589,7 @@ export function PdfPreview({
     return (
         <Card className={`relative flex flex-col h-full overflow-hidden border-none shadow-none bg-slate-900/5 ${className}`}>
             {/* Custom Toolbar - Matching ModeSettings style */}
-            <div className="flex items-center justify-between px-4 py-1.5 bg-muted/30 border-b select-none z-10 shadow-sm h-12">
+            <div className="flex items-center justify-between px-4 py-1 bg-muted/30 border-b select-none z-10 shadow-sm h-10">
                 <div className="flex items-center gap-4">
                     <span className="text-sm font-medium truncate max-w-[200px] flex items-center gap-2">
                         Documento PDF

@@ -5,7 +5,6 @@ import { ThreeStars } from "@/components/ui/three-stars"; // Gromit Core Brandin
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TemplateEditor } from "./TemplateEditor";
-import { CompiledOutput } from "./CompiledOutput";
 import { PdfPreview } from "./PdfPreview";
 import { ModelSettings } from "./ModelSettings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -278,7 +277,6 @@ export function DocumentCompilerSection({
   const setIsPdfMode = (val: boolean) => setCurrentMode(val ? 'fillable' : 'standard');
 
   const [pendingMention, setPendingMention] = useState<{ text: string; id: string; start?: number; end?: number } | null>(null);
-  const [isOutputVisible, setIsOutputVisible] = useState(false);
   const [mentionCounts, setMentionCounts] = useState({ template: 0, copilot: 0, anteprema: 0 });
 
   const [isAnonymizationReportOpen, setIsAnonymizationReportOpen] = useState(false);
@@ -1546,104 +1544,100 @@ export function DocumentCompilerSection({
               </div>
             ) : (
               /* STANDARD EDITOR VIEW */
-              <div className="flex-1 min-w-0 flex gap-4 h-full relative">
-                <div className="flex-1 h-full min-w-0 flex flex-col relative overflow-hidden">
-                  <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
-                    <TemplateEditor
-                      className="border-none rounded-none shadow-none"
-                      key={`editor-${isReviewing}-${isLocked}`}
-                      value={isReviewing ? (pendingContent || templateContent) : templateContent}
-                      onChange={(val) => {
-                        setTemplateContent(val);
-                        // Sync with output ONLY if we are in "Template Compilato" mode (Copilot active)
-                        if (isRefiningMode && !isReviewing) {
-                          setCompiledContent(val);
-                        }
-                      }}
-                      title={isReviewing
-                        ? "Anteprima Modifiche AI"
-                        : (compiledContent
-                          ? `Template Compilato${masterSource ? ` (${masterSource.name})` : ''}`
-                          : ((currentMode as string) === 'fillable'
-                            ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
-                            : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`))
+              <div className="flex-1 h-full min-w-0 flex flex-col relative overflow-hidden">
+                <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
+                  <TemplateEditor
+                    className="border-none rounded-none shadow-none"
+                    key={`editor-${isReviewing}-${isLocked}`}
+                    value={isReviewing ? (pendingContent || templateContent) : templateContent}
+                    onChange={(val) => {
+                      setTemplateContent(val);
+                      // Sync with output ONLY if we are in "Template Compilato" mode (Copilot active)
+                      if (isRefiningMode && !isReviewing) {
+                        setCompiledContent(val);
                       }
-                      placeholder=""
-                      enableMentions={isReviewing || !!compiledContent}
-                      onMention={(text, start, end) => handleMention(text, isReviewing ? 'anteprema' : 'template', start, end)}
-                      headerRight={isReviewing ? (
-                        <div className="flex gap-1 items-center">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all"
-                            onClick={handleRejectRefinement}
-                            title="Rifiuta modifiche"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-green-600 hover:bg-green-50 hover:border-green-200 shadow-sm transition-all"
-                            onClick={handleAcceptRefinement}
-                            title="Accetta modifiche"
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ) : null}
-                    >
-                      <div className="space-y-4 max-w-sm mt-0 text-foreground/70">
-                        <p className="font-medium">Seleziona un template preimpostato o carica il tuo, aggiungi documenti di contesto (visure, contratti, foto), e l'AI compilerà automaticamente tutti i placeholder con le informazioni estratte dai tuoi file.</p>
-                        <p className="text-xs">Perfetto per: contratti, relazioni tecniche, privacy policy, documenti legali.</p>
+                    }}
+                    title={isReviewing
+                      ? "Anteprima Modifiche AI"
+                      : (compiledContent
+                        ? `Template Compilato${masterSource ? ` (${masterSource.name})` : ''}`
+                        : ((currentMode as string) === 'fillable'
+                          ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
+                          : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`))
+                    }
+                    placeholder=""
+                    enableMentions={isReviewing || !!compiledContent}
+                    onMention={(text, start, end) => handleMention(text, isReviewing ? 'anteprema' : 'template', start, end)}
+                    headerRight={
+                      <div className="flex gap-1 items-center">
+                        {isReviewing ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all"
+                              onClick={handleRejectRefinement}
+                              title="Rifiuta modifiche"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-green-600 hover:bg-green-50 hover:border-green-200 shadow-sm transition-all"
+                              onClick={handleAcceptRefinement}
+                              title="Accetta modifiche"
+                            >
+                              <Check className="w-4 h-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          compiledContent && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 border-slate-200 bg-white/80 text-slate-500 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 shadow-sm transition-all text-[10px] font-bold uppercase tracking-wider gap-1.5"
+                                onClick={() => {
+                                  // Clean Copy Logic: Remove markdown escape chars
+                                  const cleanText = compiledContent
+                                    .replace(/\\\[/g, '[')
+                                    .replace(/\\\]/g, ']')
+                                    .replace(/\\\*/g, '*')
+                                    .replace(/\\_/g, '_')
+                                    .replace(/\\#/g, '#');
+
+                                  navigator.clipboard.writeText(cleanText);
+                                  toast({
+                                    title: "Copiato",
+                                    description: "Contenuto pulito copiato negli appunti.",
+                                  });
+                                }}
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                                Copia
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 border-slate-200 bg-white/80 text-slate-500 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 shadow-sm transition-all text-[10px] font-bold uppercase tracking-wider gap-1.5"
+                                onClick={handleDownload}
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                Scarica
+                              </Button>
+                            </>
+                          )
+                        )}
                       </div>
-                    </TemplateEditor>
-                  </Card>
-
-                  {/* CUSTOM TOGGLE HANDLE */}
-                  <div
-                    className={`absolute right-0 top-1/2 -translate-y-1/2 z-[40] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[12px]' : 'translate-x-[15px]'}`}
+                    }
                   >
-                    <button
-                      onClick={() => setIsOutputVisible(!isOutputVisible)}
-                      className="w-[8px] h-[33px] rounded-full bg-[#2563eb] shadow-lg flex flex-col items-center justify-center gap-[4px] hover:scale-110 active:scale-95 transition-all outline-none p-0"
-                      title={isOutputVisible ? "Nascondi output" : "Mostra output"}
-                    >
-                      <div className="w-[1.2px] h-[7px] bg-white rounded-full flex-shrink-0" />
-                      <div className="w-[1.2px] h-[7px] bg-white rounded-full flex-shrink-0" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* COLUMN 3: Compiled Output (Animated Sidebar) */}
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {isOutputVisible && (
-                    <motion.div
-                      key="output-sidebar"
-                      initial={{ width: 0, opacity: 0, x: 20 }}
-                      animate={{ width: '44.44%', opacity: 1, x: 0 }}
-                      exit={{ width: 0, opacity: 0, x: 20 }}
-                      transition={{
-                        duration: 0.5,
-                        ease: [0.32, 0.72, 0, 1]
-                      }}
-                      className="h-full flex flex-col min-w-0 pl-4 overflow-hidden"
-                    >
-                      <CompiledOutput
-                        content={compiledContent}
-                        onCopy={() => {
-                          navigator.clipboard.writeText(compiledContent);
-                          toast({
-                            title: "Copiato",
-                            description: "Il contenuto è stato copiato negli appunti.",
-                          });
-                        }}
-                        onDownload={handleDownload}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    <div className="space-y-4 max-w-sm mt-0 text-foreground/70">
+                      <p className="font-medium">Seleziona un template preimpostato o carica il tuo, aggiungi documenti di contesto (visure, contratti, foto), e l'AI compilerà automaticamente tutti i placeholder con le informazioni estratte dai tuoi file.</p>
+                      <p className="text-xs">Perfetto per: contratti, relazioni tecniche, privacy policy, documenti legali.</p>
+                    </div>
+                  </TemplateEditor>
+                </Card>
               </div>
             )}
           </div>
