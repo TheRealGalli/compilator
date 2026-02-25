@@ -80,20 +80,31 @@ export async function proposePdfFieldValues(
     geminiModel: any,
     webResearch: boolean = false
 ): Promise<Array<{ name: string; label: string; value: string | boolean }>> {
-    try {
-        const prompt = `Sei un esperto di Document Intelligence.
-Il tuo obiettivo è compilare i campi del PDF (FILE MASTER allegato) utilizzando esclusivamente le informazioni presenti nei TESTI FONTE e nelle NOTE UTENTE.
+    const CHUNK_SIZE = 30;
+    const fieldChunks: PdfFormField[][] = [];
+    for (let i = 0; i < fields.length; i += CHUNK_SIZE) {
+        fieldChunks.push(fields.slice(i, i + CHUNK_SIZE));
+    }
 
-Ti forniamo di seguito lo scheletro completo dei campi del form PDF. Per ogni campo troverai il suo ID tecnico (name), il tipo (text, checkbox, radio, dropdown), un'etichetta (Label, se disponibile) e il suo Valore Attuale.
+    const allProposals: Array<{ name: string; label: string; value: string | boolean }> = [];
 
-REGOLE PER I VALORI:
-- **Testo**: Inserisci solo il valore finale pulito e diretto.
-- **Checkbox/Radio**: Rispondi SOLO 'true' o 'false', oppure il valore esatto dell'opzione selezionata.
-- **Valori Preesistenti (CRITICO)**: Se un campo ha già un Valore Attuale sensato (es: '0', 'N/A', o un numero), **NON SOVRASCRIVERLO** con stringhe vuote a meno che le FONTI non indichino esplicitamente un valore diverso per quel campo.
-- **Dati Mancanti**: Se non trovi l'informazione nelle FONTI e il campo è vuoto, lascialo vuoto (stringa vuota ""). Usa "[DATO MANCANTE]" solo se l'assenza del dato invalida palesemente il documento nel caso dell'utente. NON inventare mai valori.
+    // Process chunks in small parallel batches to avoid Vertex rate limits while improving focus
+    for (let i = 0; i < fieldChunks.length; i += 2) {
+        const batch = fieldChunks.slice(i, i + 2);
 
-SCHELETRO DEI CAMPI DA COMPILARE:
-${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
+        const batchResults = await Promise.all(batch.map(async (chunk, chunkIdx) => {
+            try {
+                const prompt = `Sei un esperto di Document Intelligence ad alta precisione.
+Il tuo obiettivo è compilare un BLOCCO di campi del PDF (FILE MASTER allegato) utilizzando i TESTI FONTE, le NOTE UTENTE e la tua conoscenza tecnica.
+
+SCHELETRO DEI CAMPI DA COMPILARE (Blocco ${i / CHUNK_SIZE + chunkIdx + 1}):
+${chunk.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
+
+REGOLE DI PRECISIONE (TASSATIVE):
+1. **Verifica Coerenza Label**: Prima di inserire un valore, confrontalo con la Label del campo. Se il campo chiede una DATA (es. 'Date of incorporation'), NON inserire un NOME o un INDIRIZZO.
+2. **Web Research (Se Attiva)**: ${webResearch ? 'È ATTIVA la ricerca Google. Se le istruzioni per compilare questo specifico PDF sono ambigue o se mancano direttive nelle fonti, USALA per cercare le regole ufficiali di compilazione (es. istruzioni IRS per il modulo caricato).' : 'Non attiva.'}
+3. **Valori Preesistenti**: Preserva valori come '0' o 'N/A' se sensati.
+4. **Dati Mancanti**: Lascia vuoto ("") se il dato non esiste. Usa "[DATO MANCANTE]" solo per casistiche critiche.
 
 TESTO FONTI:
 ${sourceContext}
@@ -101,57 +112,59 @@ ${sourceContext}
 NOTE UTENTE:
 ${notes}
 
-Restituisci ESCLUSIVAMENTE un output in formato JSON valido che rappresenti un array di oggetti chiamato "proposals".
-Ogni oggetto deve avere 'name', 'label' e 'value'.
-Esempio:
+Restituisci ESCLUSIVAMENTE un JSON conforme a questo esempio:
 {
   "proposals": [
-    { "name": "f1_1[0]", "label": "Name of Reporting Corporation", "value": "Google LLC" }
+    { "name": "ID_CAMPO", "label": "LABEL_LETTA", "value": "VALORE_TROVATO" }
   ]
 }
-Assicurati che sia UNICO E VALIDO JSON senza markup markdown aggiuntivo testuale fuori dal JSON.
 `;
 
-        const parts: any[] = [{ text: prompt }];
+                const parts: any[] = [{ text: prompt }];
 
-        parts.push({
-            inlineData: {
-                data: masterFile.base64,
-                mimeType: masterFile.mimeType
-            }
-        });
+                // Add Master PDF
+                parts.push({
+                    inlineData: {
+                        data: masterFile.base64,
+                        mimeType: masterFile.mimeType
+                    }
+                });
 
-        for (const source of sourceFiles.slice(0, 5)) {
-            parts.push({
-                inlineData: {
-                    data: source.base64,
-                    mimeType: source.mimeType
+                // Add primary Source files (limit to first 5 for performance)
+                for (const source of sourceFiles.slice(0, 5)) {
+                    parts.push({
+                        inlineData: {
+                            data: source.base64,
+                            mimeType: source.mimeType
+                        }
+                    });
                 }
-            });
-        }
 
-        const result = await geminiModel.generateContent({
-            contents: [{ role: 'user', parts }],
-            generationConfig: {
-                responseMimeType: "application/json"
+                const result = await geminiModel.generateContent({
+                    contents: [{ role: 'user', parts }],
+                    generationConfig: {
+                        responseMimeType: "application/json"
+                    }
+                });
+
+                const response = await result.response;
+                const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                const jsonMatch = text.match(/\{[\s\S]*\}/);
+
+                if (jsonMatch) {
+                    const data = JSON.parse(jsonMatch[0]);
+                    return data.proposals || [];
+                }
+            } catch (err) {
+                console.error(`[proposePdfFieldValues] Error in chunk:`, err);
             }
-        });
+            return [];
+        }));
 
-        const response = await result.response;
-        const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-
-        if (jsonMatch) {
-            const data = JSON.parse(jsonMatch[0]);
-            return data.proposals || [];
-        }
-
-        return [];
-
-    } catch (error) {
-        console.error('[proposePdfFieldValues] Fatal Error:', error);
-        return [];
+        allProposals.push(...batchResults.flat());
     }
+
+    return allProposals;
 }
 
 /**
