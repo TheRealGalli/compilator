@@ -196,6 +196,11 @@ async function smartFetch(url: string, options: any = {}): Promise<any> {
  * Utility di diagnostica per verificare se Ollama è raggiungibile e ha il modello caricato.
  */
 export async function testOllamaConnection(): Promise<boolean> {
+    if (!isBridgeAvailable()) {
+        console.warn("[OllamaLocal] Connessione a Ollama saltata: l'estensione Gromit Bridge è richiesta.");
+        return false;
+    }
+
     const urls = [
         'http://localhost:11434',
         'http://127.0.0.1:11434'
@@ -250,6 +255,8 @@ export async function testOllamaConnection(): Promise<boolean> {
  * Recupera la lista dei modelli installati localmente su Ollama.
  */
 export async function getRunningModels(): Promise<string[]> {
+    if (!isBridgeAvailable()) return [];
+
     const urls = [
         'http://localhost:11434',
         'http://127.0.0.1:11434'
