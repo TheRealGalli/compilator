@@ -81,16 +81,7 @@ export async function proposePdfFieldValues(
     webResearch: boolean = false
 ): Promise<Array<{ name: string; label: string; value: string | boolean }>> {
     try {
-        const CHUNK_SIZE = 40; // Max fields per parallel request
-        const fieldChunks: PdfFormField[][] = [];
-        for (let i = 0; i < fields.length; i += CHUNK_SIZE) {
-            fieldChunks.push(fields.slice(i, i + CHUNK_SIZE));
-        }
-
-        const allProposals: Array<{ name: string; label: string; value: string | boolean }> = [];
-
-        await Promise.all(fieldChunks.map(async (chunk, index) => {
-            const prompt = `Sei un esperto di Document Intelligence e Precision Mapping. 
+        const prompt = `Sei un esperto di Document Intelligence e Precision Mapping. 
 Abbiamo rilevato i seguenti campi tecnici in un PDF ufficiale (FILE MASTER allegato). 
 
 IL TUO OBIETTIVO: 
@@ -108,8 +99,8 @@ REGOLE PER I VALORI:
 - **Valori Preesistenti (CRITICO)**: Se un campo ha già un Valore Attuale sensato (es: '0', 'N/A', o un numero), **NON SOVRASCRIVERLO** con stringhe vuote o avvisi a meno che le FONTI non indichino esplicitamente un valore diverso per quel campo.
 - **Dati Mancanti**: Se non trovi l'informazione nelle FONTI e il campo è vuoto, lascialo vuoto (stringa vuota ""). Usa "[DATO MANCANTE]" **SOLO ED ESCLUSIVAMENTE** come ultima risorsa se l'assenza del dato invalida palesemente il documento. NON inventare mai valori plausibili.
 
-CAMPI DA ANALIZZARE (CHUNK ${index + 1} di ${fieldChunks.length}):
-${chunk.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
+CAMPI DA ANALIZZARE:
+${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
 
 TESTO FONTI:
 ${sourceContext}
@@ -120,65 +111,59 @@ ${notes}
 Restituisci ESCLUSIVAMENTE un JSON conforme allo schema richiesto. Non includere altre chiavi.
 `;
 
-            const parts: any[] = [{ text: prompt }];
+        const parts: any[] = [{ text: prompt }];
 
+        parts.push({
+            inlineData: {
+                data: masterFile.base64,
+                mimeType: masterFile.mimeType
+            }
+        });
+
+        for (const source of sourceFiles.slice(0, 5)) {
             parts.push({
                 inlineData: {
-                    data: masterFile.base64,
-                    mimeType: masterFile.mimeType
+                    data: source.base64,
+                    mimeType: source.mimeType
                 }
             });
+        }
 
-            for (const source of sourceFiles.slice(0, 5)) {
-                parts.push({
-                    inlineData: {
-                        data: source.base64,
-                        mimeType: source.mimeType
-                    }
-                });
-            }
-
-            try {
-                const result = await geminiModel.generateContent({
-                    contents: [{ role: 'user', parts }],
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                proposals: {
-                                    type: "ARRAY",
-                                    items: {
-                                        type: "OBJECT",
-                                        properties: {
-                                            name: { type: "STRING" },
-                                            label: { type: "STRING" },
-                                            value: { type: "STRING" }
-                                        },
-                                        required: ["name", "label", "value"]
-                                    }
-                                }
-                            },
-                            required: ["proposals"]
+        const result = await geminiModel.generateContent({
+            contents: [{ role: 'user', parts }],
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                        proposals: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: {
+                                    name: { type: "STRING" },
+                                    label: { type: "STRING" },
+                                    value: { type: "STRING" }
+                                },
+                                required: ["name", "label", "value"]
+                            }
                         }
-                    }
-                });
-
-                const response = await result.response;
-                const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                const jsonMatch = text.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                    const data = JSON.parse(jsonMatch[0]);
-                    if (data.proposals) {
-                        allProposals.push(...data.proposals);
-                    }
+                    },
+                    required: ["proposals"]
                 }
-            } catch (chunkErr) {
-                console.error(`[proposePdfFieldValues] Error in chunk ${index}:`, chunkErr);
             }
-        }));
+        });
 
-        return allProposals;
+        const response = await result.response;
+        const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+
+        if (jsonMatch) {
+            const data = JSON.parse(jsonMatch[0]);
+            return data.proposals || [];
+        }
+
+        return [];
 
     } catch (error) {
         console.error('[proposePdfFieldValues] Fatal Error:', error);
