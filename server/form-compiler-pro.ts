@@ -121,11 +121,26 @@ export async function proposePdfFieldValues(
     webResearch: boolean = false
 ): Promise<Array<{ name: string; label: string; value: string | boolean; reasoning: string }>> {
     try {
-        const prompt = `Sei un esperto di Document Intelligence ad altissima precisione.
+        // Group fields by page
+        const fieldsByPage = fields.reduce((acc, field) => {
+            const p = field.page || 1;
+            if (!acc[p]) acc[p] = [];
+            acc[p].push(field);
+            return acc;
+        }, {} as Record<number, PdfFormField[]>);
+
+        const pageNumbers = Object.keys(fieldsByPage).map(Number).sort((a, b) => a - b);
+        console.log(`[proposePdfFieldValues] Parallelizing across ${pageNumbers.length} pages: ${pageNumbers.join(', ')}`);
+
+        // Prepare parallel execution for each page
+        const pagePromises = pageNumbers.map(async (pageNum) => {
+            const pageFields = fieldsByPage[pageNum];
+
+            const prompt = `Sei un esperto di Document Intelligence ad altissima precisione.
 Il tuo obiettivo è analizzare e compilare il PDF (FILE MASTER allegato) procedendo in modo sequenziale, campo per campo, partendo dal primo ID tecnico fornito.
 
 SCHELETRO DEI CAMPI DA COMPILARE (Con coordinate spaziali):
-${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Pagina: ${f.page}, Posizione: [x:${f.rect?.x}, y:${f.rect?.y}, w:${f.rect?.width}, h:${f.rect?.height}]`).join('\n')}
+${pageFields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Pagina: ${f.page}, Posizione: [x:${f.rect?.x}, y:${f.rect?.y}, w:${f.rect?.width}, h:${f.rect?.height}]`).join('\n')}
 
 PROTOCOLLO DI ANALISI SPAZIALE (TASSATIVO):
 1. **Localizzazione Visiva**: Per ogni ID (es: "f1_1[0]"), usa le coordinate fornite per trovare la sua posizione esatta nel FILE MASTER (immagine). Il PDF usa un sistema di coordinate dove (0,0) è in basso a sinistra della pagina. 
@@ -147,49 +162,61 @@ Restituisci ESCLUSIVAMENTE un JSON conforme a questo esempio:
       "name": "f1_1[0]", 
       "label": "Name of Reporting Corporation", 
       "value": "Google LLC",
-      "reasoning": "Rilevato nome società nell'intestazione del file master."
+      "reasoning": "Rilevato nome società nella pagina ${pageNum} del master."
     }
   ]
 }
 `;
 
-        const parts: any[] = [{ text: prompt }];
+            const parts: any[] = [{ text: prompt }];
 
-        // Add Master PDF
-        parts.push({
-            inlineData: {
-                data: masterFile.base64,
-                mimeType: masterFile.mimeType
-            }
-        });
-
-        // Add primary Source files (limit to first 5 for performance and token limits)
-        for (const source of sourceFiles.slice(0, 5)) {
+            // Add Master PDF (Multimodal context)
             parts.push({
                 inlineData: {
-                    data: source.base64,
-                    mimeType: source.mimeType
+                    mimeType: masterFile.mimeType,
+                    data: masterFile.base64
                 }
             });
-        }
 
-        const result = await geminiModel.generateContent({
-            contents: [{ role: 'user', parts }],
-            generationConfig: {
-                responseMimeType: "application/json"
+            // Add Source Files
+            for (const source of sourceFiles) {
+                parts.push({
+                    inlineData: {
+                        mimeType: source.mimeType,
+                        data: source.base64
+                    }
+                });
+            }
+
+            const result = await geminiModel.generateContent({
+                contents: [{ role: 'user', parts }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    temperature: 0.1, // Minimal randomness for maximum precision
+                }
+            });
+
+            const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!responseText) {
+                console.warn(`[proposePdfFieldValues] No response for page ${pageNum}`);
+                return [];
+            }
+
+            try {
+                const cleaned = responseText.replace(/```json\n?|\n?```/g, '').trim();
+                const parsed = JSON.parse(cleaned);
+                return parsed.proposals || [];
+            } catch (err) {
+                console.error(`[proposePdfFieldValues] JSON parse error for page ${pageNum}:`, err);
+                return [];
             }
         });
 
-        const response = await result.response;
-        const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        // Resolve all pages in parallel
+        const allProposals = await Promise.all(pagePromises);
 
-        if (jsonMatch) {
-            const data = JSON.parse(jsonMatch[0]);
-            return data.proposals || [];
-        }
-
-        return [];
+        // Flatten and return
+        return allProposals.flat();
 
     } catch (error) {
         console.error('[proposePdfFieldValues] Fatal Error:', error);
