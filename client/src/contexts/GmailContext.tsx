@@ -141,6 +141,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
             setHasFetchFailed(false);
             setNextPageToken(null);
             sessionStorage.removeItem('gmail_tokens');
+            window.dispatchEvent(new Event('gromit-auth-changed'));
         } catch (error) {
             console.error("Logout error:", error);
         }
@@ -196,6 +197,7 @@ export function GmailProvider({ children }: { children: React.ReactNode }) {
                 if (newTokens) {
                     setTokens(newTokens);
                     sessionStorage.setItem('gmail_tokens', JSON.stringify(newTokens));
+                    window.dispatchEvent(new Event('gromit-auth-changed'));
                 }
                 setIsConnected(true);
                 setHasFetchFailed(false);

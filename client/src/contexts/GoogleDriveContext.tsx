@@ -49,6 +49,7 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
     const [searchQuery, setSearchQueryState] = useState('');
     const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
     const [folderPath, setFolderPath] = useState<FolderInfo[]>([]);
+    const [isConnected, setIsConnected] = useState<boolean>(() => !!sessionStorage.getItem('gmail_tokens'));
     const { toast } = useToast();
 
     // Re-use tokens from session storage (shared with Gmail)
@@ -213,10 +214,27 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
     // Auto-fetch on dependencies change
     React.useEffect(() => {
         const tokens = sessionStorage.getItem('gmail_tokens');
+        setIsConnected(!!tokens);
         if (tokens) {
             fetchFiles(undefined, true);
         }
     }, [currentCategory, currentFolderId, searchQuery, fetchFiles]);
+
+    // Handle token updates from other components
+    React.useEffect(() => {
+        const handleStorageChange = () => {
+            setIsConnected(!!sessionStorage.getItem('gmail_tokens'));
+        };
+        window.addEventListener('storage', handleStorageChange);
+
+        // Also listen for a custom event we can dispatch when logged in/out
+        window.addEventListener('gromit-auth-changed', handleStorageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('gromit-auth-changed', handleStorageChange);
+        };
+    }, []);
 
     // Check memory file on load/connection
     const hasCheckedMemory = React.useRef(false);
@@ -269,7 +287,7 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
             goToParentFolder,
             resetNavigation,
             userIdentity,
-            isConnected: !!sessionStorage.getItem('gmail_tokens')
+            isConnected
         }}>
             {children}
         </GoogleDriveContext.Provider>
