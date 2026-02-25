@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -159,21 +160,6 @@ export function RefineChat({
         }
     }, [pendingMention, setMentions, setMentionRegistry, onMentionConsumed]);
 
-    // Handle clicks to clear selection
-    useEffect(() => {
-        const handleAnyClick = (e: MouseEvent) => {
-            if (!selection) return;
-
-            // If we click the mention button itself, don't clear
-            const isMentionBtn = (e.target as HTMLElement).closest('[data-mention-button]');
-            if (isMentionBtn) return;
-
-            // Clear selection for any other click (inside or outside chat)
-            setSelection(null);
-        };
-        window.addEventListener('mousedown', handleAnyClick);
-        return () => window.removeEventListener('mousedown', handleAnyClick);
-    }, [selection]);
 
     const updateSelectionPosition = useCallback(() => {
         if (isMouseDown) return;
@@ -199,14 +185,10 @@ export function RefineChat({
         const containerRect = container.getBoundingClientRect();
         const firstRect = rects[0];
 
-        // Align to the right edge of the selection's first line
-        const x = firstRect.right - containerRect.left;
-        const y = firstRect.top - containerRect.top;
-
         setSelection({
             text: sel.toString().trim(),
-            x,
-            y
+            x: firstRect.left + (firstRect.width / 2),
+            y: firstRect.top - 10
         });
     }, [isMouseDown]);
 
@@ -230,16 +212,21 @@ export function RefineChat({
 
     // Track scroll events to keep button anchored
     useEffect(() => {
-        const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+        const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') || scrollRef.current;
         if (viewport) {
-            viewport.addEventListener('scroll', updateSelectionPosition);
+            const handleScroll = () => {
+                if (selection) {
+                    updateSelectionPosition();
+                }
+            };
+            viewport.addEventListener('scroll', handleScroll);
             window.addEventListener('resize', updateSelectionPosition);
             return () => {
-                viewport.removeEventListener('scroll', updateSelectionPosition);
+                viewport.removeEventListener('scroll', handleScroll);
                 window.removeEventListener('resize', updateSelectionPosition);
             };
         }
-    }, [updateSelectionPosition]);
+    }, [updateSelectionPosition, selection]);
 
     const handleMouseUp = (e: React.MouseEvent) => {
         // This is now redundant with the window listener, but we keep it for safety 
@@ -577,17 +564,18 @@ export function RefineChat({
                 </div>
 
                 {/* Selection Mention Button */}
-                {selection && (
+                {selection && createPortal(
                     <div
-                        className="absolute z-[9999]"
+                        className="fixed z-[99999] pointer-events-auto"
                         style={{
                             left: selection.x,
                             top: selection.y,
-                            transform: 'translate(-100%, -100%)'
+                            transform: 'translate(-50%, -100%)'
                         }}
                     >
                         <MentionButton onClick={handleMentionClick} />
-                    </div>
+                    </div>,
+                    document.body
                 )}
             </motion.div>
         );
@@ -809,17 +797,18 @@ export function RefineChat({
             </div>
 
             {/* Selection Mention Button */}
-            {selection && (
+            {selection && createPortal(
                 <div
-                    className="absolute z-[9999]"
+                    className="fixed z-[99999] pointer-events-auto"
                     style={{
                         left: selection.x,
                         top: selection.y,
-                        transform: 'translate(-100%, -100%)'
+                        transform: 'translate(-50%, -100%)'
                     }}
                 >
                     <MentionButton onClick={handleMentionClick} />
-                </div>
+                </div>,
+                document.body
             )}
         </motion.div>
     );

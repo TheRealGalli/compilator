@@ -12,7 +12,6 @@ export class AiService {
     private dlpClient: DlpServiceClient;
     private ollamaUrl = 'http://localhost:11434/api/generate';
     private ollamaModel = 'gpt-oss:20b';
-    private categoryCounters: Record<string, number> = {};
 
     constructor(projectId: string, location: string = 'europe-west1') {
         this.projectId = projectId;

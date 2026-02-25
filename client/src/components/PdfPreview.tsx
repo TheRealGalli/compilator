@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -342,8 +343,8 @@ export function PdfPreview({
 
                 setPendingMentionText(selectedText);
                 setMentionPosition({
-                    x: firstRect.right - containerRect.left,
-                    y: firstRect.top - containerRect.top
+                    x: firstRect.left + (firstRect.width / 2),
+                    y: firstRect.top - 10
                 });
             }
         } else {
@@ -362,14 +363,19 @@ export function PdfPreview({
     useEffect(() => {
         const viewport = viewportRef.current;
         if (viewport) {
-            viewport.addEventListener('scroll', updateSelectionPosition);
+            const handleScroll = () => {
+                if (mentionPosition) {
+                    updateSelectionPosition();
+                }
+            };
+            viewport.addEventListener('scroll', handleScroll);
             window.addEventListener('resize', updateSelectionPosition);
             return () => {
-                viewport.removeEventListener('scroll', updateSelectionPosition);
+                viewport.removeEventListener('scroll', handleScroll);
                 window.removeEventListener('resize', updateSelectionPosition);
             };
         }
-    }, [updateSelectionPosition]);
+    }, [updateSelectionPosition, mentionPosition]);
 
     const setupFieldMentionListeners = () => {
         const annotationLayer = document.querySelector('.annotationLayer');
@@ -391,8 +397,8 @@ export function PdfPreview({
             const containerRect = containerRef.current.getBoundingClientRect();
             setPendingMentionText(`Campo: ${fieldName}`);
             setMentionPosition({
-                x: elRect.right - containerRect.left,
-                y: elRect.top - containerRect.top
+                x: elRect.left + (elRect.width / 2),
+                y: elRect.top - 10
             });
             // Select the content if it's text to give visual feedback
             if (el.select) el.select();
@@ -755,18 +761,19 @@ export function PdfPreview({
                         </Document>
                     )}
 
-                    {/* Mention Button Overlay - anchored to relative container */}
-                    {mentionPosition && (
+                    {/* Mention Button Overlay - fixed to viewport via Portal */}
+                    {mentionPosition && createPortal(
                         <div
-                            className="absolute z-[100]"
+                            className="fixed z-[99999] pointer-events-auto"
                             style={{
                                 left: mentionPosition.x,
                                 top: mentionPosition.y,
-                                transform: 'translate(-100%, -100%)'
+                                transform: 'translate(-50%, -100%)'
                             }}
                         >
                             <MentionButton onClick={handleMentionClick} />
-                        </div>
+                        </div>,
+                        document.body
                     )}
                 </div>
             </div>

@@ -38,20 +38,11 @@ export default function Home() {
     }
   });
 
-  // Ensure session reset on full refresh
+  // Ensure session remains stable on soft refresh
   useEffect(() => {
-    // If we land here without a sid in URL, we might want to clear old localStorage 
-    // ghost sid to ensure a fresh session for the AI.
-    const params = new URLSearchParams(window.location.search);
-    if (!params.get('sid')) {
-      // We clear it only on mount. If a sid was just captured in useState, 
-      // it would be in memory now.
-      // But wait, if we want a TRULY new session on refresh, 
-      // we should probably just let the server generate a new one if no cookie is present.
-      // So we clear the localStorage 'csd_sid' on every mount.
-      localStorage.removeItem('csd_sid');
-      // console.log("[Session] Page refresh detected. Clearing localStorage session ghost.");
-    }
+    // We let the session persist as requested. 
+    // Data like mentions and guardrail vault are inherently session-only in React state.
+    console.log("[Session] App mounted. Session ID preserved.");
   }, []);
 
   const renderSection = () => {

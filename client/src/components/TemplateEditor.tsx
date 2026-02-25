@@ -7,6 +7,7 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import { Markdown } from 'tiptap-markdown';
 import Placeholder from '@tiptap/extension-placeholder';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { MentionButton } from './MentionButton';
 
 interface TemplateEditorProps {
@@ -149,8 +150,8 @@ export function TemplateEditor({
 
       setSelection({
         text: editor.state.doc.textBetween(from, to, ' '),
-        x,
-        y
+        x: firstRect.left + (firstRect.width / 2),
+        y: firstRect.top - 10
       });
     } catch (e) {
       setSelection(null);
@@ -310,13 +311,13 @@ export function TemplateEditor({
           });
         }}
       >
-        {selection && (
+        {selection && createPortal(
           <div
-            className="absolute z-[99999]"
+            className="fixed z-[99999] pointer-events-auto"
             style={{
               left: selection.x,
               top: selection.y,
-              transform: 'translate(-100%, -100%)'
+              transform: 'translate(-50%, -100%)'
             }}
           >
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden pointer-events-auto">
@@ -335,7 +336,8 @@ export function TemplateEditor({
                 }}
               />
             </div>
-          </div>
+          </div>,
+          document.body
         )}
         <EditorContent editor={editor} className="h-full w-full" />
         {!value && children && (

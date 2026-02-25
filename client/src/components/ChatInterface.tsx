@@ -19,6 +19,7 @@ import { useSources } from "@/contexts/SourcesContext";
 import { useGoogleDrive } from "@/contexts/GoogleDriveContext";
 import { useChat, type Message } from "@/contexts/ChatContext";
 import { DriveLogo } from "./ConnectorsSection";
+import { createPortal } from "react-dom";
 
 // { id, role, content, timestamp, sources, audioUrl, groundingMetadata, searchEntryPoint, shortTitle }
 
@@ -260,14 +261,10 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     const containerRect = container.getBoundingClientRect();
     const firstRect = rects[0];
 
-    // Align to the right edge of the selection's first line
-    const x = firstRect.right - containerRect.left;
-    const y = firstRect.top - containerRect.top;
-
     setSelection({
       text: sel.toString().trim(),
-      x,
-      y
+      x: firstRect.left + (firstRect.width / 2),
+      y: firstRect.top - 10
     });
   }, [isMouseDown]);
 
@@ -282,35 +279,31 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       });
     };
 
-    const handleWindowMouseDown = (e: MouseEvent) => {
-      // Clear selection when clicking anywhere EXCEPT on the mention button
-      const target = e.target as HTMLElement;
-      if (target.closest('[data-mention-button]')) return;
-      setSelection(null);
-    };
-
     window.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('mousedown', handleWindowMouseDown);
     return () => {
       window.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('mousedown', handleWindowMouseDown);
     };
   }, [updateSelectionPosition]);
 
   // Track scroll events to keep button anchored
   useEffect(() => {
     const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-    if (viewport && containerRef.current) {
-      viewport.addEventListener('scroll', updateSelectionPosition);
+    if (viewport) {
+      const handleScroll = () => {
+        if (selection) {
+          updateSelectionPosition();
+        }
+      };
+      viewport.addEventListener('scroll', handleScroll);
       window.addEventListener('resize', updateSelectionPosition);
       return () => {
-        viewport.removeEventListener('scroll', updateSelectionPosition);
+        viewport.removeEventListener('scroll', handleScroll);
         window.removeEventListener('resize', updateSelectionPosition);
       };
     }
-  }, [updateSelectionPosition]);
+  }, [updateSelectionPosition, selection]);
 
   const handleMentionClick = () => {
     if (selection) {
@@ -480,18 +473,20 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   return (
     <div className="flex flex-col h-full relative">
       {/* Mention Button Overlay — anchored to selection rect */}
-      {selection && (
+      {selection && createPortal(
         <div
           style={{
-            position: 'absolute',
+            position: 'fixed',
             left: selection.x,
             top: selection.y,
-            transform: 'translate(-100%, -100%)',
-            zIndex: 9999,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 99999, // Super high z-index
+            pointerEvents: 'auto'
           }}
         >
           <MentionButton onClick={handleMentionClick} />
-        </div>
+        </div>,
+        document.body
       )}
 
       <div className="flex-1 overflow-hidden flex flex-col relative" ref={containerRef}>
