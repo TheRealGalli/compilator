@@ -139,17 +139,19 @@ export async function proposePdfFieldValues(
             const startTime = Date.now();
 
             const prompt = `Sei un esperto di Document Intelligence ad altissima precisione.
-Il tuo obiettivo è analizzare e compilare il PDF (FILE MASTER allegato) procedendo in modo sequenziale, campo per campo, partendo dal primo ID tecnico fornito.
+Stai lavorando sulla **PAGINA ${pageNum}** di un documento PDF complesso.
 
-SCHELETRO DEI CAMPI DA COMPILARE (Con coordinate spaziali):
-${pageFields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Pagina: ${f.page}, Posizione: [x:${f.rect?.x}, y:${f.rect?.y}, w:${f.rect?.width}, h:${f.rect?.height}]`).join('\n')}
+**VISIONE GLOBALE**: Considera l'intero PDF (Allegato MASTER) per garantire coerenza terminologica e logica, anche se devi generare proposte SOLO per i campi della PAGINA ${pageNum}.
 
-PROTOCOLLO DI ANALISI SPAZIALE (TASSATIVO):
-1. **Localizzazione Visiva**: Per ogni ID (es: "f1_1[0]"), usa le coordinate fornite per trovare la sua posizione esatta nel FILE MASTER (immagine). Il PDF usa un sistema di coordinate dove (0,0) è in basso a sinistra della pagina. 
-2. **Lettura Etichetta Umana**: Guarda cosa c'è scritto sopra o accanto al rettangolo alle coordinate indicate. Ignora il nome tecnico se contrasta con l'etichetta visiva che leggi sul foglio.
-3. **Cross-Reference & Reasoning**: Cerca nelle FONTI il dato corrispondente all'etichetta letta. Formula un breve pensiero (reasoning) che spieghi perché hai scelto quel valore (es: "Rilevata label '1a Name' alle coordinate x,y; inserito valore da fattura Y").
-4. **Web Research (Se Attivo)**: ${webResearch ? 'È ATTIVA la ricerca Google. Usala per chiarire dubbi su codici o istruzioni ministeriali del modulo.' : 'Non attiva.'}
-5. **Precisione**: Preserva '0', 'N/A' o valori preesistenti se validi.
+ID TECNICI DA COMPILARE (PAGINA ${pageNum}):
+${pageFields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Posizione: [x:${f.rect?.x}, y:${f.rect?.y}, w:${f.rect?.width}, h:${f.rect?.height}]`).join('\n')}
+
+PROTOCOLLO DI ANALISI & VISUAL FIT (TASSATIVO):
+1. **Analisi Spaziale**: Usa le coordinate fornite per localizzare ogni campo.
+2. **Visual Fit (Dimensioni)**: Adatta la risposta allo spazio fisico (rect). Se il box è stretto (es: campo Anno), usa formati abbreviati (es: "25" invece di "2025"). Non sforare mai i bordi visivi.
+3. **Checkboxes (Crocette)**: Se il tipo è "checkbox", analizza pixel-per-pixel le fonti e il master per capire se deve essere barrato. Non saltarle mai.
+4. **Cross-Reference**: Estrai i dati dalle FONTI. Se un dato è incerto, non inventare; lascia vuoto.
+5. **Reasoning Breve**: Spiega la scelta in max 10 parole (es: "Inserito anno abbreviato per box stretto").
 
 TESTO FONTI:
 ${sourceContext}
@@ -157,14 +159,14 @@ ${sourceContext}
 NOTE UTENTE:
 ${notes}
 
-Restituisci ESCLUSIVAMENTE un JSON conforme a questo esempio:
+Restituisci ESCLUSIVAMENTE un JSON:
 {
   "proposals": [
     { 
-      "name": "f1_1[0]", 
-      "label": "Name of Reporting Corporation", 
-      "value": "Google LLC",
-      "reasoning": "Rilevato nome società nella pagina ${pageNum} del master."
+      "name": "ID_CAMPO", 
+      "label": "Etichetta Visiva", 
+      "value": "Valore (Adattato allo spazio)",
+      "reasoning": "Breve nota logica"
     }
   ]
 }
