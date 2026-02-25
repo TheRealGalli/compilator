@@ -30,19 +30,43 @@ import { useGoogleDrive, DriveCategory } from "@/contexts/GoogleDriveContext";
 import { useQuery } from "@tanstack/react-query";
 import { LoginOverlay } from "./LoginOverlay";
 import { AVAILABLE_MODELS } from "@/lib/ollama";
-import { isBridgeAvailable } from "@/lib/local-extractor";
+import { isBridgeAvailable, pingGromitOCR } from "@/lib/local-extractor";
 
 
 export function DocumentsSection() {
   const [view, setView] = useState<'main' | 'gmail' | 'drive'>('main');
   const [isBridgeActive, setIsBridgeActive] = useState(false);
+  const [isOcrActive, setIsOcrActive] = useState(false);
 
   useEffect(() => {
-    setIsBridgeActive(isBridgeAvailable());
-    const timer = setTimeout(() => {
-      setIsBridgeActive(isBridgeAvailable());
-    }, 1000);
-    return () => clearTimeout(timer);
+    let isMounted = true;
+
+    const checkBridgeAndOcr = async () => {
+      if (!isMounted) return;
+      const bridge = isBridgeAvailable();
+      setIsBridgeActive(bridge);
+
+      if (bridge) {
+        const ocr = await pingGromitOCR();
+        if (isMounted) setIsOcrActive(ocr);
+      } else {
+        if (isMounted) setIsOcrActive(false);
+      }
+    };
+
+    checkBridgeAndOcr();
+
+    // Check again after 1.5s the first time
+    const initialTimer = setTimeout(checkBridgeAndOcr, 1500);
+
+    // Check every 5s to keep status updated
+    const intervalTimer = setInterval(checkBridgeAndOcr, 5000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(initialTimer);
+      clearInterval(intervalTimer);
+    };
   }, []);
 
   // Auth Check
@@ -691,43 +715,13 @@ export function DocumentsSection() {
           disabled={isUploading || !isAuthenticated}
         />
 
-        {(isConnected || isConnectedDrive || ollamaStatus === 'connected' || isBridgeActive) && (
+        {(isConnected || isConnectedDrive || ollamaStatus === 'connected' || isBridgeActive || isOcrActive) && (
           <div className="flex flex-col gap-4 relative">
             <div className="flex items-center gap-4">
               <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 whitespace-nowrap">Connessioni</h3>
               <div className="h-[1px] w-full bg-border/60" />
             </div>
             <div className="flex gap-3">
-              {isConnected && (
-                <Button
-                  variant="outline"
-                  className="gap-2 border-red-50 hover:bg-red-50 hover:text-red-600 transition-all hover:border-red-200 shadow-sm"
-                  onClick={() => {
-                    if (!isAuthenticated) return;
-                    fetchMessages();
-                    setView('gmail');
-                  }}
-                  disabled={!isAuthenticated}
-                >
-                  <GmailLogo className="w-4 h-4" />
-                  Gmail
-                </Button>
-              )}
-              {isConnected && (
-                <Button
-                  variant="outline"
-                  className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
-                  onClick={() => {
-                    if (!isAuthenticated) return;
-                    fetchFiles();
-                    setView('drive');
-                  }}
-                  disabled={!isAuthenticated}
-                >
-                  <DriveLogo className="w-4 h-4" />
-                  Google Drive
-                </Button>
-              )}
               {isBridgeActive && (
                 <TooltipProvider>
                   <Tooltip>
@@ -745,6 +739,54 @@ export function DocumentsSection() {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+              )}
+              {isOcrActive && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm shrink-0"
+                      >
+                        <Asterisk className="w-5 h-5 text-blue-500" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Gromit OCR Attivo</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {isConnected && (
+                <Button
+                  variant="outline"
+                  className="gap-2 border-red-50 hover:bg-red-50 hover:text-red-600 transition-all hover:border-red-200 shadow-sm"
+                  onClick={() => {
+                    if (!isAuthenticated) return;
+                    fetchMessages();
+                    setView('gmail');
+                  }}
+                  disabled={!isAuthenticated}
+                >
+                  <GmailLogo className="w-4 h-4" />
+                  Gmail
+                </Button>
+              )}
+              {isConnectedDrive && (
+                <Button
+                  variant="outline"
+                  className="gap-2 border-blue-50 hover:bg-blue-50 hover:text-blue-600 transition-all hover:border-blue-200 shadow-sm"
+                  onClick={() => {
+                    if (!isAuthenticated) return;
+                    fetchFiles();
+                    setView('drive');
+                  }}
+                  disabled={!isAuthenticated}
+                >
+                  <DriveLogo className="w-4 h-4" />
+                  Google Drive
+                </Button>
               )}
               {ollamaStatus === 'connected' && (
                 <DropdownMenu>

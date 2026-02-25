@@ -19,6 +19,47 @@ export function isBridgeAvailable(): boolean {
 }
 
 /**
+ * Pings the Gromit OCR native app via the Bridge extension.
+ */
+export async function pingGromitOCR(): Promise<boolean> {
+    if (!isBridgeAvailable()) return false;
+
+    return new Promise((resolve) => {
+        const requestId = Math.random().toString(36).substring(7);
+
+        const timeout = setTimeout(() => {
+            window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+            resolve(false);
+        }, 2000);
+
+        const handler = (event: any) => {
+            if (event.detail.requestId === requestId) {
+                clearTimeout(timeout);
+                window.removeEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+                const response = event.detail.response;
+                if (response && response.status === 'active' && response.success === true) {
+                    resolve(true);
+                } else {
+                    resolve(false);
+                }
+            }
+        };
+
+        window.addEventListener('GROMIT_BRIDGE_RESPONSE', handler);
+
+        window.dispatchEvent(new CustomEvent('GROMIT_BRIDGE_REQUEST', {
+            detail: {
+                detail: {
+                    type: 'NATIVE_OCR',
+                    command: 'ping'
+                },
+                requestId
+            }
+        }));
+    });
+}
+
+/**
  * Helper to convert File to Base64 (for extension messaging)
  */
 function fileToBase64(file: File): Promise<string> {
