@@ -135,8 +135,12 @@
             console.debug("[GromitBridge] Native Message skipped:", errMsg);
             sendResponse({ success: false, error: errMsg });
           } else {
-            console.log(`[GromitBridge] Native OCR Success (${response.text?.length || 0} chars)`);
-            sendResponse(response);
+            console.log(`[GromitBridge] Native OCR Success (${response?.text?.length || 0} chars)`);
+            if (command === "ping") {
+              sendResponse({ success: true, status: "active", ...response });
+            } else {
+              sendResponse(response);
+            }
           }
         }
       );

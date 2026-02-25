@@ -56,7 +56,9 @@ export function DocumentsSection() {
       }
 
       if (isMounted && !initialCheckDone) {
-        setInitialCheckDone(true);
+        setTimeout(() => {
+          if (isMounted) setInitialCheckDone(true);
+        }, 800);
       }
     };
 
