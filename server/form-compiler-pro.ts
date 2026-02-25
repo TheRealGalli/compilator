@@ -90,7 +90,7 @@ REGOLE PER I VALORI:
 - **Testo**: Inserisci solo il valore finale pulito e diretto.
 - **Checkbox/Radio**: Rispondi SOLO 'true' o 'false', oppure il valore esatto dell'opzione selezionata.
 - **Valori Preesistenti (CRITICO)**: Se un campo ha già un Valore Attuale sensato (es: '0', 'N/A', o un numero), **NON SOVRASCRIVERLO** con stringhe vuote a meno che le FONTI non indichino esplicitamente un valore diverso per quel campo.
-- **Dati Mancanti**: Se non trovi l'informazione nelle FONTI e il campo è vuoto, lascialo vuoto (stringa vuota ""). Usa "[DATO MANCANTE]" **SOLO** come ultima risorsa se l'assenza del dato invalida palesemente il documento. NON inventare mai valori.
+- **Dati Mancanti**: Se non trovi l'informazione nelle FONTI e il campo è vuoto, lascialo vuoto (stringa vuota ""). Usa "[DATO MANCANTE]" solo se l'assenza del dato invalida palesemente il documento nel caso dell'utente. NON inventare mai valori.
 
 SCHELETRO DEI CAMPI DA COMPILARE:
 ${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
@@ -101,7 +101,15 @@ ${sourceContext}
 NOTE UTENTE:
 ${notes}
 
-Restituisci ESCLUSIVAMENTE un JSON conforme allo schema richiesto. Non includere altre chiavi.
+Restituisci ESCLUSIVAMENTE un output in formato JSON valido che rappresenti un array di oggetti chiamato "proposals".
+Ogni oggetto deve avere 'name', 'label' e 'value'.
+Esempio:
+{
+  "proposals": [
+    { "name": "f1_1[0]", "label": "Name of Reporting Corporation", "value": "Google LLC" }
+  ]
+}
+Assicurati che sia UNICO E VALIDO JSON senza markup markdown aggiuntivo testuale fuori dal JSON.
 `;
 
         const parts: any[] = [{ text: prompt }];
@@ -125,25 +133,7 @@ Restituisci ESCLUSIVAMENTE un JSON conforme allo schema richiesto. Non includere
         const result = await geminiModel.generateContent({
             contents: [{ role: 'user', parts }],
             generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: "OBJECT",
-                    properties: {
-                        proposals: {
-                            type: "ARRAY",
-                            items: {
-                                type: "OBJECT",
-                                properties: {
-                                    name: { type: "STRING" },
-                                    label: { type: "STRING" },
-                                    value: { type: "STRING" }
-                                },
-                                required: ["name", "label", "value"]
-                            }
-                        }
-                    },
-                    required: ["proposals"]
-                }
+                responseMimeType: "application/json"
             }
         });
 

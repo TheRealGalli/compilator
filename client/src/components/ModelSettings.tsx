@@ -204,7 +204,7 @@ export function ModelSettings({
   return (
 
     <div className={cn(
-      "h-full flex flex-col min-h-0 border rounded-lg transition-all duration-500 overflow-hidden",
+      "h-full flex flex-col min-h-0 border rounded-lg overflow-hidden",
       isRefining ? "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800" : "bg-background",
       className
     )}>
