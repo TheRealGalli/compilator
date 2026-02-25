@@ -80,31 +80,18 @@ export async function proposePdfFieldValues(
     geminiModel: any,
     webResearch: boolean = false
 ): Promise<Array<{ name: string; label: string; value: string | boolean }>> {
-    const CHUNK_SIZE = 30;
-    const fieldChunks: PdfFormField[][] = [];
-    for (let i = 0; i < fields.length; i += CHUNK_SIZE) {
-        fieldChunks.push(fields.slice(i, i + CHUNK_SIZE));
-    }
+    try {
+        const prompt = `Sei un esperto di Document Intelligence ad altissima precisione.
+Il tuo obiettivo è analizzare e compilare il PDF (FILE MASTER allegato) procedendo in modo sequenziale, campo per campo, partendo dal primo ID tecnico fornito.
 
-    const allProposals: Array<{ name: string; label: string; value: string | boolean }> = [];
+SCHELETRO DEI CAMPI DA COMPILARE:
+${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
 
-    // Process chunks in small parallel batches to avoid Vertex rate limits while improving focus
-    for (let i = 0; i < fieldChunks.length; i += 2) {
-        const batch = fieldChunks.slice(i, i + 2);
-
-        const batchResults = await Promise.all(batch.map(async (chunk, chunkIdx) => {
-            try {
-                const prompt = `Sei un esperto di Document Intelligence ad alta precisione.
-Il tuo obiettivo è compilare un BLOCCO di campi del PDF (FILE MASTER allegato) utilizzando i TESTI FONTE, le NOTE UTENTE e la tua conoscenza tecnica.
-
-SCHELETRO DEI CAMPI DA COMPILARE (Blocco ${i / CHUNK_SIZE + chunkIdx + 1}):
-${chunk.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
-
-REGOLE DI PRECISIONE (TASSATIVE):
-1. **Verifica Coerenza Label**: Prima di inserire un valore, confrontalo con la Label del campo. Se il campo chiede una DATA (es. 'Date of incorporation'), NON inserire un NOME o un INDIRIZZO.
-2. **Web Research (Se Attiva)**: ${webResearch ? 'È ATTIVA la ricerca Google. Se le istruzioni per compilare questo specifico PDF sono ambigue o se mancano direttive nelle fonti, USALA per cercare le regole ufficiali di compilazione (es. istruzioni IRS per il modulo caricato).' : 'Non attiva.'}
-3. **Valori Preesistenti**: Preserva valori come '0' o 'N/A' se sensati.
-4. **Dati Mancanti**: Lascia vuoto ("") se il dato non esiste. Usa "[DATO MANCANTE]" solo per casistiche critiche.
+PROTOCOLLO DI ANALISI SEQUENZIALE (TASSATIVO):
+1. **Analisi Atomica**: Per ogni campo nell'ordine fornito, analizza visivamente il Master PDF per comprendere esattamente a quale sezione appartiene l'ID (es. 'f1_1[0]').
+2. **Cross-Reference**: Incrocia l'etichetta del campo (Label) con le informazioni presenti nei TESTI FONTE e nelle tue conoscenze (pesi del modello).
+3. **Web Research (Se Attivo)**: ${webResearch ? 'È ATTIVA la ricerca Google. Se il contenuto di un campo è ambiguo o richiede conoscenze fiscali/legali esterne, USALA per cercare le istruzioni ufficiali di compilazione.' : 'Non attiva.'}
+4. **Precisione del Dato**: Inserisci il valore solo se rispondente alla tipologia di campo (es. non inserire nomi in campi data). Preserva valori esistenti sensati (es. '0', 'N/A').
 
 TESTO FONTI:
 ${sourceContext}
@@ -120,51 +107,48 @@ Restituisci ESCLUSIVAMENTE un JSON conforme a questo esempio:
 }
 `;
 
-                const parts: any[] = [{ text: prompt }];
+        const parts: any[] = [{ text: prompt }];
 
-                // Add Master PDF
-                parts.push({
-                    inlineData: {
-                        data: masterFile.base64,
-                        mimeType: masterFile.mimeType
-                    }
-                });
-
-                // Add primary Source files (limit to first 5 for performance)
-                for (const source of sourceFiles.slice(0, 5)) {
-                    parts.push({
-                        inlineData: {
-                            data: source.base64,
-                            mimeType: source.mimeType
-                        }
-                    });
-                }
-
-                const result = await geminiModel.generateContent({
-                    contents: [{ role: 'user', parts }],
-                    generationConfig: {
-                        responseMimeType: "application/json"
-                    }
-                });
-
-                const response = await result.response;
-                const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                const jsonMatch = text.match(/\{[\s\S]*\}/);
-
-                if (jsonMatch) {
-                    const data = JSON.parse(jsonMatch[0]);
-                    return data.proposals || [];
-                }
-            } catch (err) {
-                console.error(`[proposePdfFieldValues] Error in chunk:`, err);
+        // Add Master PDF
+        parts.push({
+            inlineData: {
+                data: masterFile.base64,
+                mimeType: masterFile.mimeType
             }
-            return [];
-        }));
+        });
 
-        allProposals.push(...batchResults.flat());
+        // Add primary Source files (limit to first 5 for performance and token limits)
+        for (const source of sourceFiles.slice(0, 5)) {
+            parts.push({
+                inlineData: {
+                    data: source.base64,
+                    mimeType: source.mimeType
+                }
+            });
+        }
+
+        const result = await geminiModel.generateContent({
+            contents: [{ role: 'user', parts }],
+            generationConfig: {
+                responseMimeType: "application/json"
+            }
+        });
+
+        const response = await result.response;
+        const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+
+        if (jsonMatch) {
+            const data = JSON.parse(jsonMatch[0]);
+            return data.proposals || [];
+        }
+
+        return [];
+
+    } catch (error) {
+        console.error('[proposePdfFieldValues] Fatal Error:', error);
+        return [];
     }
-
-    return allProposals;
 }
 
 /**
