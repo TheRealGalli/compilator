@@ -81,25 +81,18 @@ export async function proposePdfFieldValues(
     webResearch: boolean = false
 ): Promise<Array<{ name: string; label: string; value: string | boolean }>> {
     try {
-        const prompt = `Sei un esperto di Document Intelligence e Precision Mapping. 
-Abbiamo rilevato i seguenti campi tecnici in un PDF ufficiale (FILE MASTER allegato). 
+        const prompt = `Sei un esperto di Document Intelligence.
+Il tuo obiettivo è compilare i campi del PDF (FILE MASTER allegato) utilizzando esclusivamente le informazioni presenti nei TESTI FONTE e nelle NOTE UTENTE.
 
-IL TUO OBIETTIVO: 
-Mappare con precisione chirurgica ogni informazione dalle FONTI ai campi del PDF originale.
-
-PROCESSO DI ANALISI (TASSATIVO):
-1. **Analisi Visiva Master**: Guarda il FILE MASTER (immagine/PDF). Trova la posizione esatta di ogni ID (es: "f1_1[0]").
-2. **Lettura Etichetta**: Leggi l'etichetta umana stampata proprio sopra o accanto a quel campo (es: "1a Name of Corporation").
-3. **Verifica Incrociata**: NON basarti sul nome tecnico per dedurre il contenuto. Usa SOLO l'etichetta visiva che hai letto.
-4. **Mappatura Dati**: Cerca nelle FONTI l'informazione che risponde a quell'etichetta.
+Ti forniamo di seguito lo scheletro completo dei campi del form PDF. Per ogni campo troverai il suo ID tecnico (name), il tipo (text, checkbox, radio, dropdown), un'etichetta (Label, se disponibile) e il suo Valore Attuale.
 
 REGOLE PER I VALORI:
-- **Testo**: Inserisci il valore pulito. Se un campo chiede "Anno", scrivi "2025", non "L'anno è 2025".
-- **Checkbox**: Rispondi SOLO true o false.
-- **Valori Preesistenti (CRITICO)**: Se un campo ha già un Valore Attuale sensato (es: '0', 'N/A', o un numero), **NON SOVRASCRIVERLO** con stringhe vuote o avvisi a meno che le FONTI non indichino esplicitamente un valore diverso per quel campo.
-- **Dati Mancanti**: Se non trovi l'informazione nelle FONTI e il campo è vuoto, lascialo vuoto (stringa vuota ""). Usa "[DATO MANCANTE]" **SOLO ED ESCLUSIVAMENTE** come ultima risorsa se l'assenza del dato invalida palesemente il documento. NON inventare mai valori plausibili.
+- **Testo**: Inserisci solo il valore finale pulito e diretto.
+- **Checkbox/Radio**: Rispondi SOLO 'true' o 'false', oppure il valore esatto dell'opzione selezionata.
+- **Valori Preesistenti (CRITICO)**: Se un campo ha già un Valore Attuale sensato (es: '0', 'N/A', o un numero), **NON SOVRASCRIVERLO** con stringhe vuote a meno che le FONTI non indichino esplicitamente un valore diverso per quel campo.
+- **Dati Mancanti**: Se non trovi l'informazione nelle FONTI e il campo è vuoto, lascialo vuoto (stringa vuota ""). Usa "[DATO MANCANTE]" **SOLO** come ultima risorsa se l'assenza del dato invalida palesemente il documento. NON inventare mai valori.
 
-CAMPI DA ANALIZZARE:
+SCHELETRO DEI CAMPI DA COMPILARE:
 ${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
 
 TESTO FONTI:
