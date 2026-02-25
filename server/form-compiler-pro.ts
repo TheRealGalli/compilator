@@ -135,6 +135,8 @@ export async function proposePdfFieldValues(
         // Prepare parallel execution for each page
         const pagePromises = pageNumbers.map(async (pageNum) => {
             const pageFields = fieldsByPage[pageNum];
+            console.log(`[proposePdfFieldValues] Page ${pageNum}: START processing ${pageFields.length} fields`);
+            const startTime = Date.now();
 
             const prompt = `Sei un esperto di Document Intelligence ad altissima precisione.
 Il tuo obiettivo è analizzare e compilare il PDF (FILE MASTER allegato) procedendo in modo sequenziale, campo per campo, partendo dal primo ID tecnico fornito.
@@ -205,6 +207,8 @@ Restituisci ESCLUSIVAMENTE un JSON conforme a questo esempio:
             try {
                 const cleaned = responseText.replace(/```json\n?|\n?```/g, '').trim();
                 const parsed = JSON.parse(cleaned);
+                const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+                console.log(`[proposePdfFieldValues] Page ${pageNum}: END processing. Found ${parsed.proposals?.length || 0} proposals in ${duration}s`);
                 return parsed.proposals || [];
             } catch (err) {
                 console.error(`[proposePdfFieldValues] JSON parse error for page ${pageNum}:`, err);
