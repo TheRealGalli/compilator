@@ -79,7 +79,7 @@ export async function proposePdfFieldValues(
     notes: string,
     geminiModel: any,
     webResearch: boolean = false
-): Promise<Array<{ name: string; label: string; value: string | boolean }>> {
+): Promise<Array<{ name: string; label: string; value: string | boolean; reasoning: string }>> {
     try {
         const prompt = `Sei un esperto di Document Intelligence ad altissima precisione.
 Il tuo obiettivo è analizzare e compilare il PDF (FILE MASTER allegato) procedendo in modo sequenziale, campo per campo, partendo dal primo ID tecnico fornito.
@@ -87,11 +87,12 @@ Il tuo obiettivo è analizzare e compilare il PDF (FILE MASTER allegato) procede
 SCHELETRO DEI CAMPI DA COMPILARE:
 ${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
 
-PROTOCOLLO DI ANALISI SEQUENZIALE (TASSATIVO):
-1. **Analisi Atomica**: Per ogni campo nell'ordine fornito, analizza visivamente il Master PDF per comprendere esattamente a quale sezione appartiene l'ID (es. 'f1_1[0]').
-2. **Cross-Reference**: Incrocia l'etichetta del campo (Label) con le informazioni presenti nei TESTI FONTE e nelle tue conoscenze (pesi del modello).
-3. **Web Research (Se Attivo)**: ${webResearch ? 'È ATTIVA la ricerca Google. Se il contenuto di un campo è ambiguo o richiede conoscenze fiscali/legali esterne, USALA per cercare le istruzioni ufficiali di compilazione.' : 'Non attiva.'}
-4. **Precisione del Dato**: Inserisci il valore solo se rispondente alla tipologia di campo (es. non inserire nomi in campi data). Preserva valori esistenti sensati (es. '0', 'N/A').
+PROTOCOLLO DI ANALISI SPAZIALE (TASSATIVO):
+1. **Localizzazione Visiva**: Per ogni ID (es: "f1_1[0]"), trova la sua posizione esatta nel FILE MASTER (immagine).
+2. **Lettura Etichetta Umana**: Leggi l'etichetta stampata accanto o sopra il campo. Ignora il nome tecnico se contrasta con l'etichetta visiva.
+3. **Cross-Reference & Reasoning**: Cerca nelle FONTI il dato corrispondente all'etichetta letta. Formula un breve pensiero (reasoning) che spieghi perché hai scelto quel valore (es: "Trovato indirizzo in fattura X corrispondente a label 1c").
+4. **Web Research (Se Attivo)**: ${webResearch ? 'È ATTIVA la ricerca Google. Usala per chiarire dubbi su codici o istruzioni ministeriali del modulo.' : 'Non attiva.'}
+5. **Precisione**: Preserva '0', 'N/A' o valori preesistenti se validi.
 
 TESTO FONTI:
 ${sourceContext}
@@ -102,7 +103,12 @@ ${notes}
 Restituisci ESCLUSIVAMENTE un JSON conforme a questo esempio:
 {
   "proposals": [
-    { "name": "ID_CAMPO", "label": "LABEL_LETTA", "value": "VALORE_TROVATO" }
+    { 
+      "name": "f1_1[0]", 
+      "label": "Name of Reporting Corporation", 
+      "value": "Google LLC",
+      "reasoning": "Rilevato nome società nell'intestazione del file master."
+    }
   ]
 }
 `;

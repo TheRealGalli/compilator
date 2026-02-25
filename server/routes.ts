@@ -2100,6 +2100,11 @@ DOC ATTUALE (Stato dei campi):
 ${processedContent}
 """
 
+NOTA SUL REASONING:
+Ogni campo nel JSON sopra contiene un campo "reasoning". Questo è il pensiero logico del modello che ha fatto la prima compilazione. 
+- USALO per capire il contesto della scelta iniziale.
+- SE L'UTENTE CHIEDE SPIEGAZIONI: Sfrutta i dati nel "reasoning" per rispondere in modo dettagliato su perché un campo è stato compilato così.
+
 ${formattedMentions ? `### ⚠️ FOCUS ATTUALE: PARTI MENZIONATE
 L'utente ha evidenziato i seguenti frammenti per un intervento MIRATO:
 ${formattedMentions}
@@ -2111,16 +2116,16 @@ STORICO CHAT:
 ${(processedChatHistory || []).map((m: any) => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
 
 ISTRUZIONI OPERATIVE (CRITICO):
-1. MODIFICA: Se l'utente chiede di cambiare un dato (es. indirizzo, CAP, importo), devi restituire **ESCLUSIVAMENTE** le nuove proposte per i campi che cambiano o che vengono compilati ex-novo.
+1. MODIFICA: Se l'utente chiede di cambiare un dato, devi restituire **ESCLUSIVAMENTE** le nuove proposte per i campi che cambiano.
 2. FORMATO JSON:
    Restituisci JSON con questa struttura:
    {
-     "newContent": "{\\"proposals\\": [{\\"name\\": \\"ID_CAMPO_TECNICO\\", \\"label\\": \\"Etichetta Umana\\", \\"value\\": \\"Nuovo Valore\\", \\"reasoning\\": \\"Trovato nello storico\\"}]}",
-     "explanation": "Spiegazione breve di cosa hai modificato."
+     "newContent": "{\\"proposals\\": [{\\"name\\": \\"ID_CAMPO\\", \\"label\\": \\"Label\\", \\"value\\": \\"Valore\\", \\"reasoning\\": \\"Spiegazione del cambio o conferma logica\\"}]}",
+     "explanation": "La tua risposta all'utente dove spieghi cosa hai fatto, citando se necessario il reasoning originale."
    }
-   - **NOTA BENE**: "newContent" deve contenere una STRINGA TESTUALE formato JSON (con doppio escape), non un oggetto reale.
-3. DOMANDE/ANALISI: Se l'utente pone una domanda e non chiede modifiche, restituisci:
-   { "newContent": null, "explanation": "La tua risposta..." }
+   - **NOTA BENE**: "newContent" deve contenere una STRINGA JSON (con escape).
+3. DOMANDE/ANALISI: Se l'utente pone una domanda e non chiede modifiche, rispondi usando i dati del "reasoning" dei campi coinvolti:
+   { "newContent": null, "explanation": "La tua risposta dettagliata basata sul reasoning..." }
 ` : `
 *** MODALITÀ RAFFINAMENTO / CHAT ATTIVA ***
 Hai già compilato una prima bozza del documento. Ora l'utente vuole discuterne o modificarlo.
