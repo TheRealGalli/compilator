@@ -223,7 +223,7 @@ export function TemplateEditor({
   }, [value, editor]);
 
   return (
-    <div className={`h-full flex flex-col border rounded-lg overflow-hidden bg-background ${className}`}>
+    <div className={`h-full flex flex-col overflow-hidden bg-background ${!className.includes('border') ? 'border' : ''} ${!className.includes('rounded') ? 'rounded-lg' : ''} ${className}`}>
       <style>{`
         .ProseMirror {
           height: 100%;

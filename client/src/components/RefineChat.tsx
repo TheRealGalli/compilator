@@ -425,16 +425,16 @@ export function RefineChat({
                 onMouseUp={handleMouseUp}
                 ref={containerRef}
             >
-                <ScrollArea className="flex-1 -mr-2 pr-2 mb-2 [&>[data-radix-scroll-area-viewport]]:h-full">
+                <ScrollArea className="flex-1 -mr-2 pr-4 mb-2 [&>[data-radix-scroll-area-viewport]]:h-full">
                     <div className="space-y-4">
                         {React.useMemo(() => (
                             messages.filter(m => m.role === 'ai' || m.role === 'user').map((msg) => (
                                 <div key={msg.id} className={cn(
-                                    "text-xs leading-relaxed break-words",
+                                    "text-xs leading-relaxed break-words px-1",
                                     msg.role === 'user' ? "font-bold text-slate-800" : "text-slate-600"
                                 )}>
                                     {msg.role === 'user' ? "> " + msg.text : (
-                                        <div className="max-w-full overflow-hidden">
+                                        <div className="max-w-full">
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
                                                 components={{
@@ -528,14 +528,14 @@ export function RefineChat({
                             ))}
                         </div>
                     )}
-                    <div className="relative">
+                    <div className="relative pr-2 pb-1">
                         <Textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
                             disabled={(isReviewing && !mentions.some(m => m.source === 'anteprema')) || isLoading || isAnalyzing}
                             placeholder="Scrivi qui..."
-                            className="pr-12 min-h-[60px] max-h-[150px] resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent text-sm shadow-none"
+                            className="w-full min-h-[60px] max-h-[150px] resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent text-sm shadow-none px-2"
                             rows={1}
                             autoFocus
                         />
@@ -752,14 +752,14 @@ export function RefineChat({
                         )}
                     </AnimatePresence>
 
-                    <div className="relative">
+                    <div className="relative pr-12 pb-2">
                         <Textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
                             disabled={(isReviewing && !mentions.some(m => m.source === 'anteprema')) || isLoading || isAnalyzing}
                             placeholder={isReviewing ? "Conferma o rifiuta la modifica corrente..." : "Chiedi modifiche (es. 'Cambia la data')..."}
-                            className="pr-12 min-h-[50px] max-h-[120px] resize-none border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent shadow-none text-sm"
+                            className="w-full min-h-[50px] max-h-[120px] resize-none border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent shadow-none text-sm px-3"
                             rows={1}
                         />
                         <Button

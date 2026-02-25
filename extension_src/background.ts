@@ -180,13 +180,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: a
                     sendResponse({ success: false, error: errMsg });
                 } else {
                     console.log(`[GromitBridge] Native OCR Success (${response?.text?.length || 0} chars)`);
-
-                    // Add explicit status for ping command compliance
-                    if (command === 'ping') {
-                        sendResponse({ success: true, status: 'active', ...response });
-                    } else {
-                        sendResponse(response);
-                    }
+                    sendResponse(response);
                 }
             }
         );

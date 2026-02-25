@@ -1457,239 +1457,197 @@ export function DocumentCompilerSection({
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col overflow-visible">
-        {isPdfMode ? (
-          /* PDF STUDIO UNIFIED VIEW */
-          <div className="flex-1 min-h-0 grid grid-cols-12 gap-4">
-            {/* COLUMN 1: Settings OR Chat (col-span-3) */}
-            <div className="col-span-3 h-full flex flex-col overflow-hidden">
-              <ModelSettings
-                className="flex-1"
-                notes={notes}
-                temperature={temperature}
-                webResearch={webResearch}
-                detailedAnalysis={detailedAnalysis}
-                formalTone={formalTone}
-                modelProvider={modelProvider}
-                onNotesChange={setNotes}
-                onTemperatureChange={setTemperature}
-                onWebResearchChange={setWebResearch}
-                onDetailedAnalysisChange={setDetailedAnalysis}
-                onFormalToneChange={setFormalTone}
-                onModelProviderChange={setModelProvider}
-                isRefining={isRefiningMode}
-                chatInterface={
-                  <RefineChat
-                    minimal={true}
-                    compileContext={lastCompileContext}
-                    currentContent={pendingContent || compiledContent}
-                    anonymizedContent={pendingAnonymizedContent || anonymizedContent}
-                    onPreview={(newContent, newAnonymizedContent) => {
-                      setPendingContent(newContent);
-                      if (newAnonymizedContent) setPendingAnonymizedContent(newAnonymizedContent);
-                      setIsReviewing(true);
-                    }}
-                    isReviewing={isReviewing}
-                    onAccept={handleAcceptRefinement}
-                    onReject={handleRejectRefinement}
-                    onClose={() => setIsRefiningMode(false)}
-                    pendingMention={pendingMention}
-                    onMentionConsumed={() => setPendingMention(null)}
-                    onMentionCreated={(text, source, start, end) => handleMention(text, source, start, end)}
-                  />
-                }
-              />
-            </div>
+        <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
+          {/* COLUMN 1: Settings OR Chat (FIXED WIDTH) */}
+          <div className="w-[340px] flex-shrink-0 flex-grow-0 h-full flex flex-col overflow-hidden">
+            <ModelSettings
+              className="flex-1"
+              notes={notes}
+              temperature={temperature}
+              webResearch={webResearch}
+              detailedAnalysis={detailedAnalysis}
+              formalTone={formalTone}
+              modelProvider={modelProvider}
+              onNotesChange={setNotes}
+              onTemperatureChange={setTemperature}
+              onWebResearchChange={setWebResearch}
+              onDetailedAnalysisChange={setDetailedAnalysis}
+              onFormalToneChange={setFormalTone}
+              onModelProviderChange={setModelProvider}
+              isRefining={isRefiningMode}
+              chatInterface={
+                <RefineChat
+                  minimal={true}
+                  compileContext={lastCompileContext}
+                  currentContent={pendingContent || compiledContent}
+                  anonymizedContent={pendingAnonymizedContent || anonymizedContent}
+                  onPreview={(newContent, newAnonymizedContent) => {
+                    setPendingContent(newContent);
+                    if (newAnonymizedContent) setPendingAnonymizedContent(newAnonymizedContent);
+                    setIsReviewing(true);
+                  }}
+                  isReviewing={isReviewing}
+                  onAccept={handleAcceptRefinement}
+                  onReject={handleRejectRefinement}
+                  onClose={() => setIsRefiningMode(false)}
+                  pendingMention={pendingMention}
+                  onMentionConsumed={() => setPendingMention(null)}
+                  onMentionCreated={(text, source, start, end) => handleMention(text, source, start, end)}
+                />
+              }
+            />
+          </div>
 
-            {/* COLUMN 2: PDF Preview (col-span-9) */}
-            <div className="col-span-9 flex flex-col min-h-0 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-              <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
-                <PdfPreview
-                  fileBase64={masterSource?.base64 || ""}
-                  fileName={masterSource?.name}
-                  className="rounded-none border-none h-full"
-                  selectedSources={selectedSources.map(s => ({
-                    name: s.name,
-                    type: s.type,
-                    base64: s.base64
-                  }))}
-                  notes={notes}
-                  webResearch={webResearch}
-                  modelProvider={modelProvider}
-                  refinerProposals={isReviewing ? pendingContent : undefined}
-                  onCompile={(content, metadata) => {
-                    // Synchronize state when PDF is compiled via AI assist
-                    setIsCompiledView(true);
-                    setCompiledContent(content);
-                    setTemplateContent(content);
-                    setIsRefiningMode(true);
-
-                    // Also store context for Copilot
-                    setLastCompileContext({
-                      sources: selectedSources.map(s => ({
+          {/* MAIN CONTENT AREA */}
+          <div className="flex-1 min-w-0 flex gap-4 overflow-hidden relative">
+            {isPdfMode ? (
+              /* PDF STUDIO UNIFIED VIEW */
+              <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+                <div className="flex-1 h-full min-w-0 flex flex-col relative overflow-hidden">
+                  <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
+                    <PdfPreview
+                      fileBase64={masterSource?.base64 || ""}
+                      fileName={masterSource?.name}
+                      className="rounded-none border-none h-full"
+                      selectedSources={selectedSources.map(s => ({
                         name: s.name,
                         type: s.type,
                         base64: s.base64
-                      })),
-                      masterSource: masterSource ? {
-                        name: masterSource.name,
-                        type: masterSource.type,
-                        base64: masterSource.base64
-                      } : null,
-                      notes,
-                      temperature,
-                      webResearch,
-                      detailedAnalysis,
-                      formalTone,
-                      modelProvider,
-                      ...metadata
-                    });
-                  }}
-                />
-              </Card>
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 min-h-0 flex gap-4 overflow-visible">
-            {/* COLUMN 1: Settings OR Chat (25% approx col-span-3) */}
-            <div className="w-[25%] min-w-[280px] h-full flex flex-col overflow-hidden">
-              <ModelSettings
-                className="flex-1"
-                notes={notes}
-                temperature={temperature}
-                webResearch={webResearch}
-                detailedAnalysis={detailedAnalysis}
-                formalTone={formalTone}
-                modelProvider={modelProvider}
-                onNotesChange={setNotes}
-                onTemperatureChange={setTemperature}
-                onWebResearchChange={setWebResearch}
-                onDetailedAnalysisChange={setDetailedAnalysis}
-                onFormalToneChange={setFormalTone}
-                onModelProviderChange={setModelProvider}
-                isRefining={isRefiningMode}
-                chatInterface={
-                  <RefineChat
-                    minimal={true}
-                    compileContext={lastCompileContext}
-                    currentContent={pendingContent || compiledContent}
-                    anonymizedContent={pendingAnonymizedContent || anonymizedContent}
-                    onPreview={(newContent, newAnonymizedContent) => {
-                      setPendingContent(newContent);
-                      if (newAnonymizedContent) setPendingAnonymizedContent(newAnonymizedContent);
-                      setIsReviewing(true);
-                    }}
-                    isReviewing={isReviewing}
-                    onAccept={handleAcceptRefinement}
-                    onReject={handleRejectRefinement}
-                    onClose={() => setIsRefiningMode(false)}
-                    pendingMention={pendingMention}
-                    onMentionConsumed={() => setPendingMention(null)}
-                    onMentionCreated={(text, source, start, end) => handleMention(text, source, start, end)}
-                  />
-                }
-              />
-            </div>
-
-            {/* FLEXIBLE CONTAINER FOR EDITOR & OUTPUT (75% approx col-span-9) */}
-            <div className="flex-1 h-full min-w-0 flex relative overflow-visible">
-              {/* COLUMN 2: Template Editor (flexible) */}
-              <div className="flex-1 h-full min-w-0 flex flex-col overflow-visible relative">
-                <TemplateEditor
-                  key={`editor-${isReviewing}-${isLocked}`}
-                  value={isReviewing ? (pendingContent || templateContent) : templateContent}
-                  onChange={(val) => {
-                    setTemplateContent(val);
-                    // Sync with output ONLY if we are in "Template Compilato" mode (Copilot active)
-                    if (isRefiningMode && !isReviewing) {
-                      setCompiledContent(val);
-                    }
-                  }}
-                  title={isReviewing
-                    ? "Anteprima Modifiche AI"
-                    : (compiledContent
-                      ? `Template Compilato${masterSource ? ` (${masterSource.name})` : ''}`
-                      : ((currentMode as string) === 'fillable'
-                        ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
-                        : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`))
-                  }
-                  placeholder=""
-                  enableMentions={isReviewing || !!compiledContent}
-                  onMention={(text, start, end) => handleMention(text, isReviewing ? 'anteprema' : 'template', start, end)}
-                  headerRight={isReviewing ? (
-                    <div className="flex gap-1 items-center">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all"
-                        onClick={handleRejectRefinement}
-                        title="Rifiuta modifiche"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-green-600 hover:bg-green-50 hover:border-green-200 shadow-sm transition-all"
-                        onClick={handleAcceptRefinement}
-                        title="Accetta modifiche"
-                      >
-                        <Check className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ) : null}
-                >
-                  <div className="space-y-4 max-w-sm mt-0">
-                    <p className="font-medium text-foreground">Seleziona un template preimpostato o carica il tuo, aggiungi documenti di contesto (visure, contratti, foto), e l'AI compilerà automaticamente tutti i placeholder con le informazioni estratte dai tuoi file.</p>
-                    <p className="text-xs">Perfetto per: contratti, relazioni tecniche, privacy policy, documenti legali.</p>
-                  </div>
-                </TemplateEditor>
-
-                {/* CUSTOM TOGGLE HANDLE (Dynamically centered in gutter or gap) */}
-                <div
-                  className={`absolute right-0 top-1/2 -translate-y-1/2 z-[40] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[12px]' : 'translate-x-[15px]'}`}
-                >
-                  <button
-                    onClick={() => setIsOutputVisible(!isOutputVisible)}
-                    className="w-[8px] h-[33px] rounded-full bg-[#2563eb] shadow-lg flex flex-col items-center justify-center gap-[4px] hover:scale-110 active:scale-95 transition-all outline-none p-0"
-                    title={isOutputVisible ? "Nascondi output" : "Mostra output"}
-                  >
-                    <div className="w-[1.2px] h-[7px] bg-white rounded-full flex-shrink-0" />
-                    <div className="w-[1.2px] h-[7px] bg-white rounded-full flex-shrink-0" />
-                  </button>
-                </div>
-              </div>
-
-              {/* COLUMN 3: Compiled Output (Animated Sidebar) */}
-              <AnimatePresence mode="popLayout" initial={false}>
-                {isOutputVisible && (
-                  <motion.div
-                    key="output-sidebar"
-                    initial={{ width: 0, opacity: 0, x: 20 }}
-                    animate={{ width: '44.44%', opacity: 1, x: 0 }}
-                    exit={{ width: 0, opacity: 0, x: 20 }}
-                    transition={{
-                      duration: 0.5,
-                      ease: [0.32, 0.72, 0, 1]
-                    }}
-                    className="h-full flex flex-col min-w-0 pl-4 overflow-hidden"
-                  >
-                    <CompiledOutput
-                      content={compiledContent}
-                      onCopy={() => {
-                        navigator.clipboard.writeText(compiledContent);
-                        toast({
-                          title: "Copiato",
-                          description: "Il contenuto è stato copiato negli appunti.",
+                      }))}
+                      onMention={handleMention}
+                      onCompile={(content, metadata) => {
+                        setIsCompiledView(true);
+                        setCompiledContent(content);
+                        setTemplateContent(content);
+                        setIsRefiningMode(true);
+                        setLastCompileContext({
+                          sources: selectedSources.map(s => ({
+                            name: s.name,
+                            type: s.type,
+                            base64: s.base64
+                          })),
+                          masterSource: masterSource ? {
+                            name: masterSource.name,
+                            type: masterSource.type,
+                            base64: masterSource.base64
+                          } : null,
+                          notes,
+                          temperature,
+                          webResearch,
+                          detailedAnalysis,
+                          formalTone,
+                          modelProvider,
+                          ...metadata
                         });
                       }}
-                      onDownload={handleDownload}
                     />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                  </Card>
+                </div>
+              </div>
+            ) : (
+              /* STANDARD EDITOR VIEW */
+              <div className="flex-1 min-w-0 flex gap-4 h-full relative">
+                <div className="flex-1 h-full min-w-0 flex flex-col relative overflow-hidden">
+                  <Card className="flex-1 min-h-0 flex flex-col overflow-hidden border-blue-500/20 shadow-xl shadow-blue-500/5 bg-background/50">
+                    <TemplateEditor
+                      className="border-none rounded-none shadow-none"
+                      key={`editor-${isReviewing}-${isLocked}`}
+                      value={isReviewing ? (pendingContent || templateContent) : templateContent}
+                      onChange={(val) => {
+                        setTemplateContent(val);
+                        // Sync with output ONLY if we are in "Template Compilato" mode (Copilot active)
+                        if (isRefiningMode && !isReviewing) {
+                          setCompiledContent(val);
+                        }
+                      }}
+                      title={isReviewing
+                        ? "Anteprima Modifiche AI"
+                        : (compiledContent
+                          ? `Template Compilato${masterSource ? ` (${masterSource.name})` : ''}`
+                          : ((currentMode as string) === 'fillable'
+                            ? `Template PDF${masterSource ? ` (${masterSource.name})` : ''}`
+                            : `Template da Compilare${masterSource ? ` (${masterSource.name})` : ''}`))
+                      }
+                      placeholder=""
+                      enableMentions={isReviewing || !!compiledContent}
+                      onMention={(text, start, end) => handleMention(text, isReviewing ? 'anteprema' : 'template', start, end)}
+                      headerRight={isReviewing ? (
+                        <div className="flex gap-1 items-center">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm transition-all"
+                            onClick={handleRejectRefinement}
+                            title="Rifiuta modifiche"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 p-0 border-slate-200 bg-white/80 text-slate-500 hover:text-green-600 hover:bg-green-50 hover:border-green-200 shadow-sm transition-all"
+                            onClick={handleAcceptRefinement}
+                            title="Accetta modifiche"
+                          >
+                            <Check className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : null}
+                    >
+                      <div className="space-y-4 max-w-sm mt-0 text-foreground/70">
+                        <p className="font-medium">Seleziona un template preimpostato o carica il tuo, aggiungi documenti di contesto (visure, contratti, foto), e l'AI compilerà automaticamente tutti i placeholder con le informazioni estratte dai tuoi file.</p>
+                        <p className="text-xs">Perfetto per: contratti, relazioni tecniche, privacy policy, documenti legali.</p>
+                      </div>
+                    </TemplateEditor>
+                  </Card>
+
+                  {/* CUSTOM TOGGLE HANDLE */}
+                  <div
+                    className={`absolute right-0 top-1/2 -translate-y-1/2 z-[40] transition-all duration-500 ease-[0.32,0.72,0,1] ${isOutputVisible ? 'translate-x-[12px]' : 'translate-x-[15px]'}`}
+                  >
+                    <button
+                      onClick={() => setIsOutputVisible(!isOutputVisible)}
+                      className="w-[8px] h-[33px] rounded-full bg-[#2563eb] shadow-lg flex flex-col items-center justify-center gap-[4px] hover:scale-110 active:scale-95 transition-all outline-none p-0"
+                      title={isOutputVisible ? "Nascondi output" : "Mostra output"}
+                    >
+                      <div className="w-[1.2px] h-[7px] bg-white rounded-full flex-shrink-0" />
+                      <div className="w-[1.2px] h-[7px] bg-white rounded-full flex-shrink-0" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* COLUMN 3: Compiled Output (Animated Sidebar) */}
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {isOutputVisible && (
+                    <motion.div
+                      key="output-sidebar"
+                      initial={{ width: 0, opacity: 0, x: 20 }}
+                      animate={{ width: '44.44%', opacity: 1, x: 0 }}
+                      exit={{ width: 0, opacity: 0, x: 20 }}
+                      transition={{
+                        duration: 0.5,
+                        ease: [0.32, 0.72, 0, 1]
+                      }}
+                      className="h-full flex flex-col min-w-0 pl-4 overflow-hidden"
+                    >
+                      <CompiledOutput
+                        content={compiledContent}
+                        onCopy={() => {
+                          navigator.clipboard.writeText(compiledContent);
+                          toast({
+                            title: "Copiato",
+                            description: "Il contenuto è stato copiato negli appunti.",
+                          });
+                        }}
+                        onDownload={handleDownload}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Template Generation Modal */}
         <Dialog open={isGenerateModalOpen} onOpenChange={setIsGenerateModalOpen}>

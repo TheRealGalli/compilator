@@ -13,8 +13,10 @@ import {
     MoreVertical,
     Loader2,
     Asterisk,
-    AlertCircle
+    AlertCircle,
+    MessageSquare
 } from "lucide-react";
+import { MentionButton } from "./MentionButton";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -39,6 +41,7 @@ interface PdfPreviewProps {
     webResearch?: boolean;
     modelProvider?: string;
     onCompile?: (content: string, metadata?: { extractedFields?: any[], manualAnnotations?: any[], fetchedCompilerContext?: string }) => void;
+    onMention?: (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => void;
     refinerProposals?: string | null;
 }
 
@@ -51,6 +54,7 @@ export function PdfPreview({
     webResearch = false,
     modelProvider = 'gemini',
     onCompile,
+    onMention,
     refinerProposals
 }: PdfPreviewProps) {
     const [numPages, setNumPages] = useState<number>(0);
@@ -70,6 +74,8 @@ export function PdfPreview({
     const [hasRefinerProposals, setHasRefinerProposals] = useState(false);
     const [rollbackValues, setRollbackValues] = useState<Record<string, string | boolean>>({});
     const [hasCompiledOnce, setHasCompiledOnce] = useState(false);
+    const [mentionPosition, setMentionPosition] = useState<{ x: number, y: number } | null>(null);
+    const [pendingMentionText, setPendingMentionText] = useState<string>('');
 
     const documentOptions = useMemo(() => ({
         cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
@@ -318,6 +324,68 @@ export function PdfPreview({
             title: "Modifiche Annullate",
             description: "Il modulo è stato riportato allo stato precedente."
         });
+    };
+
+    const handleTextSelection = () => {
+        const selection = window.getSelection();
+        const selectedText = selection?.toString().trim();
+
+        if (selectedText && selectedText.length > 0) {
+            const range = selection?.getRangeAt(0);
+            const rect = range?.getBoundingClientRect();
+            if (rect) {
+                // Check if the selection is inside the PDF viewer to avoid showing button elsewhere
+                const viewer = document.querySelector('.react-pdf__Page');
+                if (viewer && viewer.contains(range?.commonAncestorContainer || null)) {
+                    setPendingMentionText(selectedText);
+                    setMentionPosition({
+                        x: rect.left + rect.width / 2,
+                        y: rect.top - 10
+                    });
+                }
+            }
+        } else {
+            setMentionPosition(null);
+        }
+    };
+
+    const setupFieldMentionListeners = () => {
+        const annotationLayer = document.querySelector('.annotationLayer');
+        if (!annotationLayer) return;
+
+        const inputs = annotationLayer.querySelectorAll('input, textarea, select');
+        inputs.forEach((el: any) => {
+            // Remove existing to avoid duplicates if re-rendering
+            el.removeEventListener('click', handleFieldClick);
+            el.addEventListener('click', handleFieldClick);
+        });
+    };
+
+    const handleFieldClick = (e: MouseEvent) => {
+        const el = e.target as HTMLInputElement;
+        const fieldName = el.name;
+        if (fieldName) {
+            const rect = el.getBoundingClientRect();
+            setPendingMentionText(`Campo: ${fieldName}`);
+            setMentionPosition({
+                x: rect.left + rect.width / 2,
+                y: rect.top - 10
+            });
+            // Select the content if it's text to give visual feedback
+            if (el.select) el.select();
+        }
+    };
+
+    const handleMentionClick = () => {
+        if (onMention && pendingMentionText) {
+            onMention(pendingMentionText, 'anteprema');
+            setMentionPosition(null);
+            window.getSelection()?.removeAllRanges();
+            toast({
+                title: "Menzione Aggiunta",
+                description: `"${pendingMentionText.substring(0, 30)}..." aggiunta alla chat.`,
+            });
+        }
     };
 
     const handleEyeClick = async () => {
@@ -639,24 +707,39 @@ export function PdfPreview({
                             options={documentOptions}
                             loading={null}
                         >
-                            <Page
-                                key={`${pageNumber}-${scale}-${rotation}`}
-                                pageNumber={pageNumber}
-                                scale={scale}
-                                rotate={rotation}
-                                renderAnnotationLayer={true}
-                                renderForms={true}
-                                renderTextLayer={false}
-                                onRenderSuccess={() => {
-
-                                    applyProposalsToDom(proposals);
-                                    // Small delay to ensure browser layout is stable
-                                    setTimeout(() => setIsLoading(false), 50);
-                                }}
-                                className={`shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'} ${isXfaAdobe ? 'xfa-lockout' : ''}`}
-                                loading={null}
-                            />
+                            <div onMouseUp={handleTextSelection}>
+                                <Page
+                                    key={`${pageNumber}-${scale}-${rotation}`}
+                                    pageNumber={pageNumber}
+                                    scale={scale}
+                                    rotate={rotation}
+                                    renderAnnotationLayer={true}
+                                    renderForms={true}
+                                    renderTextLayer={true}
+                                    onRenderSuccess={() => {
+                                        applyProposalsToDom(proposals);
+                                        setupFieldMentionListeners();
+                                        // Small delay to ensure browser layout is stable
+                                        setTimeout(() => setIsLoading(false), 50);
+                                    }}
+                                    className={`shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'} ${isXfaAdobe ? 'xfa-lockout' : ''}`}
+                                    loading={null}
+                                />
+                            </div>
                         </Document>
+                    )}
+
+                    {/* Mention Button Overlay */}
+                    {mentionPosition && (
+                        <div
+                            className="fixed z-[100] transition-all transform -translate-x-1/2 -translate-y-full"
+                            style={{
+                                left: mentionPosition.x,
+                                top: mentionPosition.y
+                            }}
+                        >
+                            <MentionButton onClick={handleMentionClick} />
+                        </div>
                     )}
                 </div>
             </div>
