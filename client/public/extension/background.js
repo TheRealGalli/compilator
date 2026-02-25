@@ -123,11 +123,12 @@
       return true;
     }
     if (request.type === "NATIVE_OCR") {
-      const { fileBase64, fileName } = request;
-      console.log(`[GromitBridge] \u{1F680} Calling Swift Native OCR for ${fileName}...`);
+      const { fileBase64, fileName, command } = request;
+      console.log(`[GromitBridge] \u{1F680} Calling Swift Native OCR for ${fileName || command}...`);
+      const messagePayload = command ? { command } : { base64: fileBase64, fileName };
       chrome.runtime.sendNativeMessage(
         "com.gromit.ocr",
-        { base64: fileBase64, fileName },
+        messagePayload,
         (response) => {
           if (chrome.runtime.lastError) {
             const errMsg = chrome.runtime.lastError.message;
