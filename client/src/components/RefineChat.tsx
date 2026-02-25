@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -76,6 +76,7 @@ export function RefineChat({
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Initial Analysis Trigger
@@ -173,30 +174,49 @@ export function RefineChat({
         return () => window.removeEventListener('mousedown', handleAnyClick);
     }, [selection]);
 
-    // Track mouse state at window level for reliability
-    const [isMouseDown, setIsMouseDown] = useState(false);
+    const updateSelectionPosition = useCallback(() => {
+        if (isMouseDown) return;
+
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.toString().trim().length === 0) {
+            setSelection(null);
+            return;
+        }
+
+        const container = containerRef.current;
+        if (!container) return;
+
+        if (!container.contains(sel.anchorNode)) {
+            // Only show if selection is within this chat component
+            return;
+        }
+
+        const range = sel.getRangeAt(0);
+        const rects = range.getClientRects();
+        if (rects.length === 0) return;
+
+        const containerRect = container.getBoundingClientRect();
+        const firstRect = rects[0];
+
+        // Align to the right edge of the selection's first line
+        const x = firstRect.right - containerRect.left;
+        const y = firstRect.top - containerRect.top;
+
+        setSelection({
+            text: sel.toString().trim(),
+            x,
+            y
+        });
+    }, [isMouseDown]);
+
     useEffect(() => {
         const handleMouseDown = () => setIsMouseDown(true);
-        const handleMouseUp = (e: MouseEvent) => {
+        const handleMouseUp = () => {
             setIsMouseDown(false);
-            // Small delay to allow range to stabilize
-            setTimeout(() => {
-                const sel = window.getSelection();
-                if (sel && sel.toString().trim().length > 0 && containerRef.current) {
-                    if (containerRef.current.contains(sel.anchorNode)) {
-                        // Use mouse coordinates for stable positioning
-                        // Clamp X so button never goes off-screen (min 20px from left)
-                        const clampedX = Math.max(20, Math.min(e.clientX + 12, window.innerWidth - 80));
-                        setSelection({
-                            text: sel.toString().trim(),
-                            x: clampedX,
-                            y: e.clientY
-                        });
-                    }
-                } else if (!isMouseDown) {
-                    setSelection(null);
-                }
-            }, 50);
+            // Wait a tick for DOM selection to finalize
+            requestAnimationFrame(() => {
+                updateSelectionPosition();
+            });
         };
 
         window.addEventListener('mousedown', handleMouseDown);
@@ -205,7 +225,20 @@ export function RefineChat({
             window.removeEventListener('mousedown', handleMouseDown);
             window.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isMouseDown]);
+    }, [updateSelectionPosition]);
+
+    // Track scroll events to keep button anchored
+    useEffect(() => {
+        const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+        if (viewport) {
+            viewport.addEventListener('scroll', updateSelectionPosition);
+            window.addEventListener('resize', updateSelectionPosition);
+            return () => {
+                viewport.removeEventListener('scroll', updateSelectionPosition);
+                window.removeEventListener('resize', updateSelectionPosition);
+            };
+        }
+    }, [updateSelectionPosition]);
 
     const handleMouseUp = (e: React.MouseEvent) => {
         // This is now redundant with the window listener, but we keep it for safety 
@@ -425,7 +458,7 @@ export function RefineChat({
                 onMouseUp={handleMouseUp}
                 ref={containerRef}
             >
-                <ScrollArea className="flex-1 -mr-2 pr-4 mb-2 [&>[data-radix-scroll-area-viewport]]:h-full">
+                <ScrollArea ref={scrollAreaRef} className="flex-1 -mr-2 pr-4 mb-2 [&>[data-radix-scroll-area-viewport]]:h-full">
                     <div className="space-y-4">
                         {React.useMemo(() => (
                             messages.filter(m => m.role === 'ai' || m.role === 'user').map((msg) => (
@@ -545,11 +578,11 @@ export function RefineChat({
                 {/* Selection Mention Button */}
                 {selection && (
                     <div
-                        className="fixed z-[9999]"
+                        className="absolute z-[9999]"
                         style={{
                             left: selection.x,
                             top: selection.y,
-                            transform: 'translateY(-50%)'
+                            transform: 'translate(-100%, -100%)'
                         }}
                     >
                         <MentionButton onClick={handleMentionClick} />
@@ -777,11 +810,11 @@ export function RefineChat({
             {/* Selection Mention Button */}
             {selection && (
                 <div
-                    className="fixed z-[9999]"
+                    className="absolute z-[9999]"
                     style={{
                         left: selection.x,
                         top: selection.y,
-                        transform: 'translateY(-50%)'
+                        transform: 'translate(-100%, -100%)'
                     }}
                 >
                     <MentionButton onClick={handleMentionClick} />

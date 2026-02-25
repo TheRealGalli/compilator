@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
@@ -47,7 +47,9 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   // Mention State
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [isMouseDown, setIsMouseDown] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const { data: user } = useQuery({ queryKey: ['/api/user'] });
   const isAuthenticated = !!user;
@@ -234,37 +236,81 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
     extractFields();
   }, [masterSource?.id]);
 
-  // Handle Selection for Mentions (mouseup-based for stable positioning)
+  const updateSelectionPosition = useCallback(() => {
+    if (isMouseDown) return;
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.toString().trim().length === 0) {
+      setSelection(null);
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    if (!container.contains(sel.anchorNode)) {
+      // Only show if selection is within this chat component
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    const rects = range.getClientRects();
+    if (rects.length === 0) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const firstRect = rects[0];
+
+    // Align to the right edge of the selection's first line
+    const x = firstRect.right - containerRect.left;
+    const y = firstRect.top - containerRect.top;
+
+    setSelection({
+      text: sel.toString().trim(),
+      x,
+      y
+    });
+  }, [isMouseDown]);
+
+  // Handle Selection for Mentions
   useEffect(() => {
-    const handleMouseUp = (e: MouseEvent) => {
-      // Small delay to let the selection stabilize
-      setTimeout(() => {
-        const sel = window.getSelection();
-        if (sel && sel.toString().trim().length > 0 && containerRef.current && containerRef.current.contains(sel.anchorNode)) {
-          // Use MOUSE COORDINATES directly — always stable, always where user expects
-          setSelection({
-            text: sel.toString().trim(),
-            x: e.clientX + 12,
-            y: e.clientY
-          });
-        }
-      }, 10);
+    const handleMouseDown = () => setIsMouseDown(true);
+    const handleMouseUp = () => {
+      setIsMouseDown(false);
+      // Wait a tick for DOM selection to finalize
+      requestAnimationFrame(() => {
+        updateSelectionPosition();
+      });
     };
 
-    const handleMouseDown = (e: MouseEvent) => {
+    const handleWindowMouseDown = (e: MouseEvent) => {
       // Clear selection when clicking anywhere EXCEPT on the mention button
       const target = e.target as HTMLElement;
       if (target.closest('[data-mention-button]')) return;
       setSelection(null);
     };
 
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousedown', handleWindowMouseDown);
     return () => {
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousedown', handleWindowMouseDown);
     };
-  }, []);
+  }, [updateSelectionPosition]);
+
+  // Track scroll events to keep button anchored
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (viewport && containerRef.current) {
+      viewport.addEventListener('scroll', updateSelectionPosition);
+      window.addEventListener('resize', updateSelectionPosition);
+      return () => {
+        viewport.removeEventListener('scroll', updateSelectionPosition);
+        window.removeEventListener('resize', updateSelectionPosition);
+      };
+    }
+  }, [updateSelectionPosition]);
 
   const handleMentionClick = () => {
     if (selection) {
@@ -433,16 +479,15 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Mention Button Overlay — fixed to end of selection */}
+      {/* Mention Button Overlay — anchored to selection rect */}
       {selection && (
         <div
           style={{
-            position: 'fixed',
+            position: 'absolute',
             left: selection.x,
             top: selection.y,
-            transform: 'translateY(-50%)',
+            transform: 'translate(-100%, -100%)',
             zIndex: 9999,
-            pointerEvents: 'auto'
           }}
         >
           <MentionButton onClick={handleMentionClick} />
@@ -450,7 +495,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
       )}
 
       <div className="flex-1 overflow-hidden flex flex-col relative" ref={containerRef}>
-        <ScrollArea className="flex-1 p-6">
+        <ScrollArea ref={scrollAreaRef} className="flex-1 p-6">
           <div className="space-y-6 max-w-3xl mx-auto">
             {messages.map((message) => (
               <ChatMessage key={message.id} {...message} userInitial={userIdentity?.initial} />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,8 @@ export function PdfPreview({
     const [hasCompiledOnce, setHasCompiledOnce] = useState(false);
     const [mentionPosition, setMentionPosition] = useState<{ x: number, y: number } | null>(null);
     const [pendingMentionText, setPendingMentionText] = useState<string>('');
+    const viewportRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const documentOptions = useMemo(() => ({
         cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
@@ -326,28 +328,48 @@ export function PdfPreview({
         });
     };
 
-    const handleTextSelection = () => {
-        const selection = window.getSelection();
-        const selectedText = selection?.toString().trim();
+    const updateSelectionPosition = useCallback(() => {
+        const sel = window.getSelection();
+        const selectedText = sel?.toString().trim();
 
         if (selectedText && selectedText.length > 0) {
-            const range = selection?.getRangeAt(0);
-            const rect = range?.getBoundingClientRect();
-            if (rect) {
-                // Check if the selection is inside the PDF viewer to avoid showing button elsewhere
-                const viewer = document.querySelector('.react-pdf__Page');
-                if (viewer && viewer.contains(range?.commonAncestorContainer || null)) {
-                    setPendingMentionText(selectedText);
-                    setMentionPosition({
-                        x: rect.left + rect.width / 2,
-                        y: rect.top - 10
-                    });
-                }
+            const range = sel?.getRangeAt(0);
+            const rects = range?.getClientRects();
+
+            if (rects && rects.length > 0 && containerRef.current) {
+                const containerRect = containerRef.current.getBoundingClientRect();
+                const firstRect = rects[0];
+
+                setPendingMentionText(selectedText);
+                setMentionPosition({
+                    x: firstRect.right - containerRect.left,
+                    y: firstRect.top - containerRect.top
+                });
             }
         } else {
             setMentionPosition(null);
         }
+    }, []);
+
+    const handleTextSelection = () => {
+        // Wait a tick for DOM selection to finalize
+        requestAnimationFrame(() => {
+            updateSelectionPosition();
+        });
     };
+
+    // Track scroll events to keep button anchored
+    useEffect(() => {
+        const viewport = viewportRef.current;
+        if (viewport) {
+            viewport.addEventListener('scroll', updateSelectionPosition);
+            window.addEventListener('resize', updateSelectionPosition);
+            return () => {
+                viewport.removeEventListener('scroll', updateSelectionPosition);
+                window.removeEventListener('resize', updateSelectionPosition);
+            };
+        }
+    }, [updateSelectionPosition]);
 
     const setupFieldMentionListeners = () => {
         const annotationLayer = document.querySelector('.annotationLayer');
@@ -364,12 +386,13 @@ export function PdfPreview({
     const handleFieldClick = (e: MouseEvent) => {
         const el = e.target as HTMLInputElement;
         const fieldName = el.name;
-        if (fieldName) {
-            const rect = el.getBoundingClientRect();
+        if (fieldName && containerRef.current) {
+            const elRect = el.getBoundingClientRect();
+            const containerRect = containerRef.current.getBoundingClientRect();
             setPendingMentionText(`Campo: ${fieldName}`);
             setMentionPosition({
-                x: rect.left + rect.width / 2,
-                y: rect.top - 10
+                x: elRect.right - containerRect.left,
+                y: elRect.top - containerRect.top
             });
             // Select the content if it's text to give visual feedback
             if (el.select) el.select();
@@ -681,8 +704,11 @@ export function PdfPreview({
             )}
 
             {/* PDF Viewport */}
-            <div className="flex-1 overflow-auto bg-slate-100 flex justify-center p-4 scrollbar-thin group relative">
-                <div className="h-fit relative min-w-[300px] min-h-[400px] flex items-center justify-center">
+            <div
+                ref={viewportRef}
+                className="flex-1 overflow-auto bg-slate-100 flex justify-center p-4 scrollbar-thin group relative"
+            >
+                <div ref={containerRef} className="h-fit relative min-w-[300px] min-h-[400px] flex items-center justify-center">
                     {(isDocumentLoading || isLoading) && !error && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
                             <Loader2 className="w-8 h-8 animate-spin text-blue-500/20" />
@@ -729,13 +755,14 @@ export function PdfPreview({
                         </Document>
                     )}
 
-                    {/* Mention Button Overlay */}
+                    {/* Mention Button Overlay - anchored to relative container */}
                     {mentionPosition && (
                         <div
-                            className="fixed z-[100] transition-all transform -translate-x-1/2 -translate-y-full"
+                            className="absolute z-[100]"
                             style={{
                                 left: mentionPosition.x,
-                                top: mentionPosition.y
+                                top: mentionPosition.y,
+                                transform: 'translate(-100%, -100%)'
                             }}
                         >
                             <MentionButton onClick={handleMentionClick} />
