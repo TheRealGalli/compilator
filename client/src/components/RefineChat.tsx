@@ -75,6 +75,7 @@ export function RefineChat({
     const [isLoading, setIsLoading] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [selection, setSelection] = useState<{ text: string; x: number; y: number } | null>(null);
+    const [isMouseDown, setIsMouseDown] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
