@@ -75,18 +75,22 @@ export async function proposePdfFieldValues(
     fields: PdfFormField[],
     masterFile: MultimodalFile,
     sourceFiles: MultimodalFile[],
-    sourceContext: string, // Text-based context (MD, DOCX, etc.)
+    sourceContext: string,
     notes: string,
     geminiModel: any,
     webResearch: boolean = false
-): Promise<Array<{ name: string; label: string; value: string | boolean; reasoning: string }>> {
+): Promise<Array<{ name: string; label: string; value: string | boolean }>> {
     try {
-        const tools: any[] = [];
-        if (webResearch) {
-            tools.push({ googleSearch: {} });
+        const CHUNK_SIZE = 40; // Max fields per parallel request
+        const fieldChunks: PdfFormField[][] = [];
+        for (let i = 0; i < fields.length; i += CHUNK_SIZE) {
+            fieldChunks.push(fields.slice(i, i + CHUNK_SIZE));
         }
 
-        const prompt = `Sei un esperto di Document Intelligence e Precision Mapping. 
+        const allProposals: Array<{ name: string; label: string; value: string | boolean }> = [];
+
+        await Promise.all(fieldChunks.map(async (chunk, index) => {
+            const prompt = `Sei un esperto di Document Intelligence e Precision Mapping. 
 Abbiamo rilevato i seguenti campi tecnici in un PDF ufficiale (FILE MASTER allegato). 
 
 IL TUO OBIETTIVO: 
@@ -95,9 +99,8 @@ Mappare con precisione chirurgica ogni informazione dalle FONTI ai campi del PDF
 PROCESSO DI ANALISI (TASSATIVO):
 1. **Analisi Visiva Master**: Guarda il FILE MASTER (immagine/PDF). Trova la posizione esatta di ogni ID (es: "f1_1[0]").
 2. **Lettura Etichetta**: Leggi l'etichetta umana stampata proprio sopra o accanto a quel campo (es: "1a Name of Corporation").
-3. **Verifica Incrociata**: NON basarti sul nome tecnico per dedurre il contenuto. Usa SOLO l'etichetta visiva che hai letto. Se l'ID "f1_1" è vicino a "Tax Year", allora quel campo è il Tax Year.
+3. **Verifica Incrociata**: NON basarti sul nome tecnico per dedurre il contenuto. Usa SOLO l'etichetta visiva che hai letto.
 4. **Mappatura Dati**: Cerca nelle FONTI l'informazione che risponde a quell'etichetta.
-${webResearch ? `5. **Ricerca Web**: Se l'etichetta è ambigua (es: "Box 13 code"), cerca le istruzioni ufficiali del modulo per capire cosa inserire.` : ''}
 
 REGOLE PER I VALORI:
 - **Testo**: Inserisci il valore pulito. Se un campo chiede "Anno", scrivi "2025", non "L'anno è 2025".
@@ -105,8 +108,8 @@ REGOLE PER I VALORI:
 - **Valori Preesistenti (CRITICO)**: Se un campo ha già un Valore Attuale sensato (es: '0', 'N/A', o un numero), **NON SOVRASCRIVERLO** con stringhe vuote o avvisi a meno che le FONTI non indichino esplicitamente un valore diverso per quel campo.
 - **Dati Mancanti**: Se non trovi l'informazione nelle FONTI e il campo è vuoto, lascialo vuoto (stringa vuota ""). Usa "[DATO MANCANTE]" **SOLO ED ESCLUSIVAMENTE** come ultima risorsa se l'assenza del dato invalida palesemente il documento. NON inventare mai valori plausibili.
 
-CAMPI DA ANALIZZARE:
-${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
+CAMPI DA ANALIZZARE (CHUNK ${index + 1} di ${fieldChunks.length}):
+${chunk.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
 
 TESTO FONTI:
 ${sourceContext}
@@ -114,54 +117,71 @@ ${sourceContext}
 NOTE UTENTE:
 ${notes}
 
-Restituisci JSON:
-{
-  "proposals": [
-    { 
-      "name": "ID tecnico originale (es: f1_1[0])", 
-      "label": "Etichetta Umana leggibile (es: 1a Name)", 
-      "value": "Valore Proposto"
-    }
-  ]
-}
+Restituisci ESCLUSIVAMENTE un JSON conforme allo schema richiesto. Non includere altre chiavi.
 `;
 
-        // Prepare multimodal parts
-        const parts: any[] = [{ text: prompt }];
+            const parts: any[] = [{ text: prompt }];
 
-        // Add Master PDF
-        parts.push({
-            inlineData: {
-                data: masterFile.base64,
-                mimeType: masterFile.mimeType
-            }
-        });
-
-        // Add Source Files (limit to avoid token/quota issues if many)
-        for (const source of sourceFiles.slice(0, 5)) {
             parts.push({
                 inlineData: {
-                    data: source.base64,
-                    mimeType: source.mimeType
+                    data: masterFile.base64,
+                    mimeType: masterFile.mimeType
                 }
             });
-        }
 
-        const result = await geminiModel.generateContent({
-            contents: [{ role: 'user', parts }]
-        });
+            for (const source of sourceFiles.slice(0, 5)) {
+                parts.push({
+                    inlineData: {
+                        data: source.base64,
+                        mimeType: source.mimeType
+                    }
+                });
+            }
 
-        const response = await result.response;
-        const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            try {
+                const result = await geminiModel.generateContent({
+                    contents: [{ role: 'user', parts }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                proposals: {
+                                    type: "ARRAY",
+                                    items: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            name: { type: "STRING" },
+                                            label: { type: "STRING" },
+                                            value: { type: "STRING" }
+                                        },
+                                        required: ["name", "label", "value"]
+                                    }
+                                }
+                            },
+                            required: ["proposals"]
+                        }
+                    }
+                });
 
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) return [];
+                const response = await result.response;
+                const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                const jsonMatch = text.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    const data = JSON.parse(jsonMatch[0]);
+                    if (data.proposals) {
+                        allProposals.push(...data.proposals);
+                    }
+                }
+            } catch (chunkErr) {
+                console.error(`[proposePdfFieldValues] Error in chunk ${index}:`, chunkErr);
+            }
+        }));
 
-        const data = JSON.parse(jsonMatch[0]);
-        return data.proposals || [];
+        return allProposals;
 
     } catch (error) {
-        console.error('[proposePdfFieldValues] Error:', error);
+        console.error('[proposePdfFieldValues] Fatal Error:', error);
         return [];
     }
 }
