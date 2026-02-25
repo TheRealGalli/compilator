@@ -5,6 +5,8 @@ export interface PdfFormField {
     label?: string; // Human readable label (e.g. "Name of Reporting Corporation")
     type: 'text' | 'checkbox' | 'dropdown' | 'radio' | 'unknown';
     value?: string | boolean;
+    page?: number;
+    rect?: { x: number; y: number; width: number; height: number };
 }
 
 /**
@@ -15,10 +17,48 @@ export async function getPdfFormFields(buffer: Buffer): Promise<PdfFormField[]> 
         const pdfDoc = await PDFDocument.load(buffer);
         const form = pdfDoc.getForm();
         const fields = form.getFields();
+        const pages = pdfDoc.getPages();
 
         return fields.map(field => {
             const name = field.getName();
             let label = "";
+            let pageIndex = 0;
+            let rect = { x: 0, y: 0, width: 0, height: 0 };
+
+            // Find visual location of the field
+            try {
+                const widgets = field.acroField.getWidgets();
+                if (widgets && widgets.length > 0) {
+                    const widget = widgets[0];
+                    const rectangle = widget.getRectangle();
+                    rect = {
+                        x: Math.round(rectangle.x),
+                        y: Math.round(rectangle.y),
+                        width: Math.round(rectangle.width),
+                        height: Math.round(rectangle.height)
+                    };
+
+                    // Find which page this widget belongs to
+                    const p = widget.P();
+                    if (p) {
+                        pageIndex = pages.findIndex(page => page.ref === p);
+                    } else {
+                        // Fallback: search all pages for this specific widget reference
+                        for (let i = 0; i < pages.length; i++) {
+                            const pageWidgets = pages[i].node.Annots();
+                            if (pageWidgets) {
+                                const array = pageWidgets.asArray();
+                                if (array.some(ref => ref === (widget as any).ref)) {
+                                    pageIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn(`[getPdfFormFields] Could not get visual location for ${name}`);
+            }
 
             // Try to extract a useful label from the native field properties (Alternate Name / TU)
             try {
@@ -53,7 +93,7 @@ export async function getPdfFormFields(buffer: Buffer): Promise<PdfFormField[]> 
                 value = field.getSelected();
             }
 
-            return { name, label: label || name, type, value };
+            return { name, label: label || name, type, value, page: pageIndex + 1, rect };
         });
     } catch (error) {
         console.error('[getPdfFormFields] Error:', error);
@@ -84,13 +124,13 @@ export async function proposePdfFieldValues(
         const prompt = `Sei un esperto di Document Intelligence ad altissima precisione.
 Il tuo obiettivo è analizzare e compilare il PDF (FILE MASTER allegato) procedendo in modo sequenziale, campo per campo, partendo dal primo ID tecnico fornito.
 
-SCHELETRO DEI CAMPI DA COMPILARE:
-${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Valore Attuale: "${f.value !== undefined ? f.value : 'Vuoto'}"`).join('\n')}
+SCHELETRO DEI CAMPI DA COMPILARE (Con coordinate spaziali):
+${fields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Pagina: ${f.page}, Posizione: [x:${f.rect?.x}, y:${f.rect?.y}, w:${f.rect?.width}, h:${f.rect?.height}]`).join('\n')}
 
 PROTOCOLLO DI ANALISI SPAZIALE (TASSATIVO):
-1. **Localizzazione Visiva**: Per ogni ID (es: "f1_1[0]"), trova la sua posizione esatta nel FILE MASTER (immagine).
-2. **Lettura Etichetta Umana**: Leggi l'etichetta stampata accanto o sopra il campo. Ignora il nome tecnico se contrasta con l'etichetta visiva.
-3. **Cross-Reference & Reasoning**: Cerca nelle FONTI il dato corrispondente all'etichetta letta. Formula un breve pensiero (reasoning) che spieghi perché hai scelto quel valore (es: "Trovato indirizzo in fattura X corrispondente a label 1c").
+1. **Localizzazione Visiva**: Per ogni ID (es: "f1_1[0]"), usa le coordinate fornite per trovare la sua posizione esatta nel FILE MASTER (immagine). Il PDF usa un sistema di coordinate dove (0,0) è in basso a sinistra della pagina. 
+2. **Lettura Etichetta Umana**: Guarda cosa c'è scritto sopra o accanto al rettangolo alle coordinate indicate. Ignora il nome tecnico se contrasta con l'etichetta visiva che leggi sul foglio.
+3. **Cross-Reference & Reasoning**: Cerca nelle FONTI il dato corrispondente all'etichetta letta. Formula un breve pensiero (reasoning) che spieghi perché hai scelto quel valore (es: "Rilevata label '1a Name' alle coordinate x,y; inserito valore da fattura Y").
 4. **Web Research (Se Attivo)**: ${webResearch ? 'È ATTIVA la ricerca Google. Usala per chiarire dubbi su codici o istruzioni ministeriali del modulo.' : 'Non attiva.'}
 5. **Precisione**: Preserva '0', 'N/A' o valori preesistenti se validi.
 
