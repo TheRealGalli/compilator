@@ -344,9 +344,11 @@ export function PdfPreview({
             const rects = range?.getClientRects();
 
             if (rects && rects.length > 0 && containerRef.current) {
-                const containerRect = containerRef.current.getBoundingClientRect();
                 const firstRect = rects[0];
 
+                // If selection is inside an input/textarea, we might need special handling
+                // but getClientRects typically works for standard selection.
+                // We anchor to the middle-top of the first selection rectangle.
                 setPendingMentionText(selectedText);
                 setMentionPosition({
                     x: firstRect.left + (firstRect.width / 2),
@@ -354,6 +356,25 @@ export function PdfPreview({
                 });
             }
         } else {
+            // Check if there's an active element with selection (inputs/textareas)
+            const activeEl = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+                const start = activeEl.selectionStart;
+                const end = activeEl.selectionEnd;
+
+                if (start !== null && end !== null && start !== end) {
+                    const selectedText = activeEl.value.substring(start, end).trim();
+                    if (selectedText) {
+                        const elRect = activeEl.getBoundingClientRect();
+                        setPendingMentionText(selectedText);
+                        setMentionPosition({
+                            x: elRect.left + (elRect.width / 2),
+                            y: elRect.top - 10
+                        });
+                        return;
+                    }
+                }
+            }
             setMentionPosition(null);
         }
     }, []);
@@ -370,48 +391,37 @@ export function PdfPreview({
         const viewport = viewportRef.current;
         if (viewport) {
             const handleScroll = () => {
-                if (mentionPosition) {
-                    updateSelectionPosition();
-                }
+                updateSelectionPosition();
             };
-            viewport.addEventListener('scroll', handleScroll);
+            viewport.addEventListener('scroll', handleScroll, { passive: true });
             window.addEventListener('resize', updateSelectionPosition);
             return () => {
                 viewport.removeEventListener('scroll', handleScroll);
                 window.removeEventListener('resize', updateSelectionPosition);
             };
         }
-    }, [updateSelectionPosition, mentionPosition]);
+    }, [updateSelectionPosition]);
 
     const setupFieldMentionListeners = () => {
         const annotationLayer = document.querySelector('.annotationLayer');
         if (!annotationLayer) return;
 
-        const inputs = annotationLayer.querySelectorAll('input, textarea, select');
+        const inputs = annotationLayer.querySelectorAll('input, textarea');
         inputs.forEach((el: any) => {
-            // Disable browser autofill (the "black box" suggestions)
             el.setAttribute('autocomplete', 'off');
 
-            // Remove existing to avoid duplicates if re-rendering
-            el.removeEventListener('click', handleFieldClick);
-            el.addEventListener('click', handleFieldClick);
-        });
-    };
+            // Listen for selection inside the field
+            el.removeEventListener('select', updateSelectionPosition);
+            el.addEventListener('select', updateSelectionPosition);
 
-    const handleFieldClick = (e: MouseEvent) => {
-        const el = e.target as HTMLInputElement;
-        const fieldName = el.name;
-        if (fieldName && containerRef.current) {
-            const elRect = el.getBoundingClientRect();
-            const containerRect = containerRef.current.getBoundingClientRect();
-            setPendingMentionText(`Campo: ${fieldName}`);
-            setMentionPosition({
-                x: elRect.left + (elRect.width / 2),
-                y: elRect.top - 10
-            });
-            // Select the content if it's text to give visual feedback
-            if (el.select) el.select();
-        }
+            // Update on mouseup to catch end of selection
+            el.removeEventListener('mouseup', updateSelectionPosition);
+            el.addEventListener('mouseup', updateSelectionPosition);
+
+            // Hide mentioned button on focus/click if no selection
+            el.removeEventListener('click', updateSelectionPosition);
+            el.addEventListener('click', updateSelectionPosition);
+        });
     };
 
     const handleMentionClick = () => {

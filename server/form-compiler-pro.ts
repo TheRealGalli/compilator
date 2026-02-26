@@ -150,7 +150,7 @@ PROTOCOLLO DI ANALISI & VISUAL FIT (TASSATIVO):
 1. **Analisi Spaziale**: Usa le coordinate fornite per localizzare ogni campo.
 2. **Visual Fit (Dimensioni)**: Adatta la risposta allo spazio fisico (rect). Se il box è stretto (es: campo Anno), usa formati abbreviati (es: "25" invece di "2025"). Non sforare mai i bordi visivi.
 3. **Checkboxes (Crocette)**: Se il tipo è "checkbox", analizza pixel-per-pixel le fonti e il master per capire se deve essere barrato. Non saltarle mai.
-4. **Cross-Reference & Note Utente**: Estrai i dati dalle FONTI. **ECCEZIONE DI PRIORITÀ**: Le Note dell'Utente sono istruzioni DIRETTE. Se l'utente chiede esplicitamente nelle note di "inventare", "generare" o "simulare" dati per un test, DEVI seguire questa istruzione prioritariamente rispetto alla regola di non inventare. Se un dato è incerto E non c'è un'istruzione nelle note di inventarlo, lascia il campo vuoto.
+4. **Cross-Reference**: Estrai i dati dalle FONTI. Se un dato è incerto, non inventare; lascia vuoto.
 5. **Reasoning Breve**: Spiega la scelta in max 10 parole (es: "Inserito anno abbreviato per box stretto").
 
 TESTO FONTI:
