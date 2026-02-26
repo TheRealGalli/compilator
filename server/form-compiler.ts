@@ -40,6 +40,8 @@ Per ogni campo, fornisci un JSON con questa struttura:
   ]
 }
 
+**PROTOCOLLO ANTI-LOOP**: Se il documento è troppo complesso e rischi di generare migliaia di campi identici, fermati e chiedi chiarimenti. NON ripetere mai caratteri grafici per più di 15 volte.
+
 Sii estremamente preciso. Per i file PDF/Immagini usa coordinate normalizzate (0-1). Per i file di puro testo, prova a stimarne la posizione nel documento.`;
 
         const isDOCX = mimeType.includes('wordprocessingml') || mimeType.includes('msword');

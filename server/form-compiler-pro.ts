@@ -153,6 +153,8 @@ PROTOCOLLO DI ANALISI & VISUAL FIT (TASSATIVO):
 4. **Cross-Reference**: Estrai i dati dalle FONTI. Se un dato è incerto, non inventare; lascia vuoto.
 5. **Reasoning Breve**: Spiega la scelta in max 10 parole (es: "Inserito anno abbreviato per box stretto").
 
+6. **ANTI-LOOP PROTOCOL**: Se un campo richiede un valore che sembra causare una ripetizione infinita o se il contesto è ambiguo, lascia il valore vuoto "" e spiega nel reasoning: "Dato ambiguo, inserimento bloccato per sicurezza".
+
 TESTO FONTI:
 ${sourceContext}
 

@@ -534,6 +534,10 @@ Il tuo compito è prendere una BOZZA di testo e rifinirla esteticamente SENZA AL
 3. **MASTER ALIGNMENT:** 
    - Se fornito un "Master Source", imita la sua struttura delle sezioni e il suo stile.
 
+4. **ANTI-LOOP PROTOCOL**: 
+   - È vietato generare più di 15 caratteri identici consecutivi (es. "---").
+   - In caso di loop generativo, scrivi "LOOP_DETECTED" e interrompi.
+
 **RESTRIZIONI:**
 - Restituisci SOLO il testo rifinito.
 - Non aggiungere commenti personali.

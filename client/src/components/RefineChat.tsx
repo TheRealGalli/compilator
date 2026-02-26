@@ -13,6 +13,7 @@ import remarkGfm from 'remark-gfm';
 import { MentionButton } from './MentionButton';
 import { useCompiler } from '@/contexts/CompilerContext';
 import { anonymizeWithOllamaLocal, performMechanicalReverseSweep, performMechanicalGlobalSweep } from '@/lib/privacy';
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessage {
     id: string;
@@ -71,6 +72,7 @@ export function RefineChat({
         mentionRegistry, setMentionRegistry,
         guardrailVault, setGuardrailVault
     } = useCompiler();
+    const { toast } = useToast();
 
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -105,6 +107,15 @@ export function RefineChat({
             const data = await response.json();
             console.log(`[RefineChat] >> RAW SERVER RESPONSE (Initial Analysis) <<\n${data.explanation}\n>> END RESPONSE <<`);
             if (!data.success) throw new Error(data.error);
+
+            // ANTI-LOOP: Check for loop detection from AI
+            if (data.explanation?.includes("LOOP_DETECTED")) {
+                toast({
+                    title: "Loop Rilevato",
+                    description: "L'AI ha interrotto l'analisi per evitare un loop. Prova a ricaricare la pagina.",
+                    variant: "destructive",
+                });
+            }
 
             const aiMsg: ChatMessage = {
                 id: 'init-analysis',
@@ -374,6 +385,15 @@ export function RefineChat({
             console.log(`[RefineChat] >> RAW SERVER RESPONSE (Explanation) <<\n${data.explanation}\n>> END RESPONSE <<`);
             if (data.newContent) {
                 console.log(`[RefineChat] >> RAW SERVER RESPONSE (New Content) <<\n${data.newContent}\n>> END RESPONSE <<`);
+            }
+
+            // ANTI-LOOP: Check for loop detection from AI
+            if (data.explanation?.includes("LOOP_DETECTED") || data.newContent?.includes("LOOP_DETECTED")) {
+                toast({
+                    title: "Loop Rilevato",
+                    description: "L'AI ha interrotto la generazione per un possibile loop. Ricarica la pagina per ripristinare il contesto.",
+                    variant: "destructive",
+                });
             }
 
             // Success might be true even if JSON parsing failed but fallback was used

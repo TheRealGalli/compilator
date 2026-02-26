@@ -1600,6 +1600,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     return `Data e ora corrente: ${dateTimeIT}
 
+**PROTOCOLLO ANTI-LOOP & AFFIDABILITÀ (TASSATIVO):**
+1. **DIVIETO DI RIPETIZIONE**: È vietato generare sequenze ripetitive di caratteri (es. "---", "|||", "...") per più di 15 volte. Se senti la necessità di farlo, FERMATI.
+2. **GESTIONE INCERTEZZA**: Se non sei sicuro di come completare una tabella o un modulo complesso a causa di dati mancanti o fonti ambigue, NON tentare di ricostruire graficamente la struttura all'infinito. Interrompi la generazione e scrivi una domanda chiara all'utente: "Mancano dati per la sezione X, come devo procedere?".
+3. **LIMITE TABELLE (FAIL-SAFE)**: Se una tabella markdown supera le 50 righe e contiene principalmente sequenze ripetitive o campi vuoti, interrompi immediatamente la risposta scrivendo "LOOP_DETECTED".
+4. **NO HALLUCINATION STRUTTURALE**: Se un modulo originale è denso di caselle vuote, non cercare di ricrearle tutte come testo se non contengono dati. Concentrati sui dati reali.
+5. **TERMINAZIONE FORZATA**: Se rilevi di essere entrato in un loop generativo, scrivi "LOOP_DETECTED" e interrompi immediatamente la risposta.
+
 **CONTESTO FILE DISPONIBILI (Fascicolo):**
 ${masterSource ? `MASTER SOURCE: ${masterSource.name} (${masterSource.mimeType || masterSource.type})` : ''}
 ALTRI DOCUMENTI:
@@ -2093,7 +2100,10 @@ ISTRUZIONI OUTPUT:
 
       const refineInstructions = isPdfMode ? `
 *** MODALITÀ RAFFINAMENTO MODULO PDF ATTIVA ***
-Hai già compilato una bozza dei campi del PDF. Ora l'utente vuole discuterne o modificarlo.
+
+**PROTOCOLLO ANTI-LOOP (RIFERIMENTO):**
+- Se la modifica richiesta comporta la rigenerazione di una tabella enorme, limita l'output ai soli campi variati.
+- NON ripetere simboli grafici all'infinito.
 
 DOC ATTUALE (Stato dei campi):
 """
@@ -2967,6 +2977,7 @@ Ti trovi in **Modalità Ospite**.
 3. **Limite Risposta (SILENTE)**: Le tue risposte devono rispettare un limite tecnico di caratteri.
    - **REGOLA AUREA**: NON menzionare MAI questo limite o il fatto che stai troncando la risposta.
    - **STRATEGIA ADATTIVA**: Se la risposta richiesta è lunga, **RIASSUMI**, **PRIORITIZZA** i concetti chiave o **STRUTTURA** la risposta in modo che stia nel limite, invece di tagliarla brutalmente. NON dire "ho dovuto tagliare per il limite". Adattati silenziosamente.
+4. **ANTI-LOOP OSPITE**: Se rilevi di stare generando troppi trattini o tabelle vuote, FERMATI e riassumi.
 
 **FONTI CARICATE (SESSIONE CORRENTE):**
 ${sources.map((s: any) => `- ${s.name} (${s.type})`).join('\n')}

@@ -413,6 +413,15 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         aiMetadata: data.aiMetadata,
       };
 
+      // ANTI-LOOP: Check for loop detection from AI
+      if (data.text?.includes("LOOP_DETECTED")) {
+        toast({
+          title: "Loop Rilevato",
+          description: "L'AI ha interrotto la generazione per evitare un loop infinito. Prova a ricaricare la pagina per riprovare.",
+          variant: "destructive",
+        });
+      }
+
       if (data.file) {
         const base64Data = data.file.base64;
         const fileName = data.file.name;

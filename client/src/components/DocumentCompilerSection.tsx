@@ -970,6 +970,18 @@ export function DocumentCompilerSection({
 
       const data = await response.json();
       console.log('[DocumentCompiler] >> RAW SERVER RESPONSE <<', data.compiledContent);
+
+      // ANTI-LOOP: Check for loop detection from AI
+      if (data.compiledContent?.includes("LOOP_DETECTED")) {
+        toast({
+          title: "Loop Rilevato",
+          description: "L'AI ha interrotto la compilazione per evitare un loop infinito. Prova a ricaricare la pagina per ricaricare i dati e riprova.",
+          variant: "destructive",
+        });
+        setIsCompiling(false);
+        return;
+      }
+
       if (data.compiledContent) {
         let sanitizedContent = data.compiledContent
           .replace(/\\+\s*\[/g, '[')
