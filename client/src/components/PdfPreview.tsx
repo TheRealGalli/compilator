@@ -44,6 +44,8 @@ interface PdfPreviewProps {
     onCompile?: (content: string, metadata?: { extractedFields?: any[], manualAnnotations?: any[], fetchedCompilerContext?: string }) => void;
     onMention?: (text: string, source: 'template' | 'copilot' | 'anteprema', start?: number, end?: number) => void;
     refinerProposals?: string | null;
+    onAccept?: () => void;
+    onReject?: () => void;
 }
 
 export function PdfPreview({
@@ -56,7 +58,9 @@ export function PdfPreview({
     modelProvider = 'gemini',
     onCompile,
     onMention,
-    refinerProposals
+    refinerProposals,
+    onAccept,
+    onReject
 }: PdfPreviewProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [pageNumber, setPageNumber] = useState<number>(1);
@@ -282,6 +286,7 @@ export function PdfPreview({
     };
 
     const handleAcceptProposals = () => {
+        onAccept?.();
         setHasRefinerProposals(false);
         setRollbackValues({});
         setHasCompiledOnce(true);
@@ -292,6 +297,7 @@ export function PdfPreview({
     };
 
     const handleRejectProposals = () => {
+        onReject?.();
         if (Object.keys(rollbackValues).length > 0) {
             const annotationLayer = document.querySelector('.annotationLayer');
             if (annotationLayer) {
@@ -383,6 +389,9 @@ export function PdfPreview({
 
         const inputs = annotationLayer.querySelectorAll('input, textarea, select');
         inputs.forEach((el: any) => {
+            // Disable browser autofill (the "black box" suggestions)
+            el.setAttribute('autocomplete', 'off');
+
             // Remove existing to avoid duplicates if re-rendering
             el.removeEventListener('click', handleFieldClick);
             el.addEventListener('click', handleFieldClick);

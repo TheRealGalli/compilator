@@ -1513,6 +1513,9 @@ export function DocumentCompilerSection({
                         base64: s.base64
                       }))}
                       onMention={handleMention}
+                      refinerProposals={isReviewing ? pendingContent : null}
+                      onAccept={handleAcceptRefinement}
+                      onReject={handleRejectRefinement}
                       onCompile={(content, metadata) => {
                         setIsCompiledView(true);
                         setCompiledContent(content);

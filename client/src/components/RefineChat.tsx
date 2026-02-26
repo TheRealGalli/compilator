@@ -554,7 +554,7 @@ export function RefineChat({
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            disabled={(isReviewing && !mentions.some(m => m.source === 'anteprema')) || isLoading || isAnalyzing}
+                            disabled={isReviewing || isLoading || isAnalyzing}
                             placeholder="Scrivi qui..."
                             className="w-full min-h-[60px] max-h-[150px] resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent text-sm shadow-none px-2"
                             rows={1}
@@ -774,25 +774,23 @@ export function RefineChat({
                         )}
                     </AnimatePresence>
 
-                    <div className="relative pr-12 pb-2">
-                        <Textarea
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            disabled={(isReviewing && !mentions.some(m => m.source === 'anteprema')) || isLoading || isAnalyzing}
-                            placeholder={isReviewing ? "Conferma o rifiuta la modifica corrente..." : "Chiedi modifiche (es. 'Cambia la data')..."}
-                            className="w-full min-h-[50px] max-h-[120px] resize-none border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent shadow-none text-sm px-3"
-                            rows={1}
-                        />
-                        <Button
-                            size="icon"
-                            onClick={handleSend}
-                            disabled={!input.trim() || isLoading || (isReviewing && !mentions.some(m => m.source === 'anteprema')) || isAnalyzing}
-                            className="absolute right-2 bottom-2 h-8 w-8 rounded-xl bg-blue-600 hover:bg-blue-700 transition-colors disabled:bg-slate-300 text-white shadow-lg shadow-blue-500/20"
-                        >
-                            <Send className="w-4 h-4" />
-                        </Button>
-                    </div>
+                    <Textarea
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={isReviewing || isLoading || isAnalyzing}
+                        placeholder={isReviewing ? "Controlla l'anteprima nel PDF..." : "Chiedi modifiche (es. 'Cambia la data')..."}
+                        className="w-full min-h-[50px] max-h-[120px] resize-none border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-transparent shadow-none text-sm px-3"
+                        rows={1}
+                    />
+                    <Button
+                        size="icon"
+                        onClick={handleSend}
+                        disabled={!input.trim() || isLoading || isReviewing || isAnalyzing}
+                        className="absolute right-2 bottom-2 h-8 w-8 rounded-xl bg-blue-600 hover:bg-blue-700 transition-colors disabled:bg-slate-300 text-white shadow-lg shadow-blue-500/20"
+                    >
+                        <Send className="w-4 h-4" />
+                    </Button>
                 </div>
             </div>
 
