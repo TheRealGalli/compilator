@@ -336,6 +336,10 @@ export function PdfPreview({
     };
 
     const updateSelectionPosition = useCallback(() => {
+        const viewport = viewportRef.current;
+        if (!viewport) return;
+
+        const viewportRect = viewport.getBoundingClientRect();
         const sel = window.getSelection();
         const selectedText = sel?.toString().trim();
 
@@ -345,12 +349,24 @@ export function PdfPreview({
 
             if (rects && rects.length > 0) {
                 const firstRect = rects[0];
-                setPendingMentionText(selectedText);
-                setMentionPosition({
-                    x: firstRect.left + (firstRect.width / 2),
-                    y: firstRect.top - 12
-                });
-                return;
+
+                // Visibility check: is the selection within viewport bounds?
+                // Add a small buffer (5px) for smoother hiding
+                const isVisible = (
+                    firstRect.top >= viewportRect.top - 5 &&
+                    firstRect.bottom <= viewportRect.bottom + 5 &&
+                    firstRect.left >= viewportRect.left - 5 &&
+                    firstRect.right <= viewportRect.right + 5
+                );
+
+                if (isVisible) {
+                    setPendingMentionText(selectedText);
+                    setMentionPosition({
+                        x: firstRect.left + (firstRect.width / 2),
+                        y: firstRect.top - 12
+                    });
+                    return;
+                }
             }
         }
 
@@ -363,12 +379,21 @@ export function PdfPreview({
                 const text = activeEl.value.substring(start, end).trim();
                 if (text) {
                     const rect = activeEl.getBoundingClientRect();
-                    setPendingMentionText(text);
-                    setMentionPosition({
-                        x: rect.left + (rect.width / 2),
-                        y: rect.top - 10
-                    });
-                    return;
+
+                    // Visibility check for input field
+                    const isVisible = (
+                        rect.top >= viewportRect.top - 5 &&
+                        rect.bottom <= viewportRect.bottom + 5
+                    );
+
+                    if (isVisible) {
+                        setPendingMentionText(text);
+                        setMentionPosition({
+                            x: rect.left + (rect.width / 2),
+                            y: rect.top - 10
+                        });
+                        return;
+                    }
                 }
             }
         }

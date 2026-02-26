@@ -162,6 +162,10 @@ export function RefineChat({
 
 
     const updateSelectionPosition = useCallback(() => {
+        const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') || scrollRef.current;
+        if (!viewport) return;
+
+        const viewportRect = viewport.getBoundingClientRect();
         const sel = window.getSelection();
         const selectedText = sel?.toString().trim();
 
@@ -177,14 +181,23 @@ export function RefineChat({
             if (!rects || rects.length === 0) return;
 
             const firstRect = rects[0];
-            setSelection({
-                text: selectedText,
-                x: firstRect.left + (firstRect.width / 2),
-                y: firstRect.top - 12
-            });
-        } else {
-            setSelection(null);
+
+            // Visibility check: is the selection within viewport bounds?
+            const isVisible = (
+                firstRect.top >= viewportRect.top - 5 &&
+                firstRect.bottom <= viewportRect.bottom + 5
+            );
+
+            if (isVisible) {
+                setSelection({
+                    text: selectedText,
+                    x: firstRect.left + (firstRect.width / 2),
+                    y: firstRect.top - 12
+                });
+                return;
+            }
         }
+        setSelection(null);
     }, []);
 
     // Track global selection and scroll events
