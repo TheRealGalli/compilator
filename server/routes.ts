@@ -1667,7 +1667,7 @@ ${hasMemory ? `
 ${extractedFields && extractedFields.length > 0 ? `
 3. **STRUTTURA VISIVA DEL DOCUMENTO TARGET:**
    Il documento base contiene i seguenti campi tecnici (Riferimento per posizionamento dati):
-   ${extractedFields.map((f: any) => `- ${f.fieldName}`).join('\n')}
+   ${extractedFields.map((f: any) => `- ID: "${f.name || f.fieldName}", Label: "${f.label || 'N/A'}", Tipo: "${f.type || 'unknown'}", Posizione: ${f.rect ? `[x:${f.rect.x}, y:${f.rect.y}, w:${f.rect.width}, h:${f.rect.height}]` : 'N/A'}`).join('\n')}
    Usa questi riferimenti per capire DOVE inserire i dati, ma NON creare un elenco di questi campi nel documento finale se non fanno parte del layout naturale.
 ` : ''}
 ${manualAnnotations && manualAnnotations.length > 0 ? `
@@ -2110,7 +2110,7 @@ L'utente ha evidenziato i seguenti frammenti per un intervento MIRATO:
 ${formattedMentions}
 
 **REGOLA DI LOCALIZZAZIONE STRETTA (TASSATIVA):**
-1. Se la menzione inizia con "Campo: [ID]", l'utente vuole che tu agisca **SPECIFICATAMENTE** su quel campo dell'AcroForm.
+1. Se la menzione inizia con "Campo: [ID]", l'utente vuole che tu agisca **SPECIFICATAMENTE** su quel campo dell'AcroForm (dove [ID] è l'ID tecnico/nome del campo).
 2. Agisci **SOLO E SOLTANTO** sui campi correlati a questi testi o ID evidenziati.
 3. Se l'utente chiede una modifica su un campo menzionato, usa le FONTI e il REASONING originale per trovare il nuovo valore corretto.` : ''}
 
