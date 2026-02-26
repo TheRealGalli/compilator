@@ -343,61 +343,60 @@ export function PdfPreview({
             const range = sel?.getRangeAt(0);
             const rects = range?.getClientRects();
 
-            if (rects && rects.length > 0 && containerRef.current) {
+            if (rects && rects.length > 0) {
                 const firstRect = rects[0];
-
-                // If selection is inside an input/textarea, we might need special handling
-                // but getClientRects typically works for standard selection.
-                // We anchor to the middle-top of the first selection rectangle.
                 setPendingMentionText(selectedText);
                 setMentionPosition({
                     x: firstRect.left + (firstRect.width / 2),
-                    y: firstRect.top - 10
+                    y: firstRect.top - 12
                 });
+                return;
             }
-        } else {
-            // Check if there's an active element with selection (inputs/textareas)
-            const activeEl = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
-            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-                const start = activeEl.selectionStart;
-                const end = activeEl.selectionEnd;
+        }
 
-                if (start !== null && end !== null && start !== end) {
-                    const selectedText = activeEl.value.substring(start, end).trim();
-                    if (selectedText) {
-                        const elRect = activeEl.getBoundingClientRect();
-                        setPendingMentionText(selectedText);
-                        setMentionPosition({
-                            x: elRect.left + (elRect.width / 2),
-                            y: elRect.top - 10
-                        });
-                        return;
-                    }
+        // Check if selection is inside an input/textarea
+        const activeEl = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+            const start = activeEl.selectionStart;
+            const end = activeEl.selectionEnd;
+            if (start !== null && end !== null && start !== end) {
+                const text = activeEl.value.substring(start, end).trim();
+                if (text) {
+                    const rect = activeEl.getBoundingClientRect();
+                    setPendingMentionText(text);
+                    setMentionPosition({
+                        x: rect.left + (rect.width / 2),
+                        y: rect.top - 10
+                    });
+                    return;
                 }
             }
-            setMentionPosition(null);
         }
+
+        setMentionPosition(null);
     }, []);
 
-    const handleTextSelection = () => {
+    const handleTextSelection = useCallback(() => {
         // Wait a tick for DOM selection to finalize
-        requestAnimationFrame(() => {
-            updateSelectionPosition();
-        });
-    };
+        requestAnimationFrame(updateSelectionPosition);
+    }, [updateSelectionPosition]);
 
-    // Track scroll events to keep button anchored
+    // Track scroll and global selection events
     useEffect(() => {
         const viewport = viewportRef.current;
+        const handleGlobalMouseUp = () => {
+            requestAnimationFrame(updateSelectionPosition);
+        };
+
         if (viewport) {
-            const handleScroll = () => {
-                updateSelectionPosition();
-            };
-            viewport.addEventListener('scroll', handleScroll, { passive: true });
+            viewport.addEventListener('scroll', updateSelectionPosition, { passive: true });
             window.addEventListener('resize', updateSelectionPosition);
+            window.addEventListener('mouseup', handleGlobalMouseUp);
+
             return () => {
-                viewport.removeEventListener('scroll', handleScroll);
+                viewport.removeEventListener('scroll', updateSelectionPosition);
                 window.removeEventListener('resize', updateSelectionPosition);
+                window.removeEventListener('mouseup', handleGlobalMouseUp);
             };
         }
     }, [updateSelectionPosition]);
@@ -413,14 +412,6 @@ export function PdfPreview({
             // Listen for selection inside the field
             el.removeEventListener('select', updateSelectionPosition);
             el.addEventListener('select', updateSelectionPosition);
-
-            // Update on mouseup to catch end of selection
-            el.removeEventListener('mouseup', updateSelectionPosition);
-            el.addEventListener('mouseup', updateSelectionPosition);
-
-            // Hide mentioned button on focus/click if no selection
-            el.removeEventListener('click', updateSelectionPosition);
-            el.addEventListener('click', updateSelectionPosition);
         });
     };
 

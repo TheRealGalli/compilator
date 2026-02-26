@@ -162,71 +162,53 @@ export function RefineChat({
 
 
     const updateSelectionPosition = useCallback(() => {
-        if (isMouseDown) return;
-
         const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0 || sel.toString().trim().length === 0) {
-            setSelection(null);
-            return;
-        }
+        const selectedText = sel?.toString().trim();
 
-        const container = containerRef.current;
-        if (!container) return;
+        if (selectedText && selectedText.length > 0) {
+            const container = containerRef.current;
+            if (!container || !container.contains(sel?.anchorNode || null)) {
+                setSelection(null);
+                return;
+            }
 
-        if (!container.contains(sel.anchorNode)) {
-            // Only show if selection is within this chat component
-            return;
-        }
+            const range = sel?.getRangeAt(0);
+            const rects = range?.getClientRects();
+            if (!rects || rects.length === 0) return;
 
-        const range = sel.getRangeAt(0);
-        const rects = range.getClientRects();
-        if (rects.length === 0) return;
-
-        const containerRect = container.getBoundingClientRect();
-        const firstRect = rects[0];
-
-        setSelection({
-            text: sel.toString().trim(),
-            x: firstRect.left + (firstRect.width / 2),
-            y: firstRect.top - 10
-        });
-    }, [isMouseDown]);
-
-    useEffect(() => {
-        const handleMouseDown = () => setIsMouseDown(true);
-        const handleMouseUp = () => {
-            setIsMouseDown(false);
-            // Wait a tick for DOM selection to finalize
-            requestAnimationFrame(() => {
-                updateSelectionPosition();
+            const firstRect = rects[0];
+            setSelection({
+                text: selectedText,
+                x: firstRect.left + (firstRect.width / 2),
+                y: firstRect.top - 12
             });
+        } else {
+            setSelection(null);
+        }
+    }, []);
+
+    // Track global selection and scroll events
+    useEffect(() => {
+        const handleMouseUp = () => {
+            requestAnimationFrame(updateSelectionPosition);
         };
 
-        window.addEventListener('mousedown', handleMouseDown);
+        const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') || scrollRef.current;
+
         window.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('resize', updateSelectionPosition);
+        if (viewport) {
+            viewport.addEventListener('scroll', updateSelectionPosition, { passive: true });
+        }
+
         return () => {
-            window.removeEventListener('mousedown', handleMouseDown);
             window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('resize', updateSelectionPosition);
+            if (viewport) {
+                viewport.removeEventListener('scroll', updateSelectionPosition);
+            }
         };
     }, [updateSelectionPosition]);
-
-    // Track scroll events to keep button anchored
-    useEffect(() => {
-        const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') || scrollRef.current;
-        if (viewport) {
-            const handleScroll = () => {
-                if (selection) {
-                    updateSelectionPosition();
-                }
-            };
-            viewport.addEventListener('scroll', handleScroll);
-            window.addEventListener('resize', updateSelectionPosition);
-            return () => {
-                viewport.removeEventListener('scroll', handleScroll);
-                window.removeEventListener('resize', updateSelectionPosition);
-            };
-        }
-    }, [updateSelectionPosition, selection]);
 
     const handleMouseUp = (e: React.MouseEvent) => {
         // This is now redundant with the window listener, but we keep it for safety 
