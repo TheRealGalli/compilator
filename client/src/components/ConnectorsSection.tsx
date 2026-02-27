@@ -89,9 +89,66 @@ export function ConnectorsSection() {
     const [isDeploying, setIsDeploying] = useState(false);
     const [deployStatus, setDeployStatus] = useState("");
 
+    // Auth status for Cloud Deploy
+    const [authStatus, setAuthStatus] = useState<{
+        authenticated: boolean;
+        userEmail?: string;
+        hasCloudToken: boolean;
+    }>({ authenticated: false, hasCloudToken: false });
+
     useEffect(() => {
         checkOllama();
+
+        // Verifica lo stato dell'autenticazione Google Cloud
+        const checkStatus = async () => {
+            try {
+                const response = await fetch(getApiUrl("/api/auth/status"), { credentials: "include" });
+                if (response.ok) {
+                    const data = await response.json();
+                    setAuthStatus({
+                        authenticated: data.authenticated,
+                        userEmail: data.user?.email,
+                        hasCloudToken: data.hasCloudToken
+                    });
+                }
+            } catch (e) {
+                console.error("Auth status check failed:", e);
+            }
+        };
+
+        // Ripristina i dati del wizard se presenti (dopo il redirect)
+        const savedWizard = localStorage.getItem("gromit_wizard_state");
+        if (savedWizard) {
+            try {
+                const state = JSON.parse(savedWizard);
+                setSetupProjectId(state.projectId || "");
+                setSetupGeminiKey(state.geminiKey || "");
+                setSetupClientId(state.clientId || "");
+                setSetupClientSecret(state.clientSecret || "");
+                setWizardStep(state.step || "deploy");
+                setIsPrivateBackendModalOpen(true); // Riapri il wizard
+                localStorage.removeItem("gromit_wizard_state");
+            } catch (e) {
+                console.error("Failed to restore wizard state:", e);
+            }
+        }
+
+        checkStatus();
     }, []);
+
+    const handleConnectGoogleCloud = () => {
+        // Salva lo stato attuale per ripristinarlo dopo il redirect
+        localStorage.setItem("gromit_wizard_state", JSON.stringify({
+            projectId: setupProjectId,
+            geminiKey: setupGeminiKey,
+            clientId: setupClientId,
+            clientSecret: setupClientSecret,
+            step: "deploy"
+        }));
+
+        // Reindirizza al server per il login con scelta account
+        window.location.href = getApiUrl("/api/auth/google/deploy");
+    };
 
     const handleConnectOllamaAccount = async () => {
         if (!ollamaEmail.includes('@')) {
@@ -704,10 +761,26 @@ export function ConnectorsSection() {
                                     </div>
                                 </div>
                                 <h3 className="text-lg font-bold">Tutto pronto per il decollo!</h3>
-                                <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                                    Cliccando il tasto sotto, verrai reindirizzato a Google Cloud Shell.
-                                    Il sistema caricherà automaticamente la tua configurazione "Zero-Data".
-                                </p>
+                                <div className="space-y-4 max-w-md mx-auto">
+                                    <p className="text-sm text-muted-foreground">
+                                        Per procedere con il deploy automatico, dobbiamo collegarci al tuo account Google Cloud.
+                                    </p>
+
+                                    {authStatus.hasCloudToken ? (
+                                        <div className="flex items-center justify-center gap-2 p-2 bg-green-50 border border-green-100 rounded-lg text-green-700 text-xs font-medium animate-in fade-in zoom-in duration-300">
+                                            <ShieldCheck className="w-4 h-4" />
+                                            <span>Account Collegato: <strong>{authStatus.userEmail}</strong></span>
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            className="bg-white border-2 border-slate-200 text-slate-700 hover:bg-slate-50 w-full shadow-sm py-6"
+                                            onClick={handleConnectGoogleCloud}
+                                        >
+                                            <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" className="w-5 h-5 mr-3" alt="Google" />
+                                            Collega Account Google Cloud
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="p-4 bg-slate-900 rounded-xl text-white text-[10px] font-mono space-y-3 overflow-x-auto shadow-xl border border-slate-700">
@@ -786,18 +859,21 @@ export function ConnectorsSection() {
                                     </Button>
                                 ) : (
                                     <Button
-                                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg animate-pulse hover:animate-none px-6"
-                                        onClick={() => {
-                                            handleDeployToCloud();
-                                            setIsPrivateBackendModalOpen(false);
-                                            toast({
-                                                title: "Deployment Avviato",
-                                                description: "Segui le istruzioni nella finestra di Google Cloud Shell che si è aperta."
-                                            });
-                                        }}
+                                        className={`${authStatus.hasCloudToken ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'} text-white shadow-lg px-6`}
+                                        disabled={!authStatus.hasCloudToken || isDeploying}
+                                        onClick={handleDeployToCloud}
                                     >
-                                        <Cloud className="w-4 h-4 mr-2" />
-                                        LANCIA DEPLOY
+                                        {isDeploying ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                DEPLOYYING...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Rocket className="w-4 h-4 mr-2" />
+                                                LANCIA DEPLOY
+                                            </>
+                                        )}
                                     </Button>
                                 )}
                             </>

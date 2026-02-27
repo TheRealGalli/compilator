@@ -674,55 +674,7 @@ const getGoogleCredentials = async () => {
   return { clientId, clientSecret };
 };
 
-// Initialize Passport Strategy
-getGoogleCredentials().then(({ clientId, clientSecret }) => {
-  if (!clientId || !clientSecret) {
-    console.warn("[Auth] Skipping Google Strategy init - missing credentials");
-    return;
-  }
-
-  passport.use(new GoogleStrategy({
-    clientID: clientId,
-    clientSecret: clientSecret,
-    callbackURL: process.env.NODE_ENV === 'production'
-      ? 'https://compilator-983823068962.europe-west1.run.app/api/auth/google/callback'
-      : 'http://localhost:5001/api/auth/google/callback',
-    passReqToCallback: true
-  },
-    async (req, accessToken, refreshToken, profile, done) => {
-      try {
-        const email = profile.emails?.[0]?.value;
-        if (!email) return done(new Error("No email found in Google profile"));
-
-        let user = await storage.getUserByGoogleId(profile.id);
-
-        if (!user) {
-          // Check if user exists by email to link (optional, security implication: account takeover if email not verified)
-          // Google emails are generally verified.
-          user = await storage.getUserByEmail(email);
-          if (user) {
-            // Link existing user? For now, we assume if googleId is missing but email exists, we might want to update it OR fail.
-            // Let's create new user if not found by GoogleID to avoid complexity, but usually we check email.
-            // Since we only have Google Auth now, creation is safe.
-          } else {
-            user = await storage.createUser({
-              email,
-              googleId: profile.id,
-              planTier: 'free'
-            });
-          }
-        }
-
-        // Store tokens in session for Gmail usage if needed (optional)
-        // (req.session as any).tokens = { access_token: accessToken, refresh_token: refreshToken }; 
-
-        return done(null, user);
-      } catch (err) {
-        return done(err as Error);
-      }
-    }
-  ));
-});
+// Google Strategy is initialized inside registerRoutes to ensure credentials are available.
 
 // Login scopes (Passport) - ONLY for app access
 const LOGIN_SCOPES = [
@@ -792,6 +744,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.updateUser(user.id, { googleId: profile.id });
             }
           }
+
+          // Store tokens in session for GCP/Gmail usage
+          (req.session as any).tokens = { access_token: accessToken, refresh_token: refreshToken };
+          console.log(`[Auth] Tokens saved to session for ${email}`);
+
           return done(null, user);
         } catch (err) {
           return done(err as Error);
@@ -800,6 +757,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ));
 
     app.get('/api/auth/google', passport.authenticate('google', { scope: LOGIN_SCOPES }));
+
+    // NEW: Specific route for deployment that forces account selection
+    app.get('/api/auth/google/deploy', passport.authenticate('google', {
+      scope: LOGIN_SCOPES,
+      prompt: 'select_account'
+    }));
 
     app.get('/api/auth/google/callback',
       passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}?error=auth_failed` }),
@@ -815,6 +778,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.redirect(FRONTEND_URL);
       }
     );
+
+    // NEW: Auth status endpoint
+    app.get('/api/auth/status', (req, res) => {
+      if (req.isAuthenticated()) {
+        res.json({
+          authenticated: true,
+          user: req.user,
+          hasCloudToken: !!(req.session as any).tokens?.access_token
+        });
+      } else {
+        res.json({ authenticated: false });
+      }
+    });
+
+    // NEW: Logout endpoint
+    app.get('/api/auth/logout', (req, res) => {
+      req.logout(() => {
+        req.session.destroy(() => {
+          res.json({ status: 'ok' });
+        });
+      });
+    });
   } else {
     console.warn("[Auth] Google Credentials missing. Auth routes disabled.");
     app.get('/api/auth/google', (req, res) => res.status(501).json({ error: "Auth non configurata sul server." }));
