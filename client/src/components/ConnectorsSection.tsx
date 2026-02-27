@@ -139,7 +139,7 @@ export function ConnectorsSection() {
     };
 
     const handleDeployToCloud = () => {
-        window.open('https://deploy.cloud.google.com?git_repo=https://github.com/TheRealGalli/compilator', '_blank');
+        window.open('https://deploy.cloud.run/?git_repo=https://github.com/TheRealGalli/compilator', '_blank');
     };
 
     if (isLoading) {
@@ -571,7 +571,7 @@ export function ConnectorsSection() {
             </Dialog>
 
             <Dialog open={isPrivateBackendModalOpen} onOpenChange={setIsPrivateBackendModalOpen}>
-                <DialogContent className="sm:max-w-[600px]">
+                <DialogContent className="sm:max-w-[700px]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Cloud className="w-5 h-5 text-blue-600" />
