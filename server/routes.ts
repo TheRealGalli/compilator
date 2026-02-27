@@ -32,6 +32,7 @@ import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType, Ta
 // [pdfjs-dist removed - using client-side extraction instead]
 import { AiService } from './ai'; // Import new AI Service
 import type { FormField } from './form-compiler';
+import { DeploymentService } from './deployment-service';
 import { generatePDF, generateDOCX, generateMD, generateJSONL, generateLaTeX } from './tools/fileGenerator'; // Import Generators
 import {
   updateDriveFile,
@@ -727,6 +728,7 @@ getGoogleCredentials().then(({ clientId, clientSecret }) => {
 const LOGIN_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/cloud-platform',
 ];
 
 // Integration scopes (Manual OAuth) - for Gmail/Drive data access
@@ -3745,6 +3747,62 @@ ${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Pyt
     } catch (error: any) {
       console.error('Error in Master endpoint:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+
+  // --- PRIVATE CLOUD DEPLOYMENT ENGINE ---
+  app.post("/api/deploy/private-cloud", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+
+    const { projectId, geminiApiKey, googleClientId, googleClientSecret } = req.body;
+
+    if (!projectId || !geminiApiKey) {
+      return res.status(400).json({ error: "Project ID and Gemini API Key are required." });
+    }
+
+    const user = req.user as any;
+    // Get access token from session (linked to the Cloud Platform scope)
+    const accessToken = (req.session as any).tokens?.access_token || req.headers['x-gcp-token'];
+
+    if (!accessToken) {
+      return res.status(401).json({ error: "Missing Google Access Token. Please re-login with Cloud permissions." });
+    }
+
+    const deployer = new DeploymentService(accessToken as string);
+
+    try {
+      console.log(`[MagicDeploy] Starting deployment for project: ${projectId}`);
+
+      // 1. Enable APIs
+      await deployer.enableApis(projectId);
+
+      // 2. Start Build
+      const repoUrl = "https://github.com/TheRealGalli/compilator"; // Current app repo
+      const buildId = await deployer.startBuild(projectId, repoUrl);
+
+      // 3. Deploy to Cloud Run (Defaulting to europe-west1)
+      const envVars = {
+        "NODE_ENV": "production",
+        "STORAGE_MODE": "local",
+        "PRIVATE_CLOUD": "true",
+        "GCP_PROJECT_ID": projectId,
+        "GEMINI_API_KEY": geminiApiKey,
+        "GOOGLE_CLIENT_ID": googleClientId || "",
+        "GOOGLE_CLIENT_SECRET": googleClientSecret || "",
+        "FRONTEND_URL": "https://therealgalli.github.io/compilator"
+      };
+
+      const result = await deployer.deployToCloudRun(projectId, "gromit-backend", envVars);
+
+      res.json({
+        message: "Deployment started successfully!",
+        buildId,
+        serviceUrl: (result as any).status?.url
+      });
+    } catch (error: any) {
+      console.error("[MagicDeploy] Error:", error);
+      res.status(500).json({ error: error.message || "Failed to deploy private cloud backend." });
     }
   });
 

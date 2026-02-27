@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Loader2, Cpu, LogIn, Link2, Mail, ExternalLink } from "lucide-react";
+import { RefreshCw, Loader2, Cpu, LogIn, Link2, Mail, ExternalLink, Rocket } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useGmail } from "@/contexts/GmailContext";
 import { useOllama } from "@/contexts/OllamaContext";
 import { useEffect, useState } from "react";
@@ -80,11 +81,13 @@ export function ConnectorsSection() {
     const currentBackendUrl = getCustomBackendUrl();
 
     // Wizard State
-    const [wizardStep, setWizardStep] = useState<"url" | "setup" | "keys" | "deploy">("url");
+    const [wizardStep, setWizardStep] = useState<"setup" | "keys" | "deploy">("setup");
     const [setupProjectId, setSetupProjectId] = useState("");
     const [setupGeminiKey, setSetupGeminiKey] = useState("");
     const [setupClientId, setSetupClientId] = useState("");
     const [setupClientSecret, setSetupClientSecret] = useState("");
+    const [isDeploying, setIsDeploying] = useState(false);
+    const [deployStatus, setDeployStatus] = useState("");
 
     useEffect(() => {
         checkOllama();
@@ -146,8 +149,53 @@ export function ConnectorsSection() {
         setIsPrivateBackendModalOpen(false);
     };
 
-    const handleDeployToCloud = () => {
-        window.open('https://deploy.cloud.run/?git_repo=https://github.com/TheRealGalli/compilator', '_blank');
+    const handleDeployToCloud = async () => {
+        setIsDeploying(true);
+        setDeployStatus("Abilitazione API Google Cloud...");
+
+        try {
+            const response = await fetch("/api/deploy/private-cloud", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    projectId: setupProjectId,
+                    geminiApiKey: setupGeminiKey,
+                    googleClientId: setupClientId,
+                    googleClientSecret: setupClientSecret
+                })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || "Errore durante il deploy.");
+            }
+
+            const data = await response.json();
+            setDeployStatus("Build e Deploy avviati! In attesa di Cloud Run...");
+
+            toast({
+                title: "Deploy Avviato ✨",
+                description: "Il tuo backend privato si starà accendendo tra pochi istanti."
+            });
+
+            // If we have a URL, we can suggest it
+            if (data.serviceUrl) {
+                setTempBackendUrl(data.serviceUrl);
+            }
+
+            setWizardStep("setup");
+            setIsPrivateBackendModalOpen(false);
+        } catch (error: any) {
+            console.error("Deploy failure:", error);
+            toast({
+                title: "Errore Deploy",
+                description: error.message,
+                variant: "destructive"
+            });
+        } finally {
+            setIsDeploying(false);
+            setDeployStatus("");
+        }
     };
 
     if (isLoading) {
@@ -493,10 +541,21 @@ export function ConnectorsSection() {
                                         </TooltipProvider>
                                     </div>
                                     <Button
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                        className="bg-slate-900 text-white"
+                                        disabled={isDeploying}
                                         onClick={handleDeployToCloud}
                                     >
-                                        Deploy to Cloud Run
+                                        {isDeploying ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                Deploying...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Rocket className="w-4 h-4 mr-2" />
+                                                Lancia Deploy Magico
+                                            </>
+                                        )}
                                     </Button>
                                 </div>
                             </CardContent>
@@ -689,12 +748,15 @@ export function ConnectorsSection() {
                                     <p><span className="text-slate-500">AI Engine:</span> Gemini API (Studio)</p>
                                     <p><span className="text-slate-500">Integrations:</span> {setupClientId ? 'Attive' : 'Disabilitate'}</p>
                                 </div>
-                                <div className="pt-2 border-t border-slate-800">
-                                    <p className="text-blue-400 text-[9px] mb-2 leading-tight">
-                                        💡 Durante il deploy Google ti chiederà di incollare la API Key e il Project ID.
-                                        Assicurati di averli copiati (usa i tasti nelle sezioni precedenti).
-                                    </p>
-                                </div>
+                                {isDeploying && (
+                                    <div className="pt-3 border-t border-slate-800 space-y-2">
+                                        <div className="flex items-center gap-2 text-blue-400">
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                            <span>{deployStatus}</span>
+                                        </div>
+                                        <Progress value={33} className="h-1 bg-slate-800" />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
