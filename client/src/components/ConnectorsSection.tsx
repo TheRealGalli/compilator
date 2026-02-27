@@ -574,7 +574,7 @@ export function ConnectorsSection() {
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <CloudIcon className="w-5 h-5 text-blue-600" />
+                            <Cloud className="w-5 h-5 text-blue-600" />
                             Configura Backend Privato
                         </DialogTitle>
                         <DialogDescription>
