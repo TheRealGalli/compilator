@@ -43,7 +43,8 @@ import {
 } from './tools/driveTools'; // Import Drive Tools for Write Access
 
 // Initialize AI Service
-const aiService = new AiService(process.env.GCP_PROJECT_ID || 'compilator-479214');
+const projectId = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'compilator-479214';
+const aiService = new AiService(projectId);
 
 // Initialize GCS Bucket Lifecycle (Auto-delete files after 30 days)
 initializeGcs().catch(err => console.error('[GCS] Failed to initialize storage:', err));

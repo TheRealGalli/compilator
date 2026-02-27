@@ -1,12 +1,16 @@
 import { Storage } from '@google-cloud/storage';
 import path from 'path';
+import fs from 'fs/promises';
 import { Readable } from 'stream';
 import type { ChunkedDocument } from './rag-utils';
 import { randomUUID } from 'crypto';
 
-// Inizializza il client Storage di GCP
-// Usa Application Default Credentials (ADC) - su Cloud Run rileva automaticamente il progetto
-const storage = new Storage();
+// Branching Logic: GCS vs Local
+const STORAGE_MODE = process.env.STORAGE_MODE || 'gcs';
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+
+// GCS Client (only if mode is gcs)
+const storage = STORAGE_MODE === 'gcs' ? new Storage() : null;
 
 // Nome del bucket (configurabile via env, altrimenti usa il project ID come base)
 const getBucketName = () => {
@@ -15,7 +19,7 @@ const getBucketName = () => {
   return `${projectId}-gromit-docs`.toLowerCase();
 };
 
-let BUCKET_NAME = getBucketName();
+let BUCKET_NAME = STORAGE_MODE === 'gcs' ? getBucketName() : '';
 
 export interface FileUploadResult {
   fileName: string;
@@ -24,51 +28,22 @@ export interface FileUploadResult {
 }
 
 /**
- * Carica un file su Google Cloud Storage
- */
-export async function uploadFile(
-  fileBuffer: Buffer,
-  originalFileName: string,
-  contentType?: string,
-): Promise<FileUploadResult> {
-  const bucket = storage.bucket(BUCKET_NAME);
-
-  // Genera un nome file univoco
-  const fileExtension = originalFileName.split('.').pop() || '';
-  const uniqueFileName = `${randomUUID()}.${fileExtension}`;
-  const gcsPath = `uploads/${uniqueFileName}`;
-
-  const file = bucket.file(gcsPath);
-
-  // Carica il file
-  await file.save(fileBuffer, {
-    metadata: {
-      contentType: contentType || 'application/octet-stream',
-    },
-    public: false, // I file sono privati per default
-  });
-
-  // Genera un URL firmato valido per 7 giorni
-  const [signedUrl] = await file.getSignedUrl({
-    version: 'v4',
-    action: 'read',
-    expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 giorni
-  });
-
-  return {
-    fileName: originalFileName,
-    publicUrl: signedUrl,
-    gcsPath,
-  };
-}
-
-/**
- * Inizializza il bucket: lo crea se non esiste e configura il lifecycle.
- * Questo viene chiamato all'avvio del server.
+ * Inizializza lo storage: crea il bucket (GCS) o la cartella (Local)
  */
 export async function initializeGcs(): Promise<void> {
+  if (STORAGE_MODE === 'local') {
+    try {
+      await fs.mkdir(UPLOADS_DIR, { recursive: true });
+      console.log(`[Storage] Local mode active. Directory: ${UPLOADS_DIR}`);
+    } catch (error) {
+      console.error('[Storage] Error creating local uploads directory:', error);
+    }
+    return;
+  }
+
+  // GCS Logic
+  if (!storage) return;
   try {
-    // Aggiorna BUCKET_NAME caso mai il progetto sia stato rilevato dopo
     const projectId = await storage.getProjectId();
     if (!process.env.GCP_STORAGE_BUCKET) {
       BUCKET_NAME = `${projectId}-gromit-docs`.toLowerCase();
@@ -80,7 +55,7 @@ export async function initializeGcs(): Promise<void> {
     if (!exists) {
       console.log(`[GCS] Creating bucket: ${BUCKET_NAME}...`);
       await storage.createBucket(BUCKET_NAME, {
-        location: 'EU', // Può essere reso configurabile
+        location: 'EU',
         storageClass: 'STANDARD',
       });
     }
@@ -91,7 +66,7 @@ export async function initializeGcs(): Promise<void> {
         rule: [
           {
             action: { type: 'Delete' },
-            condition: { age: 1 }, // 1 giorno di retention per i file temporanei
+            condition: { age: 1 },
           },
         ],
       },
@@ -103,75 +78,167 @@ export async function initializeGcs(): Promise<void> {
 }
 
 /**
- * Carica un file su Google Cloud Storage in un percorso specifico
+ * Carica un file
  */
-export async function uploadFileToPath(
+export async function uploadFile(
   fileBuffer: Buffer,
-  gcsPath: string,
+  originalFileName: string,
   contentType?: string,
-): Promise<string> {
-  const bucket = storage.bucket(BUCKET_NAME);
-  const file = bucket.file(gcsPath);
+): Promise<FileUploadResult> {
+  const fileExtension = originalFileName.split('.').pop() || '';
+  const uniqueFileName = `${randomUUID()}.${fileExtension}`;
+  const filePath = `uploads/${uniqueFileName}`;
+
+  if (STORAGE_MODE === 'local') {
+    const fullPath = path.join(UPLOADS_DIR, uniqueFileName);
+    await fs.writeFile(fullPath, fileBuffer);
+
+    // In local mode, we return a relative URL or a placeholder
+    return {
+      fileName: originalFileName,
+      publicUrl: `/api/files/${filePath}`,
+      gcsPath: filePath,
+    };
+  }
+
+  // GCS Mode
+  const bucket = storage!.bucket(BUCKET_NAME);
+  const file = bucket.file(filePath);
 
   await file.save(fileBuffer, {
-    metadata: {
-      contentType: contentType || 'application/octet-stream',
-    },
+    metadata: { contentType: contentType || 'application/octet-stream' },
     public: false,
   });
 
-  return gcsPath;
+  const [signedUrl] = await file.getSignedUrl({
+    version: 'v4',
+    action: 'read',
+    expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
+  });
+
+  return {
+    fileName: originalFileName,
+    publicUrl: signedUrl,
+    gcsPath: filePath,
+  };
 }
 
 /**
- * Scarica un file da Google Cloud Storage
+ * Carica un file in un percorso specifico
  */
-export async function downloadFile(gcsPath: string): Promise<Buffer> {
-  const bucket = storage.bucket(BUCKET_NAME);
-  const file = bucket.file(gcsPath);
+export async function uploadFileToPath(
+  fileBuffer: Buffer,
+  filePath: string,
+  contentType?: string,
+): Promise<string> {
+  if (STORAGE_MODE === 'local') {
+    const fileName = path.basename(filePath);
+    const fullPath = path.join(UPLOADS_DIR, fileName);
+    await fs.writeFile(fullPath, fileBuffer);
+    return filePath;
+  }
 
+  const bucket = storage!.bucket(BUCKET_NAME);
+  const file = bucket.file(filePath);
+  await file.save(fileBuffer, {
+    metadata: { contentType: contentType || 'application/octet-stream' },
+    public: false,
+  });
+  return filePath;
+}
+
+/**
+ * Scarica un file
+ */
+export async function downloadFile(filePath: string): Promise<Buffer> {
+  if (STORAGE_MODE === 'local') {
+    const fileName = path.basename(filePath);
+    const fullPath = path.join(UPLOADS_DIR, fileName);
+    return await fs.readFile(fullPath);
+  }
+
+  const bucket = storage!.bucket(BUCKET_NAME);
+  const file = bucket.file(filePath);
   const [buffer] = await file.download();
   return buffer;
 }
 
 /**
- * Elimina un file da Google Cloud Storage
+ * Elimina un file
  */
-export async function deleteFile(gcsPath: string): Promise<void> {
-  const bucket = storage.bucket(BUCKET_NAME);
-  const file = bucket.file(gcsPath);
+export async function deleteFile(filePath: string): Promise<void> {
+  if (STORAGE_MODE === 'local') {
+    const fileName = path.basename(filePath);
+    const fullPath = path.join(UPLOADS_DIR, fileName);
+    try {
+      await fs.unlink(fullPath);
+    } catch (e) {
+      console.warn(`[Storage] Failed to delete local file: ${fullPath}`);
+    }
+    return;
+  }
 
+  const bucket = storage!.bucket(BUCKET_NAME);
+  const file = bucket.file(filePath);
   await file.delete();
 }
 
 /**
  * Verifica se un file esiste
  */
-export async function fileExists(gcsPath: string): Promise<boolean> {
-  const bucket = storage.bucket(BUCKET_NAME);
-  const file = bucket.file(gcsPath);
+export async function fileExists(filePath: string): Promise<boolean> {
+  if (STORAGE_MODE === 'local') {
+    const fileName = path.basename(filePath);
+    const fullPath = path.join(UPLOADS_DIR, fileName);
+    try {
+      await fs.access(fullPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
+  const bucket = storage!.bucket(BUCKET_NAME);
+  const file = bucket.file(filePath);
   const [exists] = await file.exists();
   return exists;
 }
 
 /**
- * Lista i file nel bucket
+ * Lista i file
  */
 export async function listFiles(prefix: string = 'uploads/'): Promise<any[]> {
-  const bucket = storage.bucket(BUCKET_NAME);
+  if (STORAGE_MODE === 'local') {
+    try {
+      const files = await fs.readdir(UPLOADS_DIR);
+      return await Promise.all(files.map(async (fileName) => {
+        const fullPath = path.join(UPLOADS_DIR, fileName);
+        const stats = await fs.stat(fullPath);
+        return {
+          name: fileName,
+          gcsPath: `uploads/${fileName}`,
+          size: stats.size,
+          timeCreated: stats.birthtime,
+          publicUrl: `/api/files/uploads/${fileName}`,
+        };
+      }));
+    } catch (e) {
+      return [];
+    }
+  }
+
+  const bucket = storage!.bucket(BUCKET_NAME);
   const [files] = await bucket.getFiles({ prefix });
 
   return Promise.all(files.map(async (file) => {
     const [metadata] = await file.getMetadata();
-    // Genera signed URL per download/preview
     const [signedUrl] = await file.getSignedUrl({
       action: 'read',
-      expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 giorni
+      expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
     });
 
     return {
-      name: file.name.replace(prefix, ''), // Nome file pulito
+      name: file.name.replace(prefix, ''),
       gcsPath: file.name,
       size: metadata.size,
       contentType: metadata.contentType,
@@ -182,43 +249,56 @@ export async function listFiles(prefix: string = 'uploads/'): Promise<any[]> {
 }
 
 /**
- * Salva i chunks di un documento su GCS
+ * Salva i chunks di un documento
  */
 export async function saveDocumentChunks(
-  gcsPath: string,
+  filePath: string,
   chunkedDocument: ChunkedDocument
 ): Promise<void> {
-  const bucket = storage.bucket(BUCKET_NAME);
-  const chunksPath = `${gcsPath}.chunks.json`;
-  const file = bucket.file(chunksPath);
-
   const jsonContent = JSON.stringify(chunkedDocument, null, 2);
+  const chunksPath = `${filePath}.chunks.json`;
+
+  if (STORAGE_MODE === 'local') {
+    const fileName = path.basename(chunksPath);
+    const fullPath = path.join(UPLOADS_DIR, fileName);
+    await fs.writeFile(fullPath, jsonContent);
+    return;
+  }
+
+  const bucket = storage!.bucket(BUCKET_NAME);
+  const file = bucket.file(chunksPath);
   await file.save(jsonContent, {
     contentType: 'application/json',
-    metadata: {
-      cacheControl: 'public, max-age=3600',
-    },
+    metadata: { cacheControl: 'public, max-age=3600' },
   });
 }
 
 /**
- * Carica i chunks di un documento da GCS
+ * Carica i chunks di un documento
  */
 export async function loadDocumentChunks(
-  gcsPath: string
+  filePath: string
 ): Promise<ChunkedDocument | null> {
-  const bucket = storage.bucket(BUCKET_NAME);
-  const chunksPath = `${gcsPath}.chunks.json`;
-  const file = bucket.file(chunksPath);
+  const chunksPath = `${filePath}.chunks.json`;
 
-  const [exists] = await file.exists();
-  if (!exists) {
-    return null;
+  if (STORAGE_MODE === 'local') {
+    const fileName = path.basename(chunksPath);
+    const fullPath = path.join(UPLOADS_DIR, fileName);
+    try {
+      const content = await fs.readFile(fullPath, 'utf-8');
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
   }
 
+  const bucket = storage!.bucket(BUCKET_NAME);
+  const file = bucket.file(chunksPath);
+  const [exists] = await file.exists();
+  if (!exists) return null;
+
   const [buffer] = await file.download();
-  const chunkedDocument: ChunkedDocument = JSON.parse(buffer.toString('utf-8'));
-  return chunkedDocument;
+  return JSON.parse(buffer.toString('utf-8'));
 }
 
 /**

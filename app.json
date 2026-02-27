@@ -7,9 +7,13 @@
             "description": "Ambiente di esecuzione",
             "value": "production"
         },
-        "GCP_STORAGE_BUCKET": {
-            "description": "Opzionale: Nome del bucket GCS (se vuoto verrà creato automaticamente)",
-            "required": false
+        "STORAGE_MODE": {
+            "description": "Modalità di storage (gcs o local)",
+            "value": "local"
+        },
+        "PRIVATE_CLOUD": {
+            "description": "Identifica se l'istanza è un Private Cloud",
+            "value": "true"
         }
     },
     "options": {
