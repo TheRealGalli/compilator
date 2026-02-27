@@ -51,4 +51,50 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+export class MemStorage implements IStorage {
+  private users: Map<number, User>;
+  currentId: number;
+
+  constructor() {
+    this.users = new Map();
+    this.currentId = 1;
+  }
+
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find((user) => user.googleId === googleId);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find((user) => user.email === email);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = this.currentId++;
+    const user: User = { ...insertUser, id, usageMetrics: null };
+    this.users.set(id, user);
+    return user;
+  }
+
+  async updateUser(id: number, userData: Partial<User>): Promise<User> {
+    const user = this.users.get(id);
+    if (!user) throw new Error(`User with ID ${id} not found`);
+    const updatedUser = { ...user, ...userData };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+
+  async updateUserUsage(id: number, usage: any): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.usageMetrics = usage;
+      this.users.set(id, user);
+    }
+  }
+}
+
+// Export the appropriate storage implementation
+export const storage = process.env.DATABASE_URL ? new DatabaseStorage() : new MemStorage();

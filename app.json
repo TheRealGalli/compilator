@@ -1,6 +1,6 @@
 {
     "name": "gromit-backend",
-    "description": "Gromit Document Intelligence Engine Backend",
+    "description": "Gromit Document Intelligence Engine Backend. Zero-Data & Enterprise-Ready.",
     "repository": "https://github.com/TheRealGalli/compilator",
     "env": {
         "NODE_ENV": {
@@ -8,12 +8,20 @@
             "value": "production"
         },
         "STORAGE_MODE": {
-            "description": "Modalità di storage (gcs o local)",
+            "description": "Modalità di storage (gcs o local). Default a local per Private Cloud.",
             "value": "local"
         },
         "PRIVATE_CLOUD": {
-            "description": "Identifica se l'istanza è un Private Cloud",
+            "description": "Identifica se l'istanza è un Private Cloud (abilita MemStorage se DATABASE_URL manca)",
             "value": "true"
+        },
+        "GEMINI_API_KEY": {
+            "description": "Inserisci la tua Google AI (Gemini) API Key per attivare l'AI Engine",
+            "required": true
+        },
+        "FRONTEND_URL": {
+            "description": "URL del frontend (es. https://therealgalli.github.io/compilator)",
+            "value": "https://therealgalli.github.io/compilator"
         }
     },
     "options": {

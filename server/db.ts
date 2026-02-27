@@ -3,8 +3,8 @@ import pg from "pg";
 import * as schema from "@shared/schema";
 
 if (!process.env.DATABASE_URL) {
-    throw new Error(
-        "DATABASE_URL must be set. Ensure Cloud SQL is provisioned and the connection string is valid."
+    console.warn(
+        "[DB] DATABASE_URL not set. Database interactions will fail. Using fallback storage if available."
     );
 }
 
