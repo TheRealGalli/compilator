@@ -1,28 +1,22 @@
 {
-    "expo": {
-        "name": "Gromit DIE",
-        "slug": "gromit-die",
-        "version": "1.0.0",
-        "orientation": "portrait",
-        "icon": "./client/public/logo.svg",
-        "userInterfaceStyle": "light",
-        "splash": {
-            "resizeMode": "contain",
-            "backgroundColor": "#ffffff"
+    "name": "gromit-backend",
+    "description": "Gromit Document Intelligence Engine Backend",
+    "repository": "https://github.com/TheRealGalli/compilator",
+    "env": {
+        "GCP_PROJECT_ID": {
+            "description": "Inserisci il tuo Google Cloud Project ID",
+            "required": true
         },
-        "assetBundlePatterns": [
-            "**/*"
-        ],
-        "ios": {
-            "supportsTablet": true
+        "GCP_STORAGE_BUCKET": {
+            "description": "Inserisci il nome del bucket GCS per l'archiviazione (es. gromit-docs-bucket)",
+            "required": true
         },
-        "android": {
-            "adaptiveIcon": {
-                "backgroundColor": "#ffffff"
-            }
-        },
-        "web": {
-            "favicon": "./client/public/logo.svg"
+        "NODE_ENV": {
+            "description": "Ambiente di esecuzione",
+            "value": "production"
         }
+    },
+    "options": {
+        "allow-unauthenticated": false
     }
 }
