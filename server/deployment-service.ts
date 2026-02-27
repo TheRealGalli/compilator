@@ -24,8 +24,14 @@ export class DeploymentService {
                     name: `projects/${projectId}/services/${serviceName}`
                 });
                 console.log(`[Deployment] API ${serviceName} enabled.`);
-            } catch (error) {
+            } catch (error: any) {
                 console.error(`[Deployment] Failed to enable ${serviceName}:`, error);
+
+                // Intercept Billing Error specifically
+                if (error.message?.includes('Billing account') && error.message?.includes('is not found')) {
+                    throw new Error(`Fatturazione non abilitata sul progetto '${projectId}'. Per abilitare le API Serverless necessarie, devi collegare un account di fatturazione (Billing Account) al tuo progetto dalla Google Cloud Console.`);
+                }
+
                 throw error;
             }
         }

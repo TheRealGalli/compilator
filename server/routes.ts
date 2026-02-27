@@ -970,9 +970,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: detailedMessages,
         nextPageToken: response.data.nextPageToken || null
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching Gmail metadata:', error);
-      res.status(500).json({ error: 'Failed to fetch messages' });
+      res.status(500).json({ error: `Failed to fetch messages: ${error.message}` });
     }
   });
 
@@ -1030,9 +1030,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         files: response.data.files || [],
         nextPageToken: response.data.nextPageToken || null
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching Drive files:', error);
-      res.status(500).json({ error: 'Failed to fetch Drive files' });
+      res.status(500).json({ error: `Failed to fetch files: ${error.message}` });
     }
   });
 
