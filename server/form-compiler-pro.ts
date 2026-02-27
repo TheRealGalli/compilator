@@ -1,4 +1,4 @@
-import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, PDFName, PDFString, PDFHexString } from 'pdf-lib';
+import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, PDFName, PDFString, PDFHexString, rgb, StandardFonts } from 'pdf-lib';
 
 export interface PdfFormField {
     name: string;
@@ -173,12 +173,17 @@ Stai lavorando sulla **PAGINA ${pageNum}** di un documento PDF complesso.
 ID TECNICI NATIVI (PDF-OBJ) DA COMPILARE (PAGINA ${pageNum}):
 ${pageFields.map(f => `- Native ID: "#${f.ref || '?'}"${f.label ? `, Label Suggerita: "${f.label}"` : ''}, Tipo: "${f.type}", Posizione Visiva [0-1000]: [top:${f.rect?.y}, left:${f.rect?.x}, width:${f.rect?.width}, height:${f.rect?.height}]`).join('\n')}
 
-**GUIDA SEMANTICA ALLLINEAMENTO VISIVO (TASSATIVO)**:
+**DIFESA VISIVA (MARKER SUL DOCUMENTO)**:
+Ho disegnato dei **tag rossi** con scritto il numero dell'ID (es: #24) direttamente sopra ogni campo nella versione del PDF che stai analizzando.
+1. localizza il tag rosso con il numero (es: #24).
+2. analizza cosa c'è scritto **SOTTO** o **ACCANTO** a quel tag nel documento originale.
+3. usa quel contesto visivo per capire cosa inserire.
+
+**GUIDA SEMANTICA ALLINEAMENTO VISIVO (TASSATIVO)**:
 1. Le coordinate [0-1000] partono dall'angolo TOP-LEFT del PDF (0,0 è l'angolo in alto a sinistra).
-2. I "Native ID" (es: #24) sono i riferimenti fisici dell'oggetto all'interno del file PDF. Sono ID puramente tecnici e NON hanno alcun significato semantico.
-3. **NON USARE IL NOME DELL'ID (#24, #25, etc.)** per dedurre cosa scrivere nel campo.
-4. Identifica il significato di ogni campo **ESCLUSIVAMENTE** guardando cosa c'è stampato nel PDF MASTER attorno a quelle coordinate visive.
-5. Il risultato finale nel JSON deve usare lo stesso "Native ID" come chiave per mappare le risposte.
+2. I "Native ID" (es: #24) corrispondono AI TAG ROSSI disegnati sul documento.
+3. **NON USARE IL NOME DELL'ID (#24, #25, etc.)** per dedurre cosa scrivere nel campo. Usa solo il contesto visivo ad esso associato.
+4. Il risultato finale nel JSON deve usare lo stesso "Native ID" come chiave per mappare le risposte.
 
 PROTOCOLLO DI ANALISI & VISUAL FIT (TASSATIVO):
 1. **Analisi Spaziale**: Usa le coordinate fornite per localizzare ogni campo.
@@ -210,11 +215,19 @@ Restituisci ESCLUSIVAMENTE un JSON:
 
             const parts: any[] = [{ text: prompt }];
 
-            // Add Master PDF (Multimodal context)
+            // Generate an annotated version of the Master PDF with VISUAL IDs for Gemini Vision
+            let annotatedBase64 = masterFile.base64;
+            try {
+                annotatedBase64 = await generateAnnotatedPdf(Buffer.from(masterFile.base64, 'base64'), pageFields);
+            } catch (err) {
+                console.error(`[proposePdfFieldValues] Failed to generate annotated PDF for page ${pageNum}:`, err);
+            }
+
+            // Add Annotated Master PDF (Multimodal context with visual anchors)
             parts.push({
                 inlineData: {
                     mimeType: masterFile.mimeType,
-                    data: masterFile.base64
+                    data: annotatedBase64
                 }
             });
 
@@ -312,3 +325,56 @@ export async function fillNativePdf(buffer: Buffer, values: Record<string, strin
         throw error;
     }
 }
+
+/**
+ * Generates a temporary PDF with field Object Numbers drawn directly over the fields.
+ * This provides absolute visual grounding for Gemini Vision.
+ */
+export async function generateAnnotatedPdf(buffer: Buffer, fields: PdfFormField[]): Promise<string> {
+    const pdfDoc = await PDFDocument.load(buffer);
+    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const pages = pdfDoc.getPages();
+
+    for (const field of fields) {
+        if (!field.page || !field.rect || !field.ref) continue;
+        const page = pages[field.page - 1];
+        if (!page) continue;
+
+        const { x, y, width, height } = field.rect;
+        const pageW = page.getWidth();
+        const pageH = page.getHeight();
+
+        // Convert normalized [0-1000] (Top-Down) back to PDF points (Bottom-Up)
+        const pdfX = (x / 1000) * pageW;
+        const topEdge = (y / 1000) * pageH;
+        const pdfYTop = pageH - topEdge; // This is the TOP of the field in PDF coords
+
+        const text = `#${field.ref}`;
+        const fontSize = 10;
+        const textWidth = font.widthOfTextAtSize(text, fontSize);
+        const padding = 2;
+
+        // Draw a bright background tag for the ID
+        page.drawRectangle({
+            x: pdfX,
+            y: pdfYTop - (fontSize + padding * 2), // Draw just below the top edge
+            width: textWidth + padding * 2,
+            height: fontSize + padding * 2,
+            color: rgb(1, 0, 0), // RED for high visibility
+            opacity: 0.8
+        });
+
+        // Draw the ID text in white
+        page.drawText(text, {
+            x: pdfX + padding,
+            y: pdfYTop - (fontSize + padding),
+            size: fontSize,
+            font: font,
+            color: rgb(1, 1, 1),
+        });
+    }
+
+    const modifiedBuffer = await pdfDoc.save();
+    return Buffer.from(modifiedBuffer).toString('base64');
+}
+

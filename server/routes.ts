@@ -23,7 +23,7 @@ import { db } from "./db"; // Used for session store if needed, but storage hide
 import session from "express-session";
 import pgSession from "connect-pg-simple";
 import { checkLimit } from "./middleware/licensing";
-import { getPdfFormFields, proposePdfFieldValues, fillNativePdf } from './form-compiler-pro';
+import { getPdfFormFields, proposePdfFieldValues, fillNativePdf, generateAnnotatedPdf } from './form-compiler-pro';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { getSecret } from './gcp-secrets';
 import { Document as DocxDocument, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, TableLayoutType } from "docx";
@@ -1677,8 +1677,8 @@ ${extractedFields && extractedFields.length > 0 ? `
    ${extractedFields.map((f: any) => `- Native ID: "#${f.ref || '?'}"${f.label && f.label !== (f.name || f.fieldName) ? `, Label: "${f.label}"` : ''}, Tipo: "${f.type || 'unknown'}", Posizione Visiva [0-1000]: ${f.rect ? `[top:${f.rect.y}, left:${f.rect.x}, w:${f.rect.width}, h:${f.rect.height}]` : 'N/A'}`).join('\n')}
    **GUIDA SEMANTICA ALINEAMENTO VISIVO (TASSATIVO)**:
    1. Le coordinate [0-1000] partono dal TOP-LEFT del PDF.
-   2. I "Native ID" (es: #24) sono riferimenti tecnici SENZA significato semantico. NON usarli per dedurre cosa inserire. 
-   3. Basati ESCLUSIVAMENTE sulla posizione visiva rispetto al testo stampato nel documento MASTER SOURCE per capire il significato di ogni ID.
+   2. I "Native ID" (es: #24) sono riferimenti tecnici. Ho disegnato dei **tag rossi** con questi ID direttamente sopra i campi nel documento MASTER per evitarti ogni ambiguità spaziale.
+   3. Localizza il tag rosso con il numero (es: #24) e analizza il testo circostante nel MASTER per capire cosa inserire.
    4. Se vuoi agire su un campo nella chat, riferisciti ad esso col suo Native ID (es: "Compila il campo #24").
 ` : ''}
 ${manualAnnotations && manualAnnotations.length > 0 ? `
@@ -1910,16 +1910,21 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
             }
           }
         }
+      }
 
-        if (masterSource) {
-          if (masterSource.anonymizedText) {
-            preProcessedMasterParts = [{ text: `[MASTER: ${masterSource.name}]\n` + masterSource.anonymizedText }];
-          } else {
-            console.error(`[Pawn Violation] Received non-anonymized master source in Pawn mode: ${masterSource.name}`);
-            return res.status(403).json({
-              error: "Sicurezza Pawn Violata: Documento Master non pseudonimizzato rilevato. Operazione bloccata per la tua privacy."
-            });
-          }
+      // Annotate Master PDF if available and in PDF mode for grounding
+      let processedMaster = masterSource;
+      const isPdfMode = masterSource?.mimeType === 'application/pdf' || masterSource?.type === 'application/pdf';
+      if (isPdfMode && masterSource?.base64 && extractedFields) {
+        try {
+          console.log(`[API compile] Annotating master PDF with Visual IDs for grounding precision...`);
+          const annotatedBase64 = await generateAnnotatedPdf(
+            Buffer.from(masterSource.base64, 'base64'),
+            extractedFields
+          );
+          processedMaster = { ...masterSource, base64: annotatedBase64 };
+        } catch (err) {
+          console.error('[API compile] Failed to annotate master PDF:', err);
         }
       }
 
@@ -1928,7 +1933,7 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
         hasMemory,
         extractedFields,
         manualAnnotations,
-        masterSource,
+        masterSource: processedMaster,
         detailedAnalysis,
         webResearch,
         multimodalFiles,
@@ -2065,12 +2070,28 @@ ISTRUZIONI OUTPUT:
       const processedChatHistory = chatHistory;
       const processedMentions = mentions;
 
+      const isPdfMode = masterSource?.mimeType === 'application/pdf' || masterSource?.type === 'application/pdf';
+      let processedMaster = masterSource;
+
+      if (isPdfMode && masterSource?.base64 && compileContext.extractedFields) {
+        try {
+          console.log(`[API refine] Annotating master PDF with Visual IDs for chat precision...`);
+          const annotatedBase64 = await generateAnnotatedPdf(
+            Buffer.from(masterSource.base64, 'base64'),
+            compileContext.extractedFields
+          );
+          processedMaster = { ...masterSource, base64: annotatedBase64 };
+        } catch (err) {
+          console.error('[API refine] Failed to annotate master PDF:', err);
+        }
+      }
+
       const systemPrompt = buildSystemPrompt({
         dateTimeIT,
         hasMemory,
         extractedFields: compileContext.extractedFields,
         manualAnnotations: compileContext.manualAnnotations,
-        masterSource,
+        masterSource: processedMaster,
         detailedAnalysis: compileContext.detailedAnalysis,
         webResearch: compileContext.webResearch,
         multimodalFiles,
@@ -2099,8 +2120,6 @@ ISTRUZIONI OUTPUT:
       const formattedRegistry = (mentionRegistry || []).map((m: any) => {
         return `- SESSIONE: #${m.label} -> "${m.text}"`;
       }).join('\n');
-
-      const isPdfMode = masterSource?.mimeType === 'application/pdf';
 
       const refineInstructions = isPdfMode ? `
 *** MODALITÀ RAFFINAMENTO MODULO PDF ATTIVA ***
