@@ -14,6 +14,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
+import { type User as UserType } from "@shared/schema";
 import { getApiUrl } from "@/lib/api-config";
 import { useSources } from "@/contexts/SourcesContext";
 import { useGoogleDrive } from "@/contexts/GoogleDriveContext";
@@ -52,7 +53,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const { data: user } = useQuery({ queryKey: ['/api/user'] });
+  const { data: user } = useQuery<UserType>({ queryKey: ['/api/user'] });
   const isAuthenticated = !!user;
 
   // Audio Recording State
@@ -497,7 +498,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         <ScrollArea ref={scrollAreaRef} className="flex-1 p-6">
           <div className="space-y-6 max-w-3xl mx-auto">
             {messages.map((message) => (
-              <ChatMessage key={message.id} {...message} userInitial={userIdentity?.initial} />
+              <ChatMessage key={message.id} {...message} userInitial={userIdentity?.initial} avatarUrl={user?.avatarUrl || undefined} />
             ))}
             {(isLoading || isGreetingLoading) && (
               <div className="flex gap-3 justify-start">
