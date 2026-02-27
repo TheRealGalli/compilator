@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { setCustomBackendUrl, getCustomBackendUrl } from "@/lib/api-config";
-import { Settings2, Cloud, ShieldCheck } from "lucide-react";
+import { Settings2, Cloud, ShieldCheck, Copy } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const GmailLogo = ({ className }: { className?: string }) => (
@@ -597,10 +597,12 @@ export function ConnectorsSection() {
                             <Cloud className="w-5 h-5 text-blue-600" />
                             {wizardStep === "url" ? "Configura Backend Privato" : "Magic Deployment Wizard"}
                         </DialogTitle>
-                        <DialogDescription>
+                        <DialogDescription className="text-[11px]">
                             {wizardStep === "url"
-                                ? "Collega un'istanza esistente o creane una nuova in pochi secondi."
-                                : `Passo ${wizardStep === "setup" ? "1/3" : wizardStep === "keys" ? "2/3" : "3/3"}: Configura la tua infrastruttura.`}
+                                ? "Inserisci l'URL di un'istanza esistente o creane una nuova con il Setup Magico."
+                                : wizardStep === "setup" ? "Passo 1/3: Identità e Motore AI (Setup Magico)" :
+                                    wizardStep === "keys" ? "Passo 2/3: Integrazioni Google (Opzionale)" :
+                                        "Passo 3/3: Riepilogo e Lancio"}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -610,7 +612,7 @@ export function ConnectorsSection() {
                                 <Label className="text-sm font-semibold text-slate-900">Hai già un'istanza attiva?</Label>
                                 <div className="space-y-2">
                                     <Label htmlFor="backend-url" className="text-xs text-muted-foreground">
-                                        Cloud Run URL
+                                        Indirizzo Istanza (URL)
                                     </Label>
                                     <Input
                                         id="backend-url"
@@ -618,6 +620,9 @@ export function ConnectorsSection() {
                                         value={tempBackendUrl}
                                         onChange={(e) => setTempBackendUrl(e.target.value)}
                                     />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        <strong>Nota:</strong> Se l'istanza è già attiva, assicurati che abbia le variabili d'ambiente (API Key, etc.) configurate nel suo pannello di controllo Google Cloud.
+                                    </p>
                                 </div>
                             </div>
 
@@ -645,30 +650,58 @@ export function ConnectorsSection() {
                     {wizardStep === "setup" && (
                         <div className="py-4 space-y-6 text-sm">
                             <div className="space-y-4">
-                                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 text-xs">
-                                    <strong>Nota:</strong> Useremo un'architettura "serverless" (Cloud Run) ed effimera. Nessun costo fisso, paghi solo quando usi Gromit.
+                                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 text-xs text-center">
+                                    <strong>Magical Setup:</strong> Useremo un'architettura "serverless" (Cloud Run). Nessun costo fisso, paghi solo quando usi Gromit.
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold">1. ID Progetto Google Cloud</Label>
-                                    <Input
-                                        placeholder="es. il-tuo-progetto-123"
-                                        value={setupProjectId}
-                                        onChange={(e) => setSetupProjectId(e.target.value)}
-                                    />
+                                    <Label className="text-xs font-semibold">1. Gemini API Key (da AI Studio)</Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="password"
+                                            placeholder="Incolla la tua API Key..."
+                                            value={setupGeminiKey}
+                                            onChange={(e) => setSetupGeminiKey(e.target.value)}
+                                            className="flex-1"
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            title="Copia"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(setupGeminiKey);
+                                                toast({ title: "Copiato!", description: "API Key copiata negli appunti." });
+                                            }}
+                                        >
+                                            <Copy className="w-4 h-4" />
+                                        </Button>
+                                    </div>
                                     <p className="text-[10px] text-muted-foreground">
-                                        Lo trovi nella <a href="https://console.cloud.google.com/home/dashboard" target="_blank" className="text-blue-500 underline">Dashboard di Google Cloud</a>.
+                                        Ottienila in 3 secondi su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline font-bold">Google AI Studio</a>.
                                     </p>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold">2. Gemini API Key</Label>
-                                    <Input
-                                        type="password"
-                                        placeholder="Incolla la tua API Key..."
-                                        value={setupGeminiKey}
-                                        onChange={(e) => setSetupGeminiKey(e.target.value)}
-                                    />
+                                    <Label className="text-xs font-semibold">2. ID Progetto Google Cloud</Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            placeholder="es. gen-lang-client-..."
+                                            value={setupProjectId}
+                                            onChange={(e) => setSetupProjectId(e.target.value)}
+                                            className="flex-1"
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            title="Copia"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(setupProjectId);
+                                                toast({ title: "Copiato!", description: "Project ID copiato negli appunti." });
+                                            }}
+                                        >
+                                            <Copy className="w-4 h-4" />
+                                        </Button>
+                                    </div>
                                     <p className="text-[10px] text-muted-foreground">
-                                        Ottienila gratuitamente su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline">Google AI Studio</a>.
+                                        Usa l'ID del <strong>Default Gemini Project</strong> che trovi sempre su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline">AI Studio</a>.
                                     </p>
                                 </div>
                             </div>
@@ -678,8 +711,8 @@ export function ConnectorsSection() {
                     {wizardStep === "keys" && (
                         <div className="py-4 space-y-6">
                             <div className="space-y-4">
-                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 text-xs">
-                                    <strong>Opzionale:</strong> Se vuoi che la tua istanza privata possa leggere Gmail/Drive, inserisci le tue credenziali OAuth. Puoi farlo anche dopo.
+                                <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-amber-700 text-[10px]">
+                                    <strong>Attenzione:</strong> Gmail e Drive richiedono la creazione di un Client OAuth 2.0. Questo va fatto **obbligatoriamente** nella <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="underline font-bold">Console Google Cloud</a> (non su AI Studio).
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
@@ -719,13 +752,19 @@ export function ConnectorsSection() {
                                 </p>
                             </div>
 
-                            <div className="p-4 bg-slate-900 rounded-xl text-white text-[10px] font-mono space-y-1 overflow-x-auto shadow-xl border border-slate-700">
+                            <div className="p-4 bg-slate-900 rounded-xl text-white text-[10px] font-mono space-y-3 overflow-x-auto shadow-xl border border-slate-700">
                                 <p className="text-slate-400 border-b border-slate-800 pb-1 mb-2 font-bold uppercase tracking-wider text-[9px]">Checklist Configurazione</p>
-                                <div className="grid grid-cols-2 gap-x-4">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                     <p><span className="text-slate-500">Project:</span> {setupProjectId || 'Auto'}</p>
                                     <p><span className="text-slate-500">Storage:</span> Local (Ephemeral)</p>
-                                    <p><span className="text-slate-500">AI Engine:</span> Gemini 1.5 Flash</p>
+                                    <p><span className="text-slate-500">AI Engine:</span> Gemini API (Studio)</p>
                                     <p><span className="text-slate-500">Integrations:</span> {setupClientId ? 'Attive' : 'Disabilitate'}</p>
+                                </div>
+                                <div className="pt-2 border-t border-slate-800">
+                                    <p className="text-blue-400 text-[9px] mb-2 leading-tight">
+                                        💡 Durante il deploy Google ti chiederà di incollare la API Key e il Project ID.
+                                        Assicurati di averli copiati (usa i tasti nelle sezioni precedenti).
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -768,7 +807,11 @@ export function ConnectorsSection() {
                                         onClick={() => {
                                             if (wizardStep === "setup") {
                                                 if (!setupProjectId || !setupGeminiKey) {
-                                                    toast({ title: "Dati mancanti", description: "Project ID e API Key sono richiesti.", variant: "destructive" });
+                                                    toast({
+                                                        title: "Dati mancanti",
+                                                        description: "Project ID e Gemini API Key sono richiesti per il Setup Magico.",
+                                                        variant: "destructive"
+                                                    });
                                                     return;
                                                 }
                                                 setWizardStep("keys");

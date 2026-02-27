@@ -1,23 +1,38 @@
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import mammoth from 'mammoth';
 import * as fs from 'fs';
 import * as path from 'path';
 import { DlpServiceClient } from '@google-cloud/dlp';
 
 export class AiService {
-    private vertex_ai: VertexAI;
+    private vertex_ai: VertexAI | null = null;
+    private google_ai: GoogleGenerativeAI | null = null;
     private projectId: string;
     private location: string;
     private modelId = 'gemini-2.5-flash';
-    private dlpClient: DlpServiceClient;
+    private dlpClient: DlpServiceClient | null = null;
     private ollamaUrl = 'http://localhost:11434/api/generate';
     private ollamaModel = 'gpt-oss:20b';
 
     constructor(projectId: string, location: string = 'europe-west1') {
         this.projectId = projectId;
         this.location = location;
-        this.vertex_ai = new VertexAI({ project: projectId, location: location });
-        this.dlpClient = new DlpServiceClient();
+
+        const apiKey = process.env.GEMINI_API_KEY;
+
+        if (apiKey) {
+            console.log(`[AiService] Dual-Provider: Using Gemini API via API Key`);
+            this.google_ai = new GoogleGenerativeAI(apiKey);
+        } else {
+            console.log(`[AiService] Dual-Provider: Using Vertex AI via GCP Project`);
+            this.vertex_ai = new VertexAI({ project: projectId, location: location });
+            try {
+                this.dlpClient = new DlpServiceClient();
+            } catch (err) {
+                console.warn(`[AiService] DLP not initialized (ADC missing), anonymization will be skipped.`);
+            }
+        }
 
         console.log(`[AiService] Initialized with model: ${this.modelId} in ${location}`);
     }
@@ -105,6 +120,10 @@ export class AiService {
         if (!text || text.trim() === "") return text;
 
         try {
+            if (!this.dlpClient) {
+                console.warn(`[AiService] DLP Service unavailable (Mode: API Key or Missing ADC). Skipping.`);
+                return text;
+            }
             console.log(`[AiService] Calling Cloud DLP for anonymization (Text length: ${text.length})...`);
 
             const [response] = await this.dlpClient.inspectContent({
@@ -426,15 +445,7 @@ ${text} [/INST]`;
         webResearch?: boolean
     }): Promise<{ content: string, groundingMetadata?: any, parts?: any[], aiMetadata?: { codeExecutionResults?: Array<{ code: string, output: string }> } }> {
         try {
-            const model = this.vertex_ai.getGenerativeModel({
-                model: this.modelId,
-                systemInstruction: {
-                    role: 'system',
-                    parts: [{ text: params.systemPrompt }]
-                }
-            });
-
-            // Use pre-processed parts if provided to save latency
+            let result;
             const [multimodalParts, masterParts] = await Promise.all([
                 params.preProcessedParts ? Promise.resolve(params.preProcessedParts) : this.processMultimodalParts(params.multimodalFiles),
                 params.preProcessedMasterParts ? Promise.resolve(params.preProcessedMasterParts) :
@@ -442,35 +453,58 @@ ${text} [/INST]`;
             ]);
 
             const messageParts: any[] = [{ text: params.userPrompt }, ...multimodalParts, ...masterParts];
-
             const tools: any[] = params.webResearch ? [{ googleSearch: {} }] : [];
 
-            // Add toolConfig to explicitly allow/force tool use if appropriate
-            const toolConfig: any = tools.length > 0 ? {
-                functionCallingConfig: {
-                    mode: 'AUTO',
-                }
-            } : undefined;
+            if (this.google_ai) {
+                const model = this.google_ai.getGenerativeModel({
+                    model: this.modelId,
+                    systemInstruction: params.systemPrompt,
+                });
 
-            // VERTEX AI CONSTRAINT: codeExecution CANNOT coexist with ANY other tool.
-            // When tools (googleSearch or functions) are present, skip codeExecution.
-            // ThinkingMode still handles reasoning improvement.
-            const finalTools = tools.length > 0 ? tools : [{ codeExecution: {} }];
+                const finalTools = tools.length > 0 ? tools : [{ codeExecution: {} }];
 
-            const result = await model.generateContentStream({
-                contents: [{ role: 'user', parts: messageParts }],
-                tools: finalTools,
-                toolConfig,
-                generationConfig: {
-                    maxOutputTokens: 20000, // Reduced for safety as per plan
-                    temperature: 0.2,
-                    // @ts-ignore - thinkingConfig is part of the 2026 Vertex AI SDK
-                    thinkingConfig: {
-                        includeThoughts: false,
-                        thinkingBudget: 4000
+                result = await model.generateContentStream({
+                    contents: [{ role: 'user', parts: messageParts }],
+                    tools: finalTools,
+                    generationConfig: {
+                        maxOutputTokens: 20000,
+                        temperature: 0.2,
                     }
-                }
-            });
+                });
+            } else if (this.vertex_ai) {
+                const model = this.vertex_ai.getGenerativeModel({
+                    model: this.modelId,
+                    systemInstruction: {
+                        role: 'system',
+                        parts: [{ text: params.systemPrompt }]
+                    }
+                });
+
+                const toolConfig: any = tools.length > 0 ? {
+                    functionCallingConfig: {
+                        mode: 'AUTO',
+                    }
+                } : undefined;
+
+                const finalTools = tools.length > 0 ? tools : [{ codeExecution: {} }];
+
+                result = await model.generateContentStream({
+                    contents: [{ role: 'user', parts: messageParts }],
+                    tools: finalTools,
+                    toolConfig,
+                    generationConfig: {
+                        maxOutputTokens: 20000,
+                        temperature: 0.2,
+                        // @ts-ignore
+                        thinkingConfig: {
+                            includeThoughts: false,
+                            thinkingBudget: 4000
+                        }
+                    }
+                });
+            } else {
+                throw new Error("No AI Provider initialized.");
+            }
 
             let content = '';
             let groundingMetadata: any = null;
@@ -559,29 +593,48 @@ ${params.formalTone ? "Usa un tono professionale e formale." : ""}
 BOZZA DA RIFINIRE:
 ${params.draftContent}`;
 
-            const model = this.vertex_ai.getGenerativeModel({
-                model: this.modelId,
-                systemInstruction: {
-                    role: 'system',
-                    parts: [{ text: systemPrompt }]
-                }
-            });
-
             const masterParts = params.preProcessedMasterParts || (params.masterSource ? await this.processMultimodalParts([params.masterSource]) : []);
             const messageParts: any[] = [{ text: userPrompt }, ...masterParts];
 
-            const result = await model.generateContentStream({
-                contents: [{ role: 'user', parts: messageParts }],
-                generationConfig: {
-                    maxOutputTokens: 20000, // Reduced for safety
-                    temperature: 0.1,
-                    // @ts-ignore
-                    thinkingConfig: {
-                        includeThoughts: false,
-                        thinkingBudget: 2000
+            let result;
+
+            if (this.google_ai) {
+                const model = this.google_ai.getGenerativeModel({
+                    model: this.modelId,
+                    systemInstruction: systemPrompt,
+                });
+
+                result = await model.generateContentStream({
+                    contents: [{ role: 'user', parts: messageParts }],
+                    generationConfig: {
+                        maxOutputTokens: 20000,
+                        temperature: 0.1,
                     }
-                }
-            });
+                });
+            } else if (this.vertex_ai) {
+                const model = this.vertex_ai.getGenerativeModel({
+                    model: this.modelId,
+                    systemInstruction: {
+                        role: 'system',
+                        parts: [{ text: systemPrompt }]
+                    }
+                });
+
+                result = await model.generateContentStream({
+                    contents: [{ role: 'user', parts: messageParts }],
+                    generationConfig: {
+                        maxOutputTokens: 20000,
+                        temperature: 0.1,
+                        // @ts-ignore
+                        thinkingConfig: {
+                            includeThoughts: false,
+                            thinkingBudget: 2000
+                        }
+                    }
+                });
+            } else {
+                throw new Error("No AI Provider initialized.");
+            }
 
             let content = '';
             for await (const chunk of result.stream) {
@@ -851,23 +904,40 @@ Gromit, ricordati anche di divertirti! Buona fortuna."
 
             const userPrompt = `SCACCHIERA:\n${boardText}\n\n${historyText}${legalMovesText}${illegalText}${tacticalAlertsText}${defenseAlertsText}${thoughtHistoryText}\n\nMATERIALE:\n${capturedWhiteText}\n${capturedBlackText}\n\nMossa per b:`;
 
-            const model = this.vertex_ai.getGenerativeModel({
-                model: this.modelId,
-                systemInstruction: {
-                    role: 'system',
-                    parts: [{ text: systemPrompt }]
-                }
-            });
+            let result;
 
-            console.log(`[AiService] GROMIT (b) is thinking... (Attempt ${retryCount + 1})`);
+            if (this.google_ai) {
+                const model = this.google_ai.getGenerativeModel({
+                    model: this.modelId,
+                    systemInstruction: systemPrompt,
+                });
 
-            const result = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-                generationConfig: {
-                    maxOutputTokens: 2000,
-                    temperature: 0.1
-                }
-            });
+                result = await model.generateContent({
+                    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+                    generationConfig: {
+                        maxOutputTokens: 2000,
+                        temperature: 0.1
+                    }
+                });
+            } else if (this.vertex_ai) {
+                const model = this.vertex_ai.getGenerativeModel({
+                    model: this.modelId,
+                    systemInstruction: {
+                        role: 'system',
+                        parts: [{ text: systemPrompt }]
+                    }
+                });
+
+                result = await model.generateContent({
+                    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+                    generationConfig: {
+                        maxOutputTokens: 2000,
+                        temperature: 0.1
+                    }
+                });
+            } else {
+                throw new Error("No AI Provider initialized.");
+            }
 
             const candidate = result.response.candidates?.[0];
             const rawContent = candidate?.content?.parts?.map((p: any) => p.text || '').join('') || '';
