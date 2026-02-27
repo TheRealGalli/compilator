@@ -156,6 +156,7 @@ export function ConnectorsSection() {
         try {
             const response = await fetch(getApiUrl("/api/deploy/private-cloud"), {
                 method: "POST",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     projectId: setupProjectId,
@@ -521,25 +522,11 @@ export function ConnectorsSection() {
                                     Gestisci il tuo backend privato su Cloud Run per il controllo totale dei tuoi dati.
                                     {currentBackendUrl && <span className="block mt-2 font-mono text-[10px] break-all opacity-70">{currentBackendUrl}</span>}
                                 </p>
-                                <div className="mt-auto space-y-3">
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" className="flex-1" onClick={() => setIsPrivateBackendModalOpen(true)}>
-                                            <Settings2 className="w-4 h-4 mr-2" />
-                                            Configura
-                                        </Button>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button variant="secondary" className="px-3" onClick={handleDeployToCloud}>
-                                                        <ExternalLink className="w-4 h-4" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Aggiorna Backend</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    </div>
+                                <div className="mt-auto">
+                                    <Button variant="outline" className="w-full" onClick={() => setIsPrivateBackendModalOpen(true)}>
+                                        <Settings2 className="w-4 h-4 mr-2" />
+                                        Configura
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
