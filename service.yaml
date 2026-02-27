@@ -1,0 +1,22 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: gromit-backend
+  annotations:
+    run.googleapis.com/client-name: cloud-run-button
+spec:
+  template:
+    spec:
+      containers:
+      - image: gcr.io/cloudrun/placeholder
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        env:
+        - name: GCP_PROJECT_ID
+          value: ""
+        - name: GCP_STORAGE_BUCKET
+          value: ""
+        - name: NODE_ENV
+          value: "production"

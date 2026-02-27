@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { setCustomBackendUrl, getCustomBackendUrl } from "@/lib/api-config";
 import { Settings2, Cloud, ShieldCheck } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const GmailLogo = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
@@ -471,9 +472,18 @@ export function ConnectorsSection() {
                                             <Settings2 className="w-4 h-4 mr-2" />
                                             Configura
                                         </Button>
-                                        <Button variant="secondary" className="px-3" onClick={handleDeployToCloud}>
-                                            <ExternalLink className="w-4 h-4" />
-                                        </Button>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button variant="secondary" className="px-3" onClick={handleDeployToCloud}>
+                                                        <ExternalLink className="w-4 h-4" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Aggiorna Backend</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
                                     </div>
                                     <Button
                                         className="w-full bg-blue-600 hover:bg-blue-700 text-white"
