@@ -79,6 +79,13 @@ export function ConnectorsSection() {
     const [tempBackendUrl, setTempBackendUrl] = useState(getCustomBackendUrl() || "");
     const currentBackendUrl = getCustomBackendUrl();
 
+    // Wizard State
+    const [wizardStep, setWizardStep] = useState<"url" | "setup" | "keys" | "deploy">("url");
+    const [setupProjectId, setSetupProjectId] = useState("");
+    const [setupGeminiKey, setSetupGeminiKey] = useState("");
+    const [setupClientId, setSetupClientId] = useState("");
+    const [setupClientSecret, setSetupClientSecret] = useState("");
+
     useEffect(() => {
         checkOllama();
     }, []);
@@ -580,56 +587,216 @@ export function ConnectorsSection() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={isPrivateBackendModalOpen} onOpenChange={setIsPrivateBackendModalOpen}>
+            <Dialog open={isPrivateBackendModalOpen} onOpenChange={(open) => {
+                setIsPrivateBackendModalOpen(open);
+                if (!open) setWizardStep("url");
+            }}>
                 <DialogContent className="sm:max-w-[700px]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Cloud className="w-5 h-5 text-blue-600" />
-                            Configura Backend Privato
+                            {wizardStep === "url" ? "Configura Backend Privato" : "Magic Deployment Wizard"}
                         </DialogTitle>
                         <DialogDescription>
-                            Inserisci l'URL della tua istanza privata di Gromit su Cloud Run.
+                            {wizardStep === "url"
+                                ? "Collega un'istanza esistente o creane una nuova in pochi secondi."
+                                : `Passo ${wizardStep === "setup" ? "1/3" : wizardStep === "keys" ? "2/3" : "3/3"}: Configura la tua infrastruttura.`}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="backend-url" className="text-xs">
-                                Cloud Run URL
-                            </Label>
-                            <Input
-                                id="backend-url"
-                                placeholder="https://gromit-backend-xyz.run.app"
-                                value={tempBackendUrl}
-                                onChange={(e) => setTempBackendUrl(e.target.value)}
-                            />
+
+                    {wizardStep === "url" && (
+                        <div className="py-4 space-y-6">
+                            <div className="space-y-4">
+                                <Label className="text-sm font-semibold text-slate-900">Hai già un'istanza attiva?</Label>
+                                <div className="space-y-2">
+                                    <Label htmlFor="backend-url" className="text-xs text-muted-foreground">
+                                        Cloud Run URL
+                                    </Label>
+                                    <Input
+                                        id="backend-url"
+                                        placeholder="https://gromit-backend-xyz.run.app"
+                                        value={tempBackendUrl}
+                                        onChange={(e) => setTempBackendUrl(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t border-slate-200" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-white px-2 text-muted-foreground">Oppure creane una nuova</span>
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <h4 className="font-semibold text-sm">Deployment Magico</h4>
+                                    <p className="text-xs text-muted-foreground">Crea il tuo backend privato su Google Cloud in 1 clic.</p>
+                                </div>
+                                <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={() => setWizardStep("setup")}>
+                                    Inizia Setup
+                                </Button>
+                            </div>
                         </div>
-                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                            <p className="text-[11px] text-blue-700 leading-relaxed">
-                                <strong>Nota sulla Privacy:</strong> Questo URL viene salvato esclusivamente nel tuo browser.
-                                Nessun dato sulla tua infrastruttura viene inviato ai server centrali di Gromit.
-                            </p>
+                    )}
+
+                    {wizardStep === "setup" && (
+                        <div className="py-4 space-y-6 text-sm">
+                            <div className="space-y-4">
+                                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 text-xs">
+                                    <strong>Nota:</strong> Useremo un'architettura "serverless" (Cloud Run) ed effimera. Nessun costo fisso, paghi solo quando usi Gromit.
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-semibold">1. ID Progetto Google Cloud</Label>
+                                    <Input
+                                        placeholder="es. il-tuo-progetto-123"
+                                        value={setupProjectId}
+                                        onChange={(e) => setSetupProjectId(e.target.value)}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Lo trovi nella <a href="https://console.cloud.google.com/home/dashboard" target="_blank" className="text-blue-500 underline">Dashboard di Google Cloud</a>.
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-semibold">2. Gemini API Key</Label>
+                                    <Input
+                                        type="password"
+                                        placeholder="Incolla la tua API Key..."
+                                        value={setupGeminiKey}
+                                        onChange={(e) => setSetupGeminiKey(e.target.value)}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Ottienila gratuitamente su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline">Google AI Studio</a>.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <DialogFooter className="flex gap-2 sm:gap-0">
-                        <Button
-                            variant="ghost"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => {
-                                setTempBackendUrl("");
-                                setCustomBackendUrl(null);
-                                toast({ title: "Reset effettuato", description: "Ripristinato il backend standard." });
-                                setIsPrivateBackendModalOpen(false);
-                            }}
-                        >
-                            Reset Home Cloud
-                        </Button>
-                        <div className="flex-1" />
-                        <Button variant="outline" onClick={() => setIsPrivateBackendModalOpen(false)}>
-                            Annulla
-                        </Button>
-                        <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={handleSaveBackendUrl}>
-                            Salva Configurazione
-                        </Button>
+                    )}
+
+                    {wizardStep === "keys" && (
+                        <div className="py-4 space-y-6">
+                            <div className="space-y-4">
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 text-xs">
+                                    <strong>Opzionale:</strong> Se vuoi che la tua istanza privata possa leggere Gmail/Drive, inserisci le tue credenziali OAuth. Puoi farlo anche dopo.
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-semibold">OAuth Client ID</Label>
+                                        <Input
+                                            placeholder="Client ID..."
+                                            value={setupClientId}
+                                            onChange={(e) => setSetupClientId(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-semibold">OAuth Client Secret</Label>
+                                        <Input
+                                            type="password"
+                                            placeholder="Client Secret..."
+                                            value={setupClientSecret}
+                                            onChange={(e) => setSetupClientSecret(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {wizardStep === "deploy" && (
+                        <div className="py-4 space-y-6">
+                            <div className="text-center space-y-3">
+                                <div className="flex justify-center">
+                                    <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center border-4 border-green-100 mb-2">
+                                        <ShieldCheck className="w-8 h-8 text-green-600" />
+                                    </div>
+                                </div>
+                                <h3 className="text-lg font-bold">Tutto pronto per il decollo!</h3>
+                                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                                    Cliccando il tasto sotto, verrai reindirizzato a Google Cloud Shell.
+                                    Il sistema caricherà automaticamente la tua configurazione "Zero-Data".
+                                </p>
+                            </div>
+
+                            <div className="p-4 bg-slate-900 rounded-xl text-white text-[10px] font-mono space-y-1 overflow-x-auto shadow-xl border border-slate-700">
+                                <p className="text-slate-400 border-b border-slate-800 pb-1 mb-2 font-bold uppercase tracking-wider text-[9px]">Checklist Configurazione</p>
+                                <div className="grid grid-cols-2 gap-x-4">
+                                    <p><span className="text-slate-500">Project:</span> {setupProjectId || 'Auto'}</p>
+                                    <p><span className="text-slate-500">Storage:</span> Local (Ephemeral)</p>
+                                    <p><span className="text-slate-500">AI Engine:</span> Gemini 1.5 Flash</p>
+                                    <p><span className="text-slate-500">Integrations:</span> {setupClientId ? 'Attive' : 'Disabilitate'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter className="flex gap-2 sm:gap-0 mt-4 h-12">
+                        {wizardStep === "url" ? (
+                            <>
+                                <Button
+                                    variant="ghost"
+                                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                    onClick={() => {
+                                        setTempBackendUrl("");
+                                        setCustomBackendUrl(null);
+                                        toast({ title: "Reset effettuato", description: "Ripristinato il backend standard." });
+                                        setIsPrivateBackendModalOpen(false);
+                                    }}
+                                >
+                                    Reset Home
+                                </Button>
+                                <div className="flex-1" />
+                                <Button variant="outline" onClick={() => setIsPrivateBackendModalOpen(false)}>Annulla</Button>
+                                <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={handleSaveBackendUrl}>
+                                    Connetti URL
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                <Button variant="ghost" className="text-slate-500" onClick={() => {
+                                    if (wizardStep === "setup") setWizardStep("url");
+                                    if (wizardStep === "keys") setWizardStep("setup");
+                                    if (wizardStep === "deploy") setWizardStep("keys");
+                                }}>
+                                    Indietro
+                                </Button>
+                                <div className="flex-1" />
+                                {wizardStep !== "deploy" ? (
+                                    <Button
+                                        className="bg-slate-900 text-white"
+                                        onClick={() => {
+                                            if (wizardStep === "setup") {
+                                                if (!setupProjectId || !setupGeminiKey) {
+                                                    toast({ title: "Dati mancanti", description: "Project ID e API Key sono richiesti.", variant: "destructive" });
+                                                    return;
+                                                }
+                                                setWizardStep("keys");
+                                            } else if (wizardStep === "keys") {
+                                                setWizardStep("deploy");
+                                            }
+                                        }}
+                                    >
+                                        Continua
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg animate-pulse hover:animate-none px-6"
+                                        onClick={() => {
+                                            handleDeployToCloud();
+                                            setIsPrivateBackendModalOpen(false);
+                                            toast({
+                                                title: "Deployment Avviato",
+                                                description: "Segui le istruzioni nella finestra di Google Cloud Shell che si è aperta."
+                                            });
+                                        }}
+                                    >
+                                        <Cloud className="w-4 h-4 mr-2" />
+                                        LANCIA DEPLOY
+                                    </Button>
+                                )}
+                            </>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
