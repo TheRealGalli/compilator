@@ -18,14 +18,8 @@ export default function Home() {
   const [modelProvider, setModelProvider] = useState<'openai' | 'gemini'>('gemini');
   const { sources, removeSource, toggleSource, toggleMaster, toggleBypass } = useSources();
 
-  // Global Auth Loading Check to prevent "Login Flash"
-  const { isFetched: isAuthAttempted, refetch: refetchUser } = useQuery({
-    queryKey: ['/api/user'],
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
   // FALLBACK: Handle session ID from URL (Incognito/Cross-domain)
+  // MUST BE BEFORE any API calls (like useQuery) to ensure the session ID is set
   useState(() => {
     const params = new URLSearchParams(window.location.search);
     const sid = params.get('sid');
@@ -36,6 +30,13 @@ export default function Home() {
       window.history.replaceState({}, '', newUrl);
       console.log("[Auth] Session Handshake: sid captured and stored in memory");
     }
+  });
+
+  // Global Auth Loading Check to prevent "Login Flash"
+  const { isFetched: isAuthAttempted, refetch: refetchUser } = useQuery({
+    queryKey: ['/api/user'],
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   // Ensure session remains stable on soft refresh and handle navigation from hash

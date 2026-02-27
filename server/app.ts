@@ -90,14 +90,15 @@ function createApp() {
   // Fallback for Incognito/Cross-domain: Inject session header into cookies if present
   app.use((req, res, next) => {
     const sessionId = req.headers['x-session-id'];
-    if (sessionId && typeof sessionId === 'string' && !req.headers.cookie?.includes('csd.sid')) {
-      // Re-inject the signed session ID into the cookie header
+    // ALWAYS prioritize x-session-id header over browser cookie to prevent stale session bugs
+    if (sessionId && typeof sessionId === 'string') {
+      // Re-inject the signed session ID into the cookie header, PREPENDING it so it takes priority
       // express-session will then pick it up as if it were a standard cookie
       req.headers.cookie = `csd.sid=${sessionId}; ${req.headers.cookie || ''}`;
-      console.log(`[DEBUG SESSION] Fallback: Injected x-session-id into cookie header`);
     }
     next();
   });
+
 
   // Explicitly handle OPTIONS for all routes (just in case app.use misses it)
   app.options('*', corsMiddleware);
