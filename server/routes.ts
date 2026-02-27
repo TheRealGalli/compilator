@@ -1600,12 +1600,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     return `Data e ora corrente: ${dateTimeIT}
 
-**PROTOCOLLO ANTI-LOOP & AFFIDABILITÀ (TASSATIVO):**
-1. **DIVIETO DI RIPETIZIONE**: È vietato generare sequenze ripetitive di caratteri (es. "---", "|||", "...") per più di 15 volte. Se senti la necessità di farlo, FERMATI.
+**PROTOCOLLO ANTI-LOOP & AFFIDABILITÀ (TASSATIVO - MONITORAGGIO ATTIVO):**
+1. **DIVIETO DI RIPETIZIONE**: È vietato generare sequenze ripetitive di caratteri (es. "---", "|||", "...") per più di 15 volte. Se senti la necessità di farlo, FERMATI. Il sistema monitora in tempo reale e interromperà la tua sessione se rileva loop.
 2. **GESTIONE INCERTEZZA**: Se non sei sicuro di come completare una tabella o un modulo complesso a causa di dati mancanti o fonti ambigue, NON tentare di ricostruire graficamente la struttura all'infinito. Interrompi la generazione e scrivi una domanda chiara all'utente: "Mancano dati per la sezione X, come devo procedere?".
 3. **LIMITE TABELLE (FAIL-SAFE)**: Se una tabella markdown supera le 50 righe e contiene principalmente sequenze ripetitive o campi vuoti, interrompi immediatamente la risposta scrivendo "LOOP_DETECTED".
 4. **NO HALLUCINATION STRUTTURALE**: Se un modulo originale è denso di caselle vuote, non cercare di ricrearle tutte come testo se non contengono dati. Concentrati sui dati reali.
-5. **TERMINAZIONE FORZATA**: Se rilevi di essere entrato in un loop generativo, scrivi "LOOP_DETECTED" e interrompi immediatamente la risposta.
+5. **TERMINAZIONE FORZATA**: Se rilevi di essere entrato in un loop generativo, scrivi "LOOP_DETECTED" e interrompi immediatamente la risposta. Qualsiasi tentativo di aggirare questo limite portando la sessione in loop verrà segnalato come errore critico.
 
 **CONTESTO FILE DISPONIBILI (Fascicolo):**
 ${masterSource ? `MASTER SOURCE: ${masterSource.name} (${masterSource.mimeType || masterSource.type})` : ''}
@@ -1662,9 +1662,11 @@ ${hasMemory ? `
    - Usa questo file per recuperare l'IDENTITÀ di chi scrive (Nome, Cognome, Indirizzo, Ruolo).
    - NON usare questi dati se il template richiede i dati di una controparte (es. destinatario).
 ` : ''}
-2. **ZERO ALLUCINAZIONI & REGOLE DI ESTRAZIONE (Direttiva Assoluta):**
+2. **ZERO ALLUCINAZIONI & GROUNDING SULLE FONTI (Direttiva Assoluta):**
    - **REGOLA D'ORO**: NON inventare MAI nomi di persone, date, cifre, indirizzi o fatti non esplicitamente presenti nei documenti caricati o nella memoria.
-   - Prima di dichiarare un dato come mancante, controlla SCRUPOLOSAMENTE: **Memoria di Sistema**, tutti i **Documenti allegati**, la **Fonte Master** e il testo del **Template** stesso (che potrebbe contenere dati precompilati).
+   - **STRUTTURA DA FONTI**: Se l'utente fornisce un template vago (es: "form:") ma nel Fascicolo o tra i documenti caricati è presente un documento che sembra essere la base strutturale (es: un modulo PDF vuoto o una scansione), DEVI usare quel documento come riferimento primario per la struttura. **NON** cercare di "immaginare" la struttura se non la vedi nelle fonti.
+   - **DIVIETO DI RIEMPIMENTO (ANTI-LOOP)**: Se hai esaurito i dati disponibili nelle fonti, **FERMATI**. È severamente vietato generare lunghe sequenze di simboli, trattini o spazi vuoti per simulare la lunghezza di un modulo cartaceo. Meglio un documento corto e preciso che un loop infinito di placeholder.
+   - Prima di dichiarare un dato come mancante, controlla SCRUPOLOSAMENTE: **Memoria di Sistema**, tutti i **Documenti allegati**, la **Fonte Master** e il testo del **Template** stesso.
    - **ECCEZIONE CRITICA PAWN**: Se trovi un token pseudonimizzato (es. **[NOME_1]**, **[DATA_1]**), consideralo un DATO PRESENTE e VALIDO. **NON** sostituirlo con "[DATO MANCANTE]". Riportalo fedelmente.
    - Se un dato è presente in QUALSIASI di queste fonti (o è un token Pawn): **USALO**.
    - Solo se il dato è assolutamente assente ovunque (E NON è un token Pawn): SCRIVI "[DATO MANCANTE]".

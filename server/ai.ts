@@ -457,48 +457,58 @@ ${text} [/INST]`;
             // ThinkingMode still handles reasoning improvement.
             const finalTools = tools.length > 0 ? tools : [{ codeExecution: {} }];
 
-            const result = await model.generateContent({
+            const result = await model.generateContentStream({
                 contents: [{ role: 'user', parts: messageParts }],
                 tools: finalTools,
                 toolConfig,
                 generationConfig: {
-                    maxOutputTokens: 50000,
+                    maxOutputTokens: 20000, // Reduced for safety as per plan
                     temperature: 0.2,
                     // @ts-ignore - thinkingConfig is part of the 2026 Vertex AI SDK
                     thinkingConfig: {
-                        includeThoughts: false, // Thoughts are internal to the model
-                        thinkingBudget: 4000     // 4k tokens budget for the compiler
+                        includeThoughts: false,
+                        thinkingBudget: 4000
                     }
                 }
             });
 
-            const candidate = result.response.candidates?.[0];
-            const content = candidate?.content?.parts?.map((p: any) => p.text || '').join('') || '';
-            const groundingMetadata = candidate?.groundingMetadata;
-
-            if (params.webResearch) {
-                console.log(`[AiService] Grounding Metadata returned:`, groundingMetadata ? 'YES' : 'NONE');
-                if (groundingMetadata?.searchEntryPoint) {
-                    console.log(`[AiService] Search Entry Point detected.`);
-                }
-            }
-
-            // Extract code execution metadata from response parts
+            let content = '';
+            let groundingMetadata: any = null;
             const codeExecutionResults: Array<{ code: string, output: string }> = [];
-            const allParts = (candidate?.content?.parts || []) as any[];
-            for (let i = 0; i < allParts.length; i++) {
-                const part = allParts[i];
-                if (part.executableCode) {
-                    const nextPart = allParts[i + 1];
-                    codeExecutionResults.push({
-                        code: part.executableCode.code || '',
-                        output: nextPart?.codeExecutionResult?.output || ''
-                    });
-                }
-            }
 
-            if (codeExecutionResults.length > 0) {
-                console.log(`[AiService] Code Execution detected: ${codeExecutionResults.length} block(s)`);
+            for await (const chunk of result.stream) {
+                const candidate = chunk.candidates?.[0];
+                const parts = candidate?.content?.parts || [];
+
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i] as any;
+                    if (part.text) {
+                        content += part.text;
+
+                        // PROGRAMMATIC LOOP DETECTION
+                        if (this.isLoopDetected(content)) {
+                            console.error(`[AiService] !! LOOP DETECTED !! Interrupting generation.`);
+                            return {
+                                content: content + "\n\nLOOP_DETECTED",
+                                groundingMetadata,
+                                parts: multimodalParts,
+                                aiMetadata: codeExecutionResults.length > 0 ? { codeExecutionResults } : undefined
+                            };
+                        }
+                    }
+
+                    if (part.executableCode) {
+                        const nextPart = parts[i + 1] as any;
+                        codeExecutionResults.push({
+                            code: part.executableCode.code || '',
+                            output: nextPart?.codeExecutionResult?.output || ''
+                        });
+                    }
+                }
+
+                if (candidate?.groundingMetadata) {
+                    groundingMetadata = candidate.groundingMetadata;
+                }
             }
 
             const aiMetadata = codeExecutionResults.length > 0 ? { codeExecutionResults } : undefined;
@@ -560,25 +570,81 @@ ${params.draftContent}`;
             const masterParts = params.preProcessedMasterParts || (params.masterSource ? await this.processMultimodalParts([params.masterSource]) : []);
             const messageParts: any[] = [{ text: userPrompt }, ...masterParts];
 
-            const result = await model.generateContent({
+            const result = await model.generateContentStream({
                 contents: [{ role: 'user', parts: messageParts }],
                 generationConfig: {
-                    maxOutputTokens: 50000,
+                    maxOutputTokens: 20000, // Reduced for safety
                     temperature: 0.1,
                     // @ts-ignore
                     thinkingConfig: {
                         includeThoughts: false,
-                        thinkingBudget: 2000 // Lower budget for formatting refactor
+                        thinkingBudget: 2000
                     }
                 }
             });
 
-            return result.response.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || params.draftContent;
+            let content = '';
+            for await (const chunk of result.stream) {
+                const text = chunk.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '';
+                content += text;
+
+                if (this.isLoopDetected(content)) {
+                    console.error(`[AiService] !! LOOP DETECTED in refineFormatting !! Interrupting.`);
+                    return content + "\n\nLOOP_DETECTED";
+                }
+            }
+
+            return content || params.draftContent;
 
         } catch (error) {
             console.error('[AiService] refineFormatting error:', error);
             return params.draftContent;
         }
+    }
+
+    /**
+     * Programmatic Loop Detection Logic
+     * Monitors for repetitive patterns as per approved plan.
+     */
+    private isLoopDetected(text: string): boolean {
+        if (!text || text.length < 50) return false;
+
+        // 1. Table Row Loop: |---|---| repetitive empty rows (> 10)
+        const tableRowPattern = /\|(\s*-+\s*\|){2,}/g;
+        const tableRows = text.match(tableRowPattern);
+        if (tableRows && tableRows.length > 10) {
+            // Check if they are consecutive or within a short range
+            const lastPart = text.slice(-500);
+            const recentTableRows = lastPart.match(tableRowPattern);
+            if (recentTableRows && recentTableRows.length > 6) return true;
+        }
+
+        // 2. Character Loop: > 50 identical non-whitespace characters in a row
+        const charRepeatPattern = /([^\s])\1{50,}/;
+        if (charRepeatPattern.test(text)) return true;
+
+        // 3. Line Loop: > 8 identical lines (ignoring whitespace)
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+        if (lines.length > 8) {
+            let consecutiveIdenticalCount = 0;
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i] === lines[i - 1]) {
+                    consecutiveIdenticalCount++;
+                    if (consecutiveIdenticalCount > 6) return true;
+                } else {
+                    consecutiveIdenticalCount = 0;
+                }
+            }
+        }
+
+        // 4. Empty Table Cell Loop: | | | | | repeating (> 5 cells)
+        const emptyCellPattern = /\|(\s*\|){5,}/;
+        if (emptyCellPattern.test(text)) {
+            // console.log(`[AiService] Empty cell loop detected in text of length ${text.length}`);
+            return true;
+        }
+
+        return false;
     }
 
     /**
