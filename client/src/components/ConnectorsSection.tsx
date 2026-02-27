@@ -35,6 +35,25 @@ export const VertexAILogo = ({ className }: { className?: string }) => (
     </svg>
 );
 
+export const CalendarLogo = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
+        <rect width="18" height="18" x="3" y="4" fill="#4285F4" rx="2" ry="2" />
+        <path fill="#FFF" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V9h14v10zM7 11h5v5H7z" />
+    </svg>
+);
+
+export const FormsLogo = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
+        <path fill="#7248B9" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 14H7v-2h10v2zm0-4H7v-2h10v2zm0-4H7V7h10v2z" />
+    </svg>
+);
+
+export const ContactsLogo = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
+        <path fill="#4285F4" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
+    </svg>
+);
+
 export function ConnectorsSection() {
     const { isConnected, isLoading, isFetchingMessages, connect, logout, fetchMessages } = useGmail();
     const {
@@ -195,6 +214,90 @@ export function ConnectorsSection() {
                                             Connetti Drive
                                         </Button>
                                     )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Google Calendar Card */}
+                        <Card className="opacity-60 border-dashed flex flex-col hover:opacity-100 transition-all">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
+                                        <CalendarLogo className="w-6 h-6" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-lg truncate">Calendar</CardTitle>
+                                        <CardDescription className="truncate">Scadenze & Eventi</CardDescription>
+                                    </div>
+                                </div>
+                                <div className="shrink-0 ml-2">
+                                    <Badge variant="outline">In arrivo</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-1 flex flex-col">
+                                <p className="text-sm text-muted-foreground mb-6">
+                                    Sincronizza le scadenze estratte dai contratti e gestisci i promemoria direttamente.
+                                </p>
+                                <div className="mt-auto">
+                                    <Button variant="outline" className="w-full" disabled>
+                                        Prossimamente
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Google Forms Card */}
+                        <Card className="opacity-60 border-dashed flex flex-col hover:opacity-100 transition-all">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
+                                        <FormsLogo className="w-6 h-6" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-lg truncate">Forms</CardTitle>
+                                        <CardDescription className="truncate">Data Capture</CardDescription>
+                                    </div>
+                                </div>
+                                <div className="shrink-0 ml-2">
+                                    <Badge variant="outline">In arrivo</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-1 flex flex-col">
+                                <p className="text-sm text-muted-foreground mb-6">
+                                    Genera moduli per raccogliere informazioni mancanti dai tuoi clienti in modo strutturato.
+                                </p>
+                                <div className="mt-auto">
+                                    <Button variant="outline" className="w-full" disabled>
+                                        Prossimamente
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Google Contacts Card */}
+                        <Card className="opacity-60 border-dashed flex flex-col hover:opacity-100 transition-all">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
+                                        <ContactsLogo className="w-6 h-6" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-lg truncate">Contacts</CardTitle>
+                                        <CardDescription className="truncate">Rubrica Smart</CardDescription>
+                                    </div>
+                                </div>
+                                <div className="shrink-0 ml-2">
+                                    <Badge variant="outline">In arrivo</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-1 flex flex-col">
+                                <p className="text-sm text-muted-foreground mb-6">
+                                    Riconosci e aggiorna i referenti estratti dai documenti nella tua rubrica aziendale.
+                                </p>
+                                <div className="mt-auto">
+                                    <Button variant="outline" className="w-full" disabled>
+                                        Prossimamente
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
