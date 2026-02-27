@@ -612,53 +612,25 @@ export function ConnectorsSection() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-xs font-semibold">1. Gemini API Key (da AI Studio)</Label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            type="password"
-                                            placeholder="Incolla la tua API Key..."
-                                            value={setupGeminiKey}
-                                            onChange={(e) => setSetupGeminiKey(e.target.value)}
-                                            className="flex-1"
-                                        />
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            title="Copia"
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(setupGeminiKey);
-                                                toast({ title: "Copiato!", description: "API Key copiata negli appunti." });
-                                            }}
-                                        >
-                                            <Copy className="w-4 h-4" />
-                                        </Button>
-                                    </div>
+                                    <Input
+                                        type="password"
+                                        placeholder="Incolla la tua API Key..."
+                                        value={setupGeminiKey}
+                                        onChange={(e) => setSetupGeminiKey(e.target.value)}
+                                    />
                                     <p className="text-[10px] text-muted-foreground">
                                         Ottienila in 3 secondi su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline font-bold">Google AI Studio</a>.
                                     </p>
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-xs font-semibold">2. ID Progetto Google Cloud</Label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            placeholder="es. gen-lang-client-..."
-                                            value={setupProjectId}
-                                            onChange={(e) => setSetupProjectId(e.target.value)}
-                                            className="flex-1"
-                                        />
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            title="Copia"
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(setupProjectId);
-                                                toast({ title: "Copiato!", description: "Project ID copiato negli appunti." });
-                                            }}
-                                        >
-                                            <Copy className="w-4 h-4" />
-                                        </Button>
-                                    </div>
+                                    <Input
+                                        placeholder="es. gen-lang-client-..."
+                                        value={setupProjectId}
+                                        onChange={(e) => setSetupProjectId(e.target.value)}
+                                    />
                                     <p className="text-[10px] text-muted-foreground">
-                                        Usa l'ID del <strong>Default Gemini Project</strong> che trovi sempre su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline">AI Studio</a>.
+                                        Usa l'ID (es. <code>gen-lang-client-xxx</code>) che trovi nella colonna "Project" su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline font-bold">AI Studio</a>, proprio sotto il nome del progetto.
                                     </p>
                                 </div>
                             </div>
