@@ -747,12 +747,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // Store tokens in session for GCP/Gmail usage
-          (req.session as any).tokens = { access_token: accessToken, refresh_token: refreshToken };
-          (req.session as any).avatarUrl = profile.photos?.[0]?.value;
-          console.log(`[Auth] Tokens and Avatar saved to session for ${email}`);
+          // Store tokens and avatar in the info object to survive passport session regeneration
+          const info = {
+            tokens: { access_token: accessToken, refresh_token: refreshToken },
+            avatarUrl: profile.photos?.[0]?.value
+          };
+          console.log(`[Auth] User authenticated: ${email}`);
 
-          return done(null, user);
+          return done(null, user, info);
         } catch (err) {
           return done(err as Error);
         }
@@ -767,27 +769,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       prompt: 'select_account'
     }));
 
-    app.get('/api/auth/google/callback',
-      passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}?error=auth_failed` }),
-      (req, res) => {
-        console.log(`[Auth] Login successful for user: ${(req.user as any)?.email || 'unknown'}. Redirecting to: ${FRONTEND_URL}`);
+    app.get('/api/auth/google/callback', (req, res, next) => {
+      passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}?error=auth_failed` }, (err: any, user: any, info: any) => {
+        if (err) return next(err);
+        if (!user) return res.redirect(`${FRONTEND_URL}?error=auth_failed`);
 
-        // FALLBACK: Sign the session ID and pass it in the URL for Incognito/Cross-site support
-        if (req.sessionID) {
-          const signedSid = `s:${signature.sign(req.sessionID, 'csd-station-gmail-session-secret')}`;
-          return res.redirect(`${FRONTEND_URL}/?sid=${encodeURIComponent(signedSid)}#connectors`);
-        }
+        req.login(user, (loginErr) => {
+          if (loginErr) return next(loginErr);
 
-        res.redirect(`${FRONTEND_URL}/#connectors`);
-      }
-    );
+          // Re-attach custom session data AFTER passport regenerates the session
+          if (info) {
+            if (info.tokens) (req.session as any).tokens = info.tokens;
+            if (info.avatarUrl) (req.session as any).avatarUrl = info.avatarUrl;
+          }
+
+          console.log(`[Auth] Login successful for user: ${(req.user as any)?.email || 'unknown'}. Redirecting to: ${FRONTEND_URL}`);
+
+          // FALLBACK: Sign the session ID and pass it in the URL for Incognito/Cross-site support
+          if (req.sessionID) {
+            const signedSid = `s:${signature.sign(req.sessionID, 'csd-station-gmail-session-secret')}`;
+            return res.redirect(`${FRONTEND_URL}/?sid=${encodeURIComponent(signedSid)}#connectors`);
+          }
+
+          res.redirect(`${FRONTEND_URL}/#connectors`);
+        });
+      })(req, res, next);
+    });
 
     // NEW: Auth status endpoint
     app.get('/api/auth/status', (req, res) => {
       if (req.isAuthenticated()) {
         res.json({
           authenticated: true,
-          user: req.user,
+          user: {
+            ...(req.user as any),
+            avatarUrl: (req.session as any).avatarUrl
+          },
           hasCloudToken: !!(req.session as any).tokens?.access_token
         });
       } else {
