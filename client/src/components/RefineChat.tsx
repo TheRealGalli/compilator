@@ -101,7 +101,8 @@ export function RefineChat({
                     : currentContent,
                 userInstruction: analysisPrompt,
                 chatHistory: [],
-                webResearch: compileContext.webResearch
+                webResearch: compileContext.webResearch,
+                ollamaModel: selectedModel
             });
 
             const data = await response.json();
@@ -377,7 +378,8 @@ export function RefineChat({
                     role: m.role,
                     text: isPawnActive ? performMechanicalGlobalSweep(m.text, updatedVault) : m.text
                 })),
-                webResearch: compileContext.webResearch
+                webResearch: compileContext.webResearch,
+                ollamaModel: selectedModel
                 // ZERO-DATA: Vault NEVER sent to server
             });
 

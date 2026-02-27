@@ -965,7 +965,8 @@ export function DocumentCompilerSection({
         formalTone,
         studioFontSize,
         currentMode,
-        pawnVault: undefined
+        pawnVault: undefined,
+        ollamaModel: selectedModel
       });
 
       const data = await response.json();

@@ -1831,7 +1831,11 @@ ANALIZZA TUTTE LE FONTI CON ATTENZIONE.` : 'NESSUNA FONTE FORNITA. Compila solo 
 
   app.post('/api/compile', checkLimit('compilation'), async (req: Request, res: Response) => {
     try {
-      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations, activeGuardrails } = req.body;
+      const { template, notes, sources: multimodalFiles, modelProvider, webResearch, detailedAnalysis, formalTone, masterSource, extractedFields, manualAnnotations, activeGuardrails, ollamaModel } = req.body;
+
+      if (ollamaModel) {
+        aiService.setOllamaModel(ollamaModel);
+      }
 
       console.log('[API compile] Request received:', {
         modelProvider,
@@ -2036,7 +2040,11 @@ ISTRUZIONI OUTPUT:
   // --- NEW: Refine / Chat Endpoint ---
   app.post('/api/refine', checkLimit('chat'), async (req: Request, res: Response) => {
     try {
-      const { compileContext, currentContent, userInstruction, chatHistory, mentions, mentionRegistry, webResearch } = req.body;
+      const { compileContext, currentContent, userInstruction, chatHistory, mentions, mentionRegistry, webResearch, ollamaModel } = req.body;
+
+      if (ollamaModel) {
+        aiService.setOllamaModel(ollamaModel);
+      }
 
       console.log(`[API refine] Request received | Mentions: ${mentions?.length || 0} | Registry: ${mentionRegistry?.length || 0}`);
 
