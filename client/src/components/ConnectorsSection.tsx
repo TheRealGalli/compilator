@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { setCustomBackendUrl, getCustomBackendUrl, getApiUrl } from "@/lib/api-config";
 import { apiRequest } from "@/lib/queryClient";
-import { Settings2, Cloud, ShieldCheck, Copy } from "lucide-react";
+import { Settings2, Cloud, ShieldCheck, Copy, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const GmailLogo = ({ className }: { className?: string }) => (
@@ -721,9 +721,16 @@ export function ConnectorsSection() {
                                         value={setupProjectId}
                                         onChange={(e) => setSetupProjectId(e.target.value)}
                                     />
-                                    <p className="text-[10px] text-muted-foreground">
-                                        Usa l'ID (es. <code>gen-lang-client-xxx</code>) che trovi nella colonna "Project" su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline font-bold">AI Studio</a>, proprio sotto il nome del progetto.
+                                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                                        Puoi usare il progetto autogenerato (es. <code>gen-lang-client-xxx</code>) visibile su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline font-bold">AI Studio</a>.
                                     </p>
+                                    <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-rose-700 text-[10px] flex items-start gap-2">
+                                        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                                        <span>
+                                            <strong>Fondamentale:</strong> Per poter lanciare il server, Google richiede che il progetto abbia un <strong>Account di Fatturazione (Billing)</strong> attivo, altrimenti il decollo fallirà.
+                                            Attivalo nella <a href="https://console.cloud.google.com/billing" target="_blank" className="underline font-bold">Google Cloud Console</a> (piano gratuito coperto).
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
