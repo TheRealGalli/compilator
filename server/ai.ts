@@ -225,11 +225,12 @@ export class AiService {
      * This ensures 100% data privacy (Zero-Data) as no data leaves localhost.
      * Uses a refined prompt to ensure high recall and precise tagging.
      */
-    async anonymizeWithOllama(text: string, vault: Map<string, string>): Promise<string> {
+    async anonymizeWithOllama(text: string, vault: Map<string, string>, model?: string): Promise<string> {
         if (!text || text.trim() === "") return text;
 
         try {
-            console.log(`[AiService] Calling Local Ollama for PII Extraction (Text length: ${text.length})...`);
+            const targetModel = model || this.ollamaModel;
+            console.log(`[AiService] Calling Local Ollama for PII Extraction (Model: ${targetModel}, Text length: ${text.length})...`);
 
             const systemPrompt = `[INST] Sei un Agente di Estrazione Dati. Identifica TUTTI i dati sensibili.
 Categorie: NOME_PERSONA, ORGANIZZAZIONE, INDIRIZZO, EMAIL, TELEFONO, CODICE_FISCALE, PARTITA_IVA.
@@ -257,7 +258,7 @@ ${text} [/INST]`;
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: this.ollamaModel,
+                    model: targetModel,
                     prompt: systemPrompt,
                     format: 'json',
                     stream: false,

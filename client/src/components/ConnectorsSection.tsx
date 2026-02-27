@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { setCustomBackendUrl, getCustomBackendUrl } from "@/lib/api-config";
+import { setCustomBackendUrl, getCustomBackendUrl, getApiUrl } from "@/lib/api-config";
 import { Settings2, Cloud, ShieldCheck, Copy } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -154,7 +154,7 @@ export function ConnectorsSection() {
         setDeployStatus("Abilitazione API Google Cloud...");
 
         try {
-            const response = await fetch("/api/deploy/private-cloud", {
+            const response = await fetch(getApiUrl("/api/deploy/private-cloud"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -540,23 +540,6 @@ export function ConnectorsSection() {
                                             </Tooltip>
                                         </TooltipProvider>
                                     </div>
-                                    <Button
-                                        className="bg-slate-900 text-white"
-                                        disabled={isDeploying}
-                                        onClick={handleDeployToCloud}
-                                    >
-                                        {isDeploying ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                                Deploying...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Rocket className="w-4 h-4 mr-2" />
-                                                Lancia Deploy Magico
-                                            </>
-                                        )}
-                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
