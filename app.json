@@ -15,9 +15,21 @@
             "description": "Identifica se l'istanza è un Private Cloud (abilita MemStorage se DATABASE_URL manca)",
             "value": "true"
         },
+        "GCP_PROJECT_ID": {
+            "description": "ID del tuo progetto Google Cloud",
+            "required": true
+        },
         "GEMINI_API_KEY": {
             "description": "Inserisci la tua Google AI (Gemini) API Key per attivare l'AI Engine",
             "required": true
+        },
+        "GOOGLE_CLIENT_ID": {
+            "description": "Google OAuth Client ID (necessario per Gmail/Drive)",
+            "required": false
+        },
+        "GOOGLE_CLIENT_SECRET": {
+            "description": "Google OAuth Client Secret (necessario per Gmail/Drive)",
+            "required": false
         },
         "FRONTEND_URL": {
             "description": "URL del frontend (es. https://therealgalli.github.io/compilator)",
