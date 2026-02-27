@@ -589,63 +589,20 @@ export function ConnectorsSection() {
 
             <Dialog open={isPrivateBackendModalOpen} onOpenChange={(open) => {
                 setIsPrivateBackendModalOpen(open);
-                if (!open) setWizardStep("url");
+                if (!open) setWizardStep("setup");
             }}>
                 <DialogContent className="sm:max-w-[700px]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Cloud className="w-5 h-5 text-blue-600" />
-                            {wizardStep === "url" ? "Configura Backend Privato" : "Magic Deployment Wizard"}
+                            Backend Privato: Setup Magico
                         </DialogTitle>
                         <DialogDescription className="text-[11px]">
-                            {wizardStep === "url"
-                                ? "Inserisci l'URL di un'istanza esistente o creane una nuova con il Setup Magico."
-                                : wizardStep === "setup" ? "Passo 1/3: Identità e Motore AI (Setup Magico)" :
-                                    wizardStep === "keys" ? "Passo 2/3: Integrazioni Google (Opzionale)" :
-                                        "Passo 3/3: Riepilogo e Lancio"}
+                            {wizardStep === "setup" ? "Passo 1/3: Identità e Motore AI (Setup Magico)" :
+                                wizardStep === "keys" ? "Passo 2/3: Integrazioni Google (Opzionale)" :
+                                    "Passo 3/3: Riepilogo e Lancio"}
                         </DialogDescription>
                     </DialogHeader>
-
-                    {wizardStep === "url" && (
-                        <div className="py-4 space-y-6">
-                            <div className="space-y-4">
-                                <Label className="text-sm font-semibold text-slate-900">Hai già un'istanza attiva?</Label>
-                                <div className="space-y-2">
-                                    <Label htmlFor="backend-url" className="text-xs text-muted-foreground">
-                                        Indirizzo Istanza (URL)
-                                    </Label>
-                                    <Input
-                                        id="backend-url"
-                                        placeholder="https://gromit-backend-xyz.run.app"
-                                        value={tempBackendUrl}
-                                        onChange={(e) => setTempBackendUrl(e.target.value)}
-                                    />
-                                    <p className="text-[10px] text-muted-foreground">
-                                        <strong>Nota:</strong> Se l'istanza è già attiva, assicurati che abbia le variabili d'ambiente (API Key, etc.) configurate nel suo pannello di controllo Google Cloud.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="relative">
-                                <div className="absolute inset-0 flex items-center">
-                                    <span className="w-full border-t border-slate-200" />
-                                </div>
-                                <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-white px-2 text-muted-foreground">Oppure creane una nuova</span>
-                                </div>
-                            </div>
-
-                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <h4 className="font-semibold text-sm">Deployment Magico</h4>
-                                    <p className="text-xs text-muted-foreground">Crea il tuo backend privato su Google Cloud in 1 clic.</p>
-                                </div>
-                                <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={() => setWizardStep("setup")}>
-                                    Inizia Setup
-                                </Button>
-                            </div>
-                        </div>
-                    )}
 
                     {wizardStep === "setup" && (
                         <div className="py-4 space-y-6 text-sm">
@@ -771,7 +728,7 @@ export function ConnectorsSection() {
                     )}
 
                     <DialogFooter className="flex gap-2 sm:gap-0 mt-4 h-12">
-                        {wizardStep === "url" ? (
+                        {wizardStep === "setup" ? (
                             <>
                                 <Button
                                     variant="ghost"
@@ -786,15 +743,26 @@ export function ConnectorsSection() {
                                     Reset Home
                                 </Button>
                                 <div className="flex-1" />
-                                <Button variant="outline" onClick={() => setIsPrivateBackendModalOpen(false)}>Annulla</Button>
-                                <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={handleSaveBackendUrl}>
-                                    Connetti URL
+                                <Button
+                                    className="bg-slate-900 text-white"
+                                    onClick={() => {
+                                        if (!setupProjectId || !setupGeminiKey) {
+                                            toast({
+                                                title: "Dati mancanti",
+                                                description: "Project ID e Gemini API Key sono richiesti per il Setup Magico.",
+                                                variant: "destructive"
+                                            });
+                                            return;
+                                        }
+                                        setWizardStep("keys");
+                                    }}
+                                >
+                                    Continua
                                 </Button>
                             </>
                         ) : (
                             <>
                                 <Button variant="ghost" className="text-slate-500" onClick={() => {
-                                    if (wizardStep === "setup") setWizardStep("url");
                                     if (wizardStep === "keys") setWizardStep("setup");
                                     if (wizardStep === "deploy") setWizardStep("keys");
                                 }}>
@@ -805,17 +773,7 @@ export function ConnectorsSection() {
                                     <Button
                                         className="bg-slate-900 text-white"
                                         onClick={() => {
-                                            if (wizardStep === "setup") {
-                                                if (!setupProjectId || !setupGeminiKey) {
-                                                    toast({
-                                                        title: "Dati mancanti",
-                                                        description: "Project ID e Gemini API Key sono richiesti per il Setup Magico.",
-                                                        variant: "destructive"
-                                                    });
-                                                    return;
-                                                }
-                                                setWizardStep("keys");
-                                            } else if (wizardStep === "keys") {
+                                            if (wizardStep === "keys") {
                                                 setWizardStep("deploy");
                                             }
                                         }}
