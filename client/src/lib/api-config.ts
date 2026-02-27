@@ -3,6 +3,11 @@
 const CLOUD_RUN_URL = 'https://compilator-983823068962.europe-west1.run.app';
 
 const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    const customUrl = localStorage.getItem('gromit_custom_backend_url');
+    if (customUrl) return customUrl;
+  }
+
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   if (import.meta.env.DEV) return 'http://localhost:5000';
 
@@ -12,6 +17,20 @@ const getBaseUrl = () => {
   }
 
   return CLOUD_RUN_URL;
+};
+
+export const setCustomBackendUrl = (url: string | null) => {
+  if (url) {
+    localStorage.setItem('gromit_custom_backend_url', url);
+  } else {
+    localStorage.removeItem('gromit_custom_backend_url');
+  }
+  // Reload page to apply changes across the app
+  window.location.reload();
+};
+
+export const getCustomBackendUrl = () => {
+  return localStorage.getItem('gromit_custom_backend_url');
 };
 
 export const API_BASE_URL = getBaseUrl();

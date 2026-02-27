@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { setCustomBackendUrl, getCustomBackendUrl } from "@/lib/api-config";
+import { Settings2, Cloud, ShieldCheck } from "lucide-react";
 
 export const GmailLogo = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
@@ -71,6 +73,11 @@ export function ConnectorsSection() {
     const [ollamaToken, setOllamaToken] = useState("");
     const [isConnecting, setIsConnecting] = useState(false);
 
+    // Private Cloud / Custom Backend State
+    const [isPrivateBackendModalOpen, setIsPrivateBackendModalOpen] = useState(false);
+    const [tempBackendUrl, setTempBackendUrl] = useState(getCustomBackendUrl() || "");
+    const currentBackendUrl = getCustomBackendUrl();
+
     useEffect(() => {
         checkOllama();
     }, []);
@@ -111,6 +118,28 @@ export function ConnectorsSection() {
         } finally {
             setIsConnecting(false);
         }
+    };
+
+    const handleSaveBackendUrl = () => {
+        if (tempBackendUrl && !tempBackendUrl.startsWith('http')) {
+            toast({
+                title: "URL non valido",
+                description: "L'URL deve iniziare con http:// o https://",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setCustomBackendUrl(tempBackendUrl || null);
+        toast({
+            title: "Configurazione Aggiornata",
+            description: tempBackendUrl ? "Gromit ora punta al tuo backend privato." : "Gromit è tornato a usare il backend standard.",
+        });
+        setIsPrivateBackendModalOpen(false);
+    };
+
+    const handleDeployToCloud = () => {
+        window.open('https://deploy.cloud.google.com/?git_repo=https://github.com/TheRealGalli/compilator', '_blank');
     };
 
     if (isLoading) {
@@ -310,6 +339,7 @@ export function ConnectorsSection() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
                         {/* Ollama Card */}
                         <Card className={`border-2 transition-all flex flex-col ${ollamaStatus === 'connected' ? 'border-blue-200 bg-blue-50/20' : 'opacity-60 border-dashed hover:opacity-100'}`}>
+                            {/* ... Content remains same for Ollama ... */}
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-slate-900 border border-slate-700 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
@@ -368,6 +398,60 @@ export function ConnectorsSection() {
                                         disabled={ollamaStatus === 'loading'}
                                     >
                                         {ollamaStatus === 'connected' ? 'Riconnetti' : 'Rileva Localmente'}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+
+                {/* Backend Category */}
+                <div className="space-y-4">
+                    <h2 className="text-sm font-semibold text-blue-600 uppercase tracking-wider">Backend</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+                        {/* Private Cloud Run Card */}
+                        <Card className={`border-2 transition-all flex flex-col ${currentBackendUrl ? 'border-green-200 bg-green-50/20' : 'hover:border-primary/20'}`}>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
+                                        <Cloud className="w-6 h-6 text-blue-600" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-lg truncate">Private Cloud</CardTitle>
+                                        <CardDescription className="truncate">Your Instance</CardDescription>
+                                    </div>
+                                </div>
+                                <div className="shrink-0 ml-2">
+                                    {currentBackendUrl ? (
+                                        <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100 flex gap-1">
+                                            <ShieldCheck className="w-3 h-3" />
+                                            Attivo
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="outline">Default Cloud</Badge>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-1 flex flex-col">
+                                <p className="text-sm text-muted-foreground mb-6">
+                                    Gestisci il tuo backend privato su Cloud Run per il controllo totale dei tuoi dati.
+                                    {currentBackendUrl && <span className="block mt-2 font-mono text-[10px] break-all opacity-70">{currentBackendUrl}</span>}
+                                </p>
+                                <div className="mt-auto space-y-3">
+                                    <div className="flex gap-2">
+                                        <Button variant="outline" className="flex-1" onClick={() => setIsPrivateBackendModalOpen(true)}>
+                                            <Settings2 className="w-4 h-4 mr-2" />
+                                            Configura
+                                        </Button>
+                                        <Button variant="secondary" className="px-3" onClick={handleDeployToCloud}>
+                                            <ExternalLink className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                    <Button
+                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                        onClick={handleDeployToCloud}
+                                    >
+                                        Deploy to Cloud Run
                                     </Button>
                                 </div>
                             </CardContent>
@@ -481,6 +565,60 @@ export function ConnectorsSection() {
                         <Button type="submit" className="bg-slate-900 text-white" onClick={handleConnectOllamaAccount} disabled={isConnecting}>
                             {isConnecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Link2 className="w-4 h-4 mr-2" />}
                             Connetti
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isPrivateBackendModalOpen} onOpenChange={setIsPrivateBackendModalOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <CloudIcon className="w-5 h-5 text-blue-600" />
+                            Configura Backend Privato
+                        </DialogTitle>
+                        <DialogDescription>
+                            Inserisci l'URL della tua istanza privata di Gromit su Cloud Run.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="backend-url" className="text-xs">
+                                Cloud Run URL
+                            </Label>
+                            <Input
+                                id="backend-url"
+                                placeholder="https://gromit-backend-xyz.run.app"
+                                value={tempBackendUrl}
+                                onChange={(e) => setTempBackendUrl(e.target.value)}
+                            />
+                        </div>
+                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                            <p className="text-[11px] text-blue-700 leading-relaxed">
+                                <strong>Nota sulla Privacy:</strong> Questo URL viene salvato esclusivamente nel tuo browser.
+                                Nessun dato sulla tua infrastruttura viene inviato ai server centrali di Gromit.
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter className="flex gap-2 sm:gap-0">
+                        <Button
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => {
+                                setTempBackendUrl("");
+                                setCustomBackendUrl(null);
+                                toast({ title: "Reset effettuato", description: "Ripristinato il backend standard." });
+                                setIsPrivateBackendModalOpen(false);
+                            }}
+                        >
+                            Reset Home Cloud
+                        </Button>
+                        <div className="flex-1" />
+                        <Button variant="outline" onClick={() => setIsPrivateBackendModalOpen(false)}>
+                            Annulla
+                        </Button>
+                        <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={handleSaveBackendUrl}>
+                            Salva Configurazione
                         </Button>
                     </DialogFooter>
                 </DialogContent>
