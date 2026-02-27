@@ -3,6 +3,7 @@ import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, PDF
 export interface PdfFormField {
     name: string;
     label?: string; // Human readable label (e.g. "Name of Reporting Corporation")
+    ref?: string;   // Native PDF Object Reference (e.g. "24")
     type: 'text' | 'checkbox' | 'dropdown' | 'radio' | 'unknown';
     value?: string | boolean;
     page?: number;
@@ -23,7 +24,7 @@ export async function getPdfFormFields(buffer: Buffer): Promise<PdfFormField[]> 
             const name = field.getName();
             let label = "";
             let pageIndex = 0;
-            let rect = { x: 0, y: 0, width: 0, height: 0 };
+            let rect: { x: number; y: number; width: number; height: number } | undefined = undefined;
 
             // Find visual location of the field
             try {
@@ -31,12 +32,6 @@ export async function getPdfFormFields(buffer: Buffer): Promise<PdfFormField[]> 
                 if (widgets && widgets.length > 0) {
                     const widget = widgets[0];
                     const rectangle = widget.getRectangle();
-                    rect = {
-                        x: Math.round(rectangle.x),
-                        y: Math.round(rectangle.y),
-                        width: Math.round(rectangle.width),
-                        height: Math.round(rectangle.height)
-                    };
 
                     // Find which page this widget belongs to
                     const p = widget.P();
@@ -55,6 +50,18 @@ export async function getPdfFormFields(buffer: Buffer): Promise<PdfFormField[]> 
                             }
                         }
                     }
+
+                    const page = pages[pageIndex];
+                    const { width: pageW, height: pageH } = page.getSize();
+
+                    // NORMALIZE to 0-1000 and FLIP Y-AXIS (PDF is bottom-up, Vision is top-down)
+                    // Gemini Vision expects coordinates relative to top-left.
+                    rect = {
+                        x: Math.round((rectangle.x / pageW) * 1000),
+                        y: Math.round(((pageH - (rectangle.y + rectangle.height)) / pageH) * 1000), // Top-down flip
+                        width: Math.round((rectangle.width / pageW) * 1000),
+                        height: Math.round((rectangle.height / pageH) * 1000)
+                    };
                 }
             } catch (e) {
                 console.warn(`[getPdfFormFields] Could not get visual location for ${name}`);
@@ -77,6 +84,18 @@ export async function getPdfFormFields(buffer: Buffer): Promise<PdfFormField[]> 
 
             let type: PdfFormField['type'] = 'unknown';
             let value: string | boolean | undefined = undefined;
+            let nativeRef = "";
+
+            // Extract Native PDF Object Reference
+            try {
+                // @ts-ignore - access internal acroField ref
+                const ref = (field as any).acroField?.ref;
+                if (ref) {
+                    nativeRef = `${ref.objectNumber}`;
+                }
+            } catch (e) {
+                console.warn(`[getPdfFormFields] Could not get native ref for ${name}`);
+            }
 
             if (field instanceof PDFTextField) {
                 type = 'text';
@@ -93,7 +112,10 @@ export async function getPdfFormFields(buffer: Buffer): Promise<PdfFormField[]> 
                 value = field.getSelected();
             }
 
-            return { name, label: label || name, type, value, page: pageIndex + 1, rect };
+            // Filter out labels that are identical to the name (technical IDs)
+            const cleanLabel = (label && label !== name) ? label : undefined;
+
+            return { name, label: cleanLabel, ref: nativeRef, type, value, page: pageIndex + 1, rect };
         });
     } catch (error) {
         console.error('[getPdfFormFields] Error:', error);
@@ -135,16 +157,28 @@ export async function proposePdfFieldValues(
         // Prepare parallel execution for each page
         const pagePromises = pageNumbers.map(async (pageNum) => {
             const pageFields = fieldsByPage[pageNum];
+
+            // Create a mapping from Native ID to technical name for the final response
+            const nativeToNameMap: Record<string, string> = {};
+            pageFields.forEach(f => {
+                if (f.ref) nativeToNameMap[`#${f.ref}`] = f.name;
+            });
+
             console.log(`[proposePdfFieldValues] Page ${pageNum}: START processing ${pageFields.length} fields`);
             const startTime = Date.now();
 
             const prompt = `Sei un esperto di Document Intelligence ad altissima precisione.
 Stai lavorando sulla **PAGINA ${pageNum}** di un documento PDF complesso.
 
-**VISIONE GLOBALE**: Considera l'intero PDF (Allegato MASTER) per garantire coerenza terminologica e logica, anche se devi generare proposte SOLO per i campi della PAGINA ${pageNum}.
+ID TECNICI NATIVI (PDF-OBJ) DA COMPILARE (PAGINA ${pageNum}):
+${pageFields.map(f => `- Native ID: "#${f.ref || '?'}"${f.label ? `, Label Suggerita: "${f.label}"` : ''}, Tipo: "${f.type}", Posizione Visiva [0-1000]: [top:${f.rect?.y}, left:${f.rect?.x}, width:${f.rect?.width}, height:${f.rect?.height}]`).join('\n')}
 
-ID TECNICI DA COMPILARE (PAGINA ${pageNum}):
-${pageFields.map(f => `- ID: "${f.name}", Tipo: "${f.type}", Label: "${f.label || 'N/A'}", Posizione: [x:${f.rect?.x}, y:${f.rect?.y}, w:${f.rect?.width}, h:${f.rect?.height}]`).join('\n')}
+**GUIDA SEMANTICA ALLLINEAMENTO VISIVO (TASSATIVO)**:
+1. Le coordinate [0-1000] partono dall'angolo TOP-LEFT del PDF (0,0 è l'angolo in alto a sinistra).
+2. I "Native ID" (es: #24) sono i riferimenti fisici dell'oggetto all'interno del file PDF. Sono ID puramente tecnici e NON hanno alcun significato semantico.
+3. **NON USARE IL NOME DELL'ID (#24, #25, etc.)** per dedurre cosa scrivere nel campo.
+4. Identifica il significato di ogni campo **ESCLUSIVAMENTE** guardando cosa c'è stampato nel PDF MASTER attorno a quelle coordinate visive.
+5. Il risultato finale nel JSON deve usare lo stesso "Native ID" come chiave per mappare le risposte.
 
 PROTOCOLLO DI ANALISI & VISUAL FIT (TASSATIVO):
 1. **Analisi Spaziale**: Usa le coordinate fornite per localizzare ogni campo.
@@ -211,9 +245,16 @@ Restituisci ESCLUSIVAMENTE un JSON:
             try {
                 const cleaned = responseText.replace(/```json\n?|\n?```/g, '').trim();
                 const parsed = JSON.parse(cleaned);
+
+                // Mappa il Native ID ("#24") nel nome tecnico reale ("f2_1[0]") atteso dal DOM
+                const sanitizedProposals = (parsed.proposals || []).map((p: any) => {
+                    const technicalName = nativeToNameMap[p.name] || p.name;
+                    return { ...p, name: technicalName };
+                });
+
                 const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-                console.log(`[proposePdfFieldValues] Page ${pageNum}: END processing. Found ${parsed.proposals?.length || 0} proposals in ${duration}s`);
-                return parsed.proposals || [];
+                console.log(`[proposePdfFieldValues] Page ${pageNum}: END processing. Found ${sanitizedProposals.length} proposals in ${duration}s`);
+                return sanitizedProposals;
             } catch (err) {
                 console.error(`[proposePdfFieldValues] JSON parse error for page ${pageNum}:`, err);
                 return [];

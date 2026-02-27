@@ -1673,9 +1673,13 @@ ${hasMemory ? `
 
 ${extractedFields && extractedFields.length > 0 ? `
 3. **STRUTTURA VISIVA DEL DOCUMENTO TARGET:**
-   Il documento base contiene i seguenti campi tecnici (Riferimento per posizionamento dati):
-   ${extractedFields.map((f: any) => `- ID: "${f.name || f.fieldName}", Label: "${f.label || 'N/A'}", Tipo: "${f.type || 'unknown'}", Posizione: ${f.rect ? `[x:${f.rect.x}, y:${f.rect.y}, w:${f.rect.width}, h:${f.rect.height}]` : 'N/A'}`).join('\n')}
-   Usa questi riferimenti per capire DOVE inserire i dati, ma NON creare un elenco di questi campi nel documento finale se non fanno parte del layout naturale.
+   Il documento base contiene i seguenti campi (identificati dal Native ID-OBJ):
+   ${extractedFields.map((f: any) => `- Native ID: "#${f.ref || '?'}"${f.label && f.label !== (f.name || f.fieldName) ? `, Label: "${f.label}"` : ''}, Tipo: "${f.type || 'unknown'}", Posizione Visiva [0-1000]: ${f.rect ? `[top:${f.rect.y}, left:${f.rect.x}, w:${f.rect.width}, h:${f.rect.height}]` : 'N/A'}`).join('\n')}
+   **GUIDA SEMANTICA ALINEAMENTO VISIVO (TASSATIVO)**:
+   1. Le coordinate [0-1000] partono dal TOP-LEFT del PDF.
+   2. I "Native ID" (es: #24) sono riferimenti tecnici SENZA significato semantico. NON usarli per dedurre cosa inserire. 
+   3. Basati ESCLUSIVAMENTE sulla posizione visiva rispetto al testo stampato nel documento MASTER SOURCE per capire il significato di ogni ID.
+   4. Se vuoi agire su un campo nella chat, riferisciti ad esso col suo Native ID (es: "Compila il campo #24").
 ` : ''}
 ${manualAnnotations && manualAnnotations.length > 0 ? `
 4. **ANNOTAZIONI MANUALI STUDIO (Priorità Massima):**

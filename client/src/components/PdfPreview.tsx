@@ -432,7 +432,13 @@ export function PdfPreview({
 
         const inputs = annotationLayer.querySelectorAll('input, textarea');
         inputs.forEach((el: any) => {
-            el.setAttribute('autocomplete', 'off');
+            // Aggressive autofill prevention
+            el.setAttribute('autocomplete', 'new-password'); // Trick to disable modern browser autofill
+            el.setAttribute('autocorrect', 'off');
+            el.setAttribute('autocapitalize', 'off');
+            el.setAttribute('spellcheck', 'false');
+            el.setAttribute('data-form-type', 'other');
+            el.setAttribute('aria-autocomplete', 'none');
 
             // Listen for selection inside the field
             el.removeEventListener('select', updateSelectionPosition);
