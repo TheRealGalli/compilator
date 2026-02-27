@@ -15,7 +15,7 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick }: AppHeaderProps) {
-  const { data: user } = useQuery<UserType>({ queryKey: ['/api/user'] });
+  const { data: user } = useQuery<UserType & { avatarUrl?: string }>({ queryKey: ['/api/user'] });
   const { userIdentity } = useGoogleDrive();
   const [isSpinning, setIsSpinning] = useState(false);
 

@@ -739,21 +739,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               user = await storage.createUser({
                 email,
                 googleId: profile.id,
-                avatarUrl,
                 planTier: 'free'
               });
-            } else if (!user.googleId || user.avatarUrl !== avatarUrl) {
-              // Link GoogleID to existing user if found by email, or update avatar
-              await storage.updateUser(user.id, { googleId: profile.id, avatarUrl });
+            } else if (!user.googleId) {
+              // Link GoogleID to existing user if found by email
+              await storage.updateUser(user.id, { googleId: profile.id });
             }
-          } else if (user.avatarUrl !== avatarUrl) {
-            // Update avatar if it has changed on Google's side
-            await storage.updateUser(user.id, { avatarUrl });
           }
 
           // Store tokens in session for GCP/Gmail usage
           (req.session as any).tokens = { access_token: accessToken, refresh_token: refreshToken };
-          console.log(`[Auth] Tokens saved to session for ${email}`);
+          (req.session as any).avatarUrl = profile.photos?.[0]?.value;
+          console.log(`[Auth] Tokens and Avatar saved to session for ${email}`);
 
           return done(null, user);
         } catch (err) {
@@ -888,7 +885,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User & License Routes
   app.get('/api/user', (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+    const userPayload = {
+      ...(req.user as any),
+      avatarUrl: (req.session as any).avatarUrl
+    };
+    res.json(userPayload);
   });
 
 

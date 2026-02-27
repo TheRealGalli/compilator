@@ -53,7 +53,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const { data: user } = useQuery<UserType>({ queryKey: ['/api/user'] });
+  const { data: user } = useQuery<UserType & { avatarUrl?: string }>({ queryKey: ['/api/user'] });
   const isAuthenticated = !!user;
 
   // Audio Recording State
