@@ -772,10 +772,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // FALLBACK: Sign the session ID and pass it in the URL for Incognito/Cross-site support
         if (req.sessionID) {
           const signedSid = `s:${signature.sign(req.sessionID, 'csd-station-gmail-session-secret')}`;
-          return res.redirect(`${FRONTEND_URL}?sid=${encodeURIComponent(signedSid)}`);
+          return res.redirect(`${FRONTEND_URL}/?sid=${encodeURIComponent(signedSid)}#connectors`);
         }
 
-        res.redirect(FRONTEND_URL);
+        res.redirect(`${FRONTEND_URL}/#connectors`);
       }
     );
 

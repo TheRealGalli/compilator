@@ -38,11 +38,22 @@ export default function Home() {
     }
   });
 
-  // Ensure session remains stable on soft refresh
+  // Ensure session remains stable on soft refresh and handle navigation from hash
   useEffect(() => {
     // We let the session persist as requested. 
-    // Data like mentions and guardrail vault are inherently session-only in React state.
     console.log("[Session] App mounted. Session ID preserved.");
+
+    // Handle hash-based navigation (e.g. #connectors)
+    const handleHashNav = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['documents', 'chat', 'compiler', 'generated', 'connectors'].includes(hash)) {
+        setActiveSection(hash as Section);
+      }
+    };
+
+    handleHashNav();
+    window.addEventListener('hashchange', handleHashNav);
+    return () => window.removeEventListener('hashchange', handleHashNav);
   }, []);
 
   const renderSection = () => {

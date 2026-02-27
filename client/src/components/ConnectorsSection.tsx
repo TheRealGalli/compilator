@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { setCustomBackendUrl, getCustomBackendUrl, getApiUrl } from "@/lib/api-config";
+import { apiRequest } from "@/lib/queryClient";
 import { Settings2, Cloud, ShieldCheck, Copy } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -102,7 +103,7 @@ export function ConnectorsSection() {
         // Verifica lo stato dell'autenticazione Google Cloud
         const checkStatus = async () => {
             try {
-                const response = await fetch(getApiUrl("/api/auth/status"), { credentials: "include" });
+                const response = await apiRequest("GET", "/api/auth/status");
                 if (response.ok) {
                     const data = await response.json();
                     setAuthStatus({
@@ -211,16 +212,11 @@ export function ConnectorsSection() {
         setDeployStatus("Abilitazione API Google Cloud...");
 
         try {
-            const response = await fetch(getApiUrl("/api/deploy/private-cloud"), {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    projectId: setupProjectId,
-                    geminiApiKey: setupGeminiKey,
-                    googleClientId: setupClientId,
-                    googleClientSecret: setupClientSecret
-                })
+            const response = await apiRequest("POST", "/api/deploy/private-cloud", {
+                projectId: setupProjectId,
+                geminiApiKey: setupGeminiKey,
+                googleClientId: setupClientId,
+                googleClientSecret: setupClientSecret
             });
 
             if (!response.ok) {
