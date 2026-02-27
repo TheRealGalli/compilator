@@ -125,7 +125,7 @@ export function ConnectorsSection() {
                 setSetupGeminiKey(state.geminiKey || "");
                 setSetupClientId(state.clientId || "");
                 setSetupClientSecret(state.clientSecret || "");
-                setWizardStep(state.step || "deploy");
+                setWizardStep(state.step || "setup");
                 setIsPrivateBackendModalOpen(true); // Riapri il wizard
                 localStorage.removeItem("gromit_wizard_state");
             } catch (e) {
@@ -136,14 +136,14 @@ export function ConnectorsSection() {
         checkStatus();
     }, []);
 
-    const handleConnectGoogleCloud = () => {
+    const handleConnectGoogleCloud = (startWizard = false) => {
         // Salva lo stato attuale per ripristinarlo dopo il redirect
         localStorage.setItem("gromit_wizard_state", JSON.stringify({
             projectId: setupProjectId,
             geminiKey: setupGeminiKey,
             clientId: setupClientId,
             clientSecret: setupClientSecret,
-            step: "deploy"
+            step: startWizard ? "setup" : "deploy"
         }));
 
         // Reindirizza al server per il login con scelta account
@@ -580,7 +580,17 @@ export function ConnectorsSection() {
                                     {currentBackendUrl && <span className="block mt-2 font-mono text-[10px] break-all opacity-70">{currentBackendUrl}</span>}
                                 </p>
                                 <div className="mt-auto">
-                                    <Button variant="outline" className="w-full" onClick={() => setIsPrivateBackendModalOpen(true)}>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full"
+                                        onClick={() => {
+                                            if (!authStatus.hasCloudToken) {
+                                                handleConnectGoogleCloud(true);
+                                            } else {
+                                                setIsPrivateBackendModalOpen(true);
+                                            }
+                                        }}
+                                    >
                                         <Settings2 className="w-4 h-4 mr-2" />
                                         Configura
                                     </Button>
@@ -761,26 +771,16 @@ export function ConnectorsSection() {
                                     </div>
                                 </div>
                                 <h3 className="text-lg font-bold">Tutto pronto per il decollo!</h3>
-                                <div className="space-y-4 max-w-md mx-auto">
-                                    <p className="text-sm text-muted-foreground">
-                                        Per procedere con il deploy automatico, dobbiamo collegarci al tuo account Google Cloud.
-                                    </p>
-
+                                <p className="text-sm text-muted-foreground max-w-md mx-auto">
                                     {authStatus.hasCloudToken ? (
-                                        <div className="flex items-center justify-center gap-2 p-2 bg-green-50 border border-green-100 rounded-lg text-green-700 text-xs font-medium animate-in fade-in zoom-in duration-300">
-                                            <ShieldCheck className="w-4 h-4" />
-                                            <span>Account Collegato: <strong>{authStatus.userEmail}</strong></span>
-                                        </div>
+                                        <>
+                                            Il sistema utilizzerà l'account <strong>{authStatus.userEmail}</strong> per il deploy.
+                                            Verranno create le risorse serverless necessarie su Google Cloud.
+                                        </>
                                     ) : (
-                                        <Button
-                                            className="bg-white border-2 border-slate-200 text-slate-700 hover:bg-slate-50 w-full shadow-sm py-6"
-                                            onClick={handleConnectGoogleCloud}
-                                        >
-                                            <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" className="w-5 h-5 mr-3" alt="Google" />
-                                            Collega Account Google Cloud
-                                        </Button>
+                                        "L'account non è collegato. Torna indietro o ricarica."
                                     )}
-                                </div>
+                                </p>
                             </div>
 
                             <div className="p-4 bg-slate-900 rounded-xl text-white text-[10px] font-mono space-y-3 overflow-x-auto shadow-xl border border-slate-700">
