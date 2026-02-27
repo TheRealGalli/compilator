@@ -3,17 +3,13 @@
     "description": "Gromit Document Intelligence Engine Backend",
     "repository": "https://github.com/TheRealGalli/compilator",
     "env": {
-        "GCP_PROJECT_ID": {
-            "description": "Inserisci il tuo Google Cloud Project ID",
-            "required": true
-        },
-        "GCP_STORAGE_BUCKET": {
-            "description": "Inserisci il nome del bucket GCS per l'archiviazione (es. gromit-docs-bucket)",
-            "required": true
-        },
         "NODE_ENV": {
             "description": "Ambiente di esecuzione",
             "value": "production"
+        },
+        "GCP_STORAGE_BUCKET": {
+            "description": "Opzionale: Nome del bucket GCS (se vuoto verrà creato automaticamente)",
+            "required": false
         }
     },
     "options": {

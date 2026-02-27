@@ -5,14 +5,17 @@ import type { ChunkedDocument } from './rag-utils';
 import { randomUUID } from 'crypto';
 
 // Inizializza il client Storage di GCP
-// Se non è fornito un path per le credenziali, usa le credenziali di default dell'ambiente
-const storage = new Storage({
-  projectId: process.env.GCP_PROJECT_ID,
-  keyFilename: process.env.GCP_KEY_FILE, // Opzionale, se non fornito usa Application Default Credentials
-});
+// Usa Application Default Credentials (ADC) - su Cloud Run rileva automaticamente il progetto
+const storage = new Storage();
 
-// Nome del bucket (configurabile via env)
-const BUCKET_NAME = process.env.GCP_STORAGE_BUCKET || 'notebooklm-compiler-files';
+// Nome del bucket (configurabile via env, altrimenti usa il project ID come base)
+const getBucketName = () => {
+  if (process.env.GCP_STORAGE_BUCKET) return process.env.GCP_STORAGE_BUCKET;
+  const projectId = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'gromit';
+  return `${projectId}-gromit-docs`.toLowerCase();
+};
+
+let BUCKET_NAME = getBucketName();
 
 export interface FileUploadResult {
   fileName: string;
@@ -60,34 +63,42 @@ export async function uploadFile(
 }
 
 /**
- * Configure bucket lifecycle to auto-delete files after 30 days.
- * This is called on server startup to ensure the policy is active.
+ * Inizializza il bucket: lo crea se non esiste e configura il lifecycle.
+ * Questo viene chiamato all'avvio del server.
  */
-export async function configureBucketLifecycle(): Promise<void> {
+export async function initializeGcs(): Promise<void> {
   try {
+    // Aggiorna BUCKET_NAME caso mai il progetto sia stato rilevato dopo
+    const projectId = await storage.getProjectId();
+    if (!process.env.GCP_STORAGE_BUCKET) {
+      BUCKET_NAME = `${projectId}-gromit-docs`.toLowerCase();
+    }
+
     const bucket = storage.bucket(BUCKET_NAME);
     const [exists] = await bucket.exists();
 
-    if (exists) {
-      console.log(`[GCS] Configuring lifecycle policy for bucket: ${BUCKET_NAME}`);
-      // Overwrite lifecycle rules to ensure only one rule exists: delete after 30 days
-      await bucket.setMetadata({
-        lifecycle: {
-          rule: [
-            {
-              action: { type: 'Delete' },
-              condition: { age: 1 }, // 24 hours (1 day) retention for session-only data
-            },
-          ],
-        },
+    if (!exists) {
+      console.log(`[GCS] Creating bucket: ${BUCKET_NAME}...`);
+      await storage.createBucket(BUCKET_NAME, {
+        location: 'EU', // Può essere reso configurabile
+        storageClass: 'STANDARD',
       });
-      console.log(`[GCS] Lifecycle policy set: Delete objects older than 30 days.`);
-    } else {
-      console.warn(`[GCS] Bucket ${BUCKET_NAME} does not exist. Skipping lifecycle config.`);
     }
+
+    console.log(`[GCS] Configuring lifecycle policy for bucket: ${BUCKET_NAME}`);
+    await bucket.setMetadata({
+      lifecycle: {
+        rule: [
+          {
+            action: { type: 'Delete' },
+            condition: { age: 1 }, // 1 giorno di retention per i file temporanei
+          },
+        ],
+      },
+    });
+    console.log(`[GCS] Storage initialized successfully.`);
   } catch (error) {
-    console.error('[GCS] Error configuring bucket lifecycle:', error);
-    // Don't crash the server if this fails, just log it.
+    console.error('[GCS] Error initializing storage:', error);
   }
 }
 
