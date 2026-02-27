@@ -139,7 +139,7 @@ export function ConnectorsSection() {
     };
 
     const handleDeployToCloud = () => {
-        window.open('https://deploy.cloud.google.com/?git_repo=https://github.com/TheRealGalli/compilator', '_blank');
+        window.open('https://deploy.cloud.google.com?git_repo=https://github.com/TheRealGalli/compilator', '_blank');
     };
 
     if (isLoading) {
@@ -402,6 +402,34 @@ export function ConnectorsSection() {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {/* Vertex AI Card */}
+                        <Card className="opacity-60 border-dashed flex flex-col hover:opacity-100 transition-all">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
+                                        <VertexAILogo className="w-6 h-6" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-lg truncate">Vertex AI</CardTitle>
+                                        <CardDescription className="truncate">Cloud AI Engine</CardDescription>
+                                    </div>
+                                </div>
+                                <div className="shrink-0 ml-2">
+                                    <Badge variant="outline">In arrivo</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-1 flex flex-col">
+                                <p className="text-sm text-muted-foreground mb-6">
+                                    Potenza del cloud con privacy garantita. Prossimamente disponibile per l'integrazione enterprise.
+                                </p>
+                                <div className="mt-auto">
+                                    <Button variant="outline" className="w-full" disabled>
+                                        Coming Soon
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </div>
 
@@ -452,34 +480,6 @@ export function ConnectorsSection() {
                                         onClick={handleDeployToCloud}
                                     >
                                         Deploy to Cloud Run
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Vertex AI Card */}
-                        <Card className="opacity-60 border-dashed flex flex-col hover:opacity-100 transition-all">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
-                                        <VertexAILogo className="w-6 h-6" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <CardTitle className="text-lg truncate">Vertex AI</CardTitle>
-                                        <CardDescription className="truncate">Cloud AI Engine</CardDescription>
-                                    </div>
-                                </div>
-                                <div className="shrink-0 ml-2">
-                                    <Badge variant="outline">In arrivo</Badge>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="pt-4 flex-1 flex flex-col">
-                                <p className="text-sm text-muted-foreground mb-6">
-                                    Potenza del cloud con privacy garantita. Prossimamente disponibile per l'integrazione enterprise.
-                                </p>
-                                <div className="mt-auto">
-                                    <Button variant="outline" className="w-full" disabled>
-                                        Coming Soon
                                     </Button>
                                 </div>
                             </CardContent>
@@ -571,7 +571,7 @@ export function ConnectorsSection() {
             </Dialog>
 
             <Dialog open={isPrivateBackendModalOpen} onOpenChange={setIsPrivateBackendModalOpen}>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[600px]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Cloud className="w-5 h-5 text-blue-600" />
