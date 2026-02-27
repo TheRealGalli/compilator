@@ -6,6 +6,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   googleId: text("google_id").unique(),
+  avatarUrl: text("avatar_url"),
   planTier: text("plan_tier", { enum: ['free', 'pro', 'enterprise'] }).default('free').notNull(),
   usageMetrics: jsonb("usage_metrics").$type<{ total_compilations: number, last_reset: string }>().default({ total_compilations: 0, last_reset: new Date().toISOString() }),
   subscriptionStatus: text("subscription_status").default('active'),
@@ -15,6 +16,7 @@ export const users = pgTable("users", {
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   googleId: true,
+  avatarUrl: true,
   planTier: true,
 });
 

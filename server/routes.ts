@@ -730,6 +730,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const email = profile.emails?.[0]?.value;
           if (!email) return done(new Error("No email found in Google profile"));
 
+          const avatarUrl = profile.photos?.[0]?.value;
+
           let user = await storage.getUserByGoogleId(profile.id);
           if (!user) {
             user = await storage.getUserByEmail(email);
@@ -737,12 +739,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               user = await storage.createUser({
                 email,
                 googleId: profile.id,
+                avatarUrl,
                 planTier: 'free'
               });
-            } else if (!user.googleId) {
-              // Link GoogleID to existing user if found by email
-              await storage.updateUser(user.id, { googleId: profile.id });
+            } else if (!user.googleId || user.avatarUrl !== avatarUrl) {
+              // Link GoogleID to existing user if found by email, or update avatar
+              await storage.updateUser(user.id, { googleId: profile.id, avatarUrl });
             }
+          } else if (user.avatarUrl !== avatarUrl) {
+            // Update avatar if it has changed on Google's side
+            await storage.updateUser(user.id, { avatarUrl });
           }
 
           // Store tokens in session for GCP/Gmail usage

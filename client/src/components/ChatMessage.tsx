@@ -32,8 +32,9 @@ export function ChatMessage({
   searchEntryPoint,
   userInitial,
   shortTitle,
-  aiMetadata
-}: ChatMessageProps) {
+  aiMetadata,
+  avatarUrl
+}: ChatMessageProps & { avatarUrl?: string }) {
   const { toast } = useToast();
   const { addSource } = useSources();
   const isUser = role === "user";
@@ -218,8 +219,10 @@ export function ChatMessage({
       </div>
 
       {isUser && (
-        <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${userInitial ? "bg-blue-100 text-blue-700 font-bold" : "bg-secondary"}`}>
-          {userInitial ? userInitial : <User className="w-4 h-4" />}
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${avatarUrl ? "bg-transparent" : userInitial ? "bg-blue-100 text-blue-700 font-bold" : "bg-secondary"}`}>
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
+          ) : userInitial ? userInitial : <User className="w-4 h-4" />}
         </div>
       )}
     </div>

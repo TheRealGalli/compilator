@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { User, Asterisk } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { ThreeStars } from "@/components/ui/three-stars";
 import { useGoogleDrive } from "@/contexts/GoogleDriveContext";
 import { useQuery } from "@tanstack/react-query";
+import { type User as UserType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
 interface AppHeaderProps {
@@ -14,7 +15,7 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick }: AppHeaderProps) {
-  const { data: user } = useQuery({ queryKey: ['/api/user'] });
+  const { data: user } = useQuery<UserType>({ queryKey: ['/api/user'] });
   const { userIdentity } = useGoogleDrive();
   const [isSpinning, setIsSpinning] = useState(false);
 
@@ -67,8 +68,11 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick
         )}
 
         <Avatar className="w-8 h-8" data-testid="avatar-user">
+          {user?.avatarUrl ? (
+            <AvatarImage src={user.avatarUrl} alt={user?.email || "User Avatar"} />
+          ) : null}
           <AvatarFallback className={userIdentity ? "bg-blue-100 text-blue-700 font-bold" : ""}>
-            {userIdentity ? (userIdentity.initial as string) : <User className="w-4 h-4" />}
+            {user?.avatarUrl ? null : userIdentity ? (userIdentity.initial as string) : <User className="w-4 h-4" />}
           </AvatarFallback>
         </Avatar>
       </div>

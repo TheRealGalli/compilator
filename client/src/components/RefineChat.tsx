@@ -12,6 +12,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MentionButton } from './MentionButton';
 import { useCompiler } from '@/contexts/CompilerContext';
+import { useQuery } from '@tanstack/react-query';
+import { type User as UserType } from '@shared/schema';
 import { anonymizeWithOllamaLocal, performMechanicalReverseSweep, performMechanicalGlobalSweep } from '@/lib/privacy';
 import { useToast } from "@/hooks/use-toast";
 
@@ -66,6 +68,7 @@ export function RefineChat({
     onMentionCreated,
     selectedModel = "gpt-oss:20b" // Default fallback
 }: RefineChatProps) {
+    const { data: user } = useQuery<UserType>({ queryKey: ['/api/user'] });
     const {
         messages, setMessages,
         mentions, setMentions,
@@ -637,13 +640,21 @@ export function RefineChat({
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className={cn(
-                                    "flex w-full",
-                                    msg.role === 'user' ? "justify-end" : "justify-start"
+                                    "flex w-full mb-3 max-w-[85%] relative",
+                                    msg.role === 'user' ? "justify-end ml-auto" : "justify-start mr-auto"
+                                )}>
+                                {msg.role === 'user' && (user?.avatarUrl || compileContext.userInitial) && !minimal && (
+                                    <div className="absolute -right-10 w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                                        {user?.avatarUrl ? (
+                                            <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
+                                        ) : (
+                                            compileContext.userInitial
+                                        )}
+                                    </div>
                                 )}
-                            >
                                 <div
                                     className={cn(
-                                        "max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm break-words overflow-hidden",
+                                        "rounded-2xl px-4 py-3 text-sm shadow-sm break-words overflow-hidden",
                                         msg.role === 'user'
                                             ? "bg-blue-600 text-white rounded-br-none"
                                             : "bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 rounded-bl-none"
