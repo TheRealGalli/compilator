@@ -693,15 +693,15 @@ const INTEGRATION_SCOPES = [
 export async function registerRoutes(app: Express): Promise<Server> {
   // Helper to get tokens from session or header
   const getGoogleTokens = (req: Request) => {
-    if ((req.session as any).tokens) return (req.session as any).tokens;
     const header = req.headers['x-gmail-tokens'];
     if (header && typeof header === 'string') {
       try {
         return JSON.parse(header);
       } catch (e) {
-        return null;
+        // Fallback to session
       }
     }
+    if ((req.session as any).integrationTokens) return (req.session as any).integrationTokens;
     return null;
   };
 
@@ -866,7 +866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         redirect_uri: redirectUri
       });
       console.log('[OAuth-Integration] Tokens retrieved successfully');
-      (req.session as any).tokens = tokens;
+      (req.session as any).integrationTokens = tokens;
 
       // Close popup and notify opener
       res.send(`
@@ -885,7 +885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========== Combined Status & Logout ==========
   app.get('/api/auth/check', (req, res) => {
     const isLoggedIn = req.isAuthenticated();
-    const isConnected = !!((req.session as any)?.tokens || req.headers['x-gmail-tokens']);
+    const isConnected = !!((req.session as any)?.integrationTokens || req.headers['x-gmail-tokens']);
     res.json({ isLoggedIn, isConnected, user: isLoggedIn ? req.user : null });
   });
 
