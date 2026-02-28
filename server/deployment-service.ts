@@ -67,7 +67,45 @@ export class DeploymentService {
             requestBody: build
         });
 
-        return response.data.metadata?.build?.id;
+        const buildId = response.data.metadata?.build?.id;
+        if (!buildId) {
+            throw new Error('Failed to start Cloud Build: No build ID returned.');
+        }
+
+        console.log(`[Deployment] Build ${buildId} started. Waiting for completion...`);
+        await this.waitForBuild(cloudbuild, projectId, buildId);
+
+        return buildId;
+    }
+
+    private async waitForBuild(cloudbuild: any, projectId: string, buildId: string) {
+        return new Promise<void>((resolve, reject) => {
+            const checkStatus = async () => {
+                try {
+                    const response = await cloudbuild.projects.builds.get({
+                        projectId,
+                        id: buildId
+                    });
+
+                    const status = response.data.status;
+                    console.log(`[Deployment] Build ${buildId} status: ${status}`);
+
+                    if (status === 'SUCCESS') {
+                        resolve();
+                    } else if (['FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED'].includes(status)) {
+                        reject(new Error(`Cloud Build fallita con stato: ${status}`));
+                    } else {
+                        // Still running, check again in 10 seconds
+                        setTimeout(checkStatus, 10000);
+                    }
+                } catch (error) {
+                    reject(error);
+                }
+            };
+
+            // Start polling
+            setTimeout(checkStatus, 10000);
+        });
     }
 
     async deployToCloudRun(projectId: string, serviceName: string, envVars: Record<string, string>) {

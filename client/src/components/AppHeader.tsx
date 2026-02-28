@@ -30,11 +30,13 @@ export function AppHeader({ notebookTitle = "Notebook Senza Titolo", onHomeClick
       await apiRequest('POST', '/api/auth/logout');
       // FALLBACK: Clear session ID from localStorage
       localStorage.removeItem('csd_sid');
+      window.location.hash = '#documents';
       window.location.reload(); // Refresh to clear all state
     } catch (err) {
       console.error("Logout failed", err);
       // Even if API fails, clear local sid
       localStorage.removeItem('csd_sid');
+      window.location.hash = '#documents';
       window.location.reload();
     }
   };

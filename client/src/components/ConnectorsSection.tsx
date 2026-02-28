@@ -209,7 +209,7 @@ export function ConnectorsSection() {
 
     const handleDeployToCloud = async () => {
         setIsDeploying(true);
-        setDeployStatus("Abilitazione API Google Cloud...");
+        setDeployStatus("Avvio della procedura... (1/3)");
 
         try {
             const response = await apiRequest("POST", "/api/deploy/private-cloud", {
@@ -225,11 +225,11 @@ export function ConnectorsSection() {
             }
 
             const data = await response.json();
-            setDeployStatus("Build e Deploy avviati! In attesa di Cloud Run...");
+            setDeployStatus("Quasi pronto! Configurazione di Cloud Run... (3/3)");
 
             toast({
                 title: "Deploy Avviato ✨",
-                description: "Il tuo backend privato si starà accendendo tra pochi istanti."
+                description: "Stiamo assemblando il tuo server su Google Cloud. L'operazione richiede circa 3-5 minuti, non chiudere questa finestra."
             });
 
             // If we have a URL, we can suggest it
@@ -726,10 +726,13 @@ export function ConnectorsSection() {
                                     </p>
                                     <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-rose-700 text-[10px] flex items-start gap-2">
                                         <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                                        <span>
-                                            <strong>Fondamentale:</strong> Per poter lanciare il server, Google richiede che il progetto abbia un <strong>Account di Fatturazione (Billing)</strong> attivo, altrimenti il decollo fallirà.
-                                            Attivalo nella <a href="https://console.cloud.google.com/billing" target="_blank" className="underline font-bold">Google Cloud Console</a> (piano gratuito coperto).
-                                        </span>
+                                        <div className="space-y-1">
+                                            <p><strong>Fondamentale:</strong> Per poter lanciare il server, Google richiede due requisiti obbligatori, altrimenti il decollo fallirà:</p>
+                                            <ul className="list-disc pl-3">
+                                                <li>Avere un <strong>Account di Fatturazione (Billing)</strong> attivo sul progetto. Attivalo nella <a href="https://console.cloud.google.com/billing" target="_blank" rel="noreferrer" className="underline font-bold">Google Cloud Console</a> (piano gratuito coperto).</li>
+                                                <li>Avere l'<strong>API di Cloud Build</strong> abilitata. <a href={`https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com${setupProjectId ? `?project=${setupProjectId}` : ''}`} target="_blank" rel="noreferrer" className="underline font-bold">Abilitala dalla libreria API</a>.</li>
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
