@@ -246,21 +246,8 @@ export function ConnectorsSection() {
             description: "Stiamo assemblando il tuo server su Google Cloud. L'operazione richiede circa 3-5 minuti, non chiudere questa finestra."
         });
 
-        const progressInterval = setInterval(() => {
-            setDeployProgress(prev => {
-                if (prev < 20) {
-                    setDeployStatus("Abilitazione API Serverless (Richiede ~1 min)... (1/3)");
-                    return prev + 1;
-                } else if (prev < 80) {
-                    setDeployStatus("Costruzione dell'immagine Docker in corso... (2/3) (Ancora ~3 min)");
-                    return prev + 0.5;
-                } else if (prev < 95) {
-                    setDeployStatus("Quasi pronto! Configurazione di Cloud Run... (3/3)");
-                    return prev + 0.2;
-                }
-                return prev;
-            });
-        }, 1500);
+        // No more fake timer - status is updated by actual API responses
+        const progressInterval: ReturnType<typeof setInterval> | undefined = undefined;
 
         try {
             // STEP 1: Enable APIs & Start Build
@@ -301,7 +288,7 @@ export function ConnectorsSection() {
                 buildStatus = data2.status;
                 console.log(`[MagicDeploy:FE] Step 2: build status = "${buildStatus}" (poll #${pollCount})`);
                 setDeployStatus(`Step 2/4: Build Docker... stato: ${buildStatus} (check #${pollCount})`);
-                setDeployProgress(20 + Math.min(pollCount * 3, 50));
+                setDeployProgress(20 + Math.min(Math.round(55 * (1 - 1 / (1 + pollCount * 0.15))), 55));
 
                 if (['FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED'].includes(buildStatus)) {
                     throw new Error(`Cloud Build fallita con stato: ${buildStatus}`);
@@ -359,24 +346,66 @@ export function ConnectorsSection() {
             }
 
             clearInterval(progressInterval);
-            setDeployProgress(100);
-            setDeployStatus("✅ Tutto Pronto!");
+            setDeployProgress(95);
+            setDeployStatus("Verifica connettività backend...");
             console.log("[MagicDeploy:FE] SUCCESS! serviceUrl:", serviceUrl);
 
-            toast({
-                title: "Deploy Completato! 🚀",
-                description: serviceUrl
-                    ? `Backend privato attivo su: ${serviceUrl}`
-                    : "Backend privato creato con successo!",
-            });
-
+            // Health check: verify the backend actually responds before switching
             if (serviceUrl) {
-                // Save URL and reload page
-                setTimeout(() => {
-                    setCustomBackendUrl(serviceUrl);
-                }, 2000);
+                let healthOk = false;
+                const MAX_HEALTH_CHECKS = 5;
+                for (let i = 1; i <= MAX_HEALTH_CHECKS; i++) {
+                    try {
+                        console.log(`[MagicDeploy:FE] Health check attempt ${i}/${MAX_HEALTH_CHECKS}...`);
+                        const healthRes = await fetch(`${serviceUrl}/api/cors-test`, {
+                            method: 'GET',
+                            signal: AbortSignal.timeout(8000)
+                        });
+                        if (healthRes.ok) {
+                            healthOk = true;
+                            console.log("[MagicDeploy:FE] Health check PASSED!");
+                            break;
+                        } else {
+                            console.warn(`[MagicDeploy:FE] Health check returned status ${healthRes.status}`);
+                        }
+                    } catch (e) {
+                        console.warn(`[MagicDeploy:FE] Health check attempt ${i} failed:`, e);
+                    }
+                    if (i < MAX_HEALTH_CHECKS) {
+                        await new Promise(r => setTimeout(r, 5000));
+                    }
+                }
+
+                if (healthOk) {
+                    setDeployProgress(100);
+                    setDeployStatus("✅ Tutto Pronto!");
+                    toast({
+                        title: "Deploy Completato! 🚀",
+                        description: `Backend privato verificato e attivo su: ${serviceUrl}`,
+                    });
+                    // Auto-switch only after health check passes
+                    setTimeout(() => {
+                        setCustomBackendUrl(serviceUrl);
+                    }, 2000);
+                } else {
+                    setDeployProgress(100);
+                    setDeployStatus("⚠️ Deploy completato ma il backend non risponde");
+                    toast({
+                        title: "Deploy completato con avviso ⚠️",
+                        description: `Il backend è stato deployato ma non risponde ancora. Potrebbe servire qualche minuto. URL: ${serviceUrl}`,
+                        variant: "destructive"
+                    });
+                    console.warn("[MagicDeploy:FE] Health check FAILED after all attempts. NOT auto-switching.");
+                }
             } else {
                 console.warn("[MagicDeploy:FE] WARNING: serviceUrl is null/empty!");
+                setDeployProgress(100);
+                setDeployStatus("⚠️ Deploy completato ma URL non disponibile");
+                toast({
+                    title: "Deploy Completato",
+                    description: "Backend creato ma l'URL non è stato restituito. Controlla la console Cloud Run.",
+                    variant: "destructive"
+                });
                 setWizardStep("setup");
                 setIsPrivateBackendModalOpen(false);
             }

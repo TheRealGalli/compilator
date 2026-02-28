@@ -4,8 +4,11 @@ const CLOUD_RUN_URL = 'https://compilator-983823068962.europe-west1.run.app';
 
 const getBaseUrl = () => {
   if (typeof window !== 'undefined') {
+    // Only use custom backend URL if user has an active session
+    // Guest mode always uses the main backend
+    const hasSession = !!localStorage.getItem('csd_sid');
     const customUrl = localStorage.getItem('gromit_custom_backend_url');
-    if (customUrl) return customUrl;
+    if (customUrl && hasSession) return customUrl;
   }
 
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;

@@ -1,3 +1,4 @@
+
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 
@@ -16,7 +17,8 @@ export class DeploymentService {
         const apis = [
             'run.googleapis.com',
             'cloudbuild.googleapis.com',
-            'artifactregistry.googleapis.com'
+            'artifactregistry.googleapis.com',
+            'iam.googleapis.com'
         ];
 
         console.log(`[Deployment] Enabling APIs for project ${projectId}...`);
@@ -181,6 +183,52 @@ export class DeploymentService {
             }
         } else {
             return { done: false, serviceUrl: null };
+        }
+    }
+
+    async allowPublicAccess(projectId: string, serviceName: string) {
+        const run = google.run({ version: 'v2', auth: this.auth as any });
+        const resource = `projects/${projectId}/locations/europe-west1/services/${serviceName}`;
+
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY_MS = 4000;
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                console.log(`[Deployment] Setting IAM policy for public access on ${serviceName} (attempt ${attempt}/${MAX_RETRIES})...`);
+                await run.projects.locations.services.setIamPolicy({
+                    resource,
+                    requestBody: {
+                        policy: {
+                            bindings: [{
+                                role: 'roles/run.invoker',
+                                members: ['allUsers']
+                            }]
+                        }
+                    }
+                });
+
+                // Verify the policy was actually set
+                const currentPolicy = await run.projects.locations.services.getIamPolicy({ resource });
+                const bindings = currentPolicy.data.bindings || [];
+                const hasPublicAccess = bindings.some((b: any) =>
+                    b.role === 'roles/run.invoker' && b.members?.includes('allUsers')
+                );
+
+                if (hasPublicAccess) {
+                    console.log(`[Deployment] Public access VERIFIED for ${serviceName}.`);
+                    return;
+                } else {
+                    console.warn(`[Deployment] IAM policy set but verification failed (attempt ${attempt}). Retrying...`);
+                }
+            } catch (error: any) {
+                console.error(`[Deployment] IAM attempt ${attempt} failed:`, error.message);
+                if (attempt === MAX_RETRIES) {
+                    throw new Error(`Impossibile impostare l'accesso pubblico al servizio dopo ${MAX_RETRIES} tentativi: ${error.message}`);
+                }
+            }
+            // Wait before retrying
+            await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
         }
     }
 }

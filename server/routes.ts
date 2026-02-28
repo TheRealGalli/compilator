@@ -3834,7 +3834,7 @@ ${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Pyt
 
     try {
       console.log(`[MagicDeploy] Step 2: Deploying to Cloud Run for ${projectId}`);
-      const envVars = {
+      const envVars: Record<string, string> = {
         "NODE_ENV": "production",
         "STORAGE_MODE": "local",
         "PRIVATE_CLOUD": "true",
@@ -3842,10 +3842,15 @@ ${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Pyt
         "GEMINI_API_KEY": geminiApiKey,
         "GOOGLE_CLIENT_ID": googleClientId || "",
         "GOOGLE_CLIENT_SECRET": googleClientSecret || "",
-        "FRONTEND_URL": "https://therealgalli.github.io/compilator"
+        "FRONTEND_URL": "https://therealgalli.github.io/compilator",
+        "DEPLOY_TIMESTAMP": new Date().toISOString()
       };
 
       const result = await deployer.startCloudRunDeploy(projectId, "gromit-backend", envVars);
+
+      // Allow public (unauthenticated) access to the service — MANDATORY
+      // If this fails, the service will return 403 to all unauthenticated requests
+      await deployer.allowPublicAccess(projectId, "gromit-backend");
 
       res.json({
         message: "Cloud Run deployment started!",
