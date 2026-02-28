@@ -3,8 +3,10 @@ import { OAuth2Client } from 'google-auth-library';
 
 export class DeploymentService {
     private auth: any;
+    private accessToken: string;
 
     constructor(accessToken: string) {
+        this.accessToken = accessToken;
         this.auth = new google.auth.OAuth2();
         this.auth.setCredentials({ access_token: accessToken });
     }
