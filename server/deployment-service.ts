@@ -18,7 +18,8 @@ export class DeploymentService {
             'run.googleapis.com',
             'cloudbuild.googleapis.com',
             'artifactregistry.googleapis.com',
-            'iam.googleapis.com'
+            'iam.googleapis.com',
+            'aiplatform.googleapis.com'
         ];
 
         console.log(`[Deployment] Enabling APIs for project ${projectId}...`);

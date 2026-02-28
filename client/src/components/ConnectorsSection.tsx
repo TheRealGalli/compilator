@@ -252,7 +252,7 @@ export function ConnectorsSection() {
         try {
             // STEP 1: Enable APIs & Start Build
             console.log("[MagicDeploy:FE] Step 1: calling /step1...");
-            setDeployStatus("Step 1/4: Abilitazione API e avvio build...");
+            setDeployStatus("Abilitazione API e avvio build... (1/4)");
             const res1 = await apiRequest("POST", "/api/deploy/private-cloud/step1", {
                 projectId: setupProjectId,
                 geminiApiKey: setupGeminiKey
@@ -268,7 +268,7 @@ export function ConnectorsSection() {
             setDeployProgress(20);
 
             // STEP 2: Poll Build Status
-            setDeployStatus(`Step 2/4: Build Docker in corso (ID: ${buildId?.slice(0, 8)}...)...`);
+            setDeployStatus(`Costruzione dell'immagine Docker in corso... (2/4) (Ancora ~3 min)`);
             let buildStatus = 'WORKING';
             let pollCount = 0;
             while (buildStatus === 'WORKING' || buildStatus === 'PENDING' || buildStatus === 'QUEUED') {
@@ -287,7 +287,7 @@ export function ConnectorsSection() {
                 const data2 = await res2.json();
                 buildStatus = data2.status;
                 console.log(`[MagicDeploy:FE] Step 2: build status = "${buildStatus}" (poll #${pollCount})`);
-                setDeployStatus(`Step 2/4: Build Docker... stato: ${buildStatus} (check #${pollCount})`);
+                setDeployStatus(`Costruzione dell'immagine Docker in corso... (2/4) (Ancora ~${Math.max(1, Math.round((26 - pollCount) * 10 / 60))} min)`);
                 setDeployProgress(20 + Math.min(Math.round(55 * (1 - 1 / (1 + pollCount * 0.15))), 55));
 
                 if (['FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED'].includes(buildStatus)) {
@@ -299,7 +299,7 @@ export function ConnectorsSection() {
 
             // STEP 3: Start Cloud Run Deploy
             console.log("[MagicDeploy:FE] Step 3: calling /step2 (Cloud Run deploy)...");
-            setDeployStatus("Step 3/4: Avvio deploy Cloud Run...");
+            setDeployStatus("Deploy su Cloud Run in corso... (3/4)");
             const res3 = await apiRequest("POST", "/api/deploy/private-cloud/step2", {
                 projectId: setupProjectId,
                 geminiApiKey: setupGeminiKey,
@@ -320,7 +320,7 @@ export function ConnectorsSection() {
             setDeployProgress(80);
 
             // STEP 4: Poll Cloud Run operation status
-            setDeployStatus("Step 4/4: Attesa completamento Cloud Run...");
+            setDeployStatus("Attivazione del servizio Cloud Run... (4/4)");
             let runDone = false;
             let serviceUrl = null;
             let runPollCount = 0;
@@ -341,7 +341,7 @@ export function ConnectorsSection() {
                 runDone = dataRun.done;
                 serviceUrl = dataRun.serviceUrl;
                 console.log(`[MagicDeploy:FE] Step 4: done=${runDone}, serviceUrl=${serviceUrl} (poll #${runPollCount})`);
-                setDeployStatus(`Step 4/4: Cloud Run... ${runDone ? 'COMPLETATO' : 'in corso'} (check #${runPollCount})`);
+                setDeployStatus(`Attivazione del servizio Cloud Run... (4/4) (Ancora ~${Math.max(1, Math.round((10 - runPollCount) * 5 / 60))} min)`);
                 setDeployProgress(80 + Math.min(runPollCount * 2, 18));
             }
 
@@ -378,24 +378,24 @@ export function ConnectorsSection() {
 
                 if (healthOk) {
                     setDeployProgress(100);
-                    setDeployStatus("✅ Tutto Pronto!");
+                    setDeployStatus("✅ Backend privato pronto!");
+                    // Save URL for later use but DON'T auto-switch
+                    // The user will need to re-authenticate on the new backend
+                    localStorage.setItem('gromit_private_cloud_url', serviceUrl);
                     toast({
                         title: "Deploy Completato! 🚀",
-                        description: `Backend privato verificato e attivo su: ${serviceUrl}`,
+                        description: "Il tuo backend privato è attivo e verificato. Usa il toggle Cloud/Self-Hosted nella sezione Documenti per connetterti.",
                     });
-                    // Auto-switch only after health check passes
-                    setTimeout(() => {
-                        setCustomBackendUrl(serviceUrl);
-                    }, 2000);
                 } else {
                     setDeployProgress(100);
-                    setDeployStatus("⚠️ Deploy completato ma il backend non risponde");
+                    setDeployStatus("⚠️ Deploy completato — il backend si sta avviando");
+                    // Save URL anyway — the backend might need a few more seconds to start
+                    localStorage.setItem('gromit_private_cloud_url', serviceUrl);
                     toast({
-                        title: "Deploy completato con avviso ⚠️",
-                        description: `Il backend è stato deployato ma non risponde ancora. Potrebbe servire qualche minuto. URL: ${serviceUrl}`,
-                        variant: "destructive"
+                        title: "Deploy completato ⚠️",
+                        description: "Il backend è stato deployato ma si sta ancora avviando. Prova a connetterti tra qualche minuto dal toggle nella sezione Documenti.",
                     });
-                    console.warn("[MagicDeploy:FE] Health check FAILED after all attempts. NOT auto-switching.");
+                    console.warn("[MagicDeploy:FE] Health check FAILED after all attempts. URL saved for manual switch.");
                 }
             } else {
                 console.warn("[MagicDeploy:FE] WARNING: serviceUrl is null/empty!");
