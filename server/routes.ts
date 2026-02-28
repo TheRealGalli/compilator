@@ -3845,15 +3845,36 @@ ${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Pyt
         "FRONTEND_URL": "https://therealgalli.github.io/compilator"
       };
 
-      const result = await deployer.deployToCloudRun(projectId, "gromit-backend", envVars);
+      const result = await deployer.startCloudRunDeploy(projectId, "gromit-backend", envVars);
 
       res.json({
-        message: "Deployment completed successfully!",
-        serviceUrl: (result as any).status?.url
+        message: "Cloud Run deployment started!",
+        operationName: result.operationName,
+        servicePath: result.servicePath
       });
     } catch (error: any) {
       console.error("[MagicDeploy] Step 2 Error:", error);
       res.status(500).json({ error: error.message || "Failed to deploy private cloud backend." });
+    }
+  });
+
+  app.post("/api/deploy/private-cloud/status-run", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+
+    const { operationName, servicePath } = req.body;
+    if (!operationName || !servicePath) return res.status(400).json({ error: "Operation Name and Service Path required." });
+
+    const accessToken = (req.session as any).tokens?.access_token || req.headers['x-gcp-token'];
+    if (!accessToken) return res.status(401).json({ error: "Missing Google Access Token." });
+
+    const deployer = new DeploymentService(accessToken as string);
+
+    try {
+      const status = await deployer.checkRunOperationStatus(operationName, servicePath);
+      res.json(status);
+    } catch (error: any) {
+      console.error("[MagicDeploy] Run Status Error:", error);
+      res.status(500).json({ error: error.message || "Failed to check Cloud Run deployment status." });
     }
   });
 

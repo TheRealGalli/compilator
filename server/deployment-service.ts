@@ -121,7 +121,7 @@ export class DeploymentService {
         });
     }
 
-    async deployToCloudRun(projectId: string, serviceName: string, envVars: Record<string, string>) {
+    async startCloudRunDeploy(projectId: string, serviceName: string, envVars: Record<string, string>) {
         const run = google.run({ version: 'v2', auth: this.auth as any });
         const location = 'europe-west1';
         const parent = `projects/${projectId}/locations/${location}`;
@@ -136,7 +136,7 @@ export class DeploymentService {
             }
         };
 
-        console.log(`[Deployment] Deploying ${serviceName} to Cloud Run in ${projectId} via v2 API...`);
+        console.log(`[Deployment] Starting Cloud Run deployment for ${serviceName} in ${projectId} via v2 API...`);
 
         let operationName = '';
 
@@ -150,7 +150,7 @@ export class DeploymentService {
             console.log(`[Deployment] Create operation started: ${operationName}`);
         } catch (error: any) {
             if (error.code === 409 || (error.message && error.message.includes('already exists'))) {
-                console.log(`[Deployment] Service ${serviceName} exists, pitching update instead...`);
+                console.log(`[Deployment] Service ${serviceName} exists, patching update instead...`);
                 // Cloud Run v2 requires patching existing services instead of creating
                 const patchResponse = await run.projects.locations.services.patch({
                     name: servicePath,
@@ -159,41 +159,28 @@ export class DeploymentService {
                 operationName = patchResponse.data.name!;
                 console.log(`[Deployment] Patch operation started: ${operationName}`);
             } else {
-                throw new Error(`Failed to initiate Cloud Run deployment: ${error.message}`);
+                console.error(`[Deployment] Create failed:`, error);
+                throw error;
             }
         }
 
-        console.log(`[Deployment] Waiting for Cloud Run operation to complete...`);
-        return new Promise<any>((resolve, reject) => {
-            const checkStatus = async () => {
-                try {
-                    const opResponse = await run.projects.locations.operations.get({
-                        name: operationName
-                    });
+        return { operationName, servicePath };
+    }
 
-                    const op = opResponse.data;
-                    if (op.done) {
-                        if (op.error) {
-                            reject(new Error(`Cloud Run deployment failed: ${op.error.message}`));
-                        } else {
-                            // Fetch the fully deployed service to get the final URL
-                            const serviceResponse = await run.projects.locations.services.get({
-                                name: servicePath
-                            });
-                            // Cloud Run v2 SDK puts the URL in `uri` property
-                            resolve({
-                                status: { url: serviceResponse.data.uri }
-                            });
-                        }
-                    } else {
-                        // Check again in 5 seconds
-                        setTimeout(checkStatus, 5000);
-                    }
-                } catch (error) {
-                    reject(error);
-                }
-            };
-            setTimeout(checkStatus, 5000);
-        });
+    async checkRunOperationStatus(operationName: string, servicePath: string) {
+        const run = google.run({ version: 'v2', auth: this.auth as any });
+        const op = await run.projects.locations.operations.get({ name: operationName });
+
+        if (op.data.done) {
+            if (op.data.error) {
+                throw new Error(op.data.error.message || 'Error in Cloud Run operation');
+            } else {
+                // Fetch the service to get the final URL
+                const service = await run.projects.locations.services.get({ name: servicePath });
+                return { done: true, serviceUrl: service.data.uri };
+            }
+        } else {
+            return { done: false, serviceUrl: null };
+        }
     }
 }

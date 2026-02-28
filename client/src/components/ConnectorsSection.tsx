@@ -296,7 +296,7 @@ export function ConnectorsSection() {
                 }
             }
 
-            // STEP 3: Deploy to Cloud Run
+            // STEP 3: Start Cloud Run Deploy
             setDeployStatus("Quasi pronto! Configurazione di Cloud Run... (3/3)");
             setDeployProgress(85);
             const res3 = await apiRequest("POST", "/api/deploy/private-cloud/step2", {
@@ -306,19 +306,39 @@ export function ConnectorsSection() {
                 googleClientSecret: setupClientSecret
             });
 
-            clearInterval(progressInterval);
-            setDeployProgress(100);
-
             if (!res3.ok) {
                 const errData = await res3.json();
-                throw new Error(errData.error || "Errore durante il deploy su Cloud Run (Step 3).");
+                throw new Error(errData.error || "Errore durante l'avvio del deploy su Cloud Run (Step 3).");
             }
 
             const data3 = await res3.json();
+            const runOperationName = data3.operationName;
+            const runServicePath = data3.servicePath;
+
+            // Poll Cloud Run operation status
+            let runDone = false;
+            let serviceUrl = null;
+            while (!runDone) {
+                await new Promise(r => setTimeout(r, 5000));
+                const resRun = await apiRequest("POST", "/api/deploy/private-cloud/status-run", {
+                    operationName: runOperationName,
+                    servicePath: runServicePath
+                });
+                if (!resRun.ok) {
+                    const errData = await resRun.json();
+                    throw new Error(errData.error || "Errore durante check status Cloud Run.");
+                }
+                const dataRun = await resRun.json();
+                runDone = dataRun.done;
+                serviceUrl = dataRun.serviceUrl;
+            }
+
+            clearInterval(progressInterval);
+            setDeployProgress(100);
             setDeployStatus("Tutto Pronto!");
 
-            if (data3.serviceUrl) {
-                setTempBackendUrl(data3.serviceUrl);
+            if (serviceUrl) {
+                setTempBackendUrl(serviceUrl);
             }
 
             setWizardStep("setup");
