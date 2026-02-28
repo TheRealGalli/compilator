@@ -64,14 +64,15 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
                 // Fetch models dynamically
                 const models = await getRunningModels();
                 setInstalledModels(models);
+                hasFailedInitialCheck.current = false; // Reset if successful
             } else {
-                // console.log('[OllamaContext] Connessione locale FALLITA.');
                 setStatus('disconnected');
-                setInstalledModels([]);
+                hasFailedInitialCheck.current = true; // Set if disconnected
             }
         } catch (error) {
-            console.error('[OllamaContext] Errore critico:', error);
+            console.error('[OllamaContext] Errore durante il controllo di Ollama:', error);
             setStatus('disconnected');
+            hasFailedInitialCheck.current = true; // Set if error
         } finally {
             isChecking.current = false;
         }
@@ -91,12 +92,11 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
         statusRef.current = status;
     }, [status]);
 
+    const hasFailedInitialCheck = useRef(false);
+
     useEffect(() => {
         const interval = setInterval(() => {
-            // Se siamo già connessi, controlliamo meno spesso o saltiamo se stiamo lavorando
-            // Per ora lo facciamo ogni 30s solo se non siamo già in "connected"
-            // o se vogliamo essere sicuri che la connessione regga.
-            if (statusRef.current !== 'connected') {
+            if (statusRef.current !== 'connected' && !hasFailedInitialCheck.current) {
                 checkStatus();
             }
         }, 30000);
