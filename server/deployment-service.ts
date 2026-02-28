@@ -55,7 +55,6 @@ export class DeploymentService {
             source: {
                 gitSource: {
                     url: repoUrl,
-                    dir: '/',
                     revision: 'refs/heads/main'
                 }
             }
