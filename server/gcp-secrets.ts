@@ -95,6 +95,11 @@ export async function getModelApiKey(modelProvider: string = 'openai'): Promise<
     return envValue;
   }
 
+  if (process.env.PRIVATE_CLOUD === "true") {
+    console.log(`[Private Cloud] ${envVarName} not provided in env. Skipping Secret Manager.`);
+    return "";
+  }
+
   // Fallback su Secret Manager (per compatibilità)
   const secretName = `MODEL_API_KEY_${modelProvider.toUpperCase()}`;
   console.log(`Trying to fetch ${secretName} from Secret Manager`);

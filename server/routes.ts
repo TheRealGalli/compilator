@@ -663,7 +663,13 @@ const getGoogleCredentials = async () => {
   let clientId = process.env.GOOGLE_CLIENT_ID;
   let clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-  if (!clientId || !clientSecret) {
+  // Se siamo in Private Cloud saltiamo il Secret Manager e usiamo le var d'ambiente
+  if (process.env.PRIVATE_CLOUD === "true") {
+    return { clientId, clientSecret };
+  }
+
+  // Altrimenti, se mancano (undefined), proviamo Secret Manager
+  if (clientId === undefined || clientSecret === undefined) {
     try {
       clientId = await getSecret('GOOGLE_CLIENT_ID');
       clientSecret = await getSecret('GOOGLE_CLIENT_SECRET');
