@@ -89,6 +89,7 @@ export function ConnectorsSection() {
     const [setupClientSecret, setSetupClientSecret] = useState("");
     const [isDeploying, setIsDeploying] = useState(false);
     const [deployStatus, setDeployStatus] = useState("");
+    const [deployProgress, setDeployProgress] = useState(0);
 
     // Auth status for Cloud Deploy
     const [authStatus, setAuthStatus] = useState<{
@@ -209,7 +210,29 @@ export function ConnectorsSection() {
 
     const handleDeployToCloud = async () => {
         setIsDeploying(true);
-        setDeployStatus("Avvio della procedura... (1/3)");
+        setDeployProgress(5);
+        setDeployStatus("Verifica delle policy IAM in corso... (1/3)");
+
+        toast({
+            title: "Deploy Avviato ✨",
+            description: "Stiamo assemblando il tuo server su Google Cloud. L'operazione richiede circa 3-5 minuti, non chiudere questa finestra."
+        });
+
+        const progressInterval = setInterval(() => {
+            setDeployProgress(prev => {
+                if (prev < 20) {
+                    setDeployStatus("Abilitazione API Serverless (Richiede ~1 min)... (1/3)");
+                    return prev + 1;
+                } else if (prev < 80) {
+                    setDeployStatus("Costruzione dell'immagine Docker in corso... (2/3) (Ancora ~3 min)");
+                    return prev + 0.5;
+                } else if (prev < 95) {
+                    setDeployStatus("Quasi pronto! Configurazione di Cloud Run... (3/3)");
+                    return prev + 0.2;
+                }
+                return prev;
+            });
+        }, 1500);
 
         try {
             const response = await apiRequest("POST", "/api/deploy/private-cloud", {
@@ -219,18 +242,16 @@ export function ConnectorsSection() {
                 googleClientSecret: setupClientSecret
             });
 
+            clearInterval(progressInterval);
+            setDeployProgress(100);
+
             if (!response.ok) {
                 const data = await response.json();
                 throw new Error(data.error || "Errore durante il deploy.");
             }
 
             const data = await response.json();
-            setDeployStatus("Quasi pronto! Configurazione di Cloud Run... (3/3)");
-
-            toast({
-                title: "Deploy Avviato ✨",
-                description: "Stiamo assemblando il tuo server su Google Cloud. L'operazione richiede circa 3-5 minuti, non chiudere questa finestra."
-            });
+            setDeployStatus("Tutto Pronto!");
 
             // If we have a URL, we can suggest it
             if (data.serviceUrl) {
@@ -241,14 +262,17 @@ export function ConnectorsSection() {
             setIsPrivateBackendModalOpen(false);
         } catch (error: any) {
             console.error("Deploy failure:", error);
+            clearInterval(progressInterval);
             toast({
                 title: "Errore Deploy",
                 description: error.message,
                 variant: "destructive"
             });
         } finally {
+            clearInterval(progressInterval);
             setIsDeploying(false);
             setDeployStatus("");
+            setDeployProgress(0);
         }
     };
 
@@ -803,7 +827,7 @@ export function ConnectorsSection() {
                                             <Loader2 className="w-3 h-3 animate-spin" />
                                             <span>{deployStatus}</span>
                                         </div>
-                                        <Progress value={33} className="h-1 bg-slate-800" />
+                                        <Progress value={deployProgress} className="h-1 bg-slate-800" />
                                     </div>
                                 )}
                             </div>
