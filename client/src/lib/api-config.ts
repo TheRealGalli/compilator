@@ -22,6 +22,8 @@ const getBaseUrl = () => {
 export const setCustomBackendUrl = (url: string | null) => {
   if (url) {
     localStorage.setItem('gromit_custom_backend_url', url);
+    // Keep a permanent record of the last successful private cloud URL for quick switching
+    localStorage.setItem('gromit_private_cloud_url', url);
   } else {
     localStorage.removeItem('gromit_custom_backend_url');
   }
@@ -31,6 +33,10 @@ export const setCustomBackendUrl = (url: string | null) => {
 
 export const getCustomBackendUrl = () => {
   return localStorage.getItem('gromit_custom_backend_url');
+};
+
+export const getSavedPrivateCloudUrl = () => {
+  return localStorage.getItem('gromit_private_cloud_url');
 };
 
 export const API_BASE_URL = getBaseUrl();

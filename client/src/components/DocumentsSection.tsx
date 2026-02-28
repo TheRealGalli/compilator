@@ -32,6 +32,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LoginOverlay } from "./LoginOverlay";
 import { AVAILABLE_MODELS } from "@/lib/ollama";
 import { isBridgeAvailable, pingGromitOCR } from "@/lib/local-extractor";
+import { getCustomBackendUrl, getSavedPrivateCloudUrl, setCustomBackendUrl } from "@/lib/api-config";
 
 
 export function DocumentsSection() {
@@ -662,6 +663,26 @@ export function DocumentsSection() {
           </div>
           {/* ... rest of header */}
           <div className="flex items-center gap-2">
+            {getSavedPrivateCloudUrl() && (
+              <div className="flex items-center bg-muted/30 p-1 rounded-lg border border-border/50 mr-2">
+                <Button
+                  variant={getCustomBackendUrl() ? "ghost" : "secondary"}
+                  size="sm"
+                  className={`h-7 px-3 text-xs font-semibold ${!getCustomBackendUrl() ? 'bg-white shadow-sm text-blue-600' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setCustomBackendUrl(null)}
+                >
+                  Cloud
+                </Button>
+                <Button
+                  variant={getCustomBackendUrl() ? "secondary" : "ghost"}
+                  size="sm"
+                  className={`h-7 px-3 text-xs font-semibold ${getCustomBackendUrl() ? 'bg-green-50 shadow-sm text-green-700 border border-green-200/50' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setCustomBackendUrl(getSavedPrivateCloudUrl())}
+                >
+                  Self-Hosted
+                </Button>
+              </div>
+            )}
             <Popover>
               <PopoverTrigger asChild>
                 <Button

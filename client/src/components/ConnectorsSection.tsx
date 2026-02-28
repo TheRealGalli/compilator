@@ -73,6 +73,20 @@ export const TasksLogo = ({ className }: { className?: string }) => (
     </svg>
 );
 
+export const ChatLogo = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
+        <path fill="#00ac47" d="M12 2C6.48 2 2 6.48 2 12c0 2.21.72 4.25 1.93 5.9L3 22l4.09-.94C8.6 21.66 10.25 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm-4 11H6v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z" />
+    </svg>
+);
+
+export const MeetLogo = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
+        <path fill="#00ac47" d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+    </svg>
+);
+
+
+
 export function ConnectorsSection() {
     const { isConnected, isLoading, isFetchingMessages, connect, logout, fetchMessages } = useGmail();
     const {
@@ -534,10 +548,65 @@ export function ConnectorsSection() {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {/* Google Chat Card */}
+                        <Card className="opacity-60 border-dashed flex flex-col hover:opacity-100 transition-all">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
+                                        <ChatLogo className="w-6 h-6" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-lg truncate">Chat</CardTitle>
+                                        <CardDescription className="truncate">Comunicazioni</CardDescription>
+                                    </div>
+                                </div>
+                                <div className="shrink-0 ml-2">
+                                    <Badge variant="outline">In arrivo</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-1 flex flex-col">
+                                <p className="text-sm text-muted-foreground mb-6">
+                                    Analizza le conversazioni per estrarre decisioni, azioni e informazioni chiave.
+                                </p>
+                                <div className="mt-auto">
+                                    <Button variant="outline" className="w-full" disabled>
+                                        Prossimamente
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Google Meet Card */}
+                        <Card className="opacity-60 border-dashed flex flex-col hover:opacity-100 transition-all">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
+                                        <MeetLogo className="w-6 h-6" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-lg truncate">Meet</CardTitle>
+                                        <CardDescription className="truncate">Riunioni & Verbali</CardDescription>
+                                    </div>
+                                </div>
+                                <div className="shrink-0 ml-2">
+                                    <Badge variant="outline">In arrivo</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-1 flex flex-col">
+                                <p className="text-sm text-muted-foreground mb-6">
+                                    Trascrivi e analizza le riunioni per generare verbali, riassunti e follow-up automatici.
+                                </p>
+                                <div className="mt-auto">
+                                    <Button variant="outline" className="w-full" disabled>
+                                        Prossimamente
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </div>
 
-                {/* Pseudonimizzazione Category */}
                 <div className="space-y-4">
                     <h2 className="text-sm font-semibold text-blue-600 uppercase tracking-wider">Pseudonimizzazione</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
@@ -657,7 +726,7 @@ export function ConnectorsSection() {
                                     {currentBackendUrl ? (
                                         <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100 flex gap-1">
                                             <ShieldCheck className="w-3 h-3" />
-                                            Attivo
+                                            Self Hosted
                                         </Badge>
                                     ) : (
                                         <Badge variant="outline">Default Cloud</Badge>
@@ -670,20 +739,30 @@ export function ConnectorsSection() {
                                     {currentBackendUrl && <span className="block mt-2 font-mono text-[10px] break-all opacity-70">{currentBackendUrl}</span>}
                                 </p>
                                 <div className="mt-auto">
-                                    <Button
-                                        variant="outline"
-                                        className="w-full"
-                                        onClick={() => {
-                                            if (!authStatus.hasCloudToken) {
-                                                handleConnectGoogleCloud(true);
-                                            } else {
-                                                setIsPrivateBackendModalOpen(true);
-                                            }
-                                        }}
-                                    >
-                                        <Settings2 className="w-4 h-4 mr-2" />
-                                        Configura
-                                    </Button>
+                                    {currentBackendUrl ? (
+                                        <Button
+                                            variant="outline"
+                                            className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                                            onClick={() => setCustomBackendUrl(null)}
+                                        >
+                                            Disconnetti
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            variant="default"
+                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                            onClick={() => {
+                                                if (!authStatus.hasCloudToken) {
+                                                    handleConnectGoogleCloud(true);
+                                                } else {
+                                                    setIsPrivateBackendModalOpen(true);
+                                                }
+                                            }}
+                                        >
+                                            <Settings2 className="w-4 h-4 mr-2" />
+                                            Configura
+                                        </Button>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
