@@ -75,7 +75,7 @@ export const TasksLogo = ({ className }: { className?: string }) => (
 
 export const ChatLogo = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
-        <path fill="#00ac47" d="M12 2C6.48 2 2 6.48 2 12c0 2.21.72 4.25 1.93 5.9L3 22l4.09-.94C8.6 21.66 10.25 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm-4 11H6v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z" />
+        <path fill="#00ac47" d="M12 2C6.48 2 2 6.48 2 12c0 2.21.72 4.25 1.93 5.9L3 22l4.09-.94C8.6 21.66 10.25 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2z m-3 11h-2v-2h2v2z m4 0h-2v-2h2v2z m4 0h-2v-2h2v2z" />
     </svg>
 );
 
