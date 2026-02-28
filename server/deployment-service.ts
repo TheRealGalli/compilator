@@ -110,43 +110,78 @@ export class DeploymentService {
     }
 
     async deployToCloudRun(projectId: string, serviceName: string, envVars: Record<string, string>) {
-        const service = {
-            apiVersion: 'serving.knative.dev/v1',
-            kind: 'Service',
-            metadata: {
-                name: serviceName,
-                namespace: projectId
-            },
-            spec: {
-                template: {
-                    spec: {
-                        containers: [
-                            {
-                                image: `gcr.io/${projectId}/gromit-backend`,
-                                env: Object.entries(envVars).map(([name, value]) => ({ name, value }))
-                            }
-                        ]
-                    }
-                }
+        const run = google.run({ version: 'v2', auth: this.auth as any });
+        const location = 'europe-west1';
+        const parent = `projects/${projectId}/locations/${location}`;
+        const servicePath = `${parent}/services/${serviceName}`;
+
+        const serviceBody = {
+            template: {
+                containers: [{
+                    image: `gcr.io/${projectId}/gromit-backend`,
+                    env: Object.entries(envVars).map(([name, value]) => ({ name, value }))
+                }]
             }
         };
 
-        console.log(`[Deployment] Deploying ${serviceName} to Cloud Run in ${projectId} via REST API...`);
+        console.log(`[Deployment] Deploying ${serviceName} to Cloud Run in ${projectId} via v2 API...`);
 
-        const response = await fetch(`https://europe-west1-run.googleapis.com/apis/serving.knative.dev/v1/namespaces/${projectId}/services`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.accessToken}`
-            },
-            body: JSON.stringify(service)
-        });
+        let operationName = '';
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Deploy HTTP Error ${response.status}: ${errorText}`);
+        try {
+            const createResponse = await run.projects.locations.services.create({
+                parent,
+                serviceId: serviceName,
+                requestBody: serviceBody
+            });
+            operationName = createResponse.data.name!;
+            console.log(`[Deployment] Create operation started: ${operationName}`);
+        } catch (error: any) {
+            if (error.code === 409 || (error.message && error.message.includes('already exists'))) {
+                console.log(`[Deployment] Service ${serviceName} exists, pitching update instead...`);
+                // Cloud Run v2 requires patching existing services instead of creating
+                const patchResponse = await run.projects.locations.services.patch({
+                    name: servicePath,
+                    requestBody: serviceBody
+                });
+                operationName = patchResponse.data.name!;
+                console.log(`[Deployment] Patch operation started: ${operationName}`);
+            } else {
+                throw new Error(`Failed to initiate Cloud Run deployment: ${error.message}`);
+            }
         }
 
-        return await response.json();
+        console.log(`[Deployment] Waiting for Cloud Run operation to complete...`);
+        return new Promise<any>((resolve, reject) => {
+            const checkStatus = async () => {
+                try {
+                    const opResponse = await run.projects.locations.operations.get({
+                        name: operationName
+                    });
+
+                    const op = opResponse.data;
+                    if (op.done) {
+                        if (op.error) {
+                            reject(new Error(`Cloud Run deployment failed: ${op.error.message}`));
+                        } else {
+                            // Fetch the fully deployed service to get the final URL
+                            const serviceResponse = await run.projects.locations.services.get({
+                                name: servicePath
+                            });
+                            // Cloud Run v2 SDK puts the URL in `uri` property
+                            resolve({
+                                status: { url: serviceResponse.data.uri }
+                            });
+                        }
+                    } else {
+                        // Check again in 5 seconds
+                        setTimeout(checkStatus, 5000);
+                    }
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            setTimeout(checkStatus, 5000);
+        });
     }
 }
