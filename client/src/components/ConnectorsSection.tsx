@@ -264,98 +264,126 @@ export function ConnectorsSection() {
 
         try {
             // STEP 1: Enable APIs & Start Build
+            console.log("[MagicDeploy:FE] Step 1: calling /step1...");
+            setDeployStatus("Step 1/4: Abilitazione API e avvio build...");
             const res1 = await apiRequest("POST", "/api/deploy/private-cloud/step1", {
                 projectId: setupProjectId,
                 geminiApiKey: setupGeminiKey
             });
+            console.log("[MagicDeploy:FE] Step 1 response status:", res1.status);
             if (!res1.ok) {
                 const errData = await res1.json();
-                throw new Error(errData.error || "Errore in avvio build (Step 1).");
+                throw new Error(errData.error || `Step 1 fallito (HTTP ${res1.status})`);
             }
             const data1 = await res1.json();
             const buildId = data1.buildId;
+            console.log("[MagicDeploy:FE] Step 1 OK. Build ID:", buildId);
+            setDeployProgress(20);
 
             // STEP 2: Poll Build Status
-            setDeployStatus("Costruzione dell'immagine Docker in corso... (2/3)");
+            setDeployStatus(`Step 2/4: Build Docker in corso (ID: ${buildId?.slice(0, 8)}...)...`);
             let buildStatus = 'WORKING';
+            let pollCount = 0;
             while (buildStatus === 'WORKING' || buildStatus === 'PENDING' || buildStatus === 'QUEUED') {
                 await new Promise(r => setTimeout(r, 10000));
+                pollCount++;
+                console.log(`[MagicDeploy:FE] Step 2: polling build status (attempt ${pollCount})...`);
                 const res2 = await apiRequest("POST", "/api/deploy/private-cloud/status", {
                     projectId: setupProjectId,
                     buildId
                 });
+                console.log("[MagicDeploy:FE] Step 2 response status:", res2.status);
                 if (!res2.ok) {
                     const errData = await res2.json();
-                    throw new Error(errData.error || "Errore durante check status (Step 2).");
+                    throw new Error(errData.error || `Step 2 status check fallito (HTTP ${res2.status})`);
                 }
                 const data2 = await res2.json();
                 buildStatus = data2.status;
+                console.log(`[MagicDeploy:FE] Step 2: build status = "${buildStatus}" (poll #${pollCount})`);
+                setDeployStatus(`Step 2/4: Build Docker... stato: ${buildStatus} (check #${pollCount})`);
+                setDeployProgress(20 + Math.min(pollCount * 3, 50));
 
                 if (['FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED'].includes(buildStatus)) {
                     throw new Error(`Cloud Build fallita con stato: ${buildStatus}`);
                 }
             }
+            console.log("[MagicDeploy:FE] Step 2 OK. Build completed with status:", buildStatus);
+            setDeployProgress(75);
 
             // STEP 3: Start Cloud Run Deploy
-            setDeployStatus("Quasi pronto! Configurazione di Cloud Run... (3/3)");
-            setDeployProgress(85);
+            console.log("[MagicDeploy:FE] Step 3: calling /step2 (Cloud Run deploy)...");
+            setDeployStatus("Step 3/4: Avvio deploy Cloud Run...");
             const res3 = await apiRequest("POST", "/api/deploy/private-cloud/step2", {
                 projectId: setupProjectId,
                 geminiApiKey: setupGeminiKey,
                 googleClientId: setupClientId,
                 googleClientSecret: setupClientSecret
             });
+            console.log("[MagicDeploy:FE] Step 3 response status:", res3.status);
 
             if (!res3.ok) {
                 const errData = await res3.json();
-                throw new Error(errData.error || "Errore durante l'avvio del deploy su Cloud Run (Step 3).");
+                throw new Error(errData.error || `Step 3 fallito (HTTP ${res3.status})`);
             }
 
             const data3 = await res3.json();
             const runOperationName = data3.operationName;
             const runServicePath = data3.servicePath;
+            console.log("[MagicDeploy:FE] Step 3 OK. Operation:", runOperationName, "Service:", runServicePath);
+            setDeployProgress(80);
 
-            // Poll Cloud Run operation status
+            // STEP 4: Poll Cloud Run operation status
+            setDeployStatus("Step 4/4: Attesa completamento Cloud Run...");
             let runDone = false;
             let serviceUrl = null;
+            let runPollCount = 0;
             while (!runDone) {
                 await new Promise(r => setTimeout(r, 5000));
+                runPollCount++;
+                console.log(`[MagicDeploy:FE] Step 4: polling Cloud Run status (attempt ${runPollCount})...`);
                 const resRun = await apiRequest("POST", "/api/deploy/private-cloud/status-run", {
                     operationName: runOperationName,
                     servicePath: runServicePath
                 });
+                console.log("[MagicDeploy:FE] Step 4 response status:", resRun.status);
                 if (!resRun.ok) {
                     const errData = await resRun.json();
-                    throw new Error(errData.error || "Errore durante check status Cloud Run.");
+                    throw new Error(errData.error || `Step 4 status check fallito (HTTP ${resRun.status})`);
                 }
                 const dataRun = await resRun.json();
                 runDone = dataRun.done;
                 serviceUrl = dataRun.serviceUrl;
+                console.log(`[MagicDeploy:FE] Step 4: done=${runDone}, serviceUrl=${serviceUrl} (poll #${runPollCount})`);
+                setDeployStatus(`Step 4/4: Cloud Run... ${runDone ? 'COMPLETATO' : 'in corso'} (check #${runPollCount})`);
+                setDeployProgress(80 + Math.min(runPollCount * 2, 18));
             }
 
             clearInterval(progressInterval);
             setDeployProgress(100);
-            setDeployStatus("Tutto Pronto!");
+            setDeployStatus("✅ Tutto Pronto!");
+            console.log("[MagicDeploy:FE] SUCCESS! serviceUrl:", serviceUrl);
 
             toast({
                 title: "Deploy Completato! 🚀",
                 description: serviceUrl
-                    ? `Il tuo backend privato è attivo su: ${serviceUrl}`
-                    : "Il tuo backend privato è stato creato con successo!",
+                    ? `Backend privato attivo su: ${serviceUrl}`
+                    : "Backend privato creato con successo!",
             });
 
             if (serviceUrl) {
-                // Save URL and reload page - setCustomBackendUrl handles localStorage + reload
+                // Save URL and reload page
                 setTimeout(() => {
                     setCustomBackendUrl(serviceUrl);
-                }, 1500); // Small delay so user sees the toast
+                }, 2000);
             } else {
+                console.warn("[MagicDeploy:FE] WARNING: serviceUrl is null/empty!");
                 setWizardStep("setup");
                 setIsPrivateBackendModalOpen(false);
             }
         } catch (error: any) {
-            console.error("Deploy failure:", error);
+            console.error("[MagicDeploy:FE] DEPLOY FAILURE:", error);
             clearInterval(progressInterval);
+            setDeployStatus(`❌ Errore: ${error.message}`);
             toast({
                 title: "Errore Deploy",
                 description: error.message,
@@ -363,9 +391,12 @@ export function ConnectorsSection() {
             });
         } finally {
             clearInterval(progressInterval);
-            setIsDeploying(false);
-            setDeployStatus("");
-            setDeployProgress(0);
+            // Don't reset immediately - let the user see the final status
+            setTimeout(() => {
+                setIsDeploying(false);
+                setDeployStatus("");
+                setDeployProgress(0);
+            }, 5000);
         }
     };
 
