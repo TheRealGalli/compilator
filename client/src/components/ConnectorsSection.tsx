@@ -337,12 +337,22 @@ export function ConnectorsSection() {
             setDeployProgress(100);
             setDeployStatus("Tutto Pronto!");
 
-            if (serviceUrl) {
-                setTempBackendUrl(serviceUrl);
-            }
+            toast({
+                title: "Deploy Completato! 🚀",
+                description: serviceUrl
+                    ? `Il tuo backend privato è attivo su: ${serviceUrl}`
+                    : "Il tuo backend privato è stato creato con successo!",
+            });
 
-            setWizardStep("setup");
-            setIsPrivateBackendModalOpen(false);
+            if (serviceUrl) {
+                // Save URL and reload page - setCustomBackendUrl handles localStorage + reload
+                setTimeout(() => {
+                    setCustomBackendUrl(serviceUrl);
+                }, 1500); // Small delay so user sees the toast
+            } else {
+                setWizardStep("setup");
+                setIsPrivateBackendModalOpen(false);
+            }
         } catch (error: any) {
             console.error("Deploy failure:", error);
             clearInterval(progressInterval);
