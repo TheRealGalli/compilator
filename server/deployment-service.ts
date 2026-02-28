@@ -110,12 +110,6 @@ export class DeploymentService {
     }
 
     async deployToCloudRun(projectId: string, serviceName: string, envVars: Record<string, string>) {
-        const run = google.run({
-            version: 'v1',
-            auth: this.auth as any,
-            rootUrl: 'https://europe-west1-run.googleapis.com'
-        });
-
         const service = {
             apiVersion: 'serving.knative.dev/v1',
             kind: 'Service',
@@ -137,12 +131,22 @@ export class DeploymentService {
             }
         };
 
-        console.log(`[Deployment] Deploying ${serviceName} to Cloud Run in ${projectId}...`);
-        const response = await run.namespaces.services.create({
-            parent: `namespaces/${projectId}`,
-            requestBody: service
+        console.log(`[Deployment] Deploying ${serviceName} to Cloud Run in ${projectId} via REST API...`);
+
+        const response = await fetch(`https://europe-west1-run.googleapis.com/apis/serving.knative.dev/v1/namespaces/${projectId}/services`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.accessToken}`
+            },
+            body: JSON.stringify(service)
         });
 
-        return response.data;
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Deploy HTTP Error ${response.status}: ${errorText}`);
+        }
+
+        return await response.json();
     }
 }
