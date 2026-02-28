@@ -59,6 +59,20 @@ export const ContactsLogo = ({ className }: { className?: string }) => (
     </svg>
 );
 
+export const SlidesLogo = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
+        <path fill="#FBBC04" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z" />
+        <path fill="#FBBC04" d="M7 12h10v2H7zm0-4h10v2H7z" />
+    </svg>
+);
+
+export const TasksLogo = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className}>
+        <circle cx="12" cy="12" r="10" fill="#4285F4" />
+        <path d="M7 12.5l3 3 7-7" fill="none" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+);
+
 export function ConnectorsSection() {
     const { isConnected, isLoading, isFetchingMessages, connect, logout, fetchMessages } = useGmail();
     const {
@@ -349,7 +363,7 @@ export function ConnectorsSection() {
                                         <DriveLogo className="w-6 h-6" />
                                     </div>
                                     <div className="min-w-0">
-                                        <CardTitle className="text-lg truncate">Google Drive</CardTitle>
+                                        <CardTitle className="text-lg truncate">Drive</CardTitle>
                                         <CardDescription className="truncate">File & Documenti</CardDescription>
                                     </div>
                                 </div>
@@ -456,6 +470,62 @@ export function ConnectorsSection() {
                             <CardContent className="pt-4 flex-1 flex flex-col">
                                 <p className="text-sm text-muted-foreground mb-6">
                                     Riconosci e aggiorna i referenti estratti dai documenti nella tua rubrica aziendale.
+                                </p>
+                                <div className="mt-auto">
+                                    <Button variant="outline" className="w-full" disabled>
+                                        Prossimamente
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Google Slides Card */}
+                        <Card className="opacity-60 border-dashed flex flex-col hover:opacity-100 transition-all">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
+                                        <SlidesLogo className="w-6 h-6" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-lg truncate">Slides</CardTitle>
+                                        <CardDescription className="truncate">Presentazioni AI</CardDescription>
+                                    </div>
+                                </div>
+                                <div className="shrink-0 ml-2">
+                                    <Badge variant="outline">In arrivo</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-1 flex flex-col">
+                                <p className="text-sm text-muted-foreground mb-6">
+                                    Genera e aggiorna presentazioni aziendali a partire dai documenti estratti.
+                                </p>
+                                <div className="mt-auto">
+                                    <Button variant="outline" className="w-full" disabled>
+                                        Prossimamente
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Google Tasks Card */}
+                        <Card className="opacity-60 border-dashed flex flex-col hover:opacity-100 transition-all">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
+                                        <TasksLogo className="w-6 h-6" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <CardTitle className="text-lg truncate">Tasks</CardTitle>
+                                        <CardDescription className="truncate">Gestione Attività</CardDescription>
+                                    </div>
+                                </div>
+                                <div className="shrink-0 ml-2">
+                                    <Badge variant="outline">In arrivo</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-1 flex flex-col">
+                                <p className="text-sm text-muted-foreground mb-6">
+                                    Sincronizza e assegna task operativi estratti da contratti o brief.
                                 </p>
                                 <div className="mt-auto">
                                     <Button variant="outline" className="w-full" disabled>
