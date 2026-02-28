@@ -370,7 +370,7 @@ export function ConnectorsSection() {
                         </Card>
 
                         {/* Google Drive Card */}
-                        <Card className={`border-2 transition-all flex flex-col ${isConnected ? 'hover:border-primary/20' : 'opacity-60 border-dashed'}`}>
+                        <Card className="border-2 hover:border-primary/20 transition-all flex flex-col">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-white border border-slate-100 shadow-sm rounded-lg flex items-center justify-center w-10 h-10 shrink-0">
