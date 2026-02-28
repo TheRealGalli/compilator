@@ -3768,37 +3768,66 @@ ${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Pyt
   });
 
 
-  // --- PRIVATE CLOUD DEPLOYMENT ENGINE ---
-  app.post("/api/deploy/private-cloud", async (req, res) => {
+  // --- PRIVATE CLOUD DEPLOYMENT ENGINE (MULTI-STEP) ---
+
+  app.post("/api/deploy/private-cloud/step1", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
 
-    const { projectId, geminiApiKey, googleClientId, googleClientSecret } = req.body;
-
+    const { projectId, geminiApiKey } = req.body;
     if (!projectId || !geminiApiKey) {
       return res.status(400).json({ error: "Project ID and Gemini API Key are required." });
     }
 
-    const user = req.user as any;
-    // Get access token from session (linked to the Cloud Platform scope)
     const accessToken = (req.session as any).tokens?.access_token || req.headers['x-gcp-token'];
-
-    if (!accessToken) {
-      return res.status(401).json({ error: "Missing Google Access Token. Please re-login with Cloud permissions." });
-    }
+    if (!accessToken) return res.status(401).json({ error: "Missing Google Access Token." });
 
     const deployer = new DeploymentService(accessToken as string);
 
     try {
-      console.log(`[MagicDeploy] Starting deployment for project: ${projectId}`);
-
-      // 1. Enable APIs
+      console.log(`[MagicDeploy] Step 1: Enabling APIs and starting Build for ${projectId}`);
       await deployer.enableApis(projectId);
+      const repoUrl = "https://github.com/TheRealGalli/compilator";
+      const buildId = await deployer.startBuild(projectId, repoUrl, false); // wait = false
+      res.json({ message: "Build started", buildId });
+    } catch (error: any) {
+      console.error("[MagicDeploy] Step 1 Error:", error);
+      res.status(500).json({ error: error.message || "Failed to start private cloud build." });
+    }
+  });
 
-      // 2. Start Build
-      const repoUrl = "https://github.com/TheRealGalli/compilator"; // Current app repo
-      const buildId = await deployer.startBuild(projectId, repoUrl);
+  app.post("/api/deploy/private-cloud/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
 
-      // 3. Deploy to Cloud Run (Defaulting to europe-west1)
+    const { projectId, buildId } = req.body;
+    if (!projectId || !buildId) return res.status(400).json({ error: "Project ID and Build ID required." });
+
+    const accessToken = (req.session as any).tokens?.access_token || req.headers['x-gcp-token'];
+    if (!accessToken) return res.status(401).json({ error: "Missing Google Access Token." });
+
+    const deployer = new DeploymentService(accessToken as string);
+
+    try {
+      const status = await deployer.checkBuildStatus(projectId, buildId);
+      res.json({ status });
+    } catch (error: any) {
+      console.error("[MagicDeploy] Status Error:", error);
+      res.status(500).json({ error: error.message || "Failed to check build status." });
+    }
+  });
+
+  app.post("/api/deploy/private-cloud/step2", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+
+    const { projectId, geminiApiKey, googleClientId, googleClientSecret } = req.body;
+    if (!projectId || !geminiApiKey) return res.status(400).json({ error: "Project ID and Gemini API Key required." });
+
+    const accessToken = (req.session as any).tokens?.access_token || req.headers['x-gcp-token'];
+    if (!accessToken) return res.status(401).json({ error: "Missing Google Access Token." });
+
+    const deployer = new DeploymentService(accessToken as string);
+
+    try {
+      console.log(`[MagicDeploy] Step 2: Deploying to Cloud Run for ${projectId}`);
       const envVars = {
         "NODE_ENV": "production",
         "STORAGE_MODE": "local",
@@ -3813,12 +3842,11 @@ ${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Pyt
       const result = await deployer.deployToCloudRun(projectId, "gromit-backend", envVars);
 
       res.json({
-        message: "Deployment started successfully!",
-        buildId,
+        message: "Deployment completed successfully!",
         serviceUrl: (result as any).status?.url
       });
     } catch (error: any) {
-      console.error("[MagicDeploy] Error:", error);
+      console.error("[MagicDeploy] Step 2 Error:", error);
       res.status(500).json({ error: error.message || "Failed to deploy private cloud backend." });
     }
   });

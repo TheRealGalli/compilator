@@ -263,7 +263,43 @@ export function ConnectorsSection() {
         }, 1500);
 
         try {
-            const response = await apiRequest("POST", "/api/deploy/private-cloud", {
+            // STEP 1: Enable APIs & Start Build
+            const res1 = await apiRequest("POST", "/api/deploy/private-cloud/step1", {
+                projectId: setupProjectId,
+                geminiApiKey: setupGeminiKey
+            });
+            if (!res1.ok) {
+                const errData = await res1.json();
+                throw new Error(errData.error || "Errore in avvio build (Step 1).");
+            }
+            const data1 = await res1.json();
+            const buildId = data1.buildId;
+
+            // STEP 2: Poll Build Status
+            setDeployStatus("Costruzione dell'immagine Docker in corso... (2/3)");
+            let buildStatus = 'WORKING';
+            while (buildStatus === 'WORKING' || buildStatus === 'PENDING' || buildStatus === 'QUEUED') {
+                await new Promise(r => setTimeout(r, 10000));
+                const res2 = await apiRequest("POST", "/api/deploy/private-cloud/status", {
+                    projectId: setupProjectId,
+                    buildId
+                });
+                if (!res2.ok) {
+                    const errData = await res2.json();
+                    throw new Error(errData.error || "Errore durante check status (Step 2).");
+                }
+                const data2 = await res2.json();
+                buildStatus = data2.status;
+
+                if (['FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED'].includes(buildStatus)) {
+                    throw new Error(`Cloud Build fallita con stato: ${buildStatus}`);
+                }
+            }
+
+            // STEP 3: Deploy to Cloud Run
+            setDeployStatus("Quasi pronto! Configurazione di Cloud Run... (3/3)");
+            setDeployProgress(85);
+            const res3 = await apiRequest("POST", "/api/deploy/private-cloud/step2", {
                 projectId: setupProjectId,
                 geminiApiKey: setupGeminiKey,
                 googleClientId: setupClientId,
@@ -273,17 +309,16 @@ export function ConnectorsSection() {
             clearInterval(progressInterval);
             setDeployProgress(100);
 
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || "Errore durante il deploy.");
+            if (!res3.ok) {
+                const errData = await res3.json();
+                throw new Error(errData.error || "Errore durante il deploy su Cloud Run (Step 3).");
             }
 
-            const data = await response.json();
+            const data3 = await res3.json();
             setDeployStatus("Tutto Pronto!");
 
-            // If we have a URL, we can suggest it
-            if (data.serviceUrl) {
-                setTempBackendUrl(data.serviceUrl);
+            if (data3.serviceUrl) {
+                setTempBackendUrl(data3.serviceUrl);
             }
 
             setWizardStep("setup");

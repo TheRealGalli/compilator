@@ -39,7 +39,7 @@ export class DeploymentService {
         }
     }
 
-    async startBuild(projectId: string, repoUrl: string) {
+    async startBuild(projectId: string, repoUrl: string, wait: boolean = true) {
         const cloudbuild = google.cloudbuild({ version: 'v1', auth: this.auth as any });
 
         // We target a specific branch (main) for the build
@@ -73,10 +73,22 @@ export class DeploymentService {
             throw new Error('Failed to start Cloud Build: No build ID returned.');
         }
 
-        console.log(`[Deployment] Build ${buildId} started. Waiting for completion...`);
-        await this.waitForBuild(cloudbuild, projectId, buildId);
+        console.log(`[Deployment] Build ${buildId} started. Wait=${wait}`);
+
+        if (wait) {
+            await this.waitForBuild(cloudbuild, projectId, buildId);
+        }
 
         return buildId;
+    }
+
+    async checkBuildStatus(projectId: string, buildId: string) {
+        const cloudbuild = google.cloudbuild({ version: 'v1', auth: this.auth as any });
+        const response = await cloudbuild.projects.builds.get({
+            projectId,
+            id: buildId
+        });
+        return response.data.status;
     }
 
     private async waitForBuild(cloudbuild: any, projectId: string, buildId: string) {
