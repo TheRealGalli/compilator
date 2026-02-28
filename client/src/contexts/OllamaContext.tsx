@@ -45,6 +45,8 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
         refetchOnWindowFocus: false,
     });
 
+    const hasFailedInitialCheck = useRef(false);
+
     const checkStatus = useCallback(async () => {
         // Fallback: Don't check if not authenticated or not yet attempted
         if (!isAuthAttempted || !user) {
@@ -85,23 +87,25 @@ export function OllamaProvider({ children }: { children: React.ReactNode }) {
         }
     }, [checkStatus, isAuthAttempted]);
 
-    // Controllo periodico separato (ogni 30 secondi)
     // Usiamo una ref per accedere allo stato corrente senza triggerare l'effect
     const statusRef = useRef(status);
     useEffect(() => {
         statusRef.current = status;
     }, [status]);
 
-    const hasFailedInitialCheck = useRef(false);
-
+    // Listener per la tab focus: se torniamo sulla tab, controlliamo lo status
     useEffect(() => {
-        const interval = setInterval(() => {
+        const handleFocus = () => {
             if (statusRef.current !== 'connected' && !hasFailedInitialCheck.current) {
                 checkStatus();
+            } else if (hasFailedInitialCheck.current) {
+                // Se aveva fallito in precedenza ma ora l'utente torna sulla pagina, riprova una volta.
+                checkStatus();
             }
-        }, 30000);
-        return () => clearInterval(interval);
-    }, [checkStatus]); // NOTA: status NON deve essere qui o causerà un loop infinito
+        };
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }, [checkStatus]);
 
     const connectAccount = useCallback(async (email: string, token: string) => {
         // Simuliamo un delay di connessione
