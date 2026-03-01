@@ -13,7 +13,7 @@ export function LoginOverlay() {
     return (
         <div className="absolute inset-0 z-50 flex items-stretch bg-[#002aff] animate-in fade-in duration-500">
             {/* LEFT COLUMN: Greeting (1/3) */}
-            <div className="flex-1 flex flex-col justify-center p-8 text-white border-r border-white/10 overflow-hidden">
+            <div className="flex-1 flex flex-col justify-start pt-[20vh] lg:pt-[25vh] p-8 text-white border-r border-white/10 overflow-hidden relative">
                 <h1 className="text-3xl font-bold mb-4 tracking-tight">Benvenuto in Gromit</h1>
                 <p className="text-base opacity-90 leading-relaxed">
                     La piattaforma avanzata per l'analisi e la compilazione dei tuoi documenti.
@@ -54,12 +54,12 @@ export function LoginOverlay() {
             </div>
 
             {/* RIGHT COLUMN: Information & Links (1/3) */}
-            <div className="flex-1 flex flex-col justify-center p-8 border-l border-white/10 bg-black/10">
-                <h3 className="text-xl font-medium text-white mb-6 flex items-center gap-2">
-                    <Info className="w-5 h-5" /> Informazioni
+            <div className="flex-1 flex flex-col justify-start pt-[20vh] lg:pt-[25vh] p-8 pb-20 border-l border-white/10 bg-black/10 relative">
+                <h3 className="text-2xl font-semibold text-white mb-4 flex items-center gap-2 tracking-tight">
+                    <Info className="w-6 h-6" /> Informazioni
                 </h3>
 
-                <ul className="space-y-4 text-white/80">
+                <ul className="mt-8 space-y-4 text-white/80">
                     <li>
                         <a href="#" className="flex items-center gap-3 hover:text-white hover:underline transition-colors group">
                             <span className="w-1.5 h-1.5 rounded-full bg-white/50 group-hover:bg-white transition-colors shrink-0" />
@@ -93,7 +93,7 @@ export function LoginOverlay() {
                     </li>
                 </ul>
 
-                <div className="mt-12 text-white/40 text-xs text-center border-t border-white/5 pt-6">
+                <div className="absolute bottom-0 left-0 right-0 pb-3 pt-4 text-white/40 text-xs text-center border-t border-white/5">
                     © 2025 CSD Station LLC. All rights reserved.
                 </div>
             </div>
