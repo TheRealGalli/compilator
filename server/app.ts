@@ -132,6 +132,27 @@ function createApp() {
     }
   }));
 
+  // PRIVATE_CLOUD MODE: Skip authentication for all requests
+  // In private cloud mode, the backend is the user's own server.
+  // Auth happens on the main backend — this server just processes requests.
+  if (process.env.PRIVATE_CLOUD === 'true') {
+    console.log('[PRIVATE_CLOUD] Running in private cloud mode — auth bypass enabled');
+    app.use((req: Request, _res: Response, next: NextFunction) => {
+      // Simulate an authenticated user so all existing auth checks pass
+      if (!req.user) {
+        (req as any).user = {
+          id: 'private-cloud-owner',
+          email: process.env.PRIVATE_CLOUD_OWNER || 'owner@private-cloud',
+          displayName: 'Private Cloud Owner',
+          plan: 'pro'
+        };
+        // Make req.isAuthenticated() return true
+        (req as any).isAuthenticated = () => true;
+      }
+      next();
+    });
+  }
+
   // Body parsing middleware
   app.use(express.json({
     limit: '250mb',
