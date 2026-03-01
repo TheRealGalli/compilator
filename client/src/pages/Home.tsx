@@ -33,11 +33,25 @@ export default function Home() {
   });
 
   // Global Auth Loading Check to prevent "Login Flash"
-  const { isFetched: isAuthAttempted, refetch: refetchUser } = useQuery({
+  const { data: userData, isFetched: isAuthAttempted, refetch: refetchUser } = useQuery({
     queryKey: ['/api/user'],
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  // Restore self-hosted URL from user profile when logging in
+  useEffect(() => {
+    if (userData && (userData as any).selfHostedUrl) {
+      const serverUrl = (userData as any).selfHostedUrl;
+      const localUrl = localStorage.getItem('gromit_custom_backend_url');
+      if (!localUrl && serverUrl) {
+        console.log('[Session] Restoring selfHostedUrl from profile:', serverUrl);
+        localStorage.setItem('gromit_custom_backend_url', serverUrl);
+        localStorage.setItem('gromit_private_cloud_url', serverUrl);
+        window.location.reload();
+      }
+    }
+  }, [userData]);
 
   // Ensure session remains stable on soft refresh and handle navigation from hash
   useEffect(() => {

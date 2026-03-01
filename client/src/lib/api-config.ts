@@ -66,11 +66,18 @@ export const API_BASE_URL = getMainBackendUrl();
 export const setCustomBackendUrl = (url: string | null) => {
   if (url) {
     localStorage.setItem('gromit_custom_backend_url', url);
-    // Keep a permanent record of the last successful private cloud URL for quick switching
     localStorage.setItem('gromit_private_cloud_url', url);
   } else {
     localStorage.removeItem('gromit_custom_backend_url');
   }
+  // Persist to user profile on the backend (fire-and-forget)
+  const mainBackend = getMainBackendUrl();
+  fetch(`${mainBackend}/api/user/self-hosted-url`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ selfHostedUrl: url }),
+  }).catch(() => { /* silently ignore if not authenticated */ });
   // Reload page to apply changes across the app
   window.location.reload();
 };

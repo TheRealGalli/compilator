@@ -995,7 +995,7 @@ export function ConnectorsSection() {
                                         onChange={(e) => setSetupProjectId(e.target.value)}
                                     />
                                     <p className="text-[10px] text-muted-foreground leading-relaxed">
-                                        Puoi usare il progetto autogenerato (es. <code>gen-lang-client-xxx</code>) visibile su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline font-bold">AI Studio</a>.
+                                        Crea un progetto su <a href="https://console.cloud.google.com/projectcreate" target="_blank" className="text-blue-500 underline font-bold">Google Cloud Console</a> e copia l'ID qui.
                                     </p>
                                     <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-rose-700 text-[10px] flex items-start gap-2">
                                         <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />

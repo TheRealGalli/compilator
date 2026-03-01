@@ -908,11 +908,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User & License Routes
   app.get('/api/user', (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+    const user = req.user as any;
     const userPayload = {
-      ...(req.user as any),
-      avatarUrl: (req.session as any).avatarUrl
+      ...user,
+      avatarUrl: (req.session as any).avatarUrl,
+      selfHostedUrl: user.selfHostedUrl || null
     };
     res.json(userPayload);
+  });
+
+  // Save/remove self-hosted backend URL in user profile
+  app.patch('/api/user/self-hosted-url', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const userId = (req.user as any).id;
+    const { selfHostedUrl } = req.body; // null to clear
+    try {
+      await storage.updateUser(userId, { selfHostedUrl: selfHostedUrl || null });
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error('[API] Failed to save selfHostedUrl:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
 

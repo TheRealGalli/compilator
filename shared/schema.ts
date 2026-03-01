@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   planTier: text("plan_tier", { enum: ['free', 'pro', 'enterprise'] }).default('free').notNull(),
   usageMetrics: jsonb("usage_metrics").$type<{ total_compilations: number, last_reset: string }>().default({ total_compilations: 0, last_reset: new Date().toISOString() }),
   subscriptionStatus: text("subscription_status").default('active'),
+  selfHostedUrl: text("self_hosted_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
