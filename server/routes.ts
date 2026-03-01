@@ -3779,9 +3779,9 @@ ${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Pyt
   app.post("/api/deploy/private-cloud/step1", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
 
-    const { projectId, geminiApiKey } = req.body;
-    if (!projectId || !geminiApiKey) {
-      return res.status(400).json({ error: "Project ID and Gemini API Key are required." });
+    const { projectId } = req.body;
+    if (!projectId) {
+      return res.status(400).json({ error: "Project ID is required." });
     }
 
     const accessToken = (req.session as any).tokens?.access_token || req.headers['x-gcp-token'];
@@ -3824,8 +3824,8 @@ ${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Pyt
   app.post("/api/deploy/private-cloud/step2", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
 
-    const { projectId, geminiApiKey, googleClientId, googleClientSecret } = req.body;
-    if (!projectId || !geminiApiKey) return res.status(400).json({ error: "Project ID and Gemini API Key required." });
+    const { projectId, googleClientId, googleClientSecret } = req.body;
+    if (!projectId) return res.status(400).json({ error: "Project ID required." });
 
     const accessToken = (req.session as any).tokens?.access_token || req.headers['x-gcp-token'];
     if (!accessToken) return res.status(401).json({ error: "Missing Google Access Token." });
@@ -3839,7 +3839,6 @@ ${activeModeName === 'RUN' ? `- **Strumenti disponibili**: Esecuzione codice Pyt
         "STORAGE_MODE": "local",
         "PRIVATE_CLOUD": "true",
         "GCP_PROJECT_ID": projectId,
-        "GEMINI_API_KEY": geminiApiKey,
         "GOOGLE_CLIENT_ID": googleClientId || "",
         "GOOGLE_CLIENT_SECRET": googleClientSecret || "",
         "FRONTEND_URL": "https://therealgalli.github.io/compilator",

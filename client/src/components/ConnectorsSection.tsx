@@ -112,7 +112,6 @@ export function ConnectorsSection() {
     // Wizard State
     const [wizardStep, setWizardStep] = useState<"setup" | "keys" | "deploy">("setup");
     const [setupProjectId, setSetupProjectId] = useState("");
-    const [setupGeminiKey, setSetupGeminiKey] = useState("");
     const [setupClientId, setSetupClientId] = useState("");
     const [setupClientSecret, setSetupClientSecret] = useState("");
     const [isDeploying, setIsDeploying] = useState(false);
@@ -152,7 +151,6 @@ export function ConnectorsSection() {
             try {
                 const state = JSON.parse(savedWizard);
                 setSetupProjectId(state.projectId || "");
-                setSetupGeminiKey(state.geminiKey || "");
                 setSetupClientId(state.clientId || "");
                 setSetupClientSecret(state.clientSecret || "");
                 setWizardStep(state.step || "setup");
@@ -170,7 +168,6 @@ export function ConnectorsSection() {
         // Salva lo stato attuale per ripristinarlo dopo il redirect
         localStorage.setItem("gromit_wizard_state", JSON.stringify({
             projectId: setupProjectId,
-            geminiKey: setupGeminiKey,
             clientId: setupClientId,
             clientSecret: setupClientSecret,
             step: startWizard ? "setup" : "deploy"
@@ -254,8 +251,7 @@ export function ConnectorsSection() {
             console.log("[MagicDeploy:FE] Step 1: calling /step1...");
             setDeployStatus("Abilitazione API e avvio build... (1/4)");
             const res1 = await apiRequest("POST", "/api/deploy/private-cloud/step1", {
-                projectId: setupProjectId,
-                geminiApiKey: setupGeminiKey
+                projectId: setupProjectId
             });
             console.log("[MagicDeploy:FE] Step 1 response status:", res1.status);
             if (!res1.ok) {
@@ -302,7 +298,6 @@ export function ConnectorsSection() {
             setDeployStatus("Deploy su Cloud Run in corso... (3/4)");
             const res3 = await apiRequest("POST", "/api/deploy/private-cloud/step2", {
                 projectId: setupProjectId,
-                geminiApiKey: setupGeminiKey,
                 googleClientId: setupClientId,
                 googleClientSecret: setupClientSecret
             });
@@ -1001,19 +996,7 @@ export function ConnectorsSection() {
                                     <strong>Magical Setup:</strong> Useremo un'architettura "serverless" (Cloud Run). Nessun costo fisso, paghi solo quando usi Gromit.
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-semibold">1. Gemini API Key (da AI Studio)</Label>
-                                    <Input
-                                        type="password"
-                                        placeholder="Incolla la tua API Key..."
-                                        value={setupGeminiKey}
-                                        onChange={(e) => setSetupGeminiKey(e.target.value)}
-                                    />
-                                    <p className="text-[10px] text-muted-foreground">
-                                        Ottienila in 3 secondi su <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline font-bold">Google AI Studio</a>.
-                                    </p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold">2. ID Progetto Google Cloud</Label>
+                                    <Label className="text-xs font-semibold">1. ID Progetto Google Cloud</Label>
                                     <Input
                                         placeholder="es. gen-lang-client-..."
                                         value={setupProjectId}
@@ -1092,7 +1075,7 @@ export function ConnectorsSection() {
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                     <p><span className="text-slate-500">Project:</span> {setupProjectId || 'Auto'}</p>
                                     <p><span className="text-slate-500">Storage:</span> Local (Ephemeral)</p>
-                                    <p><span className="text-slate-500">AI Engine:</span> Gemini API (Studio)</p>
+                                    <p><span className="text-slate-500">AI Engine:</span> Vertex AI (via GCP)</p>
                                     <p><span className="text-slate-500">Integrations:</span> {setupClientId ? 'Attive' : 'Disabilitate'}</p>
                                 </div>
                                 {isDeploying && (
@@ -1127,10 +1110,10 @@ export function ConnectorsSection() {
                                 <Button
                                     className="bg-slate-900 text-white"
                                     onClick={() => {
-                                        if (!setupProjectId || !setupGeminiKey) {
+                                        if (!setupProjectId) {
                                             toast({
                                                 title: "Dati mancanti",
-                                                description: "Project ID e Gemini API Key sono richiesti per il Setup Magico.",
+                                                description: "L'ID Progetto Google Cloud è richiesto per il Setup Magico.",
                                                 variant: "destructive"
                                             });
                                             return;
