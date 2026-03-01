@@ -132,25 +132,28 @@ function createApp() {
     }
   }));
 
-  // PRIVATE_CLOUD MODE: Skip authentication for all requests
-  // In private cloud mode, the backend is the user's own server.
-  // Auth happens on the main backend — this server just processes requests.
+  // PRIVATE_CLOUD MODE: Conditionally skip authentication
+  // - If OAuth credentials are configured → keep full auth (user wants integrations)
+  // - If no OAuth credentials → skip auth, simulate authenticated owner
   if (process.env.PRIVATE_CLOUD === 'true') {
-    console.log('[PRIVATE_CLOUD] Running in private cloud mode — auth bypass enabled');
-    app.use((req: Request, _res: Response, next: NextFunction) => {
-      // Simulate an authenticated user so all existing auth checks pass
-      if (!req.user) {
-        (req as any).user = {
-          id: 'private-cloud-owner',
-          email: process.env.PRIVATE_CLOUD_OWNER || 'owner@private-cloud',
-          displayName: 'Private Cloud Owner',
-          plan: 'pro'
-        };
-        // Make req.isAuthenticated() return true
-        (req as any).isAuthenticated = () => true;
-      }
-      next();
-    });
+    const hasAuthConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+    if (hasAuthConfigured) {
+      console.log('[PRIVATE_CLOUD] OAuth credentials detected — full authentication enabled');
+    } else {
+      console.log('[PRIVATE_CLOUD] No OAuth credentials — auth bypass enabled (processing-only mode)');
+      app.use((req: Request, _res: Response, next: NextFunction) => {
+        if (!req.user) {
+          (req as any).user = {
+            id: 'private-cloud-owner',
+            email: process.env.PRIVATE_CLOUD_OWNER || 'owner@private-cloud',
+            displayName: 'Private Cloud Owner',
+            plan: 'pro'
+          };
+          (req as any).isAuthenticated = () => true;
+        }
+        next();
+      });
+    }
   }
 
   // Body parsing middleware
