@@ -883,7 +883,7 @@ export function ConnectorsSection() {
                     </div>
                 </div>
 
-                {/* Prossimamente Category */}
+                {/* Prossimamente Category 
                 <div className="space-y-4">
                     <h2 className="text-sm font-semibold text-blue-600 uppercase tracking-wider">Prossimamente</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
@@ -914,6 +914,7 @@ export function ConnectorsSection() {
                         </Card>
                     </div>
                 </div>
+                */}
             </div>
 
             <Dialog open={isOllamaModalOpen} onOpenChange={setIsOllamaModalOpen}>
