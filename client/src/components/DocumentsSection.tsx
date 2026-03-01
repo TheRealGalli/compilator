@@ -32,7 +32,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LoginOverlay } from "./LoginOverlay";
 import { AVAILABLE_MODELS } from "@/lib/ollama";
 import { isBridgeAvailable, pingGromitOCR } from "@/lib/local-extractor";
-import { getCustomBackendUrl, getSavedPrivateCloudUrl, setCustomBackendUrl } from "@/lib/api-config";
+import { getCustomBackendUrl, getSavedPrivateCloudUrl, switchBackend } from "@/lib/api-config";
 
 
 export function DocumentsSection() {
@@ -669,7 +669,7 @@ export function DocumentsSection() {
                   variant={getCustomBackendUrl() ? "ghost" : "secondary"}
                   size="sm"
                   className={`h-7 px-3 text-xs font-semibold ${!getCustomBackendUrl() ? 'bg-white shadow-sm text-blue-600' : 'text-muted-foreground hover:text-foreground'}`}
-                  onClick={() => setCustomBackendUrl(null)}
+                  onClick={() => switchBackend(false)}
                 >
                   Cloud
                 </Button>
@@ -677,7 +677,7 @@ export function DocumentsSection() {
                   variant={getCustomBackendUrl() ? "secondary" : "ghost"}
                   size="sm"
                   className={`h-7 px-3 text-xs font-semibold ${getCustomBackendUrl() ? 'bg-green-50 shadow-sm text-green-700 border border-green-200/50' : 'text-muted-foreground hover:text-foreground'}`}
-                  onClick={() => setCustomBackendUrl(getSavedPrivateCloudUrl())}
+                  onClick={() => switchBackend(true)}
                 >
                   Self-Hosted
                 </Button>

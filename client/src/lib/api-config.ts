@@ -87,6 +87,21 @@ export const getCustomBackendUrl = () => {
   return localStorage.getItem('gromit_custom_backend_url');
 };
 
+/**
+ * Toggle between Cloud and Self-Hosted routing WITHOUT disconnecting.
+ * Only sets/clears the active routing URL. Does NOT touch the saved URL or DB.
+ * Use setCustomBackendUrl(null) for full disconnect (clears saved URL + DB).
+ */
+export const switchBackend = (useSelfHosted: boolean) => {
+  const savedUrl = localStorage.getItem('gromit_private_cloud_url');
+  if (useSelfHosted && savedUrl) {
+    localStorage.setItem('gromit_custom_backend_url', savedUrl);
+  } else {
+    localStorage.removeItem('gromit_custom_backend_url');
+  }
+  window.location.reload();
+};
+
 export const getSavedPrivateCloudUrl = () => {
   return localStorage.getItem('gromit_private_cloud_url');
 };
