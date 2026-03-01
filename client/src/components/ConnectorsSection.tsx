@@ -367,13 +367,14 @@ export function ConnectorsSection() {
                 if (healthOk) {
                     setDeployProgress(100);
                     setDeployStatus("✅ Backend privato pronto!");
-                    // Save URL for later use but DON'T auto-switch
-                    // The user will need to re-authenticate on the new backend
-                    localStorage.setItem('gromit_private_cloud_url', serviceUrl);
                     toast({
                         title: "Deploy Completato! 🚀",
-                        description: "Il tuo backend privato è attivo e verificato. Usa il toggle Cloud/Self-Hosted nella sezione Documenti per connetterti.",
+                        description: "Connessione al backend privato in corso...",
                     });
+                    // Auto-connect: save and reload (setCustomBackendUrl persists to DB + reloads)
+                    setTimeout(() => {
+                        setCustomBackendUrl(serviceUrl);
+                    }, 1500);
                 } else {
                     setDeployProgress(100);
                     setDeployStatus("⚠️ Deploy completato — il backend si sta avviando");

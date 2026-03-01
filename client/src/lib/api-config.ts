@@ -69,6 +69,7 @@ export const setCustomBackendUrl = (url: string | null) => {
     localStorage.setItem('gromit_private_cloud_url', url);
   } else {
     localStorage.removeItem('gromit_custom_backend_url');
+    localStorage.removeItem('gromit_private_cloud_url');
   }
   // Persist to user profile on the backend (fire-and-forget)
   const mainBackend = getMainBackendUrl();
