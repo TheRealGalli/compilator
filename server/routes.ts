@@ -767,7 +767,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     ));
 
-    app.get('/api/auth/google', passport.authenticate('google', { scope: LOGIN_SCOPES }));
+    app.get('/api/auth/google', passport.authenticate('google', {
+      scope: LOGIN_SCOPES,
+      accessType: 'offline',
+      prompt: 'consent'
+    }));
 
     // NEW: Specific route for deployment that forces account selection
     app.get('/api/auth/google/deploy', passport.authenticate('google', {
@@ -898,10 +902,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/logout', (req, res, next) => {
     // Clear integration tokens
     (req.session as any).tokens = null;
-    // Clear Passport session
+    // Clear Passport session and destroy the entire session
     req.logout((err) => {
       if (err) return next(err);
-      res.json({ success: true });
+      req.session.destroy((destroyErr) => {
+        if (destroyErr) console.error('[Auth] Session destroy error:', destroyErr);
+        res.clearCookie('connect.sid');
+        res.json({ success: true });
+      });
     });
   });
 
