@@ -110,10 +110,9 @@ export function ConnectorsSection() {
     const currentBackendUrl = getCustomBackendUrl();
 
     // Wizard State
-    const [wizardStep, setWizardStep] = useState<"setup" | "keys" | "deploy">("setup");
+    const [wizardStep, setWizardStep] = useState<"setup" | "deploy">("setup");
     const [setupProjectId, setSetupProjectId] = useState("");
-    const [setupClientId, setSetupClientId] = useState("");
-    const [setupClientSecret, setSetupClientSecret] = useState("");
+
     const [isDeploying, setIsDeploying] = useState(false);
     const [deployStatus, setDeployStatus] = useState("");
     const [deployProgress, setDeployProgress] = useState(0);
@@ -151,9 +150,7 @@ export function ConnectorsSection() {
             try {
                 const state = JSON.parse(savedWizard);
                 setSetupProjectId(state.projectId || "");
-                setSetupClientId(state.clientId || "");
-                setSetupClientSecret(state.clientSecret || "");
-                setWizardStep(state.step || "setup");
+
                 setIsPrivateBackendModalOpen(true); // Riapri il wizard
                 localStorage.removeItem("gromit_wizard_state");
             } catch (e) {
@@ -168,8 +165,6 @@ export function ConnectorsSection() {
         // Salva lo stato attuale per ripristinarlo dopo il redirect
         localStorage.setItem("gromit_wizard_state", JSON.stringify({
             projectId: setupProjectId,
-            clientId: setupClientId,
-            clientSecret: setupClientSecret,
             step: startWizard ? "setup" : "deploy"
         }));
 
@@ -297,9 +292,7 @@ export function ConnectorsSection() {
             console.log("[MagicDeploy:FE] Step 3: calling /step2 (Cloud Run deploy)...");
             setDeployStatus("Deploy su Cloud Run in corso... (3/4)");
             const res3 = await apiRequest("POST", "/api/deploy/private-cloud/step2", {
-                projectId: setupProjectId,
-                googleClientId: setupClientId,
-                googleClientSecret: setupClientSecret
+                projectId: setupProjectId
             });
             console.log("[MagicDeploy:FE] Step 3 response status:", res3.status);
 
@@ -846,7 +839,7 @@ export function ConnectorsSection() {
                                     {currentBackendUrl ? (
                                         <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100 flex gap-1">
                                             <ShieldCheck className="w-3 h-3" />
-                                            Self Hosted
+                                            Hosted
                                         </Badge>
                                     ) : (
                                         <Badge variant="outline">Default Cloud</Badge>
@@ -983,9 +976,8 @@ export function ConnectorsSection() {
                             Backend Privato: Setup Magico
                         </DialogTitle>
                         <DialogDescription className="text-[11px]">
-                            {wizardStep === "setup" ? "Passo 1/3: Identità e Motore AI (Setup Magico)" :
-                                wizardStep === "keys" ? "Passo 2/3: Integrazioni Google (Opzionale)" :
-                                    "Passo 3/3: Riepilogo e Lancio"}
+                            {wizardStep === "setup" ? "Passo 1/2: Progetto Google Cloud" :
+                                "Passo 2/2: Riepilogo e Lancio"}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -1020,34 +1012,7 @@ export function ConnectorsSection() {
                         </div>
                     )}
 
-                    {wizardStep === "keys" && (
-                        <div className="py-4 space-y-6">
-                            <div className="space-y-4">
-                                <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-amber-700 text-[10px]">
-                                    <strong>Attenzione:</strong> Gmail e Drive richiedono la creazione di un Client OAuth 2.0. Questo va fatto **obbligatoriamente** nella <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="underline font-bold">Console Google Cloud</a> (non su AI Studio).
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-semibold">OAuth Client ID</Label>
-                                        <Input
-                                            placeholder="Client ID..."
-                                            value={setupClientId}
-                                            onChange={(e) => setSetupClientId(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-semibold">OAuth Client Secret</Label>
-                                        <Input
-                                            type="password"
-                                            placeholder="Client Secret..."
-                                            value={setupClientSecret}
-                                            onChange={(e) => setSetupClientSecret(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+
 
                     {wizardStep === "deploy" && (
                         <div className="py-4 space-y-6">
@@ -1076,7 +1041,7 @@ export function ConnectorsSection() {
                                     <p><span className="text-slate-500">Project:</span> {setupProjectId || 'Auto'}</p>
                                     <p><span className="text-slate-500">Storage:</span> Local (Ephemeral)</p>
                                     <p><span className="text-slate-500">AI Engine:</span> Vertex AI (via GCP)</p>
-                                    <p><span className="text-slate-500">Integrations:</span> {setupClientId ? 'Attive' : 'Disabilitate'}</p>
+
                                 </div>
                                 {isDeploying && (
                                     <div className="pt-3 border-t border-slate-800 space-y-2">
@@ -1118,7 +1083,7 @@ export function ConnectorsSection() {
                                             });
                                             return;
                                         }
-                                        setWizardStep("keys");
+                                        setWizardStep("deploy");
                                     }}
                                 >
                                     Continua
@@ -1127,42 +1092,29 @@ export function ConnectorsSection() {
                         ) : (
                             <>
                                 <Button variant="ghost" className="text-slate-500" onClick={() => {
-                                    if (wizardStep === "keys") setWizardStep("setup");
-                                    if (wizardStep === "deploy") setWizardStep("keys");
+                                    if (wizardStep === "deploy") setWizardStep("setup");
                                 }}>
                                     Indietro
                                 </Button>
                                 <div className="flex-1" />
-                                {wizardStep !== "deploy" ? (
-                                    <Button
-                                        className="bg-slate-900 text-white"
-                                        onClick={() => {
-                                            if (wizardStep === "keys") {
-                                                setWizardStep("deploy");
-                                            }
-                                        }}
-                                    >
-                                        Continua
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        className={`${authStatus.hasCloudToken ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'} text-white shadow-lg px-6`}
-                                        disabled={!authStatus.hasCloudToken || isDeploying}
-                                        onClick={handleDeployToCloud}
-                                    >
-                                        {isDeploying ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                                DEPLOYYING...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Rocket className="w-4 h-4 mr-2" />
-                                                LANCIA DEPLOY
-                                            </>
-                                        )}
-                                    </Button>
-                                )}
+
+                                <Button
+                                    className={`${authStatus.hasCloudToken ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'} text-white shadow-lg px-6`}
+                                    disabled={!authStatus.hasCloudToken || isDeploying}
+                                    onClick={handleDeployToCloud}
+                                >
+                                    {isDeploying ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                            DEPLOYYING...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Rocket className="w-4 h-4 mr-2" />
+                                            LANCIA DEPLOY
+                                        </>
+                                    )}
+                                </Button>
                             </>
                         )}
                     </DialogFooter>
