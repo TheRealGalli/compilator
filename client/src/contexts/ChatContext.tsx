@@ -32,7 +32,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isGreetingLoading, setIsGreetingLoading] = useState(false);
     const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
-    const { selectedSources } = useSources();
+    const { sources, selectedSources } = useSources();
 
     const refreshGreeting = useCallback(async () => {
         // Se abbiamo già dei messaggi, non rifacciamo il saluto a meno che non sia esplicito
@@ -41,8 +41,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         setIsGreetingLoading(true);
         try {
             const url = new URL(getApiUrl('/api/greeting'), window.location.origin);
-            if (selectedSources && selectedSources.length > 0) {
-                url.searchParams.append('sources', JSON.stringify(selectedSources.map(s => ({
+            const allSourcesToSend = [...selectedSources, ...sources.filter(s => s.isMemory)];
+            if (allSourcesToSend.length > 0) {
+                url.searchParams.append('sources', JSON.stringify(allSourcesToSend.map(s => ({
                     id: s.id,
                     name: s.name,
                     type: s.type,

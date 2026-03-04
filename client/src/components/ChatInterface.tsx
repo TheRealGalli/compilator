@@ -44,7 +44,7 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
   const [isDriveMode, setIsDriveMode] = useState(false);
   const [toolMode, setToolMode] = useState<'allegati' | 'run'>('allegati');
   const { toast } = useToast();
-  const { selectedSources, masterSource } = useSources();
+  const { sources, selectedSources, masterSource } = useSources();
 
   // Mention State
   const [mentions, setMentions] = useState<Mention[]>([]);
@@ -380,10 +380,11 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         throw new Error("Il totale dei documenti selezionati è troppo grande (max 30MB). Deseleziona alcuni file.");
       }
 
+      const sourcesWithMemory = [...selectedSources, ...sources.filter(s => s.isMemory)];
       const response = await apiRequest('POST', '/api/chat', {
         messages: apiMessages,
         modelProvider: 'gemini',
-        sources: selectedSources,
+        sources: sourcesWithMemory,
         temperature: 0.7,
         webResearch: webResearch,
         driveMode: isDriveMode,
