@@ -236,15 +236,22 @@ export function GoogleDriveProvider({ children }: { children: React.ReactNode })
         };
     }, []);
 
-    // Check memory file on load/connection
+    // Check memory file on load/connection (only if authenticated)
     const hasCheckedMemory = React.useRef(false);
 
     React.useEffect(() => {
         const tokens = sessionStorage.getItem('gmail_tokens');
-        if (tokens && !hasCheckedMemory.current) {
-            hasCheckedMemory.current = true;
-            checkMemoryFile();
-        }
+        if (!tokens || hasCheckedMemory.current) return;
+
+        // Verify actual server-side authentication before loading memory
+        apiRequest('GET', '/api/user')
+            .then(res => {
+                if (res.ok && !hasCheckedMemory.current) {
+                    hasCheckedMemory.current = true;
+                    checkMemoryFile();
+                }
+            })
+            .catch(() => { /* not authenticated, skip memory */ });
     }, [checkMemoryFile]);
 
     const navigateToFolder = useCallback((folderId: string, folderName: string) => {
