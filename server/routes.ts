@@ -2932,6 +2932,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
 `;
 
         const hasMemory = sources?.some((s: any) => s.isMemory);
+        console.log(`[DEBUG Chat Memory] hasMemory: ${hasMemory}, memoryContext length: ${memoryContext.length}, sources with isMemory: ${sources?.filter((s: any) => s.isMemory).map((s: any) => s.name).join(', ') || 'NONE'}`);
         if (hasMemory) {
           systemInstruction += `
 **GESTIONE MEMORIA (CONTESTO SILENTE):**

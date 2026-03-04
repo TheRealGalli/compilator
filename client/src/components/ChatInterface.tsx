@@ -380,7 +380,9 @@ export function ChatInterface({ modelProvider = 'gemini' }: ChatInterfaceProps) 
         throw new Error("Il totale dei documenti selezionati è troppo grande (max 30MB). Deseleziona alcuni file.");
       }
 
-      const sourcesWithMemory = [...selectedSources, ...sources.filter(s => s.isMemory)];
+      const memorySources = sources.filter(s => s.isMemory);
+      const sourcesWithMemory = [...selectedSources, ...memorySources];
+      console.log(`[DEBUG Chat] Sending ${sourcesWithMemory.length} sources (${memorySources.length} memory, ${selectedSources.length} selected). Memory names: ${memorySources.map(s => s.name).join(', ') || 'NONE'}. Memory has base64: ${memorySources.map(s => !!s.base64).join(', ') || 'N/A'}`);
       const response = await apiRequest('POST', '/api/chat', {
         messages: apiMessages,
         modelProvider: 'gemini',
