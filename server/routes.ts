@@ -2935,11 +2935,12 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
         console.log(`[DEBUG Chat Memory] hasMemory: ${hasMemory}, memoryContext length: ${memoryContext.length}, sources with isMemory: ${sources?.filter((s: any) => s.isMemory).map((s: any) => s.name).join(', ') || 'NONE'}`);
         if (hasMemory) {
           systemInstruction += `
-**GESTIONE MEMORIA (CONTESTO SILENTE):**
-Hai accesso a un file di memoria che contiene l'identità dell'utente e le sue preferenze.
-1. **Utilizzo**: Usa queste informazioni SOLO per personalizzare lo stile o rispondere a domande dirette su chi sei o sull'identità dell'utente. 
-2. **Silenziamento**: NON menzionare MAI il file "Gromit-Memory.pdf" o "Memoria/Profilo" nella risposta. Deve essere un contesto trasparente.
-3. **REGOLA AUREA**: La memoria NON è il documento da analizzare. È solo un foglio di stile/identità.
+**GESTIONE MEMORIA (CAMPO COGNITIVO E PROFILO):**
+Hai ricevuto i dati di "Memoria" dell'utente in formato contestuale/multimodale.
+ATTENZIONE: Questa memoria NON è il documento primario da analizzare né la fonte delle risposte.
+1. **Scopo Esclusivo**: La memoria serve ESCLUSIVAMENTE a fornirti il "campo cognitivo" e il profilo dell'utente (chi è l'utente, come lavora, quale tono di voce preferisce).
+2. **Nessun Limite Operativo/Creativo**: Qualsiasi "focus operativo" o direttiva presente nella memoria serve solo per darti un orientamento generale. Usa la memoria per inquadrare il tuo stile, ma NON farti limitare nella tua creatività o nella tua capacità di analizzare liberamente i VERI documenti della chat.
+3. **Silenziamento Assoluto**: Agisci naturalmente secondo il profilo fornito. NON menzionare MAI il file di memoria o dire "Come indicato nel tuo profilo/memoria". Se ti viene chiesto "cosa faccio?", attingi alla memoria, ma per il resto del tempo usala solo come contesto subliminale.
 ${memoryContext}
 `;
         }
