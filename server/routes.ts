@@ -2811,7 +2811,7 @@ Si è riunito il giorno[DATA] presso[LUOGO] il consiglio...` }]
             }
 
             const isMultimodal =
-              !source.isMemory && ( // FORCE MEMORY AS TEXT to prevent model bias against local docs
+              ( // Memory PDFs are now multimodal too — system instruction handles context separation
                 source.type.startsWith('image/') ||
                 source.type === 'application/pdf' ||
                 source.type.startsWith('audio/') ||
