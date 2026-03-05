@@ -433,15 +433,36 @@ export function RefineChat({
                 onPreview(contentToShow, data.newContent);
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Refine error:", error);
-            const errorMsg: ChatMessage = {
-                id: (Date.now() + 1).toString(),
-                role: 'ai',
-                text: "Errore durante la modifica. Riprova.",
-                timestamp: new Date()
-            };
-            setMessages(prev => [...prev, errorMsg]);
+
+            const errorMessage = error?.message || "";
+            const isVertexRateLimit = errorMessage.includes("VertexAI") && (errorMessage.includes("429") || errorMessage.includes("Resource exhausted") || errorMessage.includes("Too Many Requests"));
+
+            if (isVertexRateLimit) {
+                toast({
+                    title: "Limite Richieste Raggiunto",
+                    description: "Hai inviato troppe richieste in poco tempo. Per favore, attendi un minuto e ricarica la pagina.",
+                    variant: "destructive",
+                    duration: 10000,
+                });
+
+                const errorMsg: ChatMessage = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'ai',
+                    text: "⚠️ **Limite richieste Vertex AI raggiunto.** Stai generando contenuti troppo velocemente per la quota attuale.\n\nPer favore, **attendi un minuto e ricarica la pagina** prima di riprovare.",
+                    timestamp: new Date()
+                };
+                setMessages(prev => [...prev, errorMsg]);
+            } else {
+                const errorMsg: ChatMessage = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'ai',
+                    text: "Errore durante la modifica. Riprova.",
+                    timestamp: new Date()
+                };
+                setMessages(prev => [...prev, errorMsg]);
+            }
         } finally {
             setIsLoading(false);
         }
